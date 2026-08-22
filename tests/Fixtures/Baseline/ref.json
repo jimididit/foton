@@ -1,0 +1,31 @@
+{
+  "Header": {
+    "BaselineSchemaVersion": "1.0.0",
+    "ToolVersion": "1.3.0",
+    "Hostname": "PC1",
+    "CapturedUtc": "2026-01-01 00:00:00",
+    "Elevated": true,
+    "PayloadSha256": "00",
+    "Note": "fixture"
+  },
+  "Providers": [
+    { "RecordType": "Service", "IdentityFields": ["Name"], "ComparedFields": ["DisplayName", "StartMode", "StartName", "PathName"] },
+    { "RecordType": "LocalGroupMember", "IdentityFields": ["Group", "SID"], "ComparedFields": ["Member"] },
+    { "RecordType": "HardeningRegistry", "IdentityFields": ["Setting"], "ComparedFields": ["Value"] },
+    { "RecordType": "InstalledSoftware", "IdentityFields": ["DisplayName", "Publisher"], "ComparedFields": ["DisplayVersion", "InstallLocation"] }
+  ],
+  "Records": {
+    "Service": [
+      { "Name": "Spooler", "DisplayName": "Print Spooler", "StartMode": "Auto", "StartName": "LocalSystem", "PathName": "C:\\Windows\\System32\\spoolsv.exe" }
+    ],
+    "LocalGroupMember": [
+      { "Group": "Administrators", "SID": "S-1-5-21-1-2-3-500", "Member": "PC1\\Administrator" }
+    ],
+    "HardeningRegistry": [
+      { "Setting": "UseLogonCredential", "Key": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest", "Value": "0" }
+    ],
+    "InstalledSoftware": [
+      { "DisplayName": "Foton Lab App", "Publisher": "JDI", "DisplayVersion": "1.0", "InstallLocation": "C:\\Program Files\\FotonLab" }
+    ]
+  }
+}

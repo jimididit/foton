@@ -48,7 +48,7 @@ Revert the snapshot after noisy collect runs, or keep a second snapshot “dirty
 On the **host**, open this repo in Cursor and tell the agent:
 
 - Read `AGENTS.md` and `docs/MIGRATION.md`.
-- Next engineering step is **step 6** (Baseline first, then IOC, then one parser with fixture, then carve proposal). Flatten exists: `.\build\Build-Standalone.ps1` → `dist/Foton-Collect.ps1`. Confirm that file on the VM against a v1 `WinFoton.ps1` package (task names / finding titles).
+- Next: extend baseline providers, more parsers (LNK first), IOC feeds. Carve is a **proposal only** (`docs/CARVE.md`) — do not implement NTFS unallocated parsing in PowerShell. Flatten: `.\build\Build-Standalone.ps1` → `dist/Foton-Collect.ps1` (rebuild after Core/Collect changes). VM collect is proven for admin and standard user.
 - Live collect is still `WinFoton.ps1`. Do not rename internals in that file.
 - Product name is **Foton**. Lab policy is this file.
 

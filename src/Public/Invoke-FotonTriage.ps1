@@ -41,7 +41,7 @@ function Invoke-FotonTriage {
         -IncludeFileTimeline:$IncludeFileTimeline
 
     if (-not $script:FotonSession.Version) {
-        $script:FotonSession.Version = '1.2.0'
+        $script:FotonSession.Version = '1.3.0'
     }
     $script:FotonSession.StartTimeUtc = (Get-Date).ToUniversalTime()
     $script:FotonSession.IsElevated = Test-FotonElevated

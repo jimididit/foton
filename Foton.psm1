@@ -17,17 +17,27 @@ $ErrorActionPreference = 'Continue'
 $script:FotonModuleRoot = $PSScriptRoot
 $script:FotonSrcRoot    = Join-Path $PSScriptRoot 'src'
 $script:FotonSession    = $null
+$script:FotonEmbeddedPatterns = $null
+$script:FotonBaselineProviders = New-Object System.Collections.ArrayList
 
-foreach ($dirName in @('Private', 'Public')) {
-    $directory = Join-Path $script:FotonSrcRoot $dirName
-    if (-not (Test-Path -LiteralPath $directory)) {
-        continue
-    }
+# Load Private/Core first (helpers). Then remaining Private (providers register at
+# load). Then Public. Sorted within each group for deterministic order.
+
+$loaded = New-Object 'System.Collections.Generic.HashSet[string]'
+$groups = @(
+    (Join-Path $script:FotonSrcRoot 'Private\Core'),
+    (Join-Path $script:FotonSrcRoot 'Private'),
+    (Join-Path $script:FotonSrcRoot 'Public')
+)
+foreach ($directory in $groups) {
+    if (-not (Test-Path -LiteralPath $directory)) { continue }
     $files = @(
         Get-ChildItem -LiteralPath $directory -Filter '*.ps1' -File -Recurse -ErrorAction SilentlyContinue |
             Sort-Object FullName
     )
     foreach ($file in $files) {
+        if ($loaded.Contains($file.FullName)) { continue }
+        $null = $loaded.Add($file.FullName)
         . $file.FullName
     }
 }

@@ -1,16 +1,15 @@
 # Public/Baseline
 
-Normalized snapshots of **stable** configuration (services, tasks, autoruns, accounts,
-drivers, software, firewall, shares, listeners, hardening values, certs, key binary hashes).
+Normalized snapshots of **stable** configuration. First providers:
 
-Exclude volatile state (PIDs, live connections, uptime, sessions) or diffs become noise.
+| RecordType | Identity | Compared | False-positive notes |
+|------------|----------|----------|----------------------|
+| Service | `Name` | PathName, StartMode, StartName, DisplayName | Patch replaces binaries |
+| LocalAccount | `SID` | Name, Enabled, PasswordRequired, PasswordExpires | Edition differences |
+| LocalGroupMember | `Group` + `SID` | Member | Domain join, LAPS |
+| HardeningRegistry | `Setting` | Value | GPO / edition |
+| InstalledSoftware | `DisplayName` + `Publisher` | DisplayVersion, InstallLocation | Patch Tuesday |
 
-**Provider model:** one file per surface declaring record type, identity key, collect
-scriptblock, compared vs ignored fields. Adding a surface = one new provider file, not a
-edit to a giant function.
+Volatile fields (PID, State, connections) are not captured.
 
-`New-FotonBaseline` captures. `Compare-FotonBaseline` diffs field-by-field and feeds
-findings. Always state snapshot times and that a diff proves **change between observations**,
-not when or who.
-
-Capture may run on a live host. Diff must run fully offline on two package/baseline files.
+`New-FotonBaseline` captures on a live host. `Compare-FotonBaseline` is offline and **refuses** a schema mismatch. Diffs are Tier 1 change facts; High attention for service PathName, WDigest/UAC/AlwaysInstallElevated, and new Administrators members — still not a conclusion.

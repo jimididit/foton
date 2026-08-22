@@ -12,7 +12,7 @@
 #
 @{
     RootModule        = 'Foton.psm1'
-    ModuleVersion     = '1.2.0'
+    ModuleVersion     = '1.3.0'
     GUID              = 'b7e4c1a2-8d3f-4a91-9c6e-2f0d5a8b1e73'
     Author            = 'JDI Consulting'
     CompanyName       = 'JDI Consulting'
@@ -37,6 +37,12 @@ may require PowerShell 7; if they do, it will be stated on those commands.
         'Invoke-FotonAnalysis'
         'New-FotonReport'
         'Invoke-FotonTriage'
+        'New-FotonBaseline'
+        'Compare-FotonBaseline'
+        'Invoke-FotonIocMatch'
+        'ConvertFrom-FotonPrefetch'
+        'Invoke-FotonParse'
+        'Invoke-FotonCarve'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
@@ -46,7 +52,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = 'Step 5: Invoke-FotonTriage and build/Build-Standalone.ps1 emit dist/Foton-Collect.ps1. WinFoton.ps1 remains the frozen v1 reference.'
+            ReleaseNotes = 'Step 6: Baseline capture/diff, IOC match, Prefetch parser, carve proposal. Collect flatten unchanged (rebuild if Core changed).'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.

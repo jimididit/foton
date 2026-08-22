@@ -52,7 +52,18 @@ Invoke-FotonAnalysis
 New-FotonReport
 ```
 
-Open `Foton_Report.html` from inside that folder. Does not rewrite `hashes.csv`. Live collection remains `.\WinFoton.ps1`.
+Open `Foton_Report.html` from inside that folder. Does not rewrite `hashes.csv`. Live collection: `.\WinFoton.ps1` or `.\dist\Foton-Collect.ps1`.
+
+### Baseline and parse (workstation)
+
+```powershell
+New-FotonBaseline -Path D:\Baselines\host-day0.json
+Compare-FotonBaseline -ReferencePath D:\Baselines\host-day0.json -DifferencePath D:\Baselines\host-day30.json
+ConvertFrom-FotonPrefetch -Path D:\lab\prefetch-scca-v23.bin
+```
+
+Carve is not implemented in PowerShell; see `docs/CARVE.md`.
+
 
 ## Requirements
 
@@ -112,7 +123,7 @@ See `00_Collection/collection_manifest.csv` for the full artifact list. `WinFoto
 
 Do not add detections by editing `WinFoton.ps1` going forward. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): new collectors, baseline providers, parsers, and rules are new files under `src/`.
 
-Until flatten (step 5), v1 still analyzes in-process inside `WinFoton.ps1`. The module path is `Get-FotonPackage` → `Invoke-FotonAnalysis` → `New-FotonReport`.
+Until flatten (step 5), v1 still analyzes in-process inside `WinFoton.ps1`. The module path is `Get-FotonPackage` → `Invoke-FotonAnalysis` → `New-FotonReport`. Baseline, IOC, and Prefetch parse are module commands (not in the endpoint flatten).
 
 ## Docs
 
@@ -122,5 +133,6 @@ Until flatten (step 5), v1 still analyzes in-process inside `WinFoton.ps1`. The 
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to add a module/feature |
 | [docs/MIGRATION.md](docs/MIGRATION.md) | Extract plan from the frozen v1 script |
 | [docs/LAB.md](docs/LAB.md) | Host Cursor vs VMware guest (Defender, collect) |
+| [docs/CARVE.md](docs/CARVE.md) | Why NTFS carving is not in PowerShell |
 | [docs/TODO.md](docs/TODO.md) | Later features (in-report artifact viewer, …) |
 | [AGENTS.md](AGENTS.md) | Invariants for human and AI contributors |

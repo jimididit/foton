@@ -16,7 +16,19 @@ InModuleScope Foton {
         }
         It 'does not export Collect commands on the public module surface yet' {
             Get-Command -Module Foton | Select-Object -ExpandProperty Name | Sort-Object |
-                Should -Be @('Get-FotonPackage', 'Get-FotonVersion', 'Invoke-FotonAnalysis', 'Invoke-FotonTriage', 'New-FotonReport')
+                Should -Be @(
+                    'Compare-FotonBaseline'
+                    'ConvertFrom-FotonPrefetch'
+                    'Get-FotonPackage'
+                    'Get-FotonVersion'
+                    'Invoke-FotonAnalysis'
+                    'Invoke-FotonCarve'
+                    'Invoke-FotonIocMatch'
+                    'Invoke-FotonParse'
+                    'Invoke-FotonTriage'
+                    'New-FotonBaseline'
+                    'New-FotonReport'
+                )
         }
     }
 }

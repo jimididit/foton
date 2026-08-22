@@ -2,8 +2,8 @@
 
 Recover structured records from blobs or images the analyst supplies.
 
-Signature-based carving of known formats in PowerShell is in scope. Full NTFS
-unallocated-space parsing is not — propose C# `Add-Type` or consuming another tool's
-output before writing a filesystem parser.
+See **[docs/CARVE.md](../../../docs/CARVE.md)**. `Invoke-FotonCarve` throws until a
+non-PowerShell NTFS engine exists. Do not invent unallocated timestamps in this repo.
+
 
 Carved data is **Tier 3** until corroborated: no reliable path or timestamp.

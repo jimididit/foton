@@ -13,8 +13,8 @@ Approved sequence. **Do not start a later step until the previous one is reviewa
 | 2 | Split nine collection sections into `Public/Collect/*` | **Done** (extract). Live endpoint runs still use `WinFoton.ps1`. Collect functions are not exported; `Invoke-FotonTriage` is step 4/5. |
 | 3 | Patterns + remaining hardening tables as data files | **Done** (module). `WinFoton.ps1` still has inline copies until flatten. |
 | 4 | Findings engine → `Public/Analyze`; HTML → `Public/Report`; **load `$script:FotonSession.Data` from package files** so re-report works offline | **Done** (module). `Get-FotonPackage` / `Invoke-FotonAnalysis` / `New-FotonReport`. Live collect still `WinFoton.ps1`. |
-| 5 | `Build-Standalone.ps1` writes `dist/Foton-Collect.ps1`; VM run | **Build done.** VM run is the operator check (see `docs/LAB.md`). |
-| 6 | New capabilities: Baseline first, then IOC, then one parser with fixture, then carve **proposal** | Not started |
+| 5 | `Build-Standalone.ps1` writes `dist/Foton-Collect.ps1`; VM run | **Done** (build + admin and standard-user VM runs) |
+| 6 | New capabilities: Baseline first, then IOC, then one parser with fixture, then carve **proposal** | **Done** (this tree) |
 
 ## Equivalence (step 1–5)
 
