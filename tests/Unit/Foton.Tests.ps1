@@ -18,15 +18,15 @@ Describe 'Foton module scaffold' {
         Import-Module $moduleManifest -Force
         $v = Get-FotonVersion
         $v.ProductName | Should -Be 'Foton'
-        $v.ModuleVersion | Should -Be '1.1.0'
+        $v.ModuleVersion | Should -Be '1.2.0'
         $v.CollectSchemaVersion | Should -Be '1.0.0'
         $v.BaselineSchemaVersion | Should -Be '1.0.0'
         $v.FindingsSchemaVersion | Should -Be '1.0.0'
     }
 
-    It 'does not export unimplemented layer commands yet' {
+    It 'exports package, analysis, and report commands (Collect stays unexported)' {
         Import-Module $moduleManifest -Force
-        Get-Command -Module Foton | Select-Object -ExpandProperty Name |
-            Should -Be @('Get-FotonVersion')
+        Get-Command -Module Foton | Select-Object -ExpandProperty Name | Sort-Object |
+            Should -Be @('Get-FotonPackage', 'Get-FotonVersion', 'Invoke-FotonAnalysis', 'Invoke-FotonTriage', 'New-FotonReport')
     }
 }

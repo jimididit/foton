@@ -1,0 +1,3 @@
+Setting,Key,Value,RecommendedValue,Meaning,MatchesRecommended
+UseLogonCredential,HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest,1,0,1 stores cleartext credentials in memory,False
+EnableLUA,HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System,1,1,UAC enabled,True

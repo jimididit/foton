@@ -44,6 +44,10 @@ Tasks that cannot succeed without admin are **skipped** (`SkippedNotElevated` in
 
 Baseline capture of machine-wide services/drivers will be similarly privilege-aware when implemented: record what could not be read rather than inventing empty state.
 
+## Later: in-report artifact viewer
+
+See [docs/TODO.md](TODO.md). Findings-first HTML is the v1 report; a navigable CSV/JSON viewer inside the same package is a planned extension, not part of the Collect extract.
+
 ## Command prefix
 
 Public cmdlets: `Verb-FotonNoun` (e.g. `New-FotonBaseline`). Private helpers: `Verb-FotonNoun` as well so the flattened collector has unique names.

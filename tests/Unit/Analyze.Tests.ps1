@@ -1,0 +1,74 @@
+$moduleManifest = Join-Path $PSScriptRoot '..\..\Foton.psd1'
+$fixture = Join-Path $PSScriptRoot '..\Fixtures\WinFoton_FIXTURE_20260115-120000Z'
+Import-Module $moduleManifest -Force
+
+Describe 'Get-FotonPackage and offline analysis' {
+    It 'loads v1-style folder artifacts and does not treat hashes as collect data' {
+        $pkg = Get-FotonPackage -Path $fixture
+        $pkg.Kind | Should -Be 'Folder'
+        InModuleScope Foton {
+            $script:FotonSession.Data.ContainsKey('os_info') | Should -Be $true
+            $script:FotonSession.Data['os_info'].Hostname | Should -Be 'FIXTURE-PC'
+            $script:FotonSession.Data.ContainsKey('hashes') | Should -Be $false
+            $script:FotonSession.Data.ContainsKey('security_process_creation') | Should -Be $false
+            $script:FotonSession.Data['running_processes'][1].UserWritablePath | Should -Be $true
+        }
+    }
+
+    It 'fires WDigest and RTP heuristics and not for a benign hardening value' {
+        Get-FotonPackage -Path $fixture | Out-Null
+        Invoke-FotonAnalysis
+        InModuleScope Foton {
+            $titles = @($script:FotonSession.Findings | ForEach-Object { $_.Title })
+            $titles | Should -Contain 'WDigest cleartext credential storage is enabled'
+            $titles | Should -Contain 'Defender real-time protection is disabled'
+            $titles | Should -Contain 'Unsigned processes running from user-writable paths'
+            $titles | Should -Contain 'Host and collection baseline'
+            $titles | Should -Contain 'Collection ran without Administrator rights'
+        }
+        $analysisCsv = Join-Path $fixture 'analysis\findings.csv'
+        Test-Path -LiteralPath $analysisCsv | Should -Be $true
+    }
+
+    It 'does not fire WDigest when UseLogonCredential is 0' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['hardening_registry_settings'] = @(
+                [PSCustomObject]@{ Setting = 'UseLogonCredential'; Value = '0' }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @(
+                [PSCustomObject]@{ EventId = 4688 }
+            )
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'WDigest cleartext credential storage is enabled' }) |
+                Should -HaveCount 0
+        }
+    }
+
+    It 'writes HTML using package hostname not the analyst workstation' {
+        Get-FotonPackage -Path $fixture | Out-Null
+        Invoke-FotonAnalysis
+        $htmlPath = Join-Path $env:TEMP ('foton-report-' + [guid]::NewGuid().ToString('N') + '.html')
+        try {
+            New-FotonReport -Path $htmlPath
+            $html = Get-Content -LiteralPath $htmlPath -Raw
+            $html | Should -Match 'FIXTURE-PC'
+            $html | Should -Not -Match '<script src="https://'
+            $html | Should -Match 'What was observed'
+        }
+        finally {
+            Remove-Item -LiteralPath $htmlPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    AfterAll {
+        $analysisDir = Join-Path $fixture 'analysis'
+        if (Test-Path -LiteralPath $analysisDir) {
+            Remove-Item -LiteralPath $analysisDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        $rpt = Join-Path $fixture 'Foton_Report.html'
+        if (Test-Path -LiteralPath $rpt) {
+            Remove-Item -LiteralPath $rpt -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

@@ -12,7 +12,7 @@
 #
 @{
     RootModule        = 'Foton.psm1'
-    ModuleVersion     = '1.1.0'
+    ModuleVersion     = '1.2.0'
     GUID              = 'b7e4c1a2-8d3f-4a91-9c6e-2f0d5a8b1e73'
     Author            = 'JDI Consulting'
     CompanyName       = 'JDI Consulting'
@@ -33,6 +33,10 @@ may require PowerShell 7; if they do, it will be stated on those commands.
     # file; do not use '*' — contributors should see the command surface in one place.
     FunctionsToExport = @(
         'Get-FotonVersion'
+        'Get-FotonPackage'
+        'Invoke-FotonAnalysis'
+        'New-FotonReport'
+        'Invoke-FotonTriage'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
@@ -42,7 +46,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = 'Step 1: Core helpers extracted into src/Private/Core. Live triage still runs from WinFoton.ps1.'
+            ReleaseNotes = 'Step 5: Invoke-FotonTriage and build/Build-Standalone.ps1 emit dist/Foton-Collect.ps1. WinFoton.ps1 remains the frozen v1 reference.'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.

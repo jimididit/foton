@@ -4,7 +4,7 @@ Windows DFIR, baseline comparison, and security-audit toolkit.
 
 Foton captures host state into a hashed case **package**, then lets you compare baselines over time, run heuristics, and (later) parse artifacts — without turning a 3,000-line script into the only extension point.
 
-**v1.0.0 live triage** still runs from the frozen reference script `WinFoton.ps1` (same behavior, historical filename). The **Foton** module (`Foton.psd1`) is the modular product; Collect will ship as `dist/Foton-Collect.ps1` once extracted.
+**v1.0.x live triage** still runs from frozen `WinFoton.ps1`. After `.\build\Build-Standalone.ps1`, the endpoint file is `dist/Foton-Collect.ps1` (same switches; case folders `Foton_*`).
 
 Photons penetrate glass; Foton is meant to make Windows state legible — not to declare compromise.
 
@@ -43,12 +43,16 @@ Fast triage on a slow or low-disk box:
 
 Open `WinFoton_Report.html` **from inside the extracted case folder** so artifact links resolve.
 
-### Module scaffold (no collection yet)
+### Re-analyze a collected package (offline)
 
 ```powershell
 Import-Module .\Foton.psd1 -Force
-Get-FotonVersion
+Get-FotonPackage -Path C:\FotonCases\WinFoton_HOST_20260101-120000Z
+Invoke-FotonAnalysis
+New-FotonReport
 ```
+
+Open `Foton_Report.html` from inside that folder. Does not rewrite `hashes.csv`. Live collection remains `.\WinFoton.ps1`.
 
 ## Requirements
 
@@ -108,7 +112,7 @@ See `00_Collection/collection_manifest.csv` for the full artifact list. `WinFoto
 
 Do not add detections by editing `WinFoton.ps1` going forward. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): new collectors, baseline providers, parsers, and rules are new files under `src/`.
 
-Until Analyze is extracted, v1 heuristics still live in `Invoke-FindingsAnalysis` inside `WinFoton.ps1` (`$Script:Data`, `Add-Finding`, pattern arrays at the top of that file).
+Until flatten (step 5), v1 still analyzes in-process inside `WinFoton.ps1`. The module path is `Get-FotonPackage` → `Invoke-FotonAnalysis` → `New-FotonReport`.
 
 ## Docs
 
@@ -118,4 +122,5 @@ Until Analyze is extracted, v1 heuristics still live in `Invoke-FindingsAnalysis
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to add a module/feature |
 | [docs/MIGRATION.md](docs/MIGRATION.md) | Extract plan from the frozen v1 script |
 | [docs/LAB.md](docs/LAB.md) | Host Cursor vs VMware guest (Defender, collect) |
+| [docs/TODO.md](docs/TODO.md) | Later features (in-report artifact viewer, …) |
 | [AGENTS.md](AGENTS.md) | Invariants for human and AI contributors |

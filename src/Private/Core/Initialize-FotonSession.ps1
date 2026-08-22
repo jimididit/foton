@@ -8,7 +8,11 @@
 
 function Initialize-FotonSession {
     param(
-        [switch]$SkipHashing
+        [switch]$SkipHashing,
+        [int]$EventLogDays = 14,
+        [int]$MaxEventsPerLog = 3000,
+        [switch]$SkipEvtxExport,
+        [switch]$IncludeFileTimeline
     )
 
     $keepVersion = $null
@@ -18,16 +22,28 @@ function Initialize-FotonSession {
 
     $writable = @()
     $suspicious = @()
-    $patternDir = Join-Path $script:FotonSrcRoot 'Private\Patterns'
-    $writableFile = Join-Path $patternDir 'UserWritablePatterns.txt'
-    $suspiciousFile = Join-Path $patternDir 'SuspiciousCommandPatterns.txt'
-    if (Test-Path -LiteralPath $writableFile) {
-        $writable = @(Get-Content -LiteralPath $writableFile -ErrorAction SilentlyContinue |
-                Where-Object { $_ -and $_.Trim() -notmatch '^#' })
+    $ratNames = @()
+    $hardening = @()
+    $patternDir = $null
+
+    if ($script:FotonEmbeddedPatterns) {
+        $patternDir = '(embedded)'
+        $writable = @($script:FotonEmbeddedPatterns.UserWritablePatterns)
+        $suspicious = @($script:FotonEmbeddedPatterns.SuspiciousCommandPatterns)
+        $ratNames = @($script:FotonEmbeddedPatterns.RemoteAccessToolNames)
+        if ($script:FotonEmbeddedPatterns.HardeningCsv) {
+            $hardening = @($script:FotonEmbeddedPatterns.HardeningCsv | ConvertFrom-Csv)
+        }
     }
-    if (Test-Path -LiteralPath $suspiciousFile) {
-        $suspicious = @(Get-Content -LiteralPath $suspiciousFile -ErrorAction SilentlyContinue |
-                Where-Object { $_ -and $_.Trim() -notmatch '^#' })
+    elseif ($script:FotonSrcRoot) {
+        $patternDir = Join-Path $script:FotonSrcRoot 'Private\Patterns'
+        $writable = @(Get-FotonPatternLines -Path (Join-Path $patternDir 'UserWritablePatterns.txt'))
+        $suspicious = @(Get-FotonPatternLines -Path (Join-Path $patternDir 'SuspiciousCommandPatterns.txt'))
+        $ratNames = @(Get-FotonPatternLines -Path (Join-Path $patternDir 'RemoteAccessToolNames.txt'))
+        $hardeningFile = Join-Path $patternDir 'HardeningRegistryChecks.csv'
+        if (Test-Path -LiteralPath $hardeningFile) {
+            $hardening = @(Import-Csv -LiteralPath $hardeningFile)
+        }
     }
 
     $script:FotonSession = @{
@@ -44,6 +60,10 @@ function Initialize-FotonSession {
         LoadedHives               = New-Object System.Collections.ArrayList
         IsElevated                = $false
         SkipHashing               = [bool]$SkipHashing
+        EventLogDays              = $EventLogDays
+        MaxEventsPerLog           = $MaxEventsPerLog
+        SkipEvtxExport            = [bool]$SkipEvtxExport
+        IncludeFileTimeline       = [bool]$IncludeFileTimeline
         LoadUserHivesActive       = $false
         HiveMountPrefix           = 'Foton'
         Categories                = [ordered]@{
@@ -60,6 +80,8 @@ function Initialize-FotonSession {
         }
         UserWritablePatterns      = $writable
         SuspiciousCommandPatterns = $suspicious
+        RemoteAccessToolNames     = $ratNames
+        HardeningRegistryChecks   = $hardening
         PatternSource             = $patternDir
     }
 }

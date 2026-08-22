@@ -29,4 +29,6 @@ Name mapping from frozen `WinFoton.ps1`:
 | Dismount-OfflineUserHives | Dismount-FotonOfflineUserHive  |
 | Get-UserHiveRoots         | Get-FotonUserHiveRoot          |
 
+`Get-FotonPatternLines` is module-only (no WinFoton equivalent). Pattern files live in `src/Private/Patterns/`.
+
 Hive mount prefix is `Foton_<SID>` (v1 used `WinFoton_<SID>`). `Get-FotonUserHiveRoot` accepts both.

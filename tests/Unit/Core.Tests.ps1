@@ -125,7 +125,40 @@ InModuleScope Foton {
         }
     }
 
-    Describe 'Test-FotonElevated' {
+    Describe 'Pattern data files' {
+        BeforeEach { Initialize-FotonSession }
+        It 'loads user-writable and suspicious command lists' {
+            $script:FotonSession.UserWritablePatterns.Count | Should -BeGreaterThan 0
+            $script:FotonSession.SuspiciousCommandPatterns | Should -Contain '-encodedcommand'
+        }
+        It 'loads the same hardening check count as WinFoton.ps1' {
+            $script:FotonSession.HardeningRegistryChecks.Count | Should -Be 29
+            $lua = $script:FotonSession.HardeningRegistryChecks | Where-Object { $_.Name -eq 'EnableLUA' } | Select-Object -First 1
+            $lua.Expected | Should -Be '1'
+            $lua.Path | Should -Match 'Policies\\System'
+        }
+        It 'loads remote-access name substrings' {
+            $script:FotonSession.RemoteAccessToolNames | Should -Contain 'teamviewer'
+            $script:FotonSession.RemoteAccessToolNames | Should -Contain 'putty'
+        }
+        It 'Get-FotonPatternLines skips comments and blanks' {
+            $f = Join-Path $env:TEMP ("foton-pat-" + [guid]::NewGuid().ToString('N') + '.txt')
+            @"
+# comment
+teamviewer
+
+putty
+"@ | Out-File -FilePath $f -Encoding ascii
+            try {
+                $lines = Get-FotonPatternLines -Path $f
+                $lines.Count | Should -Be 2
+                $lines[0] | Should -Be 'teamviewer'
+            }
+            finally {
+                Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
         It 'returns a boolean' {
             $r = Test-FotonElevated
             ($r -eq $true -or $r -eq $false) | Should -Be $true

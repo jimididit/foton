@@ -32,8 +32,14 @@ Set-Location C:\src\foton
 Set-ExecutionPolicy -Scope Process Bypass -Force
 Import-Module .\Foton.psd1 -Force
 Get-FotonVersion
-.\WinFoton.ps1 -NoZip -OutputPath C:\FotonCases   # standard user or elevated
+.\WinFoton.ps1 -NoZip -OutputPath C:\FotonCases   # frozen v1
+# After git pull of step 5:
+.\build\Build-Standalone.ps1
+.\dist\Foton-Collect.ps1 -NoZip -OutputPath C:\FotonCases
 ```
+
+Compare **task names, file names, column sets, and finding titles** against a `WinFoton.ps1` package from the same snapshot — not PIDs or connection counts.
+
 
 Revert the snapshot after noisy collect runs, or keep a second snapshot “dirty IR box.”
 
@@ -42,7 +48,7 @@ Revert the snapshot after noisy collect runs, or keep a second snapshot “dirty
 On the **host**, open this repo in Cursor and tell the agent:
 
 - Read `AGENTS.md` and `docs/MIGRATION.md`.
-- Next engineering step is **step 2** (split Collect into `src/Public/Collect`).
+- Next engineering step is **step 6** (Baseline first, then IOC, then one parser with fixture, then carve proposal). Flatten exists: `.\build\Build-Standalone.ps1` → `dist/Foton-Collect.ps1`. Confirm that file on the VM against a v1 `WinFoton.ps1` package (task names / finding titles).
 - Live collect is still `WinFoton.ps1`. Do not rename internals in that file.
 - Product name is **Foton**. Lab policy is this file.
 
