@@ -86,7 +86,8 @@ Develop modular, ship flat. `build/Build-Standalone.ps1` concatenates Private/Co
 ```powershell
 Get-FotonVersion       # module + schema versions (exists now)
 Invoke-FotonTriage     # orchestrator: collect -> analyze -> report -> package (v1 behavior)
-New-FotonBaseline      # capture a normalized state snapshot
+New-FotonBaseline      # capture a normalized state snapshot (JSON or package folder)
+New-FotonBaselineReport # HTML snapshot of one baseline (capped tables)
 Compare-FotonBaseline  # diff two snapshots into field-level change records + findings
 ConvertFrom-FotonPrefetch
 ConvertFrom-FotonLnk
@@ -98,7 +99,7 @@ New-FotonReport        # render HTML from findings + data
 Get-FotonPackage       # open/validate a case package, verify hashes
 ```
 
-Operators who do not want cmdlets: `Foton.cmd` (`docs/USAGE.md`). Collect on an endpoint is still one file: `dist/Foton-Collect.ps1`.
+Operators who do not want cmdlets: `Foton.cmd` (`docs/USAGE.md`). Collect on an endpoint is still one file: `dist/Foton-Collect.ps1`. Baseline capture on an endpoint is `dist/Foton-Baseline.ps1`.
 
 Every command (except Version) works against a **package** (case folder or ZIP) as the unit of I/O so layers compose.
 

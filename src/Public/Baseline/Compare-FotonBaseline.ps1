@@ -28,6 +28,9 @@ function Compare-FotonBaseline {
         [Parameter(Mandatory)][string]$DifferencePath
     )
 
+    $ReferencePath = Get-FotonBaselineJsonPath -Path $ReferencePath
+    $DifferencePath = Get-FotonBaselineJsonPath -Path $DifferencePath
+
     $ref = Get-Content -LiteralPath $ReferencePath -Raw | ConvertFrom-Json
     $dif = Get-Content -LiteralPath $DifferencePath -Raw | ConvertFrom-Json
 

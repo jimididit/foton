@@ -18,6 +18,7 @@ $script:FotonModuleRoot = $PSScriptRoot
 $script:FotonSrcRoot    = Join-Path $PSScriptRoot 'src'
 $script:FotonSession    = $null
 $script:FotonEmbeddedPatterns = $null
+$script:FotonEmbeddedBaselineSchema = $null
 $script:FotonBaselineProviders = New-Object System.Collections.ArrayList
 
 # Load Private/Core first (helpers). Then remaining Private (providers register at

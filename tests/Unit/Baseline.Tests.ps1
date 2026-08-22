@@ -65,3 +65,33 @@ Describe 'Baseline providers and diff' {
         }
     }
 }
+
+Describe 'New-FotonBaselineReport' {
+    It 'renders a fixture snapshot without network script tags' {
+        $htmlPath = Join-Path $env:TEMP ('foton-base-html-' + [guid]::NewGuid().ToString('N') + '.html')
+        try {
+            $out = New-FotonBaselineReport -Path $script:Ref -OutputPath $htmlPath
+            $out | Should -Be $htmlPath
+            $html = Get-Content -LiteralPath $htmlPath -Raw
+            $html | Should -Match 'PC1'
+            $html | Should -Match 'Spooler'
+            $html | Should -Match 'Baseline snapshot'
+            $html | Should -Not -Match '<script src="https://'
+        }
+        finally {
+            Remove-Item -LiteralPath $htmlPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'opens baseline.json inside a package folder' {
+        $dir = Join-Path $env:TEMP ('foton-base-pkg-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path $dir -ItemType Directory | Out-Null
+        Copy-Item -LiteralPath $script:Ref -Destination (Join-Path $dir 'baseline.json')
+        try {
+            Compare-FotonBaseline -ReferencePath $dir -DifferencePath $script:Dif | Out-Null
+        }
+        finally {
+            Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

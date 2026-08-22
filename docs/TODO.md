@@ -35,6 +35,7 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 
 - [x] One-file collect: `dist/Foton-Collect.ps1` after `Build-Standalone.ps1`
 - [x] Workstation wrapper: `Foton.cmd` / `docs/USAGE.md` (`analyze`, `baseline`, `compare`, `parse`, `ioc`, `carve`)
+- [x] One-file baseline: `dist/Foton-Baseline.ps1` → hashed folder/ZIP + HTML snapshot (see “Flattened baseline package”)
 - [ ] Signed `Foton-Collect.ps1` or documented Authenticode story (ExecutionPolicy)
 - [ ] Installer or zip that does not require cloning the repo to analyze a case
 - [ ] Double-click collect that picks an output folder without `-OutputPath` (prompt or Desktop default that is obvious)
@@ -62,4 +63,60 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 - Shares / binary hashes as baseline providers
 - EVTX / jumplist / Amcache parsers
 - Real NTFS carve engine (see `docs/CARVE.md`)
+
+---
+
+## Flattened baseline package (same shipping idea as Collect)
+
+**Status:** Snapshot HTML + flatten exist (`New-FotonBaselineReport`, `build/Build-BaselineStandalone.ps1`). Compare-HTML is still later.
+
+**User story:** Someone on a host (or a golden VM) copies **one file**, runs it, and gets a folder they can zip/hash/email to an analyst - without cloning the repo or reading JSON. Optional HTML so *they* can see “what was captured,” not so the tool declares the host clean.
+
+**Ship format**
+
+1. `build/Build-BaselineStandalone.ps1` emits `dist/Foton-Baseline.ps1`.
+2. Default output is a **package folder**, not a naked JSON on the Desktop:
+   `FotonBaseline_<HOST>_<UTCSTAMP>Z/`
+   - `baseline.json` (schema-stamped; compared payload still hashed in the header)
+   - `hashes.csv` / `*_PACKAGE_HASH.txt` after optional ZIP (same custody loop as Collect)
+   - `coverage.json`: what providers failed / not elevated
+   - `Foton_Baseline.html` - **snapshot of this observation**, not a findings dump
+3. Operator copies the ZIP + hash file off-host. Analyst runs `Compare-FotonBaseline` (or later `Foton.cmd compare`) on two packages / two JSON paths. Compare stays **offline**.
+
+**HTML snapshot - not too much if it stays dumb**
+
+Worth doing. JSON is the source of truth; HTML is a capped, escaped table per `RecordType` (identity + compared fields), header block (hostname, schema, payload SHA-256, elevated, captured UTC), and the provenance caveat: *picture of this moment, not when or who*. Cap rows per table. No “secure / infected” language. No charts that imply health score.
+
+**HTML compare report - the visual that actually matters**
+
+A second page (or a mode of the same renderer) for **Added / Removed / Modified** rows after `Compare-FotonBaseline`. That is what an analyst wants in a browser. Do snapshot first, compare-HTML second. Do not generate a compare report on the endpoint (no second JSON there).
+
+**Not in this flatten**
+
+- Live Analyze heuristics (LOLBin lists, etc.)
+- Re-using `Foton_Report.html` triage cards as if a baseline were a collect
+- Writing the baseline into an existing Collect case folder (different schema, different hash set)
+
+**Public-release bar:** one-file baseline is implemented; still exercise on a VM (admin + standard user) before calling it public-ready.
+
+---
+
+## Visualization: GUI executable and/or TUI (consideration)
+
+**Status:** Not started. Capture only - do not build until Collect + Baseline flatten + HTML snapshot exist and the public-release bar is mostly green. A GUI will not fix missing providers or a JSON-only day0.
+
+**Why consider it:** `Foton.cmd` still assumes a repo checkout. End users who will never `Import-Module` still hit walls (ExecutionPolicy, “which file do I run,” opening HTML via `file://`). A single Windows binary or a keyboard TUI could be *one* entry: Collect / Baseline / open last package / compare two baselines.
+
+**Constraints (non-negotiable if we build this)**
+
+- **Offline.** No phone-home, no CDN, no “check for updates” that hits the network from Analyze/Parse/Carve.
+- **Does not replace the one-file Collect/Baseline scripts** for RMM/USB. Those stay the IR drop. A GUI is the *workstation* (and maybe a lab golden-image) experience.
+- **Findings stay observations.** UI chrome must not grow a “risk score” or red “compromised” banner.
+- **PS 5.1 Collect/Baseline** remain the acquisition engines. A WinForms/WPF/WinUI shell that shells out to `Foton-Collect.ps1` / `Foton-Baseline.ps1` is more honest than rewriting acquisition in C#.
+- **TUI** (e.g. Spectre.Console, or a PS-only menu) is cheaper than a signed `.exe` and still helps operators who live in a terminal. Prefer a TUI prototype before an installer.
+- Signing, SmartScreen, and “is this malware” on a DFIR tool that contains LOLBin strings is a product problem - same as the Authenticode bar above.
+
+**Suggested order if picked up:** (1) TUI menu wrapping existing commands, (2) HTML snapshot/compare, (3) only then a packaged exe that launches those scripts + opens the HTML. Propose stack (WinForms vs WPF vs Avalonia vs “just mshta/WebView on the report”) before writing it.
+
+**Relate to in-report browser:** a GUI that is only a nicer `Foton_Report.html` host (local HTTP to dodge `file://` CORS) may be enough visualization without a full app.
 

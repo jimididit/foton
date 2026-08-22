@@ -14,13 +14,22 @@ You do **not** install a module. You do **not** run `Import-Module`.
 
 Optional: `-NoZip`, `-RequireAdministrator`, same switches as `WinFoton.ps1`.
 
+## 1b. Baseline on an endpoint (not Collect)
+
+1. `.\build\Build-BaselineStandalone.ps1`
+2. Copy **only** `dist\Foton-Baseline.ps1` to the target.
+3. `powershell -ExecutionPolicy Bypass -File .\Foton-Baseline.ps1`
+4. Open **`Foton_Baseline.html`** inside `FotonBaseline_<HOST>_...Z`. Send the ZIP and `_PACKAGE_HASH.txt` like a collect package.
+
+`Foton.cmd baseline D:\Baselines` writes a package. `Foton.cmd baseline D:\x.json` still writes a bare JSON. Compare accepts a folder that contains `baseline.json`.
+
 ## 2. The PC you analyze on (workstation, this repo)
 
 Double-click **`Foton.cmd`** or:
 
 ```
 Foton.cmd analyze   D:\Cases\Foton_HOSTNAME_...Z
-Foton.cmd baseline  D:\Baselines\this-pc.json
+Foton.cmd baseline  D:\Baselines
 Foton.cmd compare   D:\Baselines\day0.json D:\Baselines\day1.json
 Foton.cmd parse     D:\file.lnk
 Foton.cmd ioc       D:\Cases\Foton_...Z D:\intel\iocs.txt

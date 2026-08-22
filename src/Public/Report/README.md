@@ -1,12 +1,13 @@
 # Public/Report
 
-Render HTML from a loaded package + findings (`New-FotonReport`).
+Render HTML from a loaded package + findings (`New-FotonReport`), or a baseline
+snapshot (`New-FotonBaselineReport`).
 
 All untrusted strings through `ConvertTo-FotonSafeHtml`. CSS/JS in single-quoted
 here-strings; closing `'@` at column 0.
 
-The report must remain openable from **inside the extracted case folder** so relative
-artifact links resolve. Default path is `Foton_Report.html` at the case root (does not
-overwrite `WinFoton_Report.html`). Re-reporting must not rewrite `00_Collection/hashes.csv`.
+The triage report must remain openable from **inside the extracted case folder**.
+Default path is `Foton_Report.html` at the case root. Baseline packages use
+`Foton_Baseline.html` beside `baseline.json`. Re-reporting must not rewrite collect `hashes.csv`.
 
 In-report CSV browser: see `docs/TODO.md`.

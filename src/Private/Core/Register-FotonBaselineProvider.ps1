@@ -32,7 +32,13 @@ function Get-FotonBaselineIdentity {
 }
 
 function Get-FotonBaselineSchemaVersion {
+    if ($script:FotonEmbeddedBaselineSchema) {
+        return [string]$script:FotonEmbeddedBaselineSchema
+    }
     $psd1 = Join-Path $script:FotonModuleRoot 'Foton.psd1'
-    $man = Import-PowerShellDataFile -LiteralPath $psd1
-    return [string]$man.PrivateData.Foton.BaselineSchemaVersion
+    if ($script:FotonModuleRoot -and (Test-Path -LiteralPath $psd1)) {
+        $man = Import-PowerShellDataFile -LiteralPath $psd1
+        return [string]$man.PrivateData.Foton.BaselineSchemaVersion
+    }
+    return '1.1.0'
 }

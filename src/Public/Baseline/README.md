@@ -18,4 +18,4 @@ Normalized snapshots of **stable** configuration. Schema **1.1.0** (recapture da
 
 Volatile fields (PID, service State, connection tuples beyond the listen tuple) are not captured.
 
-`New-FotonBaseline` captures on a live host. `Compare-FotonBaseline` is offline and **refuses** a schema mismatch. Diffs are Tier 1 change facts; High attention for service/driver PathName, autorun Command, task Actions, WDigest/UAC/AlwaysInstallElevated, new Administrators members, and new LocalMachine Root certificates - still not a conclusion.
+`New-FotonBaseline` captures on a live host (`-Path` JSON, or `-OutputPath` package folder with HTML/hashes/ZIP). Flattened endpoint script: `dist/Foton-Baseline.ps1`. `Compare-FotonBaseline` is offline (JSON or package folder) and **refuses** a schema mismatch. Diffs are Tier 1 change facts; High attention for service/driver PathName, autorun Command, task Actions, WDigest/UAC/AlwaysInstallElevated, new Administrators members, and new LocalMachine Root certificates - still not a conclusion.

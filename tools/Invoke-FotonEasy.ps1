@@ -23,8 +23,14 @@ function Show-FotonEasyHelp {
     Write-Host '    2. Copy dist\Foton-Collect.ps1 to the target'
     Write-Host '    3. Double-click it or:  powershell -File Foton-Collect.ps1'
     Write-Host ''
+    Write-Host '  Baseline (known-state snapshot, different file):'
+    Write-Host '    .\build\Build-BaselineStandalone.ps1'
+    Write-Host '    Copy dist\Foton-Baseline.ps1 to the target, then run it.'
+    Write-Host '    Open Foton_Baseline.html inside FotonBaseline_HOST_...Z'
+    Write-Host ''
     Write-Host '  On this repo (workstation):'
     Write-Host '    Foton.cmd analyze  C:\FotonCases\Foton_HOST_...Z'
+    Write-Host '    Foton.cmd baseline C:\Baselines'
     Write-Host '    Foton.cmd baseline C:\Baselines\this-pc.json'
     Write-Host '    Foton.cmd compare  C:\Baselines\day0.json C:\Baselines\day1.json'
     Write-Host '    Foton.cmd parse    C:\path\file.lnk'
@@ -70,8 +76,13 @@ switch ($cmd) {
         Write-Host "  Report: $(Join-Path $Target 'Foton_Report.html')" -ForegroundColor Green
     }
     'baseline' {
-        if (-not $Target) { throw 'Usage: Foton.cmd baseline <output.json>' }
-        New-FotonBaseline -Path $Target
+        if (-not $Target) { throw 'Usage: Foton.cmd baseline <output-folder-or.json>' }
+        if ($Target -like '*.json') {
+            New-FotonBaseline -Path $Target
+        }
+        else {
+            New-FotonBaseline -OutputPath $Target
+        }
     }
     'compare' {
         $b = $Rest | Select-Object -First 1
