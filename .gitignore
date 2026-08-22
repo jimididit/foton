@@ -10,7 +10,10 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# LLM files
-AGENTS.md
+# Generated / local
+dist/Foton-Collect.ps1
+*.zip
+
+# LLM files (AGENTS.md is tracked — shared invariants)
 CLAUDE.md
 RULES.md

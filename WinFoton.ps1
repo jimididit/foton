@@ -48,6 +48,11 @@
 .PARAMETER NoZip
     Leave the case folder uncompressed.
 
+.PARAMETER RequireAdministrator
+    Exit immediately if the process is not elevated. Use on IR engagements that must
+    have Security-log and other-user coverage. The default is to collect whatever the
+    current token can read (standard-user / work-laptop mode).
+
 .EXAMPLE
     .\WinFoton.ps1
     Default triage collection to the Desktop.
@@ -57,8 +62,8 @@
 
 .NOTES
     Name       : WinFoton
-    Version    : 1.0.0
-    Requires   : Windows PowerShell 5.1+ (or PowerShell 7 on Windows), Administrator
+    Version    : 1.0.1
+    Requires   : Windows PowerShell 5.1+ (or PowerShell 7 on Windows). Administrator recommended; standard-user coverage is supported.
     Author     : Built for JDI Consulting DFIR workflows
 #>
 
@@ -73,7 +78,8 @@ param(
     [switch]$SkipHashing,
     [switch]$LoadUserHives,
     [switch]$IncludeFileTimeline,
-    [switch]$NoZip
+    [switch]$NoZip,
+    [switch]$RequireAdministrator
 )
 
 $ErrorActionPreference = 'Continue'
@@ -83,7 +89,7 @@ $ProgressPreference = 'SilentlyContinue'
 #  GLOBAL STATE
 # ==============================================================================
 
-$Script:Version      = '1.0.0'
+$Script:Version      = '1.0.1'
 $Script:StartTimeUtc = (Get-Date).ToUniversalTime()
 $Script:Findings     = New-Object System.Collections.ArrayList
 $Script:Manifest     = New-Object System.Collections.ArrayList
@@ -92,6 +98,9 @@ $Script:Dirs         = @{}
 $Script:LogFile      = $null
 $Script:Errors       = New-Object System.Collections.ArrayList
 $Script:LoadedHives  = New-Object System.Collections.ArrayList
+# Token used for this run. StandardUser is a supported coverage profile, not a failed run.
+$Script:IsElevated   = $false
+$Script:LoadUserHivesActive = $false
 
 $Script:Categories = [ordered]@{
     'Collection'  = '00_Collection'
@@ -196,7 +205,8 @@ function Invoke-Collection {
         [Parameter(Mandatory)][scriptblock]$Script,
         [ValidateSet('Json', 'Csv', 'Txt')][string]$Format = 'Json',
         [string]$Description = '',
-        [switch]$NoCache
+        [switch]$NoCache,
+        [switch]$RequiresElevation
     )
 
     $dir = $Script:Dirs[$Category]
@@ -206,6 +216,34 @@ function Invoke-Collection {
     $errMsg = ''
     $data = $null
     $count = 0
+
+    # Tasks that cannot return a useful artifact without an elevated token are skipped
+    # on purpose. A skip is a disclosed visibility gap, not a collection error.
+    if ($RequiresElevation -and -not $Script:IsElevated) {
+        $status = 'SkippedNotElevated'
+        $errMsg = 'Requires an Administrator token; skipped in standard-user coverage.'
+        $skipText = @(
+            "WinFoton: task '$Name' was not run."
+            "Status: SkippedNotElevated"
+            $errMsg
+            'This is a visibility gap. Do not treat a missing or empty artifact as proof the underlying data was absent on the host.'
+        ) -join [Environment]::NewLine
+        try { $skipText | Out-File -FilePath $file -Encoding UTF8 } catch { }
+        $sw.Stop()
+        $null = $Script:Manifest.Add([PSCustomObject]@{
+                Category    = $Category
+                Task        = $Name
+                Description = $Description
+                File        = (Join-Path $Script:Categories[$Category] (Split-Path $file -Leaf))
+                Records     = 0
+                Status      = $status
+                DurationMs  = [int]$sw.ElapsedMilliseconds
+                Error       = $errMsg
+            })
+        if (-not $NoCache) { $Script:Data[$Name] = $null }
+        Write-Status "$Name - skipped (not elevated)" 'Info'
+        return $null
+    }
 
     try {
         $data = & $Script
@@ -505,6 +543,7 @@ function Write-ChainOfCustody {
     $lines += ''
     $lines += "Collection Account   : $env:USERDOMAIN\$env:USERNAME"
     $lines += "Elevated (Admin)     : $elevated"
+    $lines += "Coverage Profile     : $(if ($elevated) { 'Elevated' } else { 'StandardUser' })"
     $lines += "PowerShell Version   : $($PSVersionTable.PSVersion.ToString())"
     $lines += "Script Path          : $($MyInvocation.ScriptName)"
     $lines += ''
@@ -516,6 +555,8 @@ function Write-ChainOfCustody {
     $lines += "  SkipHashing         = $SkipHashing"
     $lines += "  LoadUserHives       = $LoadUserHives"
     $lines += "  IncludeFileTimeline = $IncludeFileTimeline"
+    $lines += "  NoZip               = $NoZip"
+    $lines += "  RequireAdministrator = $RequireAdministrator"
     $lines += ''
     $lines += '----------------------------------------------------------------'
     $lines += ' METHODOLOGY DISCLOSURE'
@@ -529,10 +570,25 @@ function Write-ChainOfCustody {
     $lines += 'were produced. If either is required, capture them before or'
     $lines += 'independently of this collection.'
     $lines += ''
-    if ($LoadUserHives) {
+    if ($LoadUserHives -and $elevated) {
         $lines += 'The -LoadUserHives option was used: NTUSER.DAT hives for users not'
         $lines += 'logged on were mounted read into HKEY_USERS and unloaded at the end'
         $lines += 'of collection. This is a registry write operation on the target.'
+        $lines += ''
+    }
+    elseif ($LoadUserHives -and -not $elevated) {
+        $lines += 'The -LoadUserHives option was requested but ignored: mounting NTUSER.DAT'
+        $lines += 'requires an elevated token. Per-user keys are limited to hives already loaded.'
+        $lines += ''
+    }
+    if (-not $elevated) {
+        $lines += 'Coverage profile STANDARD USER. This process was not elevated. The package'
+        $lines += 'contains what the current token could read (typically the interactive user''s'
+        $lines += 'processes, HKCU persistence, readable HKLM values, network snapshot, and that'
+        $lines += 'user''s profile artifacts). The Security event log, Prefetch, VSS listing,'
+        $lines += 'auditpol, secedit export, and other users'' files were not collected (see'
+        $lines += 'collection_coverage.json and manifest Status=SkippedNotElevated). Absence of'
+        $lines += 'those artifacts is a visibility gap, not evidence they were empty on the host.'
         $lines += ''
     }
     $lines += 'SHA-256 hashes for every collected artifact are recorded in'
@@ -546,6 +602,45 @@ function Write-ChainOfCustody {
 
     $file = Join-Path $Script:Dirs['Collection'] 'chain_of_custody.txt'
     $lines | Out-File -FilePath $file -Encoding UTF8
+}
+
+function Write-CollectionCoverage {
+    <#
+        Records how this run was privileged so an analyst does not read a thin package
+        as a quiet host. Written after collection so skipped-task counts are accurate.
+    #>
+    $skipped = @($Script:Manifest | Where-Object { $_.Status -eq 'SkippedNotElevated' })
+    $profileName = 'Elevated'
+    if (-not $Script:IsElevated) { $profileName = 'StandardUser' }
+    $obj = [PSCustomObject]@{
+        CoverageProfile        = $profileName
+        Elevated               = $Script:IsElevated
+        CollectionAccount      = "$env:USERDOMAIN\$env:USERNAME"
+        RequireAdministrator   = [bool]$RequireAdministrator
+        LoadUserHivesRequested = [bool]$LoadUserHives
+        LoadUserHivesActive    = [bool]$Script:LoadUserHivesActive
+        SkippedTaskCount       = $skipped.Count
+        SkippedTasks           = @($skipped | ForEach-Object { $_.Task })
+        WorthCollectingWithoutAdmin = @(
+            'Current-user processes (image hash/signature only if the file is readable)',
+            'TCP connections and listeners the token can enumerate',
+            'HKCU autoruns, user Startup folder, PSReadLine history for accessible profiles',
+            'Readable HKLM software/uninstall, OS identity, environment, hosts file',
+            'Application / PowerShell / Defender operational logs when ACLs allow',
+            'Browser extensions and executables under the current profile'
+        )
+        NotCollectedWithoutAdmin = @(
+            'Security event log (parsed and EVTX export)',
+            'Prefetch directory listing',
+            'Volume shadow copy listing (vssadmin)',
+            'auditpol / secedit exports',
+            'Offline NTUSER.DAT for other users',
+            'Other users'' AppData, recycle bins, and files the token cannot read'
+        )
+    }
+    $path = Join-Path $Script:Dirs['Collection'] 'collection_coverage.json'
+    $obj | ConvertTo-Json -Depth 5 | Out-File -FilePath $path -Encoding UTF8
+    $Script:Data['collection_coverage'] = $obj
 }
 
 # ==============================================================================
@@ -634,7 +729,7 @@ function Invoke-SystemCollection {
         Get-ChildItem Env: | Select-Object Name, Value
     } | Out-Null
 
-    Invoke-Collection -Category 'System' -Name 'system_restore_and_shadowcopies' -Format 'Txt' -Description 'Volume shadow copies (deletion is a ransomware indicator)' -Script {
+    Invoke-Collection -Category 'System' -Name 'system_restore_and_shadowcopies' -Format 'Txt' -Description 'Volume shadow copies (deletion is a ransomware indicator)' -RequiresElevation -Script {
         $out = @()
         $out += '--- vssadmin list shadows ---'
         $out += (& vssadmin.exe list shadows 2>&1 | Out-String)
@@ -729,7 +824,7 @@ function Invoke-UserCollection {
         & net.exe accounts 2>&1 | Out-String
     } | Out-Null
 
-    Invoke-Collection -Category 'Users' -Name 'user_rights_and_secpol' -Format 'Txt' -Description 'Security policy export (secedit)' -Script {
+    Invoke-Collection -Category 'Users' -Name 'user_rights_and_secpol' -Format 'Txt' -Description 'Security policy export (secedit)' -RequiresElevation -Script {
         $tmp = Join-Path $env:TEMP ("winfoton_secpol_{0}.inf" -f ([guid]::NewGuid().ToString('N')))
         $null = & secedit.exe /export /cfg "$tmp" /quiet 2>&1
         if (Test-Path -LiteralPath $tmp) {
@@ -1568,7 +1663,7 @@ function Invoke-SecurityCollection {
         $rows
     } | Out-Null
 
-    Invoke-Collection -Category 'Security' -Name 'audit_policy' -Format 'Txt' -Description 'Advanced audit policy configuration (log coverage)' -Script {
+    Invoke-Collection -Category 'Security' -Name 'audit_policy' -Format 'Txt' -Description 'Advanced audit policy configuration (log coverage)' -RequiresElevation -Script {
         & auditpol.exe /get /category:* 2>&1 | Out-String
     } | Out-Null
 
@@ -1708,7 +1803,9 @@ function Invoke-EventLogCollection {
     )
 
     foreach ($q in $queries) {
-        Invoke-Collection -Category 'EventLogs' -Name $q.Name -Format 'Csv' -Description $q.Desc -Script {
+        $needAdmin = $false
+        if ($q.Log -eq 'Security') { $needAdmin = $true }
+        Invoke-Collection -Category 'EventLogs' -Name $q.Name -Format 'Csv' -Description $q.Desc -RequiresElevation:$needAdmin -Script {
             $events = Get-EventsSafe -LogName $q.Log -EventIds $q.Ids -StartTime $start -MaxEvents $MaxEventsPerLog
             if (-not $events) { return @() }
             $rows = @()
@@ -1758,6 +1855,10 @@ function Invoke-EventLogCollection {
             'Microsoft-Windows-WMI-Activity/Operational',
             'Microsoft-Windows-Sysmon/Operational')
         foreach ($log in $exportLogs) {
+            if ((-not $Script:IsElevated) -and ($log -eq 'Security')) {
+                Write-Status "EVTX export skipped for Security (not elevated)" 'Info'
+                continue
+            }
             $safeName = ($log -replace '[\\/ ]', '_') + '.evtx'
             $dest = Join-Path $evtxDir $safeName
             try {
@@ -1848,7 +1949,7 @@ function Invoke-FilesystemCollection {
         $rows | Sort-Object ModifiedUtc -Descending
     } | Out-Null
 
-    Invoke-Collection -Category 'Filesystem' -Name 'prefetch_listing' -Format 'Csv' -Description 'Prefetch entries (execution evidence, names and timestamps only)' -Script {
+    Invoke-Collection -Category 'Filesystem' -Name 'prefetch_listing' -Format 'Csv' -Description 'Prefetch entries (execution evidence, names and timestamps only)' -RequiresElevation -Script {
         $pf = "$env:SystemRoot\Prefetch"
         if (-not (Test-Path -LiteralPath $pf)) { return @() }
         Get-ChildItem -LiteralPath $pf -Filter '*.pf' -Force -ErrorAction SilentlyContinue |
@@ -2201,6 +2302,16 @@ function Invoke-FindingsAnalysis {
                 $osInfo.Hostname, $osInfo.Caption, $osInfo.BuildNumber, $osInfo.UptimeDays, $osInfo.TimeZone, $osInfo.UtcOffset) `
             -WhyItMatters 'All timestamps in this package are recorded in UTC. Confirm the host clock was accurate before building any timeline (see time_sync.txt).' `
             -Artifact (Get-ArtifactPath 'System' 'os_info' 'json')
+    }
+
+    $cov = $Script:Data['collection_coverage']
+    if ($cov -and $cov.Elevated -eq $false) {
+        Add-Finding -Severity 'Info' -Category 'Collection' -Tier 1 -Title 'Collection ran without Administrator rights' `
+            -Observation ("Coverage profile {0} as {1}. {2} task(s) were skipped because they require an elevated token (see collection_coverage.json)." -f `
+                $cov.CoverageProfile, $cov.CollectionAccount, $cov.SkippedTaskCount) `
+            -WhyItMatters 'Standard-user collection still captures the current user''s process list, readable network state, HKCU persistence, and profile artifacts. It does not capture the Security log, Prefetch, VSS, audit policy export, or other users'' files. Missing those artifacts is a visibility gap, not evidence they were empty. Re-run elevated when the host owner can grant it.' `
+            -Artifact (Get-ArtifactPath 'Collection' 'collection_coverage' 'json') `
+            -NextStep 'If this is an incident, obtain an elevated collection or a disk/memory image. If this is a self-audit on a locked-down work PC, treat skipped tasks as out of scope and verify remaining artifacts against that user''s activity only.'
     }
 
     # ---------- Defender / AV ----------
@@ -2929,7 +3040,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine("<div><b>Examiner</b>$(ConvertTo-SafeHtml $Examiner)</div>")
     $null = $sb.AppendLine("<div><b>Collected (UTC)</b>$($Script:StartTimeUtc.ToString('yyyy-MM-dd HH:mm:ss')) - $($endUtc.ToString('HH:mm:ss')) ($duration min)</div>")
     $null = $sb.AppendLine("<div><b>Event Window</b>Last $EventLogDays days</div>")
-    $null = $sb.AppendLine("<div><b>Tool</b>WinFoton v$Script:Version</div>")
+    $null = $sb.AppendLine("<div><b>Privilege</b>$(if ($Script:IsElevated) { 'Elevated (Administrator)' } else { 'Standard user — reduced coverage' })</div>")
     $null = $sb.AppendLine('</div>')
     $null = $sb.AppendLine('<div class="notice"><b>Read this first.</b> Every item below is an automated observation produced by pattern matching, not a conclusion. Nothing here establishes that this host is compromised. Each finding cites the artifact file it came from - verify against that artifact, and against the host owner''s expectations, before it goes anywhere near a report or a remediation decision.</div>')
     $null = $sb.AppendLine('</header>')
@@ -3067,6 +3178,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
 <li><b>Heuristics are not detections.</b> The pattern lists used here match on common attacker tradecraft and also match legitimate administrative tooling. Expect false positives, and treat an empty findings list as an absence of matched patterns, not an absence of compromise.</li>
 <li><b>Signature status is not integrity.</b> A valid signature does not mean the binary is benign, and an invalid one does not mean it is malicious. Catalog-signed system files frequently return non-Valid status.</li>
 <li><b>No anti-rootkit capability.</b> All data is gathered through the operating system''s own APIs. Kernel-level tampering could render any of it unreliable.</li>
+<li><b>Standard-user coverage.</b> If this package was collected without Administrator rights, the Security log, Prefetch, VSS, secedit/auditpol, and other users'' artifacts were skipped by design. See 00_Collection/collection_coverage.json. Do not read those gaps as a clean host.</li>
 <li><b>Timestamps.</b> All times are UTC as reported by this host. Verify the host clock against the time source data before building a timeline, and note that file MACB times are trivially modifiable.</li>
 </ul>
 </details>
@@ -3171,24 +3283,39 @@ function Invoke-WinFoton {
     }
 
     $elevated = Test-Elevated
+    $Script:IsElevated = $elevated
+
+    if ($RequireAdministrator -and -not $elevated) {
+        Write-Host '  [x] -RequireAdministrator was set, but this process is not elevated.' -ForegroundColor Red
+        Write-Host '      Re-run from an elevated PowerShell, or omit -RequireAdministrator' -ForegroundColor Red
+        Write-Host '      to collect with standard-user coverage.' -ForegroundColor Red
+        return
+    }
+
     if (-not $elevated) {
-        Write-Host '  [!] Not running as Administrator.' -ForegroundColor Yellow
-        Write-Host '      Collection will proceed, but the Security event log, service' -ForegroundColor Yellow
-        Write-Host '      configuration, other users'' artifacts, and several registry' -ForegroundColor Yellow
-        Write-Host '      hives will be inaccessible. Re-run elevated for full coverage.' -ForegroundColor Yellow
+        Write-Host '  [!] Standard-user coverage (not Administrator).' -ForegroundColor Yellow
+        Write-Host '      Still collected: this user''s processes, readable network state,' -ForegroundColor Yellow
+        Write-Host '      HKCU persistence, profile files, and any logs the token can read.' -ForegroundColor Yellow
+        Write-Host '      Skipped: Security log, Prefetch, VSS, auditpol/secedit, other users.' -ForegroundColor Yellow
+        Write-Host '      Use -RequireAdministrator to refuse to run in this mode.' -ForegroundColor DarkGray
         Write-Host ''
-        Start-Sleep -Seconds 3
     }
 
     $caseRoot = Initialize-Case
     Write-Status "Case folder: $caseRoot" 'Good'
-    Write-Status "Examiner: $Examiner | Case: $(if ($CaseNumber) { $CaseNumber } else { 'not supplied' }) | Elevated: $elevated" 'Info'
+    Write-Status "Examiner: $Examiner | Case: $(if ($CaseNumber) { $CaseNumber } else { 'not supplied' }) | Coverage: $(if ($elevated) { 'Elevated' } else { 'StandardUser' })" 'Info'
     Write-ChainOfCustody
 
     if ($LoadUserHives) {
-        Write-Status 'Mounting offline user registry hives' 'Step'
-        $mounted = Mount-OfflineUserHives
-        Write-Status ("Mounted {0} offline hive(s)" -f @($mounted).Count) 'Info'
+        if (-not $elevated) {
+            Write-Status 'LoadUserHives ignored: mounting NTUSER.DAT requires elevation' 'Warn'
+        }
+        else {
+            Write-Status 'Mounting offline user registry hives' 'Step'
+            $mounted = Mount-OfflineUserHives
+            $Script:LoadUserHivesActive = $true
+            Write-Status ("Mounted {0} offline hive(s)" -f @($mounted).Count) 'Info'
+        }
     }
 
     try {
@@ -3203,10 +3330,11 @@ function Invoke-WinFoton {
         Invoke-EventLogCollection
         Invoke-FilesystemCollection
 
+        Write-CollectionCoverage
         Invoke-FindingsAnalysis
     }
     finally {
-        if ($LoadUserHives) {
+        if ($Script:LoadUserHivesActive) {
             Write-Status 'Unmounting offline user registry hives' 'Step'
             Dismount-OfflineUserHives
         }

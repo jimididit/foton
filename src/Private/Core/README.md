@@ -1,0 +1,32 @@
+# Private/Core
+
+Helpers used by Collect, Baseline capture, Analyze, and Report. One function per file.
+These are **not** exported — tests use `InModuleScope Foton`.
+
+Windows PowerShell 5.1 syntax only. Empty catch blocks on best-effort paths are intentional.
+
+Session state lives in `$script:FotonSession` (see `Initialize-FotonSession.ps1`).
+Call `Initialize-FotonSession` at the start of a collect/baseline run.
+
+Name mapping from frozen `WinFoton.ps1`:
+
+| WinFoton.ps1              | Foton                          |
+|---------------------------|--------------------------------|
+| Write-Status              | Write-FotonStatus              |
+| Add-Finding               | Add-FotonFinding               |
+| Invoke-Collection         | Invoke-FotonCollection         |
+| Get-ArtifactPath          | Get-FotonArtifactPath          |
+| Test-Elevated             | Test-FotonElevated             |
+| Get-SafeHash              | Get-FotonSafeHash              |
+| Get-SignatureInfo         | Get-FotonSignatureInfo         |
+| Test-UserWritablePath     | Test-FotonUserWritablePath     |
+| Test-SuspiciousCommand    | Test-FotonSuspiciousCommand    |
+| Get-RegValueSafe          | Get-FotonRegValue              |
+| Get-RegValueList          | Get-FotonRegValueList          |
+| ConvertTo-SafeHtml        | ConvertTo-FotonSafeHtml        |
+| Get-UserProfileList       | Get-FotonUserProfile           |
+| Mount-OfflineUserHives    | Mount-FotonOfflineUserHive     |
+| Dismount-OfflineUserHives | Dismount-FotonOfflineUserHive  |
+| Get-UserHiveRoots         | Get-FotonUserHiveRoot          |
+
+Hive mount prefix is `Foton_<SID>` (v1 used `WinFoton_<SID>`). `Get-FotonUserHiveRoot` accepts both.
