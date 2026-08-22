@@ -1,7 +1,7 @@
 function Write-FotonStatus {
     <#
         Console + collection-log line. Write-Host is intentional (this is a console tool).
-        Timestamps in the log are UTC. Do not write findings here — status is operational, not evidentiary.
+        Timestamps in the log are UTC. Do not write findings here - status is operational, not evidentiary.
     #>
     param(
         [string]$Message,

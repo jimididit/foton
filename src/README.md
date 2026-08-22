@@ -5,7 +5,7 @@ Foton source. `Foton.psm1` dotsources **Private** then **Public**.
 | Path | What belongs here | Live host? |
 |------|-------------------|------------|
 | `Private/Core` | Shared helpers (status, hash, registry, HTML escape, package I/O) | Only if called from Collect/Baseline |
-| `Private/Patterns` | Data: command/path/RAT lists, hardening checks — not logic | n/a |
+| `Private/Patterns` | Data: command/path/RAT lists, hardening checks - not logic | n/a |
 | `Private/Schema` | Versioned contracts for packages, baselines, findings | n/a |
 | `Public/Collect` | One collection category per file | Yes (endpoint) |
 | `Public/Baseline` | Snapshot + diff + one file per provider | Capture: yes. Diff: anywhere |

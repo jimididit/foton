@@ -2,13 +2,13 @@
 
 Windows DFIR, baseline comparison, and security-audit toolkit.
 
-Foton captures host state into a hashed case **package**, then lets you compare baselines over time, run heuristics, and (later) parse artifacts — without turning a 3,000-line script into the only extension point.
+Foton captures host state into a hashed case **package**, then lets you compare baselines over time, run heuristics, and (later) parse artifacts - without turning a 3,000-line script into the only extension point.
 
 **v1.0.x live triage** still runs from frozen `WinFoton.ps1`. After `.\build\Build-Standalone.ps1`, the endpoint file is `dist/Foton-Collect.ps1` (same switches; case folders `Foton_*`).
 
-Photons penetrate glass; Foton is meant to make Windows state legible — not to declare compromise.
+Photons penetrate glass; Foton is meant to make Windows state legible - not to declare compromise.
 
-**Module 1.4.0** — baseline schema **1.1.0** (recapture day0). Easy workstation path: `Foton.cmd help` ([docs/USAGE.md](docs/USAGE.md)).
+**Module 1.4.0** - baseline schema **1.1.0** (recapture day0). Easy workstation path: `Foton.cmd help` ([docs/USAGE.md](docs/USAGE.md)).
 
 ## Quick start (v1 collector)
 
@@ -25,7 +25,7 @@ Typical **elevated** engagement:
                -OutputPath D:\Cases -EventLogDays 30 -LoadUserHives
 ```
 
-**Work PC / no admin** (default — collects what this user can read):
+**Work PC / no admin** (default - collects what this user can read):
 
 ```powershell
 .\WinFoton.ps1 -CaseNumber "SELF-AUDIT" -OutputPath $env:USERPROFILE\Desktop
@@ -92,7 +92,7 @@ See `docs/CARVE.md` (MZ/PE signature scan; not NTFS). Recapture baselines after 
 | `-SkipEvtxExport`      | off          | Skip raw `.evtx` export (parsed CSVs still collected) |
 | `-SkipHashing`         | off          | Skip SHA-256 of **process/file images** via `Get-SafeHash`. The case folder is still hashed into `00_Collection/hashes.csv` |
 | `-LoadUserHives`       | off          | Mount NTUSER.DAT for users not logged on (registry write, logged) |
-| `-IncludeFileTimeline` | off          | Deeper recurse (depth 6 vs 3) of user-writable executable sweep — not a MACB timeline |
+| `-IncludeFileTimeline` | off          | Deeper recurse (depth 6 vs 3) of user-writable executable sweep - not a MACB timeline |
 | `-NoZip`               | off          | Leave the case folder uncompressed |
 | `-RequireAdministrator`| off          | Exit if not elevated. Default is StandardUser coverage |
 

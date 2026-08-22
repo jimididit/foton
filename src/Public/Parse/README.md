@@ -3,8 +3,8 @@
 Pure functions over bytes or files already in a package. No live system, no network,
 no writes except what the caller asked for.
 
-- `ConvertFrom-FotonPrefetch` — SCCA executable name; MAM is unsupported, not guessed.
-- `ConvertFrom-FotonLnk` — ANSI LocalBasePath from LinkInfo when present.
+- `ConvertFrom-FotonPrefetch` - SCCA executable name; MAM is unsupported, not guessed.
+- `ConvertFrom-FotonLnk` - ANSI LocalBasePath from LinkInfo when present.
 
 Fixtures: `tests/Fixtures/Parse/` (prefetch). LNK tests create a shortcut via COM.
 

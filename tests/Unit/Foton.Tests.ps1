@@ -1,4 +1,4 @@
-# Foton.Tests.ps1 — module import smoke test
+# Foton.Tests.ps1 - module import smoke test
 
 BeforeAll {
     $script:FotonPsd1 = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\Foton.psd1'))

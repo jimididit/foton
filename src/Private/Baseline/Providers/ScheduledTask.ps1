@@ -1,4 +1,4 @@
-# ScheduledTask — identity TaskPath + TaskName. Ignore last-run (volatile).
+# ScheduledTask - identity TaskPath + TaskName. Ignore last-run (volatile).
 Register-FotonBaselineProvider -RecordType 'ScheduledTask' `
     -IdentityFields @('TaskPath', 'TaskName') `
     -ComparedFields @('Actions', 'RunAsUser', 'RunLevel', 'Triggers') `

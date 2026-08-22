@@ -1,4 +1,4 @@
-# Invoke-FotonProcessCollection — volatile process state, modules, PS history.
+# Invoke-FotonProcessCollection - volatile process state, modules, PS history.
 
 function Invoke-FotonProcessCollection {
     Write-FotonStatus 'Collecting running processes, modules, and volatile state' 'Step'

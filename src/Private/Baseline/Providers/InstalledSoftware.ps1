@@ -1,4 +1,4 @@
-# InstalledSoftware — identity DisplayName + Publisher (version is compared, not identity).
+# InstalledSoftware - identity DisplayName + Publisher (version is compared, not identity).
 Register-FotonBaselineProvider -RecordType 'InstalledSoftware' `
     -IdentityFields @('DisplayName', 'Publisher') `
     -ComparedFields @('DisplayVersion', 'InstallLocation') `

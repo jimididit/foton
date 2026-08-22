@@ -1,4 +1,4 @@
-# FirewallRule — identity Name + Direction. Enabled/Action are compared; profiles can churn with GPO.
+# FirewallRule - identity Name + Direction. Enabled/Action are compared; profiles can churn with GPO.
 Register-FotonBaselineProvider -RecordType 'FirewallRule' `
     -IdentityFields @('Name', 'Direction') `
     -ComparedFields @('Action', 'Enabled', 'Profile') `

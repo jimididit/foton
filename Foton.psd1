@@ -2,7 +2,7 @@
 # Foton module manifest
 #
 # This is the workstation import path (Parse / Analyze / Report / Baseline diff).
-# The Collect layer still ships as a single flattened script from build/Build-Standalone.ps1 —
+# The Collect layer still ships as a single flattened script from build/Build-Standalone.ps1 -
 # never deploy this module tree onto a target endpoint.
 #
 # Versioning:
@@ -30,7 +30,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
     PowerShellVersion = '5.1'
     CompatiblePSEditions = @('Desktop', 'Core')
     # FunctionsToExport is an allow-list. Add a name here when you add a Public/*.ps1
-    # file; do not use '*' — contributors should see the command surface in one place.
+    # file; do not use '*' - contributors should see the command surface in one place.
     FunctionsToExport = @(
         'Get-FotonVersion'
         'Get-FotonPackage'
@@ -53,7 +53,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = '1.4.0: more baseline providers (schema 1.1.0 — recapture day0), LNK parser, path/csv/json IOC, MZ/PE signature carve, Foton.cmd wrapper.'
+            ReleaseNotes = '1.4.0: more baseline providers (schema 1.1.0 - recapture day0), LNK parser, path/csv/json IOC, MZ/PE signature carve, Foton.cmd wrapper.'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.

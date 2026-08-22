@@ -1,4 +1,4 @@
-# LocalAccount — identity SID, never username (rename would look like remove+add).
+# LocalAccount - identity SID, never username (rename would look like remove+add).
 Register-FotonBaselineProvider -RecordType 'LocalAccount' `
     -IdentityFields @('SID') `
     -ComparedFields @('Name', 'Enabled', 'PasswordRequired', 'PasswordExpires') `

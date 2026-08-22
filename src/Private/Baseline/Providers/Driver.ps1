@@ -1,4 +1,4 @@
-# Driver — identity Name. Ignore State (started/stopped is volatile).
+# Driver - identity Name. Ignore State (started/stopped is volatile).
 Register-FotonBaselineProvider -RecordType 'Driver' `
     -IdentityFields @('Name') `
     -ComparedFields @('DisplayName', 'StartMode', 'PathName') `

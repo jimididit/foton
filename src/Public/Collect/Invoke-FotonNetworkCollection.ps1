@@ -1,4 +1,4 @@
-# Invoke-FotonNetworkCollection — connections, DNS, firewall, shares, proxy, Wi-Fi.
+# Invoke-FotonNetworkCollection - connections, DNS, firewall, shares, proxy, Wi-Fi.
 
 function Invoke-FotonNetworkCollection {
     Write-FotonStatus 'Collecting network configuration, connections, and DNS state' 'Step'

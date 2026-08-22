@@ -1,4 +1,4 @@
-# Autorun — machine Run/RunOnce only. Per-user keys follow who is logged on (noisy for fleet).
+# Autorun - machine Run/RunOnce only. Per-user keys follow who is logged on (noisy for fleet).
 Register-FotonBaselineProvider -RecordType 'Autorun' `
     -IdentityFields @('Key', 'ValueName') `
     -ComparedFields @('Command') `

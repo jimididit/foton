@@ -14,6 +14,6 @@ Desktop.ini
 dist/Foton-Collect.ps1
 *.zip
 
-# LLM files (AGENTS.md is tracked — shared invariants)
+# LLM files (AGENTS.md is tracked - shared invariants)
 CLAUDE.md
 RULES.md

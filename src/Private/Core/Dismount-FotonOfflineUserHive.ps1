@@ -1,5 +1,5 @@
 function Dismount-FotonOfflineUserHive {
-    <# Unload hives this run mounted. GC collect first so handles are released. Failures are warnings — leftover keys need manual unload. #>
+    <# Unload hives this run mounted. GC collect first so handles are released. Failures are warnings - leftover keys need manual unload. #>
     foreach ($mountName in $script:FotonSession.LoadedHives) {
         try {
             [gc]::Collect()

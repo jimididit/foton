@@ -1,4 +1,4 @@
-# Invoke-FotonUserCollection — accounts, groups, sessions, RDP, credentials.
+# Invoke-FotonUserCollection - accounts, groups, sessions, RDP, credentials.
 
 function Invoke-FotonUserCollection {
     Write-FotonStatus 'Collecting accounts, groups, sessions, and access configuration' 'Step'

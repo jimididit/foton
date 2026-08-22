@@ -18,8 +18,8 @@ v1 (`WinFoton.ps1`) still analyzes in the same process as collection using an in
 
 See `src/README.md` for folder mapping. Rule of thumb:
 
-- **Collect / Baseline capture** — may use WMI, registry, files on a live OS. PowerShell 5.1. Ships flat.
-- **Parse / Carve / Analyze / Report / Baseline diff** — bytes and JSON/CSV already in the package. Deterministic. No network.
+- **Collect / Baseline capture** - may use WMI, registry, files on a live OS. PowerShell 5.1. Ships flat.
+- **Parse / Carve / Analyze / Report / Baseline diff** - bytes and JSON/CSV already in the package. Deterministic. No network.
 
 ## Findings
 

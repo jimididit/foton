@@ -2,7 +2,7 @@ function Get-FotonSafeHash {
     <#
         SHA-256 of a file, or a sentinel string when hashing is skipped, the path is missing,
         the file is over 200MB, or the read failed. Sentinels are facts about the attempt,
-        not hashes — do not treat them as IOC values.
+        not hashes - do not treat them as IOC values.
     #>
     param([string]$Path)
     if ($script:FotonSession.SkipHashing) { return 'NotHashed' }

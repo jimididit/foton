@@ -8,7 +8,7 @@ Walks a file you already copied (max 8 MiB by default). Records **MZ** at any of
 
 ## Why not NTFS in PowerShell
 
-- NTFS `FILE` records, fixups, attribute lists, and slack need careful little-endian parsing at volume scale. A half-correct parser invents timestamps and parent paths — in DFIR that is worse than “not parsed.”
+- NTFS `FILE` records, fixups, attribute lists, and slack need careful little-endian parsing at volume scale. A half-correct parser invents timestamps and parent paths - in DFIR that is worse than “not parsed.”
 - Live images are tens to hundreds of GB. PS 5.1 arrays do not stream well.
 
 ## Later (not this release)

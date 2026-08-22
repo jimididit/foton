@@ -1,4 +1,4 @@
-# Listener — identity Protocol + LocalAddress + LocalPort. No PID (volatile). Added/removed only.
+# Listener - identity Protocol + LocalAddress + LocalPort. No PID (volatile). Added/removed only.
 Register-FotonBaselineProvider -RecordType 'Listener' `
     -IdentityFields @('Protocol', 'LocalAddress', 'LocalPort') `
     -ComparedFields @() `

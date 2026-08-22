@@ -14,8 +14,8 @@ Normalized snapshots of **stable** configuration. Schema **1.1.0** (recapture da
 | Driver | `Name` | PathName, StartMode, DisplayName | Driver updates; State is not compared |
 | FirewallRule | `Name` + `Direction` | Action, Enabled, Profile | GPO/MDM; duplicate display names |
 | Certificate | `Store` + `Thumbprint` | Subject, Issuer, NotAfter | Enterprise PKI, Windows Update roots |
-| Listener | `Protocol` + `LocalAddress` + `LocalPort` | *(none — Added/Removed only)* | Services bind ports; PID is not stored |
+| Listener | `Protocol` + `LocalAddress` + `LocalPort` | *(none - Added/Removed only)* | Services bind ports; PID is not stored |
 
 Volatile fields (PID, service State, connection tuples beyond the listen tuple) are not captured.
 
-`New-FotonBaseline` captures on a live host. `Compare-FotonBaseline` is offline and **refuses** a schema mismatch. Diffs are Tier 1 change facts; High attention for service/driver PathName, autorun Command, task Actions, WDigest/UAC/AlwaysInstallElevated, new Administrators members, and new LocalMachine Root certificates — still not a conclusion.
+`New-FotonBaseline` captures on a live host. `Compare-FotonBaseline` is offline and **refuses** a schema mismatch. Diffs are Tier 1 change facts; High attention for service/driver PathName, autorun Command, task Actions, WDigest/UAC/AlwaysInstallElevated, new Administrators members, and new LocalMachine Root certificates - still not a conclusion.

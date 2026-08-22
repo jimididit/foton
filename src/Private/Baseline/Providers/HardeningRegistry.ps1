@@ -1,4 +1,4 @@
-# HardeningRegistry — identity Setting (value name). Same table as Collect.
+# HardeningRegistry - identity Setting (value name). Same table as Collect.
 Register-FotonBaselineProvider -RecordType 'HardeningRegistry' `
     -IdentityFields @('Setting') `
     -ComparedFields @('Value') `

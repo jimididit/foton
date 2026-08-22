@@ -3126,7 +3126,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine("<div><b>Examiner</b>$(ConvertTo-SafeHtml $Examiner)</div>")
     $null = $sb.AppendLine("<div><b>Collected (UTC)</b>$($Script:StartTimeUtc.ToString('yyyy-MM-dd HH:mm:ss')) - $($endUtc.ToString('HH:mm:ss')) ($duration min)</div>")
     $null = $sb.AppendLine("<div><b>Event Window</b>Last $EventLogDays days</div>")
-    $null = $sb.AppendLine("<div><b>Privilege</b>$(if ($Script:IsElevated) { 'Elevated (Administrator)' } else { 'Standard user — reduced coverage' })</div>")
+    $null = $sb.AppendLine("<div><b>Privilege</b>$(if ($Script:IsElevated) { 'Elevated (Administrator)' } else { 'Standard user - reduced coverage' })</div>")
     $null = $sb.AppendLine('</div>')
     $null = $sb.AppendLine('<div class="notice"><b>Read this first.</b> Every item below is an automated observation produced by pattern matching, not a conclusion. Nothing here establishes that this host is compromised. Each finding cites the artifact file it came from - verify against that artifact, and against the host owner''s expectations, before it goes anywhere near a report or a remediation decision.</div>')
     $null = $sb.AppendLine('</header>')

@@ -7,7 +7,7 @@ function Invoke-FotonCarve {
         Walks a file you already copied (image fragment, unallocated dump, or sample).
         Records MZ hits and, when e_lfanew points at 'PE\0\0', labels them PE.
         Does not recover filenames or MAC times. Full NTFS FILE-record carving is
-        not implemented — see docs/CARVE.md.
+        not implemented - see docs/CARVE.md.
 
         Caps: -MaxBytes (default 8 MiB) and -MaxHits (default 50) so a huge blob
         cannot hang the analyst box.

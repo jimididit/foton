@@ -1,4 +1,4 @@
-# Foton — Development Handover
+# Foton - Development Handover
 
 You are working on **Foton**, a Windows forensic, baseline-comparison, and security-audit toolkit written in PowerShell.
 
@@ -26,7 +26,7 @@ Streamline forensic analysis and security audits by capturing machine state into
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | **Collect** | Live triage acquisition from a running endpoint (what `WinFoton.ps1` does today) | Target endpoint; **Administrator preferred**, standard user supported |
 | **Baseline** | Capture a normalized known-state snapshot; diff two snapshots for added/removed/modified | Target endpoint (capture) / anywhere (diff) |
-| **Parse** | Turn raw artifacts into structured records — prefetch, EVTX, LNK/jumplists, Amcache, shellbags, SRUM, browser databases, registry hives | Analyst workstation, against a collected package |
+| **Parse** | Turn raw artifacts into structured records - prefetch, EVTX, LNK/jumplists, Amcache, shellbags, SRUM, browser databases, registry hives | Analyst workstation, against a collected package |
 | **Carve** | Recover structured data from unallocated space, slack, deleted registry cells, and file remnants | Analyst workstation, against images/blobs |
 | **Analyze** | Apply heuristics, IOC lists, and baseline diffs to produce tiered findings, then render the report | Anywhere, offline |
 
@@ -51,7 +51,7 @@ Register public functions in `Foton.psd1` `FunctionsToExport`. `Foton.psm1` dots
 
 ```
 Foton/
-  WinFoton.ps1                 # FROZEN v1.0.0 live collector — do not rename internals
+  WinFoton.ps1                 # FROZEN v1.0.0 live collector - do not rename internals
   Foton.psd1                   # module manifest (RootModule = Foton.psm1)
   Foton.psm1                   # dotsources Private/ then Public/, exports via manifest
   src/
@@ -102,9 +102,9 @@ Operators who do not want cmdlets: `Foton.cmd` (`docs/USAGE.md`). Collect on an 
 
 Every command (except Version) works against a **package** (case folder or ZIP) as the unit of I/O so layers compose.
 
-## Baseline layer — design guidance
+## Baseline layer - design guidance
 
-A baseline is a normalized, deterministic snapshot of *stable* configuration — services, scheduled tasks, autoruns, local accounts and group membership, drivers, installed software, firewall rules, shares, listening ports, hardening registry values, certificate stores, and hashes of key system binaries. It is not a triage collection; it excludes volatile state (PIDs, active connections, uptime, sessions).
+A baseline is a normalized, deterministic snapshot of *stable* configuration - services, scheduled tasks, autoruns, local accounts and group membership, drivers, installed software, firewall rules, shares, listening ports, hardening registry values, certificate stores, and hashes of key system binaries. It is not a triage collection; it excludes volatile state (PIDs, active connections, uptime, sessions).
 
 1. **Deterministic serialization.** Same machine state → same bytes: stable property order, sorted collections, no collection timestamps inside the compared payload (header block only), invariant culture. A baseline is only useful if its hash means something.
 2. **Stable identity key per record type.** Service → `Name`. Task → `TaskPath` + `TaskName`. Autorun → `Key` + `ValueName`. Account → `SID`, never username. Driver → `Name`. Software → `DisplayName` + `Publisher`. Firewall → rule `Name` + direction. Certificate → `Store` + `Thumbprint`. Listener → protocol + address + port. Document the key with each provider.
@@ -113,7 +113,7 @@ A baseline is a normalized, deterministic snapshot of *stable* configuration —
 5. **Schema versioning.** Stamp WinFoton-era packages as collect 1.0; Foton baselines carry BaselineSchemaVersion. Refuse incompatible diffs.
 6. **Diffs feed findings.** The change itself is Tier 1; interpretation is Tier 2. Weight by what changed (new admin, new root CA, Winlogon change = High; software version bump = Info).
 7. **Two modes.** Temporal (same host, two times) and fleet (host vs golden/role). Same engine, different report framing.
-8. **Provenance caveat.** A baseline taken after intrusion is a picture of the compromised state. Diff proves change between observations — never when or who. Prefer capture at provisioning, hash, store off-host.
+8. **Provenance caveat.** A baseline taken after intrusion is a picture of the compromised state. Diff proves change between observations - never when or who. Prefer capture at provisioning, hash, store off-host.
 
 ## Parse and Carve
 
@@ -128,7 +128,7 @@ A baseline is a normalized, deterministic snapshot of *stable* configuration —
 
 1. **Layer separation.** Collect and Baseline capture may touch a live host. Parse, Carve, Analyze never read live state, never hit the network, identical input → identical output.
 2. **Collectors never interpret; analyzers never acquire.**
-3. **Windows PowerShell 5.1** in Collect and Baseline — no ternaries, `??`, `-Parallel`, PS7-only cmdlets, external modules, or runtime internet. Parse/Carve/Analyze may require PS7 if stated in manifest and docs.
+3. **Windows PowerShell 5.1** in Collect and Baseline - no ternaries, `??`, `-Parallel`, PS7-only cmdlets, external modules, or runtime internet. Parse/Carve/Analyze may require PS7 if stated in manifest and docs.
 4. **Collect ships as one flat file** in `dist/`.
 5. **Nothing is fatal.** Fail into the manifest and error list. Empty catch blocks in best-effort paths are intentional.
 6. **Findings are observations, not conclusions.** Tier 1 fact, Tier 2 inference, Tier 3 hypothesis (carved/uncorroborated). Cite artifact; name benign explanation in WhyItMatters. Never assert compromise, attribution, intent, or causation.
@@ -157,7 +157,7 @@ $e=$null;$t=$null
 [System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$t,[ref]$e) | Out-Null
 if ($e) { $e | ForEach-Object { "LINE $($_.Extent.StartLineNumber): $($_.Message)" } } else { 'PARSE OK' }
 
-# 2. Static analysis — clean apart from accepted rules
+# 2. Static analysis - clean apart from accepted rules
 Invoke-ScriptAnalyzer -Path .\src -Recurse -Severity Error,Warning |
   Where-Object RuleName -notin @(
     'PSAvoidUsingWriteHost',

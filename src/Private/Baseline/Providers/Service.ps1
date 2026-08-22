@@ -1,4 +1,4 @@
-# Service — identity Name. Ignore State and PID (volatile).
+# Service - identity Name. Ignore State and PID (volatile).
 Register-FotonBaselineProvider -RecordType 'Service' `
     -IdentityFields @('Name') `
     -ComparedFields @('DisplayName', 'StartMode', 'StartName', 'PathName') `

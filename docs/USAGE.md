@@ -7,7 +7,7 @@ Foton has two different machines in mind. Mixing them is what feels “too much 
 You do **not** install a module. You do **not** run `Import-Module`.
 
 1. On a trusted lab/workstation: `.\build\Build-Standalone.ps1`
-2. Copy **only** `dist\Foton-Collect.ps1` to the target (USB, RMM, email — whatever you already use).
+2. Copy **only** `dist\Foton-Collect.ps1` to the target (USB, RMM, email - whatever you already use).
 3. Right-click → Run with PowerShell, or:
    `powershell -ExecutionPolicy Bypass -File .\Foton-Collect.ps1`
 4. Open **`Foton_Report.html` inside the new case folder**. That is the whole collect loop.

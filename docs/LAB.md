@@ -1,4 +1,4 @@
-# Lab setup — host editor, guest collector
+# Lab setup - host editor, guest collector
 
 Do **not** move Cursor or this git repo’s “main” editing into the VMware guest. Chat history lives with Cursor on the **host**. A new conversation on the host still has the repo: start it with `AGENTS.md`, `docs/MIGRATION.md`, and this file.
 
@@ -38,11 +38,11 @@ Get-FotonVersion
 .\dist\Foton-Collect.ps1 -NoZip -OutputPath C:\FotonCases
 ```
 
-Compare **task names, file names, column sets, and finding titles** against a `WinFoton.ps1` package from the same snapshot — not PIDs or connection counts.
+Compare **task names, file names, column sets, and finding titles** against a `WinFoton.ps1` package from the same snapshot - not PIDs or connection counts.
 
 **Baseline schema 1.1.0:** after pulling this tree, recapture day0 (`New-FotonBaseline` or `Foton.cmd baseline`). Compare will refuse a 1.0.0 JSON against 1.1.0.
 
-Workstation (host or guest) without memorizing cmdlets: `Foton.cmd help` — see `docs/USAGE.md`.
+Workstation (host or guest) without memorizing cmdlets: `Foton.cmd help` - see `docs/USAGE.md`.
 
 Revert the snapshot after noisy collect runs, or keep a second snapshot “dirty IR box.”
 

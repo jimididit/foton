@@ -16,7 +16,7 @@ $psd1 = Join-Path $repoRoot 'Foton.psd1'
 
 function Show-FotonEasyHelp {
     Write-Host ''
-    Write-Host '  Foton — simple commands' -ForegroundColor Cyan
+    Write-Host '  Foton - simple commands' -ForegroundColor Cyan
     Write-Host ''
     Write-Host '  Collect on a Windows PC (copy ONE file, no module install):'
     Write-Host '    1. On a lab box:  .\build\Build-Standalone.ps1'

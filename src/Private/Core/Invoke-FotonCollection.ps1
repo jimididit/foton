@@ -1,7 +1,7 @@
 function Invoke-FotonCollection {
     <#
         Runs one collection task: write artifact, manifest row, timing, error capture, cache.
-        A failure here is logged and does not stop the run — partial collection is evidence.
+        A failure here is logged and does not stop the run - partial collection is evidence.
 
         -RequiresElevation: skip with Status SkippedNotElevated when the token is not admin.
         That is a visibility gap, not a collection error.

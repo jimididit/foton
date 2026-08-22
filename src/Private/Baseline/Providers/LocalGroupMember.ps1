@@ -1,4 +1,4 @@
-# LocalGroupMember — identity Group + SID.
+# LocalGroupMember - identity Group + SID.
 Register-FotonBaselineProvider -RecordType 'LocalGroupMember' `
     -IdentityFields @('Group', 'SID') `
     -ComparedFields @('Member') `

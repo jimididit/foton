@@ -1,7 +1,7 @@
 # Private/Core
 
 Helpers used by Collect, Baseline capture, Analyze, and Report. One function per file.
-These are **not** exported — tests use `InModuleScope Foton`.
+These are **not** exported - tests use `InModuleScope Foton`.
 
 Windows PowerShell 5.1 syntax only. Empty catch blocks on best-effort paths are intentional.
 
