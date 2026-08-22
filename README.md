@@ -8,6 +8,8 @@ Foton captures host state into a hashed case **package**, then lets you compare 
 
 Photons penetrate glass; Foton is meant to make Windows state legible — not to declare compromise.
 
+**Module 1.4.0** — baseline schema **1.1.0** (recapture day0). Easy workstation path: `Foton.cmd help` ([docs/USAGE.md](docs/USAGE.md)).
+
 ## Quick start (v1 collector)
 
 ```powershell
@@ -45,6 +47,12 @@ Open `WinFoton_Report.html` **from inside the extracted case folder** so artifac
 
 ### Re-analyze a collected package (offline)
 
+```
+Foton.cmd analyze C:\FotonCases\Foton_HOST_20260101-120000Z
+```
+
+Or cmdlets:
+
 ```powershell
 Import-Module .\Foton.psd1 -Force
 Get-FotonPackage -Path C:\FotonCases\WinFoton_HOST_20260101-120000Z
@@ -56,14 +64,14 @@ Open `Foton_Report.html` from inside that folder. Does not rewrite `hashes.csv`.
 
 ### Baseline and parse (workstation)
 
-```powershell
-New-FotonBaseline -Path D:\Baselines\host-day0.json
-Compare-FotonBaseline -ReferencePath D:\Baselines\host-day0.json -DifferencePath D:\Baselines\host-day30.json
-ConvertFrom-FotonPrefetch -Path D:\lab\prefetch-scca-v23.bin
+```
+Foton.cmd baseline D:\Baselines\host-day0.json
+Foton.cmd compare  D:\Baselines\host-day0.json D:\Baselines\host-day30.json
+Foton.cmd parse    D:\lab\note.lnk
+Foton.cmd carve    D:\blob.bin
 ```
 
-Carve is not implemented in PowerShell; see `docs/CARVE.md`.
-
+See `docs/CARVE.md` (MZ/PE signature scan; not NTFS). Recapture baselines after a `BaselineSchemaVersion` bump.
 
 ## Requirements
 
@@ -123,16 +131,17 @@ See `00_Collection/collection_manifest.csv` for the full artifact list. `WinFoto
 
 Do not add detections by editing `WinFoton.ps1` going forward. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): new collectors, baseline providers, parsers, and rules are new files under `src/`.
 
-Until flatten (step 5), v1 still analyzes in-process inside `WinFoton.ps1`. The module path is `Get-FotonPackage` → `Invoke-FotonAnalysis` → `New-FotonReport`. Baseline, IOC, and Prefetch parse are module commands (not in the endpoint flatten).
+Until flatten (step 5), v1 still analyzes in-process inside `WinFoton.ps1`. The module path is `Get-FotonPackage` → `Invoke-FotonAnalysis` → `New-FotonReport`. Baseline, parse, IOC, and carve are module commands (not in the endpoint flatten). `Foton.cmd` wraps those on a workstation.
 
 ## Docs
 
 | Doc | For |
 |-----|-----|
+| [docs/USAGE.md](docs/USAGE.md) | Collect vs analyze; `Foton.cmd` |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, package, naming |
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to add a module/feature |
 | [docs/MIGRATION.md](docs/MIGRATION.md) | Extract plan from the frozen v1 script |
 | [docs/LAB.md](docs/LAB.md) | Host Cursor vs VMware guest (Defender, collect) |
-| [docs/CARVE.md](docs/CARVE.md) | Why NTFS carving is not in PowerShell |
+| [docs/CARVE.md](docs/CARVE.md) | Signature scan vs NTFS |
 | [docs/TODO.md](docs/TODO.md) | Later features (in-report artifact viewer, …) |
 | [AGENTS.md](AGENTS.md) | Invariants for human and AI contributors |

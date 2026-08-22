@@ -1,10 +1,12 @@
-$build = Join-Path $PSScriptRoot '..\..\build\Build-Standalone.ps1'
+BeforeAll {
+    $script:BuildScript = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\build\Build-Standalone.ps1'))
+}
 
 Describe 'Build-Standalone' {
     It 'emits a parse-clean Foton-Collect.ps1 without Import-Module' {
         $out = Join-Path $env:TEMP ('Foton-Collect-test-' + [guid]::NewGuid().ToString('N') + '.ps1')
         try {
-            & $build -OutputPath $out
+            & $script:BuildScript -OutputPath $out
             Test-Path -LiteralPath $out | Should -Be $true
             $errors = $null
             $null = [System.Management.Automation.Language.Parser]::ParseFile($out, [ref]$null, [ref]$errors)

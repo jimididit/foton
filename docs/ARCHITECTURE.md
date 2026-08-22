@@ -56,4 +56,4 @@ The frozen file `WinFoton.ps1` keeps historical names (`Add-Finding`, `Get-SafeH
 
 ## Standalone collect
 
-`build/Build-Standalone.ps1` will emit `dist/Foton-Collect.ps1`. Operators on an endpoint never `Import-Module Foton`.
+`build/Build-Standalone.ps1` emits `dist/Foton-Collect.ps1`. Operators on an endpoint never `Import-Module Foton`. On a workstation clone, `Foton.cmd` wraps analyze/baseline/compare/parse/ioc/carve (`docs/USAGE.md`).

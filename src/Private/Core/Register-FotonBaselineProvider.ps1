@@ -5,8 +5,8 @@ function Register-FotonBaselineProvider {
     #>
     param(
         [Parameter(Mandatory)][string]$RecordType,
-        [Parameter(Mandatory)][string[]]$IdentityFields,
-        [Parameter(Mandatory)][string[]]$ComparedFields,
+        [Parameter(Mandatory)]        [string[]]$IdentityFields,
+        [string[]]$ComparedFields = @(),
         [Parameter(Mandatory)][scriptblock]$Collect,
         [string]$FalsePositives = ''
     )

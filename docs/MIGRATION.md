@@ -14,7 +14,9 @@ Approved sequence. **Do not start a later step until the previous one is reviewa
 | 3 | Patterns + remaining hardening tables as data files | **Done** (module). `WinFoton.ps1` still has inline copies until flatten. |
 | 4 | Findings engine → `Public/Analyze`; HTML → `Public/Report`; **load `$script:FotonSession.Data` from package files** so re-report works offline | **Done** (module). `Get-FotonPackage` / `Invoke-FotonAnalysis` / `New-FotonReport`. Live collect still `WinFoton.ps1`. |
 | 5 | `Build-Standalone.ps1` writes `dist/Foton-Collect.ps1`; VM run | **Done** (build + admin and standard-user VM runs) |
-| 6 | New capabilities: Baseline first, then IOC, then one parser with fixture, then carve **proposal** | **Done** (this tree) |
+| 6 | New capabilities: Baseline first, then IOC, then one parser with fixture, then carve **proposal** | **Done** (1.3.0) |
+
+Post-migration product work (not a blocked step): baseline schema **1.1.0** extra providers, LNK, IOC csv/json, MZ/PE carve, `Foton.cmd`. Recapture day0 baselines. See `docs/USAGE.md` and `docs/TODO.md` public-release bar.
 
 ## Equivalence (step 1–5)
 

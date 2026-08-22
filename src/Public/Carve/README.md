@@ -1,9 +1,5 @@
 # Public/Carve
 
-Recover structured records from blobs or images the analyst supplies.
+`Invoke-FotonCarve` signature-scans a capped blob for MZ/PE. Hits are Tier 3.
 
-See **[docs/CARVE.md](../../../docs/CARVE.md)**. `Invoke-FotonCarve` throws until a
-non-PowerShell NTFS engine exists. Do not invent unallocated timestamps in this repo.
-
-
-Carved data is **Tier 3** until corroborated: no reliable path or timestamp.
+See **[docs/CARVE.md](../../../docs/CARVE.md)**. Do not walk `$MFT` or invent unallocated timestamps in PowerShell.

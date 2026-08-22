@@ -4,8 +4,7 @@ function Invoke-FotonParse {
         Run available parsers over files in a loaded package or an explicit path.
 
     .DESCRIPTION
-        Offline only. Currently Prefetch (.pf). Other formats emit nothing until
-        their ConvertFrom-Foton* parsers exist.
+        Offline only. Prefetch (.pf) and shortcuts (.lnk).
 
     .PARAMETER PackagePath
         Optional case folder. If omitted, uses session CaseRoot.
@@ -14,7 +13,7 @@ function Invoke-FotonParse {
         Parse a single file.
 
     .EXAMPLE
-        Invoke-FotonParse -Path C:\lab\NOTEPAD.EXE-D41D8CD9.pf
+        Invoke-FotonParse -Path C:\lab\note.lnk
     #>
     [CmdletBinding()]
     param(
@@ -29,14 +28,17 @@ function Invoke-FotonParse {
         $files = @(Get-Item -LiteralPath $Path)
     }
     elseif ($script:FotonSession.CaseRoot) {
-        $files = @(Get-ChildItem -LiteralPath $script:FotonSession.CaseRoot -Recurse -Filter '*.pf' -File -ErrorAction SilentlyContinue)
+        $files = @(Get-ChildItem -LiteralPath $script:FotonSession.CaseRoot -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Extension -match '\.(pf|lnk)$' })
     }
     else {
-        throw 'Pass -Path or load a package that contains Prefetch files.'
+        throw 'Pass -Path or load a package that contains Prefetch or LNK files.'
     }
     $out = @()
     foreach ($f in $files) {
-        $out += ConvertFrom-FotonPrefetch -Path $f.FullName
+        $ext = $f.Extension.ToLower()
+        if ($ext -eq '.pf') { $out += ConvertFrom-FotonPrefetch -Path $f.FullName }
+        elseif ($ext -eq '.lnk') { $out += ConvertFrom-FotonLnk -Path $f.FullName }
     }
     return $out
 }

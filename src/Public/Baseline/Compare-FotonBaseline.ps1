@@ -101,8 +101,14 @@ function Compare-FotonBaseline {
         $sev = 'Medium'
         if ($c.RecordType -eq 'InstalledSoftware' -and $c.Field -eq 'DisplayVersion') { $sev = 'Info' }
         if ($c.RecordType -eq 'Service' -and $c.Field -eq 'PathName') { $sev = 'High' }
+        if ($c.RecordType -eq 'Driver' -and $c.Field -eq 'PathName') { $sev = 'High' }
+        if ($c.RecordType -eq 'Autorun' -and $c.Field -eq 'Command') { $sev = 'High' }
+        if ($c.RecordType -eq 'ScheduledTask' -and $c.Field -eq 'Actions') { $sev = 'High' }
         if ($c.RecordType -eq 'HardeningRegistry' -and $c.Identity -in @('UseLogonCredential', 'EnableLUA', 'AlwaysInstallElevated')) { $sev = 'High' }
         if ($c.RecordType -eq 'LocalGroupMember' -and $c.ChangeType -eq 'Added' -and $c.Identity -like 'Administrators|*') { $sev = 'High' }
+        if ($c.RecordType -eq 'Certificate' -and $c.ChangeType -eq 'Added' -and $c.Identity -like 'Cert:\LocalMachine\Root|*') { $sev = 'High' }
+        if ($c.RecordType -eq 'FirewallRule' -and $c.ChangeType -eq 'Added') { $sev = 'Medium' }
+        if ($c.RecordType -eq 'Listener' -and $c.ChangeType -eq 'Added') { $sev = 'Low' }
         if ($c.RecordType -eq 'LocalAccount' -and $c.ChangeType -eq 'Added') { $sev = 'Medium' }
 
         $title = "{0} {1}" -f $c.ChangeType, $c.RecordType

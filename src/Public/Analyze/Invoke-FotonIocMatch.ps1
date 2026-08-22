@@ -4,10 +4,13 @@ function Invoke-FotonIocMatch {
         Match a simple IOC list against an already-loaded package (offline).
 
     .DESCRIPTION
-        Does not query the live host or the network. IOC file: one indicator per
+        Does not query the live host or the network. Text file: one indicator per
         line. Lines starting with # are comments. Prefixes:
-          sha256:<hex>   match any SHA256 / sha256 / Hash property
-          text:<string>  case-insensitive substring across string properties
+          sha256:<hex>   match SHA256/Hash properties only
+          path:<string>  substring on Path/Command/File properties only
+          text:<string>  substring across all string properties
+        Also accepted: .csv (Kind,Value) and .json (array of {Kind,Value}).
+        Kind = sha256|path|text.
 
         Hits are Tier 2 observations (lists match admin tools and attacker tools).
 
@@ -38,17 +41,42 @@ function Invoke-FotonIocMatch {
     }
 
     $iocs = @()
-    foreach ($line in (Get-Content -LiteralPath $IocPath -ErrorAction Stop)) {
-        if ($line -match '^\s*$' -or $line -match '^\s*#') { continue }
-        $trim = $line.Trim()
-        if ($trim -like 'sha256:*') {
-            $iocs += [PSCustomObject]@{ Kind = 'sha256'; Value = $trim.Substring(7).Trim().ToUpper() }
+    $ext = [IO.Path]::GetExtension($IocPath).ToLower()
+    if ($ext -eq '.csv') {
+        foreach ($row in @(Import-Csv -LiteralPath $IocPath)) {
+            $kind = ([string]$row.Kind).ToLower()
+            if (-not $kind) { $kind = 'text' }
+            $val = [string]$row.Value
+            if ($kind -eq 'sha256') { $val = $val.ToUpper() }
+            $iocs += [PSCustomObject]@{ Kind = $kind; Value = $val }
         }
-        elseif ($trim -like 'text:*') {
-            $iocs += [PSCustomObject]@{ Kind = 'text'; Value = $trim.Substring(5).Trim() }
+    }
+    elseif ($ext -eq '.json') {
+        $raw = Get-Content -LiteralPath $IocPath -Raw -ErrorAction Stop | ConvertFrom-Json
+        foreach ($row in @($raw)) {
+            $kind = ([string]$row.Kind).ToLower()
+            if (-not $kind) { $kind = 'text' }
+            $val = [string]$row.Value
+            if ($kind -eq 'sha256') { $val = $val.ToUpper() }
+            $iocs += [PSCustomObject]@{ Kind = $kind; Value = $val }
         }
-        else {
-            $iocs += [PSCustomObject]@{ Kind = 'text'; Value = $trim }
+    }
+    else {
+        foreach ($line in (Get-Content -LiteralPath $IocPath -ErrorAction Stop)) {
+            if ($line -match '^\s*$' -or $line -match '^\s*#') { continue }
+            $trim = $line.Trim()
+            if ($trim -like 'sha256:*') {
+                $iocs += [PSCustomObject]@{ Kind = 'sha256'; Value = $trim.Substring(7).Trim().ToUpper() }
+            }
+            elseif ($trim -like 'path:*') {
+                $iocs += [PSCustomObject]@{ Kind = 'path'; Value = $trim.Substring(5).Trim() }
+            }
+            elseif ($trim -like 'text:*') {
+                $iocs += [PSCustomObject]@{ Kind = 'text'; Value = $trim.Substring(5).Trim() }
+            }
+            else {
+                $iocs += [PSCustomObject]@{ Kind = 'text'; Value = $trim }
+            }
         }
     }
 
@@ -62,10 +90,13 @@ function Invoke-FotonIocMatch {
                     $pv = [string]$prop.Value
                     if ([string]::IsNullOrWhiteSpace($pv)) { continue }
                     $matched = $false
-                    if ($ioc.Kind -eq 'sha256' -and $prop.Name -match 'SHA256|Hash' -and $pv.ToUpper() -eq $ioc.Value) {
+                    if ($ioc.Kind -eq 'sha256' -and $prop.Name -match 'SHA256|Hash' -and $pv.ToUpper() -eq $ioc.Value.ToUpper()) {
                         $matched = $true
                     }
-                    if ($ioc.Kind -eq 'text' -and $pv.ToLower().Contains($ioc.Value.ToLower())) {
+                    elseif ($ioc.Kind -eq 'path' -and $prop.Name -match 'Path|Command|File|FullName' -and $pv.ToLower().Contains($ioc.Value.ToLower())) {
+                        $matched = $true
+                    }
+                    elseif ($ioc.Kind -eq 'text' -and $pv.ToLower().Contains($ioc.Value.ToLower())) {
                         $matched = $true
                     }
                     if ($matched) {

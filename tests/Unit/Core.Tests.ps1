@@ -1,7 +1,10 @@
 # Core helper tests. These functions are module-private; InModuleScope is required.
 # Behavior must match WinFoton.ps1 helpers (sentinels, escape rules, skip status).
 
-$moduleManifest = Join-Path $PSScriptRoot '..\Foton.psd1'
+# Core helper tests. These functions are module-private; InModuleScope is required.
+# Behavior must match WinFoton.ps1 helpers (sentinels, escape rules, skip status).
+
+$moduleManifest = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\Foton.psd1'))
 Import-Module $moduleManifest -Force
 
 InModuleScope Foton {
@@ -159,6 +162,8 @@ putty
             }
         }
     }
+
+    Describe 'Test-FotonElevated' {
         It 'returns a boolean' {
             $r = Test-FotonElevated
             ($r -eq $true -or $r -eq $false) | Should -Be $true

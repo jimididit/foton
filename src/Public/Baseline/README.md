@@ -1,6 +1,6 @@
 # Public/Baseline
 
-Normalized snapshots of **stable** configuration. First providers:
+Normalized snapshots of **stable** configuration. Schema **1.1.0** (recapture day0 after this version; Compare refuses 1.0.0 vs 1.1.0).
 
 | RecordType | Identity | Compared | False-positive notes |
 |------------|----------|----------|----------------------|
@@ -9,7 +9,13 @@ Normalized snapshots of **stable** configuration. First providers:
 | LocalGroupMember | `Group` + `SID` | Member | Domain join, LAPS |
 | HardeningRegistry | `Setting` | Value | GPO / edition |
 | InstalledSoftware | `DisplayName` + `Publisher` | DisplayVersion, InstallLocation | Patch Tuesday |
+| ScheduledTask | `TaskPath` + `TaskName` | Actions, RunAsUser, RunLevel, Triggers | GPO/MDM tasks; last-run is not compared |
+| Autorun | `Key` + `ValueName` | Command | Installers and updaters; HKLM Run/RunOnce only |
+| Driver | `Name` | PathName, StartMode, DisplayName | Driver updates; State is not compared |
+| FirewallRule | `Name` + `Direction` | Action, Enabled, Profile | GPO/MDM; duplicate display names |
+| Certificate | `Store` + `Thumbprint` | Subject, Issuer, NotAfter | Enterprise PKI, Windows Update roots |
+| Listener | `Protocol` + `LocalAddress` + `LocalPort` | *(none — Added/Removed only)* | Services bind ports; PID is not stored |
 
-Volatile fields (PID, State, connections) are not captured.
+Volatile fields (PID, service State, connection tuples beyond the listen tuple) are not captured.
 
-`New-FotonBaseline` captures on a live host. `Compare-FotonBaseline` is offline and **refuses** a schema mismatch. Diffs are Tier 1 change facts; High attention for service PathName, WDigest/UAC/AlwaysInstallElevated, and new Administrators members — still not a conclusion.
+`New-FotonBaseline` captures on a live host. `Compare-FotonBaseline` is offline and **refuses** a schema mismatch. Diffs are Tier 1 change facts; High attention for service/driver PathName, autorun Command, task Actions, WDigest/UAC/AlwaysInstallElevated, new Administrators members, and new LocalMachine Root certificates — still not a conclusion.

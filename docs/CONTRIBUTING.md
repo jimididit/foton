@@ -4,7 +4,7 @@ This project is designed so someone new can add a **collector**, **baseline prov
 
 ## Before you write code
 
-1. Read [AGENTS.md](../AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [LAB.md](LAB.md) (host vs VMware guest).
+1. Read [AGENTS.md](../AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [USAGE.md](USAGE.md), and [LAB.md](LAB.md) (host vs VMware guest).
 2. Live triage behavior lives in frozen `WinFoton.ps1` until Collect is extracted. Do not “fix” naming inside that file.
 3. If the change is a large new capability (especially Carve/NTFS), propose it first.
 

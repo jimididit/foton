@@ -1,10 +1,12 @@
-$moduleManifest = Join-Path $PSScriptRoot '..\..\Foton.psd1'
-$fixture = Join-Path $PSScriptRoot '..\Fixtures\WinFoton_FIXTURE_20260115-120000Z'
-Import-Module $moduleManifest -Force
+BeforeAll {
+    $script:FotonPsd1 = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\Foton.psd1'))
+    $script:Fixture = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\Fixtures\WinFoton_FIXTURE_20260115-120000Z'))
+    Import-Module $script:FotonPsd1 -Force
+}
 
 Describe 'Get-FotonPackage and offline analysis' {
     It 'loads v1-style folder artifacts and does not treat hashes as collect data' {
-        $pkg = Get-FotonPackage -Path $fixture
+        $pkg = Get-FotonPackage -Path $script:Fixture
         $pkg.Kind | Should -Be 'Folder'
         InModuleScope Foton {
             $script:FotonSession.Data.ContainsKey('os_info') | Should -Be $true
@@ -16,7 +18,7 @@ Describe 'Get-FotonPackage and offline analysis' {
     }
 
     It 'fires WDigest and RTP heuristics and not for a benign hardening value' {
-        Get-FotonPackage -Path $fixture | Out-Null
+        Get-FotonPackage -Path $script:Fixture | Out-Null
         Invoke-FotonAnalysis
         InModuleScope Foton {
             $titles = @($script:FotonSession.Findings | ForEach-Object { $_.Title })
@@ -26,7 +28,7 @@ Describe 'Get-FotonPackage and offline analysis' {
             $titles | Should -Contain 'Host and collection baseline'
             $titles | Should -Contain 'Collection ran without Administrator rights'
         }
-        $analysisCsv = Join-Path $fixture 'analysis\findings.csv'
+        $analysisCsv = Join-Path $script:Fixture 'analysis\findings.csv'
         Test-Path -LiteralPath $analysisCsv | Should -Be $true
     }
 
@@ -46,7 +48,7 @@ Describe 'Get-FotonPackage and offline analysis' {
     }
 
     It 'writes HTML using package hostname not the analyst workstation' {
-        Get-FotonPackage -Path $fixture | Out-Null
+        Get-FotonPackage -Path $script:Fixture | Out-Null
         Invoke-FotonAnalysis
         $htmlPath = Join-Path $env:TEMP ('foton-report-' + [guid]::NewGuid().ToString('N') + '.html')
         try {
@@ -62,11 +64,11 @@ Describe 'Get-FotonPackage and offline analysis' {
     }
 
     AfterAll {
-        $analysisDir = Join-Path $fixture 'analysis'
+        $analysisDir = Join-Path $script:Fixture 'analysis'
         if (Test-Path -LiteralPath $analysisDir) {
             Remove-Item -LiteralPath $analysisDir -Recurse -Force -ErrorAction SilentlyContinue
         }
-        $rpt = Join-Path $fixture 'Foton_Report.html'
+        $rpt = Join-Path $script:Fixture 'Foton_Report.html'
         if (Test-Path -LiteralPath $rpt) {
             Remove-Item -LiteralPath $rpt -Force -ErrorAction SilentlyContinue
         }

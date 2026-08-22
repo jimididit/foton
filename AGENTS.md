@@ -88,13 +88,17 @@ Get-FotonVersion       # module + schema versions (exists now)
 Invoke-FotonTriage     # orchestrator: collect -> analyze -> report -> package (v1 behavior)
 New-FotonBaseline      # capture a normalized state snapshot
 Compare-FotonBaseline  # diff two snapshots into field-level change records + findings
+ConvertFrom-FotonPrefetch
+ConvertFrom-FotonLnk
 Invoke-FotonParse      # parse raw artifacts in a package into structured records
-Invoke-FotonCarve      # recover data from unallocated/slack/remnants
+Invoke-FotonCarve      # MZ/PE signature scan of a capped blob (not NTFS)
 Invoke-FotonAnalysis   # run rules + IOC matching over collected/parsed/diff data
 Invoke-FotonIocMatch   # match an IOC list against a package
 New-FotonReport        # render HTML from findings + data
 Get-FotonPackage       # open/validate a case package, verify hashes
 ```
+
+Operators who do not want cmdlets: `Foton.cmd` (`docs/USAGE.md`). Collect on an endpoint is still one file: `dist/Foton-Collect.ps1`.
 
 Every command (except Version) works against a **package** (case folder or ZIP) as the unit of I/O so layers compose.
 
@@ -103,7 +107,7 @@ Every command (except Version) works against a **package** (case folder or ZIP) 
 A baseline is a normalized, deterministic snapshot of *stable* configuration — services, scheduled tasks, autoruns, local accounts and group membership, drivers, installed software, firewall rules, shares, listening ports, hardening registry values, certificate stores, and hashes of key system binaries. It is not a triage collection; it excludes volatile state (PIDs, active connections, uptime, sessions).
 
 1. **Deterministic serialization.** Same machine state → same bytes: stable property order, sorted collections, no collection timestamps inside the compared payload (header block only), invariant culture. A baseline is only useful if its hash means something.
-2. **Stable identity key per record type.** Service → `Name`. Task → `TaskPath` + `TaskName`. Autorun → `Hive` + `Key` + `ValueName`. Account → `SID`, never username. Driver → `Name`. Software → `DisplayName` + `Publisher`. Firewall → rule `Name` + direction. Certificate → `Thumbprint`. Document the key with each provider.
+2. **Stable identity key per record type.** Service → `Name`. Task → `TaskPath` + `TaskName`. Autorun → `Key` + `ValueName`. Account → `SID`, never username. Driver → `Name`. Software → `DisplayName` + `Publisher`. Firewall → rule `Name` + direction. Certificate → `Store` + `Thumbprint`. Listener → protocol + address + port. Document the key with each provider.
 3. **Field-level diffs.** `{ RecordType, Identity, ChangeType (Added|Removed|Modified), Field, OldValue, NewValue }`.
 4. **Provider model**, not one giant function.
 5. **Schema versioning.** Stamp WinFoton-era packages as collect 1.0; Foton baselines carry BaselineSchemaVersion. Refuse incompatible diffs.
