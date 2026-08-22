@@ -1,8 +1,14 @@
 function Write-FotonBanner {
     <#
         Console brand only. Not written to collection.log (not evidence).
-        ASCII so cmd.exe / PS 5.1 / RMM transcripts do not mojibake.
-        Bump BrandUpdated when you change this wordmark or the credit lines.
+
+        Windows mark follows the neofetch / fastfetch Windows 11 flag:
+        four solid slash-filled panes, two-space gutter, blank row between
+        the upper and lower pair (see dylanaraps/neofetch Windows 11 ascii_data
+        and fastfetch src/logo/ascii/windows_11.txt). Backslashes through the
+        inner corners are Foton's glass crack, not part of those logos.
+
+        Wordmark is figlet ANSI Shadow. Bump BrandUpdated with credit changes.
     #>
     param(
         [ValidateSet('Collect', 'Baseline', 'Analyze', 'Easy', 'Parse', 'Carve', 'Compare')]
@@ -34,13 +40,53 @@ function Write-FotonBanner {
         'Compare'  { $mode = 'Compare  (offline baseline diff)' }
     }
 
+    $word = @(
+        '███████╗ ██████╗ ████████╗ ██████╗ ███╗   ██╗',
+        '██╔════╝██╔═══██╗╚══██╔══╝██╔═══██╗████╗  ██║',
+        '█████╗  ██║   ██║   ██║   ██║   ██║██╔██╗ ██║',
+        '██╔══╝  ██║   ██║   ██║   ██║   ██║██║╚██╗██║',
+        '██║     ╚██████╔╝   ██║   ╚██████╔╝██║ ╚████║',
+        '╚═╝      ╚═════╝    ╚═╝    ╚═════╝ ╚═╝  ╚═══╝',
+        '',
+        '',
+        ''
+    )
+
+    # 12-char panes (small fastfetch). Intact fill is all '/'.
+    $full = '////////////'
+    $rows = @(
+        @{ L = $full;           R = $full;           Lc = 'Blue';     Rc = 'Cyan' },
+        @{ L = $full;           R = $full;           Lc = 'Blue';     Rc = 'Cyan' },
+        @{ L = '//////////\\';  R = $full;           Lc = 'Blue';     Rc = 'Cyan' },
+        @{ L = '////////  \\';  R = '\\//////////';  Lc = 'Blue';     Rc = 'Cyan' },
+        @{ L = $null;           R = $null;           Lc = '';         Rc = '' },
+        @{ L = $full;           R = '\\//////////';  Lc = 'DarkCyan'; Rc = 'Blue' },
+        @{ L = $full;           R = '//\\////////';  Lc = 'DarkCyan'; Rc = 'Blue' },
+        @{ L = $full;           R = $full;           Lc = 'DarkCyan'; Rc = 'Blue' },
+        @{ L = $full;           R = $full;           Lc = 'DarkCyan'; Rc = 'Blue' }
+    )
+
     Write-Host ''
-    Write-Host '      _____     _' -ForegroundColor Cyan
-    Write-Host '     |  ___|__ | |_ ___  _ __' -ForegroundColor Cyan
-    Write-Host '     | |_ / _ \| __/ _ \| ''_ \' -ForegroundColor Cyan
-    Write-Host '     |  _| (_) | || (_) | | | |' -ForegroundColor Cyan
-    Write-Host '     |_|  \___/ \__\___/|_| |_|' -ForegroundColor Cyan
-    Write-Host '            >>>>|::|>>>>' -ForegroundColor DarkCyan
+    for ($i = 0; $i -lt $rows.Count; $i++) {
+        $row = $rows[$i]
+        Write-Host '  ' -NoNewline
+        if ($null -eq $row.L) {
+            Write-Host ('            ') -NoNewline
+            Write-Host '\/' -ForegroundColor Yellow -NoNewline
+            Write-Host ('            ') -NoNewline
+        }
+        else {
+            Write-Host $row.L -ForegroundColor $row.Lc -NoNewline
+            Write-Host '  ' -NoNewline
+            Write-Host $row.R -ForegroundColor $row.Rc -NoNewline
+        }
+        if ($word[$i]) {
+            Write-Host ('  ' + $word[$i]) -ForegroundColor Cyan
+        }
+        else {
+            Write-Host ''
+        }
+    }
     Write-Host ''
     Write-Host '     Windows DFIR / baseline / audit' -ForegroundColor Gray
     Write-Host '     Author      J. Flynn' -ForegroundColor DarkGray

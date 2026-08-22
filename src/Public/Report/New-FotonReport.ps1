@@ -69,10 +69,11 @@ a:hover{text-decoration:underline}
 header.hero{border:1px solid var(--line);border-radius:14px;padding:26px 28px;background:
   radial-gradient(1100px 200px at 12% -40%,rgba(55,214,255,.20),transparent 60%),
   linear-gradient(180deg,#121b26,#0e151e)}
-.brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.brand h1{margin:0;font-size:30px;letter-spacing:.5px}
-.brand h1 span{color:var(--beam)}
-.tagline{color:#93a7bb;font-size:13px;font-style:italic}
+.brand{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.mark{flex:0 0 auto;display:block}
+.brand-text h1{margin:0;font-size:32px;letter-spacing:4px;font-weight:700;color:var(--beam);text-transform:uppercase}
+.tagline{color:#93a7bb;font-size:13px;font-style:italic;margin-top:4px}
+.credits{color:#6f8399;font-size:12px;margin-top:6px;letter-spacing:.2px}
 .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px 26px;margin-top:20px}
 .meta div{font-size:13px;color:#a9bccf}
 .meta b{display:block;color:#6f8399;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.9px;margin-bottom:2px}
@@ -168,8 +169,20 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine('</head><body><div class="wrap">')
 
     # ---- Hero ----
+    $verDisplay = ConvertTo-FotonSafeHtml ([string]$script:FotonSession.Version)
     $null = $sb.AppendLine('<header class="hero">')
-    $null = $sb.AppendLine('<div class="brand"><h1>Fo<span>ton</span></h1><div class="tagline">Windows DFIR triage report - light through the glass</div></div>')
+    $null = $sb.AppendLine('<div class="brand">')
+    $null = $sb.AppendLine('<svg class="mark" width="56" height="56" viewBox="0 0 48 48" aria-hidden="true">')
+    $null = $sb.AppendLine('<defs><linearGradient id="fotonBeam" x1="0" y1="24" x2="48" y2="24"><stop offset="0" stop-color="#37d6ff" stop-opacity=".15"/><stop offset=".45" stop-color="#37d6ff"/><stop offset="1" stop-color="#7cf5c4" stop-opacity=".7"/></linearGradient></defs>')
+    $null = $sb.AppendLine('<line x1="1" y1="24" x2="47" y2="24" stroke="url(#fotonBeam)" stroke-width="2.2"/>')
+    $null = $sb.AppendLine('<polygon points="24,7 41,24 24,41 7,24" fill="rgba(55,214,255,.08)" stroke="#37d6ff" stroke-width="1.8"/>')
+    $null = $sb.AppendLine('<circle cx="24" cy="24" r="4" fill="#37d6ff"/>')
+    $null = $sb.AppendLine('</svg>')
+    $null = $sb.AppendLine('<div class="brand-text">')
+    $null = $sb.AppendLine('<h1>Foton</h1>')
+    $null = $sb.AppendLine('<div class="tagline">Windows DFIR triage report - light through the glass</div>')
+    $null = $sb.AppendLine("<div class=""credits"">J. Flynn &middot; jimididit &middot; v$verDisplay &middot; updated 2026-08-22</div>")
+    $null = $sb.AppendLine('</div></div>')
     $null = $sb.AppendLine('<div class="meta">')
     $null = $sb.AppendLine("<div><b>Hostname</b>$(ConvertTo-FotonSafeHtml $hostName)</div>")
     if ($osInfo) {
@@ -331,7 +344,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
 </details>
 '@)
 
-    $null = $sb.AppendLine("<footer>Foton v$(ConvertTo-FotonSafeHtml $script:FotonSession.Version) &middot; collected $(ConvertTo-FotonSafeHtml $collectedUtc) UTC on $(ConvertTo-FotonSafeHtml $hostName) by $(ConvertTo-FotonSafeHtml $examinerDisplay) &middot; verify artifact hashes in 00_Collection/hashes.csv before analysis</footer>")
+    $null = $sb.AppendLine("<footer>Foton v$(ConvertTo-FotonSafeHtml $script:FotonSession.Version) &middot; J. Flynn / jimididit &middot; collected $(ConvertTo-FotonSafeHtml $collectedUtc) UTC on $(ConvertTo-FotonSafeHtml $hostName) by $(ConvertTo-FotonSafeHtml $examinerDisplay) &middot; verify artifact hashes in 00_Collection/hashes.csv before analysis</footer>")
     $null = $sb.AppendLine('</div>')
     $null = $sb.AppendLine($js)
     $null = $sb.AppendLine('</body></html>')
