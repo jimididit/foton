@@ -12,12 +12,15 @@ function Get-FotonUserProfile {
                     SID         = $sid
                     UserName    = $name
                     ProfilePath = $path
-                    Exists      = (Test-Path -LiteralPath $path)
-                    HiveLoaded  = (Test-Path -LiteralPath ("Registry::HKEY_USERS\$sid"))
+                    Exists      = (Test-FotonPathAccessible -Path $path)
+                    HiveLoaded  = (Test-FotonPathAccessible -Path ("Registry::HKEY_USERS\$sid"))
                 }
             }
         }
     }
     catch { }
+    if (-not $script:FotonSession.IsElevated) {
+        $profiles = @($profiles | Where-Object { $_.SID -like 'S-1-5-21-*' })
+    }
     return $profiles
 }

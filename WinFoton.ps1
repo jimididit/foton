@@ -62,7 +62,7 @@
 
 .NOTES
     Name       : WinFoton
-    Version    : 1.0.2
+    Version    : 1.0.3
     Requires   : Windows PowerShell 5.1+ (or PowerShell 7 on Windows). Administrator recommended; standard-user coverage is supported.
     Author     : Built for JDI Consulting DFIR workflows
 #>
@@ -89,7 +89,7 @@ $ProgressPreference = 'SilentlyContinue'
 #  GLOBAL STATE
 # ==============================================================================
 
-$Script:Version      = '1.0.2'
+$Script:Version      = '1.0.3'
 $Script:StartTimeUtc = (Get-Date).ToUniversalTime()
 $Script:Findings     = New-Object System.Collections.ArrayList
 $Script:Manifest     = New-Object System.Collections.ArrayList
@@ -403,6 +403,22 @@ function ConvertTo-SafeHtml {
     return $s
 }
 
+function Test-PathAccessible {
+    <#
+        Test-Path that treats access-denied as "not here for this token".
+        Default Test-Path writes UnauthorizedAccessException to the console under
+        $ErrorActionPreference Continue (SYSTEM and ServiceProfiles paths).
+    #>
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    try {
+        return [bool](Test-Path -LiteralPath $Path -ErrorAction Stop)
+    }
+    catch {
+        return $false
+    }
+}
+
 function Get-UserProfileList {
     <# Local profiles from ProfileList, used for per-user artifact collection. #>
     $profiles = @()
@@ -417,13 +433,18 @@ function Get-UserProfileList {
                     SID         = $sid
                     UserName    = $name
                     ProfilePath = $path
-                    Exists      = (Test-Path -LiteralPath $path)
-                    HiveLoaded  = (Test-Path -LiteralPath ("Registry::HKEY_USERS\$sid"))
+                    Exists      = (Test-PathAccessible -Path $path)
+                    HiveLoaded  = (Test-PathAccessible -Path ("Registry::HKEY_USERS\$sid"))
                 }
             }
         }
     }
     catch { }
+    if (-not $Script:IsElevated) {
+        # SYSTEM (S-1-5-18) and service profiles live under Windows\system32\config and
+        # ServiceProfiles; a standard user cannot Test-Path them without Access Denied noise.
+        $profiles = @($profiles | Where-Object { $_.SID -like 'S-1-5-21-*' })
+    }
     return $profiles
 }
 
@@ -1255,7 +1276,7 @@ function Invoke-PersistenceCollection {
             $paths += (Join-Path $userProfile.ProfilePath 'AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup')
         }
         foreach ($p in $paths) {
-            if (-not (Test-Path -LiteralPath $p)) { continue }
+            if (-not (Test-PathAccessible -Path $p)) { continue }
             foreach ($f in (Get-ChildItem -LiteralPath $p -Force -ErrorAction SilentlyContinue)) {
                 if ($f.Name -eq 'desktop.ini') { continue }
                 $sig = Get-SignatureInfo -Path $f.FullName
@@ -1918,7 +1939,7 @@ function Invoke-FilesystemCollection {
         $exts = @('.exe', '.dll', '.ps1', '.bat', '.cmd', '.vbs', '.js', '.jse', '.wsf', '.hta', '.scr', '.jar', '.lnk', '.msi', '.sys', '.com', '.pif')
         $rows = @()
         foreach ($r in ($roots | Sort-Object -Unique)) {
-            if (-not (Test-Path -LiteralPath $r)) { continue }
+            if (-not (Test-PathAccessible -Path $r)) { continue }
             try {
                 $files = Get-ChildItem -LiteralPath $r -Recurse -File -Force -Depth $depth -ErrorAction SilentlyContinue |
                     Where-Object { $exts -contains $_.Extension.ToLower() }
@@ -1987,7 +2008,7 @@ function Invoke-FilesystemCollection {
             $roots += (Join-Path $userProfile.ProfilePath 'AppData\Local\Temp')
         }
         foreach ($r in ($roots | Sort-Object -Unique)) {
-            if (-not (Test-Path -LiteralPath $r)) { continue }
+            if (-not (Test-PathAccessible -Path $r)) { continue }
             try {
                 foreach ($f in (Get-ChildItem -LiteralPath $r -Recurse -File -Force -Depth 3 -ErrorAction SilentlyContinue)) {
                     try {
@@ -2068,7 +2089,7 @@ function Invoke-FilesystemCollection {
                 (Join-Path $userProfile.ProfilePath 'AppData\Roaming\Microsoft\Windows\Recent\CustomDestinations')
             )
             foreach ($p in $paths) {
-                if (-not (Test-Path -LiteralPath $p)) { continue }
+                if (-not (Test-PathAccessible -Path $p)) { continue }
                 foreach ($f in (Get-ChildItem -LiteralPath $p -File -Force -ErrorAction SilentlyContinue)) {
                     $rows += [PSCustomObject]@{
                         User        = $userProfile.UserName
@@ -2288,8 +2309,15 @@ function Invoke-SoftwareCollection {
     } | Out-Null
 
     Invoke-Collection -Category 'Software' -Name 'appx_packages' -Format 'Csv' -Description 'Installed Store/AppX packages' -Script {
-        Get-AppxPackage -AllUsers -ErrorAction Stop |
-            Select-Object Name, PackageFullName, Publisher, Version, InstallLocation, SignatureKind, Status
+        # -AllUsers requires elevation. Standard-user coverage is this token's packages only.
+        if ($Script:IsElevated) {
+            Get-AppxPackage -AllUsers -ErrorAction Stop |
+                Select-Object Name, PackageFullName, Publisher, Version, InstallLocation, SignatureKind, Status
+        }
+        else {
+            Get-AppxPackage -ErrorAction Stop |
+                Select-Object Name, PackageFullName, Publisher, Version, InstallLocation, SignatureKind, Status
+        }
     } | Out-Null
 }
 
