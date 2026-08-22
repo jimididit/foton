@@ -13,10 +13,10 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $collect = Join-Path $repoRoot 'dist\Foton-Collect.ps1'
 $psd1 = Join-Path $repoRoot 'Foton.psd1'
+$banner = Join-Path $repoRoot 'src\Private\Core\Write-FotonBanner.ps1'
 
 function Show-FotonEasyHelp {
-    Write-Host ''
-    Write-Host '  Foton - simple commands' -ForegroundColor Cyan
+    Write-Host '  Simple commands' -ForegroundColor Cyan
     Write-Host ''
     Write-Host '  Collect on a Windows PC (copy ONE file, no module install):'
     Write-Host '    1. On a lab box:  .\build\Build-Standalone.ps1'
@@ -38,6 +38,11 @@ function Show-FotonEasyHelp {
 }
 
 $cmd = $Command.ToLower()
+if ($cmd -notin @('collect', 'baseline', 'compare') -and (Test-Path -LiteralPath $banner)) {
+    . $banner
+    Write-FotonBanner -Kind 'Easy'
+}
+
 if ($cmd -in @('help', '-h', '/h', '/?', '')) {
     Show-FotonEasyHelp
     return

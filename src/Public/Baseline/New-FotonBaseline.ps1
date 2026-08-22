@@ -33,6 +33,7 @@ function New-FotonBaseline {
     }
 
     Initialize-FotonSession
+    Write-FotonBanner -Kind 'Baseline'
     $psd1 = Join-Path $script:FotonModuleRoot 'Foton.psd1'
     $man = Import-PowerShellDataFile -LiteralPath $psd1
     $script:FotonSession.Version = [string]$man.ModuleVersion

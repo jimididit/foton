@@ -53,13 +53,7 @@ function Invoke-FotonTriage {
         OutputPath            = $OutputPath
     }
 
-    Write-Host ''
-    Write-Host '  +--------------------------------------------------------+' -ForegroundColor DarkCyan
-    Write-Host '  |     F o t o n              >>>>>|::|>>>>>              |' -ForegroundColor Cyan
-    Write-Host '  |     Windows DFIR triage collector                      |' -ForegroundColor Gray
-    Write-Host '  +--------------------------------------------------------+' -ForegroundColor DarkCyan
-    Write-Host "   v$($script:FotonSession.Version)   Light through the glass." -ForegroundColor DarkGray
-    Write-Host ''
+    Write-FotonBanner -Kind 'Collect'
 
     if ($RequireAdministrator -and -not $script:FotonSession.IsElevated) {
         Write-Host '  [x] -RequireAdministrator was set, but this process is not elevated.' -ForegroundColor Red

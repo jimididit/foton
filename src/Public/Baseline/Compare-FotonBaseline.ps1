@@ -40,6 +40,7 @@ function Compare-FotonBaseline {
     if ($ref.Header.Hostname -eq $dif.Header.Hostname) { $mode = 'Temporal' }
 
     if ($null -eq $script:FotonSession) { Initialize-FotonSession }
+    Write-FotonBanner -Kind 'Compare'
     $script:FotonSession.Findings = New-Object System.Collections.ArrayList
 
     $provByType = @{}
