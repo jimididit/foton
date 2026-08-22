@@ -62,7 +62,7 @@
 
 .NOTES
     Name       : WinFoton
-    Version    : 1.0.3
+    Version    : 1.0.4
     Requires   : Windows PowerShell 5.1+ (or PowerShell 7 on Windows). Administrator recommended; standard-user coverage is supported.
     Author     : Built for JDI Consulting DFIR workflows
 #>
@@ -89,7 +89,7 @@ $ProgressPreference = 'SilentlyContinue'
 #  GLOBAL STATE
 # ==============================================================================
 
-$Script:Version      = '1.0.3'
+$Script:Version      = '1.0.4'
 $Script:StartTimeUtc = (Get-Date).ToUniversalTime()
 $Script:Findings     = New-Object System.Collections.ArrayList
 $Script:Manifest     = New-Object System.Collections.ArrayList
@@ -401,6 +401,41 @@ function ConvertTo-SafeHtml {
     $s = [string]$Text
     $s = $s.Replace('&', '&amp;').Replace('<', '&lt;').Replace('>', '&gt;').Replace('"', '&quot;').Replace("'", '&#39;')
     return $s
+}
+
+function ConvertTo-ObservationHtml {
+    <#
+        Renders a finding Observation. Format-Sample joins items with ' ; ', which
+        wrapped badly inside an inline span (overlapping lines). Lead sentence stays
+        a paragraph; sampled paths/commands become a list.
+    #>
+    param([string]$Text)
+    $safe = ConvertTo-SafeHtml $Text
+    $marker = 'Sample: '
+    $pos = $safe.IndexOf($marker)
+    $lead = ''
+    $items = @()
+    if ($pos -ge 0) {
+        $lead = $safe.Substring(0, $pos).Trim()
+        $rest = $safe.Substring($pos + $marker.Length)
+        $items = @($rest -split ' ; ' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    }
+    elseif ($safe.Contains(' ; ')) {
+        $items = @($safe -split ' ; ' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    }
+    else {
+        return "<div class=""obs""><p class=""obs-lead"">$safe</p></div>"
+    }
+    $html = '<div class="obs">'
+    if ($lead) {
+        $html += "<p class=""obs-lead"">$lead</p>"
+    }
+    $html += '<ul class="obs-list">'
+    foreach ($item in $items) {
+        $html += "<li>$item</li>"
+    }
+    $html += '</ul></div>'
+    return $html
 }
 
 function Test-PathAccessible {
@@ -3012,9 +3047,14 @@ input[type=search]{flex:1;min-width:230px;background:var(--panel2);border:1px so
 .f-title{flex:1;font-weight:600}
 .f-body{display:none;padding:2px 18px 18px;border-top:1px solid var(--line)}
 .finding.open .f-body{display:block}
-.f-body p{margin:12px 0 0}
-.f-body .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:#6f8399;display:block;margin-bottom:3px}
-.f-body .obs{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;word-break:break-word}
+.f-body p{margin:12px 0 0;line-height:1.55}
+.f-body .obs-block{margin:12px 0 0}
+.f-body .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:#6f8399;display:block;margin-bottom:6px}
+.f-body .obs{display:block;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.55;word-break:break-word}
+.obs-lead{margin:0;color:var(--text);font-family:inherit;line-height:1.55}
+.obs-list{margin:8px 0 0;padding:0 0 0 18px;line-height:1.55}
+.obs-list li{margin:0 0 8px;padding:0;line-height:1.55}
+.obs-list li:last-child{margin-bottom:0}
 table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12.5px}
 th{background:var(--panel2);text-align:left;padding:9px 12px;color:#8fa3b8;font-size:11px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--line)}
 td{padding:8px 12px;border-bottom:1px solid rgba(34,48,63,.6);vertical-align:top;word-break:break-word}
@@ -3135,7 +3175,9 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
         $null = $sb.AppendLine("<span class=""f-title"">$(ConvertTo-SafeHtml $f.Title)</span>")
         $null = $sb.AppendLine("<span class=""chip chip-tier"">Tier $($f.Tier)</span>")
         $null = $sb.AppendLine('</div><div class="f-body">')
-        $null = $sb.AppendLine("<p><span class=""lbl"">What was observed</span><span class=""obs"">$(ConvertTo-SafeHtml $f.Observation)</span></p>")
+        $null = $sb.AppendLine('<div class="obs-block"><span class="lbl">What was observed</span>')
+        $null = $sb.AppendLine((ConvertTo-ObservationHtml $f.Observation))
+        $null = $sb.AppendLine('</div>')
         if ($f.WhyItMatters) {
             $null = $sb.AppendLine("<p><span class=""lbl"">Why it matters</span>$(ConvertTo-SafeHtml $f.WhyItMatters)</p>")
         }
