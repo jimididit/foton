@@ -20,32 +20,6 @@ function Initialize-FotonSession {
         $keepVersion = $script:FotonSession.Version
     }
 
-    $writable = @()
-    $suspicious = @()
-    $ratNames = @()
-    $hardening = @()
-    $patternDir = $null
-
-    if ($script:FotonEmbeddedPatterns) {
-        $patternDir = '(embedded)'
-        $writable = @($script:FotonEmbeddedPatterns.UserWritablePatterns)
-        $suspicious = @($script:FotonEmbeddedPatterns.SuspiciousCommandPatterns)
-        $ratNames = @($script:FotonEmbeddedPatterns.RemoteAccessToolNames)
-        if ($script:FotonEmbeddedPatterns.HardeningCsv) {
-            $hardening = @($script:FotonEmbeddedPatterns.HardeningCsv | ConvertFrom-Csv)
-        }
-    }
-    elseif ($script:FotonSrcRoot) {
-        $patternDir = Join-Path $script:FotonSrcRoot 'Private\Patterns'
-        $writable = @(Get-FotonPatternLines -Path (Join-Path $patternDir 'UserWritablePatterns.txt'))
-        $suspicious = @(Get-FotonPatternLines -Path (Join-Path $patternDir 'SuspiciousCommandPatterns.txt'))
-        $ratNames = @(Get-FotonPatternLines -Path (Join-Path $patternDir 'RemoteAccessToolNames.txt'))
-        $hardeningFile = Join-Path $patternDir 'HardeningRegistryChecks.csv'
-        if (Test-Path -LiteralPath $hardeningFile) {
-            $hardening = @(Import-Csv -LiteralPath $hardeningFile)
-        }
-    }
-
     $script:FotonSession = @{
         Version                   = $keepVersion
         Data                      = @{}
@@ -78,10 +52,52 @@ function Initialize-FotonSession {
             'Filesystem'  = '08_Filesystem'
             'Software'    = '09_Software_and_Drivers'
         }
-        UserWritablePatterns      = $writable
-        SuspiciousCommandPatterns = $suspicious
-        RemoteAccessToolNames     = $ratNames
-        HardeningRegistryChecks   = $hardening
-        PatternSource             = $patternDir
+        UserWritablePatterns      = @()
+        SuspiciousCommandPatterns = @()
+        RemoteAccessToolNames     = @()
+        HardeningRegistryChecks   = @()
+        PatternSource             = $null
     }
+
+    Import-FotonPatternTables
+}
+
+function Import-FotonPatternTables {
+    <#
+        Fill pattern lists on the current session. Does not replace $script:FotonSession
+        (baseline providers must not wipe StartTimeUtc / CaseRoot mid-capture).
+    #>
+    if ($null -eq $script:FotonSession) { return }
+
+    $writable = @()
+    $suspicious = @()
+    $ratNames = @()
+    $hardening = @()
+    $patternDir = $null
+
+    if ($script:FotonEmbeddedPatterns) {
+        $patternDir = '(embedded)'
+        $writable = @($script:FotonEmbeddedPatterns.UserWritablePatterns)
+        $suspicious = @($script:FotonEmbeddedPatterns.SuspiciousCommandPatterns)
+        $ratNames = @($script:FotonEmbeddedPatterns.RemoteAccessToolNames)
+        if ($script:FotonEmbeddedPatterns.HardeningCsv) {
+            $hardening = @($script:FotonEmbeddedPatterns.HardeningCsv | ConvertFrom-Csv)
+        }
+    }
+    elseif ($script:FotonSrcRoot) {
+        $patternDir = Join-Path $script:FotonSrcRoot 'Private\Patterns'
+        $writable = @(Get-FotonPatternLines -Path (Join-Path $patternDir 'UserWritablePatterns.txt'))
+        $suspicious = @(Get-FotonPatternLines -Path (Join-Path $patternDir 'SuspiciousCommandPatterns.txt'))
+        $ratNames = @(Get-FotonPatternLines -Path (Join-Path $patternDir 'RemoteAccessToolNames.txt'))
+        $hardeningFile = Join-Path $patternDir 'HardeningRegistryChecks.csv'
+        if (Test-Path -LiteralPath $hardeningFile) {
+            $hardening = @(Import-Csv -LiteralPath $hardeningFile)
+        }
+    }
+
+    if ($writable.Count -gt 0) { $script:FotonSession.UserWritablePatterns = $writable }
+    if ($suspicious.Count -gt 0) { $script:FotonSession.SuspiciousCommandPatterns = $suspicious }
+    if ($ratNames.Count -gt 0) { $script:FotonSession.RemoteAccessToolNames = $ratNames }
+    if ($hardening.Count -gt 0) { $script:FotonSession.HardeningRegistryChecks = $hardening }
+    if ($patternDir) { $script:FotonSession.PatternSource = $patternDir }
 }

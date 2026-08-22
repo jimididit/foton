@@ -27,6 +27,19 @@ Describe 'Baseline providers and diff' {
         }
     }
 
+    It 'does not reset StartTimeUtc when the hardening provider loads checks' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $stamp = [datetime]::UtcNow
+            $script:FotonSession.StartTimeUtc = $stamp
+            $script:FotonSession.HardeningRegistryChecks = @()
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'HardeningRegistry' })[0]
+            & $prov.Collect | Out-Null
+            $script:FotonSession.StartTimeUtc | Should -Be $stamp
+            @($script:FotonSession.HardeningRegistryChecks).Count | Should -BeGreaterThan 0
+        }
+    }
+
     It 'diffs field-level changes and fires High on service PathName and new admin' {
         $changes = Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif
         $path = @($changes | Where-Object { $_.RecordType -eq 'Service' -and $_.Field -eq 'PathName' })

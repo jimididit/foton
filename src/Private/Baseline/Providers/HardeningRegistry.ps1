@@ -4,8 +4,11 @@ Register-FotonBaselineProvider -RecordType 'HardeningRegistry' `
     -ComparedFields @('Value') `
     -FalsePositives 'Domain GPO and Windows edition change defaults. Expected values in the Collect table are a common lab baseline, not proof of compromise when they differ.' `
     -Collect {
-        if ($null -eq $script:FotonSession -or -not $script:FotonSession.HardeningRegistryChecks) {
+        if ($null -eq $script:FotonSession) {
             Initialize-FotonSession
+        }
+        elseif (-not $script:FotonSession.HardeningRegistryChecks -or @($script:FotonSession.HardeningRegistryChecks).Count -eq 0) {
+            Import-FotonPatternTables
         }
         $rows = @()
         foreach ($c in $script:FotonSession.HardeningRegistryChecks) {

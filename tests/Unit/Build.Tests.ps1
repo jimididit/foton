@@ -37,6 +37,8 @@ Describe 'Build-BaselineStandalone' {
             $raw | Should -Match 'function New-FotonBaseline'
             $raw | Should -Match 'function New-FotonBaselineReport'
             $raw | Should -Match 'Register-FotonBaselineProvider'
+            $raw | Should -Match 'HardeningCsv'
+            $raw | Should -Match 'EnableLUA'
             $raw | Should -Not -Match 'function Invoke-FotonTriage'
             $raw | Should -Not -Match '(?m)^\s*Import-Module\b'
         }

@@ -19,12 +19,15 @@ $psd1 = Import-PowerShellDataFile -LiteralPath (Join-Path $RepoRoot 'Foton.psd1'
 $version = [string]$psd1.ModuleVersion
 $baseSchema = [string]$psd1.PrivateData.Foton.BaselineSchemaVersion
 
+$hardeningCsv = Get-Content -LiteralPath (Join-Path $srcRoot 'Private\Patterns\HardeningRegistryChecks.csv') -Raw
+
+# Core first so Register-FotonBaselineProvider exists before provider files run.
 $files = @(
-    Get-ChildItem -LiteralPath (Join-Path $srcRoot 'Private\Core') -Filter '*.ps1' -File
-    Get-ChildItem -LiteralPath (Join-Path $srcRoot 'Private\Baseline\Providers') -Filter '*.ps1' -File
+    Get-ChildItem -LiteralPath (Join-Path $srcRoot 'Private\Core') -Filter '*.ps1' -File | Sort-Object FullName
+    Get-ChildItem -LiteralPath (Join-Path $srcRoot 'Private\Baseline\Providers') -Filter '*.ps1' -File | Sort-Object FullName
     Get-Item -LiteralPath (Join-Path $srcRoot 'Public\Baseline\New-FotonBaseline.ps1')
     Get-Item -LiteralPath (Join-Path $srcRoot 'Public\Report\New-FotonBaselineReport.ps1')
-) | Sort-Object { $_.Directory.Name + '\' + $_.Name }, FullName
+)
 
 $chunks = New-Object System.Text.StringBuilder
 foreach ($file in $files) {
@@ -66,7 +69,14 @@ param(
 `$script:FotonModuleRoot = `$PSScriptRoot
 `$script:FotonSrcRoot = `$null
 `$script:FotonSession = @{ Version = '$version' }
-`$script:FotonEmbeddedPatterns = `$null
+`$script:FotonEmbeddedPatterns = @{
+    UserWritablePatterns      = @()
+    SuspiciousCommandPatterns = @()
+    RemoteAccessToolNames     = @()
+    HardeningCsv              = @'
+$hardeningCsv
+'@
+}
 `$script:FotonEmbeddedBaselineSchema = '$baseSchema'
 `$script:FotonBaselineProviders = New-Object System.Collections.ArrayList
 `$script:FotonColorMode = `$null

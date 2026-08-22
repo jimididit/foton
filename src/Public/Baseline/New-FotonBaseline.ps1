@@ -72,7 +72,8 @@ function New-FotonBaseline {
     }
 
     $script:FotonSession.IsElevated = Test-FotonElevated
-    $script:FotonSession.StartTimeUtc = (Get-Date).ToUniversalTime()
+    $capturedUtc = (Get-Date).ToUniversalTime()
+    $script:FotonSession.StartTimeUtc = $capturedUtc
 
     if ($RequireAdministrator -and -not $script:FotonSession.IsElevated) {
         Write-Host '  [x] -RequireAdministrator was set, but this process is not elevated.' -ForegroundColor Red
@@ -123,7 +124,7 @@ function New-FotonBaseline {
             BaselineSchemaVersion = $schema
             ToolVersion           = $script:FotonSession.Version
             Hostname              = $env:COMPUTERNAME
-            CapturedUtc           = $script:FotonSession.StartTimeUtc.ToString('yyyy-MM-dd HH:mm:ss')
+            CapturedUtc           = $capturedUtc.ToString('yyyy-MM-dd HH:mm:ss')
             Elevated              = [bool]$script:FotonSession.IsElevated
             PayloadSha256         = $sha
             Note                  = 'Header timestamps are not part of the compared payload hash. Diff proves change between observations, not attribution. A baseline taken after an incident is a picture of that state.'
@@ -155,7 +156,7 @@ function New-FotonBaseline {
         if (-not (Test-Path -LiteralPath $OutputPath)) {
             New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
         }
-        $stamp = $script:FotonSession.StartTimeUtc.ToString('yyyyMMdd-HHmmss')
+        $stamp = $capturedUtc.ToString('yyyyMMdd-HHmmss')
         $folderName = "FotonBaseline_{0}_{1}Z" -f $env:COMPUTERNAME, $stamp
         $packageRoot = Join-Path $OutputPath $folderName
         New-Item -Path $packageRoot -ItemType Directory -Force | Out-Null
@@ -192,7 +193,7 @@ function New-FotonBaseline {
                         "Folder   : $packageRoot"
                         "ZIP      : $zipPath"
                         "SHA-256  : $zipHash"
-                        "UTC      : $($script:FotonSession.StartTimeUtc.ToString('yyyy-MM-dd HH:mm:ss'))"
+                        "UTC      : $($capturedUtc.ToString('yyyy-MM-dd HH:mm:ss'))"
                     )
                     $stampLines | Out-File -FilePath ($packageRoot + '_PACKAGE_HASH.txt') -Encoding UTF8
                     Write-FotonStatus ("Package SHA-256: {0}" -f $zipHash) 'Good'
