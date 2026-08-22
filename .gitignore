@@ -1,0 +1,16 @@
+# Misc IDE and Editor files
+.cursor/
+.vscode/
+.specstory/
+.cursorindexingignore
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# LLM files
+AGENTS.md
+CLAUDE.md
+RULES.md
