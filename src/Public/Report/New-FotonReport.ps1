@@ -181,7 +181,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine('<div class="brand-text">')
     $null = $sb.AppendLine('<h1>Foton</h1>')
     $null = $sb.AppendLine('<div class="tagline">Windows DFIR triage report - light through the glass</div>')
-    $null = $sb.AppendLine("<div class=""credits"">J. Flynn &middot; jimididit &middot; v$verDisplay &middot; updated 2026-08-22</div>")
+    $null = $sb.AppendLine("<div class=""credits"">jimididit &middot; v$verDisplay &middot; updated 2026-08-22</div>")
     $null = $sb.AppendLine('</div></div>')
     $null = $sb.AppendLine('<div class="meta">')
     $null = $sb.AppendLine("<div><b>Hostname</b>$(ConvertTo-FotonSafeHtml $hostName)</div>")
