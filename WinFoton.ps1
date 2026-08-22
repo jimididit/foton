@@ -62,7 +62,7 @@
 
 .NOTES
     Name       : WinFoton
-    Version    : 1.0.1
+    Version    : 1.0.2
     Requires   : Windows PowerShell 5.1+ (or PowerShell 7 on Windows). Administrator recommended; standard-user coverage is supported.
     Author     : Built for JDI Consulting DFIR workflows
 #>
@@ -89,7 +89,7 @@ $ProgressPreference = 'SilentlyContinue'
 #  GLOBAL STATE
 # ==============================================================================
 
-$Script:Version      = '1.0.1'
+$Script:Version      = '1.0.2'
 $Script:StartTimeUtc = (Get-Date).ToUniversalTime()
 $Script:Findings     = New-Object System.Collections.ArrayList
 $Script:Manifest     = New-Object System.Collections.ArrayList
@@ -1674,7 +1674,16 @@ function Invoke-SecurityCollection {
         $out += '--- SMB1 optional feature ---'
         try { $out += (Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -ErrorAction Stop | Select-Object FeatureName, State | Out-String) } catch { $out += 'SMB1 feature query unavailable' }
         $out += '--- winrm enumerate winrm/config/listener ---'
-        $out += (& winrm.exe enumerate winrm/config/listener 2>&1 | Out-String)
+        $winrmCmd = Join-Path $env:SystemRoot 'System32\winrm.cmd'
+        if (-not (Test-Path -LiteralPath $winrmCmd)) {
+            $winrmCmd = Join-Path $env:SystemRoot 'System32\winrm.exe'
+        }
+        if (Test-Path -LiteralPath $winrmCmd) {
+            $out += (& $winrmCmd enumerate winrm/config/listener 2>&1 | Out-String)
+        }
+        else {
+            $out += 'winrm client not present on PATH or System32 (common on some Windows editions). WinRM service status still recorded below.'
+        }
         $out += '--- WinRM service ---'
         $out += (Get-Service WinRM -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType | Out-String)
         $out += '--- PSRemoting trusted hosts ---'
@@ -1802,14 +1811,23 @@ function Invoke-EventLogCollection {
         @{ Name = 'sysmon_operational'; Log = 'Microsoft-Windows-Sysmon/Operational'; Ids = @(1, 3, 6, 7, 8, 10, 11, 12, 13, 15, 22, 23, 25); Desc = 'Sysmon telemetry if Sysmon is deployed' }
     )
 
+    # GetNewClosure() copies *variables* into a private scope so each query keeps its own
+    # $q, but it does not copy script functions. Capture the helpers here or the task
+    # fails with "Get-EventsSafe is not recognized" (seen on Windows 11 / PS7).
+    $fnGetEvents = ${function:Get-EventsSafe}
+    $fnToRow = ${function:ConvertTo-EventRow}
+
     foreach ($q in $queries) {
         $needAdmin = $false
         if ($q.Log -eq 'Security') { $needAdmin = $true }
+        $query = $q
+        $windowStart = $start
+        $maxEv = $MaxEventsPerLog
         Invoke-Collection -Category 'EventLogs' -Name $q.Name -Format 'Csv' -Description $q.Desc -RequiresElevation:$needAdmin -Script {
-            $events = Get-EventsSafe -LogName $q.Log -EventIds $q.Ids -StartTime $start -MaxEvents $MaxEventsPerLog
+            $events = & $fnGetEvents -LogName $query.Log -EventIds $query.Ids -StartTime $windowStart -MaxEvents $maxEv
             if (-not $events) { return @() }
             $rows = @()
-            foreach ($e in $events) { $rows += (ConvertTo-EventRow -EventRecord $e -LogLabel $q.Log) }
+            foreach ($e in $events) { $rows += (& $fnToRow -EventRecord $e -LogLabel $query.Log) }
             $rows | Sort-Object TimeCreatedUtc -Descending
         }.GetNewClosure() | Out-Null
     }
