@@ -76,6 +76,10 @@ function Invoke-FotonPersistenceCollection {
         $rows
     } | Out-Null
 
+    Invoke-FotonCollection -Category 'Persistence' -Name 'startup_approved' -Format 'Csv' -Description 'Task Manager / Settings StartupApproved enable-disable bits (not the Startup folder)' -Script {
+        Get-FotonStartupApprovedRows
+    } | Out-Null
+
     Invoke-FotonCollection -Category 'Persistence' -Name 'scheduled_tasks' -Format 'Csv' -Description 'Scheduled tasks with actions, principals, and last run state' -Script {
         $rows = @()
         try {

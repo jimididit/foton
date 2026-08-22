@@ -16,7 +16,7 @@ Approved sequence. **Do not start a later step until the previous one is reviewa
 | 5 | `Build-Standalone.ps1` writes `dist/Foton-Collect.ps1`; VM run | **Done** (build + admin and standard-user VM runs) |
 | 6 | New capabilities: Baseline first, then IOC, then one parser with fixture, then carve **proposal** | **Done** (1.3.0) |
 
-Post-migration product work (not a blocked step): baseline schema **1.2.0** extra providers + compare HTML, LNK, IOC csv/json, MZ/PE carve, `Foton.cmd`. Recapture day0 baselines. See `docs/USAGE.md` and `docs/TODO.md` public-release bar.
+Post-migration product work (not a blocked step): baseline schema **1.4.0**, collect **1.1.0**, compare HTML, `Foton.cmd`. Recapture day0. See `docs/USAGE.md`, `docs/COVERAGE.md`, and `docs/TODO.md`.
 
 ## Equivalence (step 1–5)
 

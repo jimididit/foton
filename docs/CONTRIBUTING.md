@@ -4,9 +4,10 @@ This project is designed so someone new can add a **collector**, **baseline prov
 
 ## Before you write code
 
-1. Read [AGENTS.md](../AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [USAGE.md](USAGE.md), and [LAB.md](LAB.md) (host vs VMware guest).
+1. Read [AGENTS.md](../AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [USAGE.md](USAGE.md), [LAB.md](LAB.md), and **[COVERAGE.md](COVERAGE.md)** (in vs missing artifacts).
 2. Live triage behavior lives in frozen `WinFoton.ps1` until Collect is extracted. Do not “fix” naming inside that file.
 3. If the change is a large new capability (especially Carve/NTFS), propose it first.
+4. Prefer filling a **P0/P1** row in COVERAGE.md over a novel ASEP. Map the operator UI to the real artifact before coding.
 
 ## Naming and files
 
@@ -24,9 +25,9 @@ This project is designed so someone new can add a **collector**, **baseline prov
 
 ## Add a baseline provider
 
-Declare: record type, identity key, collect scriptblock, compared fields vs ignored fields (e.g. ignore service `State` and `ProcessId`; compare `PathName`, `StartMode`, `StartName`, binary hash).
+Declare: record type, identity key, collect scriptblock, compared fields vs ignored fields (e.g. ignore service `State` and `ProcessId`; compare `PathName`, `StartMode`, `StartName`, binary hash). Put the file in `src/Private/Baseline/Providers/`. Bump `BaselineSchemaVersion`. Update `docs/COVERAGE.md`.
 
-State likely false positives in the PR (e.g. software `DisplayName` churn from patch Tuesday).
+State likely false positives in the PR (e.g. software `DisplayName` churn from patch Tuesday; Settings startup toggles are `StartupApproved`, not `StartupFile`).
 
 ## Add an analysis rule
 

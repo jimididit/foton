@@ -169,4 +169,13 @@ putty
             ($r -eq $true -or $r -eq $false) | Should -Be $true
         }
     }
+
+    Describe 'Get-FotonStartupApprovedState' {
+        It 'maps Task Manager enable and disable bytes' {
+            Get-FotonStartupApprovedState -Value ([byte[]](2, 0, 0, 0)) | Should -Be 'Enabled'
+            Get-FotonStartupApprovedState -Value ([byte[]](3, 0, 0, 0, 0, 0, 0, 0)) | Should -Be 'Disabled'
+            Get-FotonStartupApprovedState -Value ([byte[]](7, 0, 0, 0)) | Should -Be 'Disabled'
+            Get-FotonStartupApprovedState -Value $null | Should -Be 'Unknown'
+        }
+    }
 }

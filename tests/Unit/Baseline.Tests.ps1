@@ -32,6 +32,12 @@ Describe 'Baseline providers and diff' {
                 Should -Contain 'HostsEntry'
             @($script:FotonBaselineProviders | ForEach-Object RecordType) |
                 Should -Contain 'Winlogon'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'StartupApproved'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'UserAutorun'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'DefenderPreference'
         }
     }
 

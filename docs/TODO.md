@@ -43,7 +43,7 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 **Layers to exercise on a lab VM (admin + standard user)**
 
 - [ ] Collect → open `Foton_Report.html` from the case folder (file://)
-- [ ] Recapture baseline after every `BaselineSchemaVersion` bump; Compare day0 vs day1 (now **1.2.0**)
+- [ ] Recapture baseline after every `BaselineSchemaVersion` bump; Compare day0 vs day1 (now **1.4.0**)
 - [ ] `Get-FotonPackage` on a `WinFoton_*` v1 zip and a `Foton_*` flatten folder
 - [ ] Parse `.pf` and `.lnk` copied into a case (not live reads)
 - [ ] IOC txt + csv against a known fixture package
@@ -60,7 +60,7 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 **Still later**
 
 - In-report CSV browser (this file, above)
-- More baseline providers (LSA packages, print monitors, BITS) as they earn a stable identity key
+- Baseline/Collect gaps in **[docs/COVERAGE.md](COVERAGE.md)** (next: Prefetch/Amcache copy-into-package, RemoteAccessConfig, EVTX parser)
 - EVTX / jumplist / Amcache parsers
 - Real NTFS carve engine (see `docs/CARVE.md`)
 

@@ -26,5 +26,9 @@ function Get-FotonBaselineChangeSeverity {
     if ($c.RecordType -eq 'Winlogon' -and $c.Identity -in @('Userinit', 'Shell', 'GinaDLL', 'System', 'UIHost')) { $sev = 'High' }
     if ($c.RecordType -eq 'AppInitDll' -and $c.ChangeType -in @('Added', 'Modified')) { $sev = 'High' }
     if ($c.RecordType -eq 'MachineEnvironment' -and $c.Identity -eq 'Path' -and $c.ChangeType -eq 'Modified') { $sev = 'High' }
+    if ($c.RecordType -eq 'StartupApproved' -and $c.Field -eq 'State') { $sev = 'High' }
+    if ($c.RecordType -eq 'UserAutorun' -and ($c.ChangeType -eq 'Added' -or $c.Field -eq 'Command')) { $sev = 'High' }
+    if ($c.RecordType -eq 'DefenderPreference' -and $c.Identity -like 'Switch|DisableRealtimeMonitoring') { $sev = 'High' }
+    if ($c.RecordType -eq 'DefenderPreference' -and $c.ChangeType -eq 'Added' -and $c.Identity -like 'Exclusion*') { $sev = 'High' }
     return $sev
 }

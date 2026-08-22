@@ -43,8 +43,8 @@ Foton.cmd help
 
 - Live collect **changes the host**. The report says so.
 - Findings are **observations**. The wrapper will not say “infected.”
-- A baseline taken after an incident is a picture of that state. Recapture after provider/schema changes (see BaselineSchemaVersion). Schema **1.2.0** cannot compare against **1.1.0** JSON from earlier GREY captures.
+- A baseline taken after an incident is a picture of that state. Recapture after provider/schema changes (see BaselineSchemaVersion). Schema **1.4.0** cannot compare against **1.3.0** JSON.
 
 ## Gaps before a public release (testing / UX)
 
-See `docs/TODO.md` section “Public-release bar.” Until those are ticked, treat Foton as a lab/internal tool.
+See `docs/TODO.md` section “Public-release bar” and `docs/COVERAGE.md` for artifact gaps. Until the release bar is ticked, treat Foton as a lab/internal tool.

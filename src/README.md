@@ -14,7 +14,7 @@ Foton source. `Foton.psm1` dotsources **Private** then **Public**.
 | `Public/Analyze` | Rules + IOC match over a package | Never |
 | `Public/Report` | HTML/CSS/JS rendering from findings + data | Never |
 
-**Adding a feature:** new file in the matching folder, filename = function name, comment-based help, a Pester test. Public commands must be listed in `Foton.psd1` `FunctionsToExport`.
+**Adding a feature:** new file in the matching folder, filename = function name, comment-based help, a Pester test. Public commands must be listed in `Foton.psd1` `FunctionsToExport`. Check [docs/COVERAGE.md](../docs/COVERAGE.md) so Collect vs Baseline vs Parse stay distinct.
 
 **Do not** add network calls or live registry/WMI reads under Parse, Carve, or Analyze.
 

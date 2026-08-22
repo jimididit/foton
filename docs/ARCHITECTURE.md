@@ -42,7 +42,11 @@ Collect does **not** require Administrator. A locked-down work PC is a valid tar
 
 Tasks that cannot succeed without admin are **skipped** (`SkippedNotElevated` in the manifest), not failed. `collection_coverage.json` plus an Info finding state the gap. `-RequireAdministrator` exits instead of collecting thin.
 
-Baseline capture of machine-wide services/drivers will be similarly privilege-aware when implemented: record what could not be read rather than inventing empty state.
+Baseline capture is privilege-aware: record what could not be read (`coverage.json`) rather than inventing empty state. Per-user rows need a loaded hive.
+
+## Coverage vs architecture
+
+Layers say *where code runs*. [docs/COVERAGE.md](COVERAGE.md) says *which Windows artifacts* belong in Collect vs Baseline vs Parse, what is P0 next, and what Foton will not become (memory imager, EDR, CIS scorer).
 
 ## Later: in-report artifact viewer
 

@@ -1,0 +1,130 @@
+# Coverage and product intent
+
+Living map of **what Foton is for**, **what each layer already captures**, and **what is still missing**. Update this file when you add a collector, baseline provider, or parser. Schema version numbers stay in `Foton.psd1`; this file is the *inventory*.
+
+Sources that shaped the gap list (industry practice, not a vendor checklist):
+
+- Sysinternals **Autoruns** ASEP categories ([Microsoft](https://learn.microsoft.com/en-us/sysinternals/downloads/autoruns)): logon, services, drivers, scheduled tasks, WMI, Winlogon, AppInit, IFEO, LSA, print monitors, KnownDLLs, Winsock, codecs, Office, boot execute.
+- MITRE ATT&CK persistence (TA0003): T1547 (Run/Startup/Winlogon/SSP), T1053.005 tasks, T1543.003 services, T1546 (WMI, IFEO, AppInit, COM), T1197 BITS.
+- Live-response kits in the same niche (NovaTrace-style IR zips, SANS baselining papers): volatile first, then persistence, then execution evidence (Prefetch, Amcache, SRUM, BAM), then EVTX - hashed package, admin preferred, standard-user gaps recorded.
+- Configuration-drift practice: compare a **known-good** snapshot to later state; Defender/`Get-MpPreference` and local admin membership are high-value *stable* surfaces, not “malware scores.”
+
+Foton must not become Autoruns, Velociraptor, WinPmem, or a CIS benchmark scorer. It automates **enough Windows DFIR** that an examiner gets a hashed package and a honest diff, then goes deeper with specialist tools.
+
+---
+
+## Use cases (in scope)
+
+| Use case | Layer | Success looks like |
+|----------|--------|-------------------|
+| **Live triage** | Collect | One file on the endpoint; volatile + persistence + logs + coverage JSON; HTML observations; no “infected” banner |
+| **What changed?** | Baseline temporal | Two snapshots of *stable* config; field-level Added/Removed/Modified; HTML compare |
+| **Host vs golden** | Baseline fleet | Same engine; wording says role image, not a clean-host certificate |
+| **Harden / audit snapshot** | Baseline + Collect security tasks | UAC/WDigest/SMB/Defender facts; drift vs a provisioning baseline |
+| **Offline execution evidence** | Parse | Prefetch, LNK, later Amcache/EVTX/SRUM from files *in the package* |
+| **IOC sweep** | Analyze | Text/CSV IOC against package rows, not a live host |
+
+## Use cases (out of scope unless we change product charter)
+
+- RAM acquisition, kernel dumps, packet capture
+- Full NTFS MFT/USN/$LogFile carving in PowerShell (see `docs/CARVE.md`)
+- Live VirusTotal / any Analyze-layer network
+- Remediation, quarantine, disabling startup apps
+- Domain-wide hunting (DCSync, GPO at the DC). Endpoint *may* later record “this host is Entra-joined” as a fact
+- Replacing EDR telemetry or Sysmon
+
+---
+
+## Collect vs Baseline (do not conflate)
+
+**Collect** answers “what is on this host *right now*, including volatile evidence?” PIDs, connections, Prefetch *listing*, Defender detections, sessions. Coverage gaps (`SkippedNotElevated`) are findings.
+
+**Baseline** answers “did *stable configuration* change between two observations?” Same machine state must hash the same. Exclude PIDs, connection 4-tuples, uptime, last-run times, ephemeral UDP, BITS transfer progress.
+
+A surface can exist in **both** (services, tasks, WMI) with different fields. Collect includes HKCU Run and `startup_approved`. Baseline **Autorun** is HKLM; **UserAutorun** is loaded-hive HKCU; **StartupApproved** is Settings/Task Manager enable bits. **Settings → Startup apps** is not the Startup folder.
+
+If Collect already captures a fact and Baseline does not, the examiner can still *see* it in a triage package; they cannot *diff* it over weeks without a provider.
+
+---
+
+## Collect today (v1 / flatten)
+
+Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
+
+| Category | In tree (high level) |
+|----------|----------------------|
+| System | OS, time sync, hotfixes, Secure Boot/TPM/BitLocker, disks, env, VSS |
+| Users | Local users/groups, profiles, sessions, RDP, secedit (admin), credential manager listing |
+| Processes | Process list + tree, nonstandard modules, PS history, RecentDocs |
+| Network | Connections, listeners, IP/ARP/DNS/hosts, firewall, shares, proxy, Wi-Fi profiles |
+| Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
+| Security | Defender status/prefs/detections, hardening CSV, auditpol (admin), SMB/WinRM, PS policy, non-MS roots, AppLocker/WDAC summary |
+| EventLogs | Capped queries + log configuration |
+| Filesystem | User-writable executables, recent System32 churn, Prefetch *listing*, ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
+| Software | Uninstall keys, drivers, browser extensions, RAT name hits, AppX |
+
+**Collect gaps (priority).** These are common in IR kits and still thin or missing as *package artifacts*:
+
+| Priority | Gap | Why it matters | Note |
+|----------|-----|----------------|------|
+| P0 | **Copy** Prefetch `.pf`, Amcache.hve, SRUM DB (capped) into the package | Parse cannot run on a listing CSV | Locked files: copy, record failure |
+| P1 | BAM/DAM, Shimcache (AppCompatCache) export | Execution evidence when Prefetch is off | Registry/hive; admin |
+| P1 | Named pipes | Classic IR volatile | High churn; Collect only |
+| P1 | Command Processor `AutoRun`, BootExecute, KnownDLLs, print monitors, Winsock LSP as **named** tasks | Autoruns tabs Foton currently folds or skips | Prefer dedicated CSVs |
+| P2 | Entra/workplace join, OneDrive/Teams local artifacts | Modern endpoints | Do not phone home |
+| P2 | Screensaver, SilentProcessExit, netsh helpers, time providers | Lower-volume ASEPs | |
+| P3 | Memory, pcap, full MFT | Wrong runtime | External tools |
+
+Standard-user Collect is **intentional**. Security log, Prefetch, other users’ hives stay skipped, not empty-success.
+
+---
+
+## Baseline today (schema 1.4.0)
+
+See `src/Public/Baseline/README.md` for identity keys.
+
+Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
+
+**Baseline gaps (priority).** Prefer these over exotic ASEPs. Each needs a stable identity key and documented false positives.
+
+| Priority | RecordType (proposed) | Identity sketch | Why / FP |
+|----------|----------------------|-----------------|----------|
+| P0 | RemoteAccessConfig | Setting (RDP NLA, WinRM, SMBv1 feature) | Audit/IR. FP: helpdesk enabling RDP |
+| P1 | LsaPackage | ValueName + package string | T1547.005. FP: third-party MFA |
+| P1 | PrintMonitor | Monitor name | Spooler SYSTEM DLL. FP: printer installs |
+| P1 | BitsJob | JobId | T1197. Compare type/flags, **not** bytes transferred |
+| P1 | CmdAutoRun | Hive + value | IFEO-adjacent. FP: autorun scripts |
+| P1 | BootExecute / SessionManager | Value name | Native boot images |
+| P1 | KnownDll | Name | Search-order override |
+| P1 | ProxyConfig | Scope + value | WinHTTP/user proxy. FP: PAC changes |
+| P2 | ComHijack | Hive + CLSID | Noisy; maybe Collect-only unless identity is tight |
+| P2 | OfficeAddin | Path + name | Collect has it; user churn |
+| P2 | WinsockLsp | Catalog id | Rare, high impact |
+| P2 | ActiveSetup | Component GUID | Logon once-per-user |
+| P2 | OptionalFeature / Appx (pinned) | Name | Noisy on consumer SKUs |
+| P3 | Codecs, gadgets, IE BHO | — | Low ROI unless hunting a specific family |
+| never | Ephemeral UDP, PIDs, last-run, bytes-in-flight | — | Destroys payload hash |
+
+**Hive load:** per-user baseline rows (StartupApproved, UserAutorun) only see **loaded** NTUSER hives unless we add optional `reg load` (always `finally`, disclose footprint). Document visibility gaps in `coverage.json`.
+
+---
+
+## Parse / Analyze / Carve
+
+| Layer | Have | Next (useful DFIR, still offline) |
+|-------|------|-----------------------------------|
+| Parse | Prefetch (uncompressed SCCA), LNK | EVTX (selected IDs), jumplists, Amcache, shellbags, SRUM, browser DB - **fixtures first** |
+| Analyze | Triage heuristics + IOC file | Rules that consume *parsed* rows and baseline diffs; never live WMI |
+| Carve | MZ/PE signature scan of a blob | Not NTFS unallocated in PS |
+
+---
+
+## How to extend (refinement rules)
+
+1. Map the **operator UI or ATT&CK technique** to the actual artifact (Startup apps → `StartupApproved`, not Startup folder).
+2. Decide Collect, Baseline, or both. Volatile → Collect only.
+3. New baseline provider: identity key, compared fields, false positives, schema bump, recapture day0.
+4. New collect task: facts, `RequiresElevation` if needed, manifest skip, no severity.
+5. If PowerShell cannot do it correctly (raw hive, memory), say so and point at a tool - do not emit a fake empty table.
+
+When this inventory changes, bump nothing unless on-disk columns change; then bump Collect or Baseline schema as in `src/Private/Schema/README.md`.

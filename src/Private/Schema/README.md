@@ -14,3 +14,22 @@ Silent diffs across schema versions are a defect.
 
 Package unit: a case **folder or ZIP**. Every public command should accept that unit so
 Collect on the endpoint and Analyze on the workstation compose without recollecting.
+
+## What schema is not
+
+Schema versions do **not** list every Windows artifact Foton might one day collect.
+That inventory (use cases, Collect vs Baseline, ASEP gaps, parse backlog) is
+[docs/COVERAGE.md](../../../docs/COVERAGE.md).
+
+| If you… | Bump |
+|---------|------|
+| Add a Collect CSV with a new task name or columns | CollectSchemaVersion |
+| Add or change a baseline RecordType / identity / compared fields | BaselineSchemaVersion (recapture day0) |
+| Add a finding property | FindingsSchemaVersion |
+| Only document a *planned* provider | Nothing - edit COVERAGE.md |
+
+Collect packages: **1.1.0** (`startup_approved` task). Baseline **1.4.0** (UserAutorun, DefenderPreference, StartupApproved). Older JSON will not compare across baseline schema bumps.
+
+Empty tables are allowed; empty *because we never mapped the artifact* (Settings
+startup vs Startup folder) is a coverage bug, not a schema event, until the
+provider exists and the version bumps.

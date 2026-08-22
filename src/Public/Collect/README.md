@@ -18,6 +18,8 @@ Live triage acquisition. **This layer may touch a running Windows host.**
 
 Collectors emit **facts**. Do not call `Add-FotonFinding` from Collect.
 
+**Coverage:** Collect includes per-user Run keys, **startup_approved**, BITS, COM candidates, LSA/IFEO. Prefetch/Amcache/SRUM are still listings unless copied into the package. Gap list: [docs/COVERAGE.md](../../../docs/COVERAGE.md).
+
 **Privilege:** `-RequiresElevation` on the collection wrapper for admin-only tasks.
 
 Ships to endpoints only via `dist/Foton-Collect.ps1` once flatten exists.

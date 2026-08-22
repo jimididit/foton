@@ -20,6 +20,8 @@ Streamline forensic analysis and security audits by capturing machine state into
 - Parse and (later) carve artifacts on an analyst workstation without touching the host again.
 - Add collectors, baseline providers, parsers, and analysis rules as separate files so the toolkit can grow without editing a 3k-line script.
 
+**Coverage intent:** automate the Windows DFIR loop that examiners actually run (live triage package, known-good vs later/golden diff, offline parse/IOC) without pretending to be Autoruns, EDR, or a memory imager. The inventory of what is in vs missing - and why Startup-folder ≠ Settings “Startup apps” - is **[docs/COVERAGE.md](docs/COVERAGE.md)**. Read that before adding a provider or collect task.
+
 ## Five capability layers (one core, one findings model, one report engine)
 
 | Layer | Purpose | Runs where |
@@ -38,8 +40,8 @@ Do not grow giant functions. Add a file:
 
 | You want to… | Add |
 |--------------|-----|
-| A new live artifact category | `src/Public/Collect/<Name>.ps1` + manifest export + tests |
-| A new stable config surface for diffs | `src/Public/Baseline` provider file (record type, identity key, compared fields) |
+| A new live artifact category | `src/Public/Collect/<Name>.ps1` + tests; add the task to [docs/COVERAGE.md](docs/COVERAGE.md) |
+| A new stable config surface for diffs | `src/Private/Baseline/Providers/<Name>.ps1` (record type, identity key, compared fields, false positives) + schema bump + COVERAGE.md |
 | A new file format parser | `src/Public/Parse/ConvertFrom-Foton*.ps1` + `tests/Fixtures/` + Pester |
 | A new heuristic | `src/Public/Analyze` rule file: one mock that fires, one that must not |
 | A new IOC source | feed `Invoke-FotonIocMatch` (when implemented); do not scrape the live host |
@@ -59,9 +61,10 @@ Foton/
       Core/                    # Write-FotonStatus, Invoke-FotonCollection, Add-FotonFinding, …
       Patterns/                # command/path/RAT/hardening data, not code
       Schema/                  # package + baseline + findings schema versions
+      Baseline/Providers/      # Register-FotonBaselineProvider files
     Public/
       Collect/                 # one file per category
-      Baseline/                # New-FotonBaseline, Compare-FotonBaseline, providers
+      Baseline/                # New-FotonBaseline, Compare-FotonBaseline
       Parse/                   # ConvertFrom-FotonPrefetch, -FotonLnk, …
       Carve/                   # Invoke-FotonCarve + signature recognizers
       Analyze/                 # Invoke-FotonAnalysis, rules, Invoke-FotonIocMatch
@@ -106,7 +109,9 @@ Every command (except Version) works against a **package** (case folder or ZIP) 
 
 ## Baseline layer - design guidance
 
-A baseline is a normalized, deterministic snapshot of *stable* configuration - services, scheduled tasks, autoruns, local accounts and group membership, drivers, installed software, firewall rules, shares, listening ports, hardening registry values, certificate stores, and hashes of key system binaries. It is not a triage collection; it excludes volatile state (PIDs, active connections, uptime, sessions).
+A baseline is a normalized, deterministic snapshot of *stable* configuration. It is not a triage collection and not a complete Autoruns dump. Current record types and the next ASEP/Defender/RDP gaps are listed in [docs/COVERAGE.md](docs/COVERAGE.md). Exclude volatile state (PIDs, active connections, uptime, sessions, ephemeral UDP, BITS bytes transferred).
+
+Operator-visible “startup apps” in Settings/Task Manager are **StartupApproved** (and usually HKCU Run), not files in the Startup folder. If the UI change would not alter a captured record type, Compare will correctly show zero diffs.
 
 1. **Deterministic serialization.** Same machine state → same bytes: stable property order, sorted collections, no collection timestamps inside the compared payload (header block only), invariant culture. A baseline is only useful if its hash means something.
 2. **Stable identity key per record type.** Service → `Name`. Task → `TaskPath` + `TaskName`. Autorun → `Key` + `ValueName`. Account → `SID`, never username. Driver → `Name`. Software → `DisplayName` + `Publisher`. Firewall → rule `Name` + direction. Certificate → `Store` + `Thumbprint`. Listener → protocol + address + port. Document the key with each provider.
@@ -177,6 +182,7 @@ Invoke-ScriptAnalyzer -Path .\src -Recurse -Severity Error,Warning |
 ## Working style
 
 - Plan before large refactors; focused edits otherwise. Don't reformat regions you aren't changing.
-- When adding a heuristic or baseline provider, state expected false-positive sources, not just the rule.
+- When adding a heuristic or baseline provider, state expected false-positive sources, not just the rule. Update [docs/COVERAGE.md](docs/COVERAGE.md).
+- Public operator docs (`README.md`, `docs/USAGE.md`) use placeholders (`CASE-0001`, `D:\Cases`, `HOSTNAME`). Contributor VM workflow stays in [docs/LAB.md](docs/LAB.md). Do not put editor, hypervisor, or personal host names in shipped operator docs.
 - Bump module and schema versions on behavior or format changes; keep docs in sync.
 - If a capability can't be done correctly in PowerShell, say so and propose the alternative. In forensics, a wrong answer is more expensive than a missing one.

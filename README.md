@@ -8,7 +8,7 @@ Foton captures host state into a hashed case **package**, then lets you compare 
 
 Photons penetrate glass; Foton is meant to make Windows state legible - not to declare compromise.
 
-**Module 1.6.0** - baseline schema **1.2.0** (recapture day0). Easy workstation path: `Foton.cmd help` ([docs/USAGE.md](docs/USAGE.md)).
+**Module 1.8.0** - baseline schema **1.4.0**, collect schema **1.1.0**. Recapture baselines after schema bumps. Workstation path: `Foton.cmd help` ([docs/USAGE.md](docs/USAGE.md)).
 
 ## Quick start (v1 collector)
 
@@ -21,11 +21,11 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 Typical **elevated** engagement:
 
 ```powershell
-.\WinFoton.ps1 -CaseNumber "JDI-2026-0142" -Examiner "J. Flynn" `
+.\WinFoton.ps1 -CaseNumber "CASE-0001" -Examiner "A. Examiner" `
                -OutputPath D:\Cases -EventLogDays 30 -LoadUserHives
 ```
 
-**Work PC / no admin** (default - collects what this user can read):
+**Work PC / no admin** (default - collects what the current user can read):
 
 ```powershell
 .\WinFoton.ps1 -CaseNumber "SELF-AUDIT" -OutputPath $env:USERPROFILE\Desktop
@@ -141,7 +141,8 @@ Until flatten (step 5), v1 still analyzes in-process inside `WinFoton.ps1`. The 
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, package, naming |
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to add a module/feature |
 | [docs/MIGRATION.md](docs/MIGRATION.md) | Extract plan from the frozen v1 script |
-| [docs/LAB.md](docs/LAB.md) | Host Cursor vs VMware guest (Defender, collect) |
+| [docs/LAB.md](docs/LAB.md) | Isolated Windows VM for live collect/baseline (contributors) |
+| [docs/COVERAGE.md](docs/COVERAGE.md) | Collect vs baseline artifact inventory |
 | [docs/CARVE.md](docs/CARVE.md) | Signature scan vs NTFS |
 | [docs/TODO.md](docs/TODO.md) | Later features (in-report artifact viewer, …) |
 | [AGENTS.md](AGENTS.md) | Invariants for human and AI contributors |
