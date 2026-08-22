@@ -43,7 +43,7 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 **Layers to exercise on a lab VM (admin + standard user)**
 
 - [ ] Collect → open `Foton_Report.html` from the case folder (file://)
-- [ ] Recapture baseline after every `BaselineSchemaVersion` bump; Compare day0 vs day1
+- [ ] Recapture baseline after every `BaselineSchemaVersion` bump; Compare day0 vs day1 (now **1.2.0**)
 - [ ] `Get-FotonPackage` on a `WinFoton_*` v1 zip and a `Foton_*` flatten folder
 - [ ] Parse `.pf` and `.lnk` copied into a case (not live reads)
 - [ ] IOC txt + csv against a known fixture package
@@ -60,7 +60,7 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 **Still later**
 
 - In-report CSV browser (this file, above)
-- Shares / binary hashes as baseline providers
+- More baseline providers (LSA packages, print monitors, BITS) as they earn a stable identity key
 - EVTX / jumplist / Amcache parsers
 - Real NTFS carve engine (see `docs/CARVE.md`)
 
@@ -68,7 +68,7 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 
 ## Flattened baseline package (same shipping idea as Collect)
 
-**Status:** Snapshot HTML + flatten exist (`New-FotonBaselineReport`, `build/Build-BaselineStandalone.ps1`). Compare-HTML is still later.
+**Status:** Snapshot HTML, flatten, and compare-HTML exist (`New-FotonBaselineReport`, `New-FotonBaselineCompareReport`, `build/Build-BaselineStandalone.ps1`).
 
 **User story:** Someone on a host (or a golden VM) copies **one file**, runs it, and gets a folder they can zip/hash/email to an analyst - without cloning the repo or reading JSON. Optional HTML so *they* can see “what was captured,” not so the tool declares the host clean.
 
@@ -89,7 +89,7 @@ Worth doing. JSON is the source of truth; HTML is a capped, escaped table per `R
 
 **HTML compare report - the visual that actually matters**
 
-A second page (or a mode of the same renderer) for **Added / Removed / Modified** rows after `Compare-FotonBaseline`. That is what an analyst wants in a browser. Do snapshot first, compare-HTML second. Do not generate a compare report on the endpoint (no second JSON there).
+`Compare-FotonBaseline` (workstation) writes **Added / Removed / Modified** to `Foton_BaselineCompare.html` beside the difference JSON. Do not generate a compare report on the endpoint (no second JSON there).
 
 **Not in this flatten**
 

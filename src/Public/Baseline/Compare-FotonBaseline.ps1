@@ -19,13 +19,21 @@ function Compare-FotonBaseline {
 
         Temporal diff. New Administrators members are High attention, not proof of compromise.
 
+    .PARAMETER OutputPath
+        HTML compare report path. Default: Foton_BaselineCompare.html beside the difference JSON.
+
+    .PARAMETER NoHtml
+        Skip the HTML file (tests and New-FotonBaselineCompareReport re-entry).
+
     .OUTPUTS
         Change records (RecordType, Identity, ChangeType, Field, OldValue, NewValue).
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$ReferencePath,
-        [Parameter(Mandatory)][string]$DifferencePath
+        [Parameter(Mandatory)][string]$DifferencePath,
+        [string]$OutputPath,
+        [switch]$NoHtml
     )
 
     $ReferencePath = Get-FotonBaselineJsonPath -Path $ReferencePath
@@ -43,7 +51,9 @@ function Compare-FotonBaseline {
     if ($ref.Header.Hostname -eq $dif.Header.Hostname) { $mode = 'Temporal' }
 
     if ($null -eq $script:FotonSession) { Initialize-FotonSession }
-    Write-FotonBanner -Kind 'Compare'
+    if (-not $NoHtml) {
+        Write-FotonBanner -Kind 'Compare'
+    }
     $script:FotonSession.Findings = New-Object System.Collections.ArrayList
 
     $provByType = @{}
@@ -102,18 +112,7 @@ function Compare-FotonBaseline {
     }
 
     foreach ($c in $changes) {
-        $sev = 'Medium'
-        if ($c.RecordType -eq 'InstalledSoftware' -and $c.Field -eq 'DisplayVersion') { $sev = 'Info' }
-        if ($c.RecordType -eq 'Service' -and $c.Field -eq 'PathName') { $sev = 'High' }
-        if ($c.RecordType -eq 'Driver' -and $c.Field -eq 'PathName') { $sev = 'High' }
-        if ($c.RecordType -eq 'Autorun' -and $c.Field -eq 'Command') { $sev = 'High' }
-        if ($c.RecordType -eq 'ScheduledTask' -and $c.Field -eq 'Actions') { $sev = 'High' }
-        if ($c.RecordType -eq 'HardeningRegistry' -and $c.Identity -in @('UseLogonCredential', 'EnableLUA', 'AlwaysInstallElevated')) { $sev = 'High' }
-        if ($c.RecordType -eq 'LocalGroupMember' -and $c.ChangeType -eq 'Added' -and $c.Identity -like 'Administrators|*') { $sev = 'High' }
-        if ($c.RecordType -eq 'Certificate' -and $c.ChangeType -eq 'Added' -and $c.Identity -like 'Cert:\LocalMachine\Root|*') { $sev = 'High' }
-        if ($c.RecordType -eq 'FirewallRule' -and $c.ChangeType -eq 'Added') { $sev = 'Medium' }
-        if ($c.RecordType -eq 'Listener' -and $c.ChangeType -eq 'Added') { $sev = 'Low' }
-        if ($c.RecordType -eq 'LocalAccount' -and $c.ChangeType -eq 'Added') { $sev = 'Medium' }
+        $sev = Get-FotonBaselineChangeSeverity -Change $c
 
         $title = "{0} {1}" -f $c.ChangeType, $c.RecordType
         $obs = "Identity '{0}'." -f $c.Identity
@@ -129,5 +128,15 @@ function Compare-FotonBaseline {
     }
 
     Write-FotonStatus ("Baseline diff ({0}): {1} change(s), {2} finding(s)" -f $mode, $changes.Count, $script:FotonSession.Findings.Count) 'Good'
+
+    if (-not $NoHtml) {
+        if (-not $OutputPath) {
+            $OutputPath = Join-Path (Split-Path -Parent $DifferencePath) 'Foton_BaselineCompare.html'
+        }
+        New-FotonBaselineCompareReport -Changes $changes -Mode $mode `
+            -ReferenceHeader $ref.Header -DifferenceHeader $dif.Header `
+            -OutputPath $OutputPath | Out-Null
+    }
+
     return $changes
 }

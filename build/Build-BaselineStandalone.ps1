@@ -2,7 +2,7 @@
 #
 # Ship Baseline capture as one file. Concatenates Private/Core, baseline
 # providers, New-FotonBaseline, and New-FotonBaselineReport.
-# Does not include Collect, Analyze heuristics, or Parse.
+# Does not include Collect, Analyze heuristics, Parse, or compare-HTML (workstation).
 
 [CmdletBinding()]
 param(

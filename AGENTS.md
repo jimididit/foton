@@ -88,7 +88,8 @@ Get-FotonVersion       # module + schema versions (exists now)
 Invoke-FotonTriage     # orchestrator: collect -> analyze -> report -> package (v1 behavior)
 New-FotonBaseline      # capture a normalized state snapshot (JSON or package folder)
 New-FotonBaselineReport # HTML snapshot of one baseline (capped tables)
-Compare-FotonBaseline  # diff two snapshots into field-level change records + findings
+New-FotonBaselineCompareReport # HTML Added/Removed/Modified (workstation)
+Compare-FotonBaseline  # diff two snapshots into field-level change records + findings (+ HTML unless -NoHtml)
 ConvertFrom-FotonPrefetch
 ConvertFrom-FotonLnk
 Invoke-FotonParse      # parse raw artifacts in a package into structured records

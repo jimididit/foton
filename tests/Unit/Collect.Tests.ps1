@@ -32,6 +32,7 @@ Describe 'Collect category functions (extracted)' {
                 'Invoke-FotonParse'
                 'Invoke-FotonTriage'
                 'New-FotonBaseline'
+                'New-FotonBaselineCompareReport'
                 'New-FotonBaselineReport'
                 'New-FotonReport'
             )

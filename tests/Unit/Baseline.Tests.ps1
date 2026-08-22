@@ -24,6 +24,14 @@ Describe 'Baseline providers and diff' {
                 Should -Contain 'Certificate'
             @($script:FotonBaselineProviders | ForEach-Object RecordType) |
                 Should -Contain 'Listener'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'NetworkShare'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'SystemBinary'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'HostsEntry'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'Winlogon'
         }
     }
 
@@ -41,7 +49,7 @@ Describe 'Baseline providers and diff' {
     }
 
     It 'diffs field-level changes and fires High on service PathName and new admin' {
-        $changes = Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif
+        $changes = Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif -NoHtml
         $path = @($changes | Where-Object { $_.RecordType -eq 'Service' -and $_.Field -eq 'PathName' })
         $path.Count | Should -Be 1
         $path[0].ChangeType | Should -Be 'Modified'
@@ -58,7 +66,7 @@ Describe 'Baseline providers and diff' {
     }
 
     It 'does not treat a software version bump as High' {
-        Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif | Out-Null
+        Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif -NoHtml | Out-Null
         InModuleScope Foton {
             @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Modified InstalledSoftware' -and $_.Severity -eq 'Info' }) |
                 Should -Not -BeNullOrEmpty
@@ -101,10 +109,29 @@ Describe 'New-FotonBaselineReport' {
         New-Item -Path $dir -ItemType Directory | Out-Null
         Copy-Item -LiteralPath $script:Ref -Destination (Join-Path $dir 'baseline.json')
         try {
-            Compare-FotonBaseline -ReferencePath $dir -DifferencePath $script:Dif | Out-Null
+            Compare-FotonBaseline -ReferencePath $dir -DifferencePath $script:Dif -NoHtml | Out-Null
         }
         finally {
             Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+Describe 'New-FotonBaselineCompareReport' {
+    It 'renders Added/Removed/Modified without network script tags' {
+        $htmlPath = Join-Path $env:TEMP ('foton-base-cmp-' + [guid]::NewGuid().ToString('N') + '.html')
+        try {
+            $out = New-FotonBaselineCompareReport -ReferencePath $script:Ref -DifferencePath $script:Dif -OutputPath $htmlPath
+            $out | Should -Be $htmlPath
+            $html = Get-Content -LiteralPath $htmlPath -Raw
+            $html | Should -Match 'Baseline compare'
+            $html | Should -Match 'Added'
+            $html | Should -Match 'LocalGroupMember'
+            $html | Should -Match 'High'
+            $html | Should -Not -Match '<script src="https://'
+        }
+        finally {
+            Remove-Item -LiteralPath $htmlPath -Force -ErrorAction SilentlyContinue
         }
     }
 }

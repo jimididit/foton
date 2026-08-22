@@ -12,7 +12,7 @@
 #
 @{
     RootModule        = 'Foton.psm1'
-    ModuleVersion     = '1.5.0'
+    ModuleVersion     = '1.6.0'
     GUID              = 'b7e4c1a2-8d3f-4a91-9c6e-2f0d5a8b1e73'
     Author            = 'JDI Consulting'
     CompanyName       = 'JDI Consulting'
@@ -39,6 +39,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
         'Invoke-FotonTriage'
         'New-FotonBaseline'
         'New-FotonBaselineReport'
+        'New-FotonBaselineCompareReport'
         'Compare-FotonBaseline'
         'Invoke-FotonIocMatch'
         'ConvertFrom-FotonPrefetch'
@@ -54,13 +55,13 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = '1.5.0: flattened Foton-Baseline.ps1 package (folder/ZIP/hash) and HTML snapshot report. Recapture still required after baseline schema bumps.'
+            ReleaseNotes = '1.6.0: baseline schema 1.2.0 (extra providers, UDP ephemeral listeners omitted), HTML compare report. Recapture day0 after this bump.'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.
             CollectSchemaVersion  = '1.0.0'
             # Baseline payload identity keys and compared fields. Diff must refuse a mismatch.
-            BaselineSchemaVersion = '1.1.0'
+            BaselineSchemaVersion = '1.2.0'
             # Findings object shape (Severity, Tier, Artifact, ...).
             FindingsSchemaVersion = '1.0.0'
         }

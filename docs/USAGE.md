@@ -21,7 +21,7 @@ Optional: `-NoZip`, `-RequireAdministrator`, same switches as `WinFoton.ps1`.
 3. `powershell -ExecutionPolicy Bypass -File .\Foton-Baseline.ps1`
 4. Open **`Foton_Baseline.html`** inside `FotonBaseline_<HOST>_...Z`. Send the ZIP and `_PACKAGE_HASH.txt` like a collect package.
 
-`Foton.cmd baseline D:\Baselines` writes a package. `Foton.cmd baseline D:\x.json` still writes a bare JSON. Compare accepts a folder that contains `baseline.json`.
+`Foton.cmd baseline D:\Baselines` writes a package. `Foton.cmd baseline D:\x.json` still writes a bare JSON. Compare accepts a folder that contains `baseline.json` and writes **`Foton_BaselineCompare.html`** next to the second JSON.
 
 ## 2. The PC you analyze on (workstation, this repo)
 
@@ -43,7 +43,7 @@ Foton.cmd help
 
 - Live collect **changes the host**. The report says so.
 - Findings are **observations**. The wrapper will not say “infected.”
-- A baseline taken after an incident is a picture of that state. Recapture after provider/schema changes (see BaselineSchemaVersion).
+- A baseline taken after an incident is a picture of that state. Recapture after provider/schema changes (see BaselineSchemaVersion). Schema **1.2.0** cannot compare against **1.1.0** JSON from earlier GREY captures.
 
 ## Gaps before a public release (testing / UX)
 

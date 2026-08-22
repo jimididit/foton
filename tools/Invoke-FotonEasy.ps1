@@ -86,8 +86,9 @@ switch ($cmd) {
     }
     'compare' {
         $b = $Rest | Select-Object -First 1
-        if (-not $Target -or -not $b) { throw 'Usage: Foton.cmd compare <day0.json> <day1.json>' }
+        if (-not $Target -or -not $b) { throw 'Usage: Foton.cmd compare <day0.json-or-folder> <day1.json-or-folder>' }
         Compare-FotonBaseline -ReferencePath $Target -DifferencePath $b | Format-Table -AutoSize
+        Write-Host '  Open Foton_BaselineCompare.html next to the second baseline JSON.' -ForegroundColor Green
     }
     'parse' {
         if (-not $Target) { throw 'Usage: Foton.cmd parse <file.pf|file.lnk>' }

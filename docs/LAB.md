@@ -40,7 +40,7 @@ Get-FotonVersion
 
 Compare **task names, file names, column sets, and finding titles** against a `WinFoton.ps1` package from the same snapshot - not PIDs or connection counts.
 
-**Baseline schema 1.1.0:** after pulling this tree, recapture day0 (`New-FotonBaseline` or `Foton.cmd baseline`). Compare will refuse a 1.0.0 JSON against 1.1.0.
+**Baseline schema 1.2.0:** after pulling this tree, recapture day0 (`New-FotonBaseline` or `Foton-Baseline.ps1`). Compare will refuse a 1.1.0 JSON against 1.2.0.
 
 Workstation (host or guest) without memorizing cmdlets: `Foton.cmd help` - see `docs/USAGE.md`.
 
@@ -51,7 +51,7 @@ Revert the snapshot after noisy collect runs, or keep a second snapshot “dirty
 On the **host**, open this repo in Cursor and tell the agent:
 
 - Read `AGENTS.md` and `docs/MIGRATION.md`.
-- Next: more parsers (EVTX, jumplists), richer IOC, shares/binary-hash baseline providers. Carve is **signature scan only** (`Invoke-FotonCarve`); no NTFS unallocated in PowerShell. Flatten after Core/Collect: `.\build\Build-Standalone.ps1`. Recapture baselines after schema bumps. Easy path: `Foton.cmd` / `docs/USAGE.md`. Public-release checklist: `docs/TODO.md`.
+- Next: more parsers (EVTX, jumplists), richer IOC. Carve is **signature scan only** (`Invoke-FotonCarve`); no NTFS unallocated in PowerShell. Flatten after Core/Collect: `.\build\Build-Standalone.ps1`. Recapture baselines after schema bumps. Easy path: `Foton.cmd` / `docs/USAGE.md`. Public-release checklist: `docs/TODO.md`.
 - Live collect is still `WinFoton.ps1`. Do not rename internals in that file.
 - Product name is **Foton**. Lab policy is this file.
 
