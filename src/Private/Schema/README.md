@@ -28,7 +28,7 @@ That inventory (use cases, Collect vs Baseline, ASEP gaps, parse backlog) is
 | Add a finding property | FindingsSchemaVersion |
 | Only document a *planned* provider | Nothing - edit COVERAGE.md |
 
-Collect packages: **1.2.0** (`prefetch_files`, `amcache_hive`, `srum_database` copies under `08_Filesystem/`). Baseline **1.11.0** (KnownDll, ProxyConfig). Older JSON will not compare across baseline schema bumps. You may recapture day0 once after a batch of provider adds.
+Collect packages: **1.3.0** (named persistence CSVs + Prefetch/Amcache/SRUM copies). Baseline **1.12.0** (WinsockLsp, ActiveSetup). Older JSON will not compare across baseline schema bumps.
 
 Empty tables are allowed; empty *because we never mapped the artifact* (Settings
 startup vs Startup folder) is a coverage bug, not a schema event, until the

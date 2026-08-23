@@ -38,5 +38,8 @@ function Get-FotonBaselineChangeSeverity {
     if ($c.RecordType -eq 'KnownDll') { $sev = 'High' }
     if ($c.RecordType -eq 'ProxyConfig') { $sev = 'High' }
     if ($c.RecordType -eq 'ProxyConfig' -and [string]$c.Identity -like '*|AutoConfigURL') { $sev = 'Medium' }
+    if ($c.RecordType -eq 'WinsockLsp') { $sev = 'High' }
+    if ($c.RecordType -eq 'ActiveSetup' -and ($c.ChangeType -in @('Added', 'Removed') -or $c.Field -eq 'StubPath')) { $sev = 'High' }
+    if ($c.RecordType -eq 'ActiveSetup' -and $c.Field -eq 'Version') { $sev = 'Info' }
     return $sev
 }

@@ -37,7 +37,7 @@ Foton.cmd carve     D:\blob.bin
 Foton.cmd help
 ```
 
-Parse writes `analysis\Foton_Parse.html` and `parsed_records.csv`. Analyze writes `Foton_Report.html` and `analysis\findings.csv`. Those are different products.
+Parse writes `analysis\Foton_Parse.html` and `parsed_records.csv` (Prefetch, LNK, selected-ID EVTX). Analyze writes `Foton_Report.html` and `analysis\findings.csv`. Those are different products.
 
 `Foton.cmd` is a wrapper. PowerShell cmdlets remain for people who already live in a shell.
 
@@ -45,7 +45,7 @@ Parse writes `analysis\Foton_Parse.html` and `parsed_records.csv`. Analyze write
 
 - Live collect **changes the host**. The report says so.
 - Findings are **observations**. The wrapper will not say “infected.”
-- A baseline taken after an incident is a picture of that state. Recapture after provider/schema changes (see BaselineSchemaVersion). Schema **1.11.0** cannot compare against **1.10.0** JSON. P1 providers are complete; recapture day0 once against this schema.
+- A baseline taken after an incident is a picture of that state. Recapture after provider/schema changes (see BaselineSchemaVersion). Schema **1.12.0** cannot compare against **1.11.0** JSON.
 
 ## Gaps before a public release (testing / UX)
 

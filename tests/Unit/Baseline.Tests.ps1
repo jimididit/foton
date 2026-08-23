@@ -54,6 +54,10 @@ Describe 'Baseline providers and diff' {
                 Should -Contain 'KnownDll'
             @($script:FotonBaselineProviders | ForEach-Object RecordType) |
                 Should -Contain 'ProxyConfig'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'WinsockLsp'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'ActiveSetup'
         }
     }
 
@@ -166,6 +170,28 @@ Describe 'Baseline providers and diff' {
             $machine | Should -Contain 'AutoConfigURL'
             @($rows | Where-Object { $_.Scope -eq 'WinHttp' -and $_.Setting -eq 'WinHttpSettings' }).Count | Should -Be 1
             @($rows | Where-Object { $_.Setting -eq 'DefaultConnectionSettings' }).Count | Should -Be 0
+        }
+    }
+
+    It 'captures WinsockLsp catalog entries with a LibraryPath' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'WinsockLsp' })[0]
+            $prov.IdentityFields | Should -Contain 'Kind'
+            $prov.IdentityFields | Should -Contain 'Entry'
+            $rows = @(& $prov.Collect)
+            $rows.Count | Should -BeGreaterThan 0
+            $rows[0].PSObject.Properties.Name | Should -Contain 'LibraryPath'
+        }
+    }
+
+    It 'captures ActiveSetup HKLM GUIDs with StubPath' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'ActiveSetup' })[0]
+            $prov.IdentityFields | Should -Contain 'Guid'
+            $rows = @(& $prov.Collect)
+            $rows.Count | Should -BeGreaterThan 0
+            $rows[0].PSObject.Properties.Name | Should -Contain 'StubPath'
+            $rows[0].Key | Should -Match 'Active Setup'
         }
     }
 

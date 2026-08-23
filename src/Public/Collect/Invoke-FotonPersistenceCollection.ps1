@@ -264,6 +264,98 @@ function Invoke-FotonPersistenceCollection {
         $rows
     } | Out-Null
 
+    Invoke-FotonCollection -Category 'Persistence' -Name 'cmd_autorun' -Format 'Csv' -Description 'cmd.exe Command Processor AutoRun (HKLM and loaded HKCU)' -Script {
+        $rows = @()
+        foreach ($rel in @('SOFTWARE\Microsoft\Command Processor', 'SOFTWARE\Wow6432Node\Microsoft\Command Processor')) {
+            $path = 'HKLM:\' + $rel
+            if ($rel -like '*Wow6432Node*' -and -not (Test-Path -LiteralPath 'HKLM:\SOFTWARE\Wow6432Node')) { continue }
+            $val = Get-FotonRegValue -Path $path -Name 'AutoRun'
+            $shown = '(not set)'
+            if ($null -ne $val -and [string]$val -ne '') { $shown = [string]$val }
+            $rows += [PSCustomObject]@{ Scope = 'HKLM'; Key = $rel; Command = $shown }
+        }
+        foreach ($h in @(Get-FotonUserHiveRoot)) {
+            foreach ($rel in @('Software\Microsoft\Command Processor', 'Software\Wow6432Node\Microsoft\Command Processor')) {
+                $val = Get-FotonRegValue -Path (Join-Path $h.Root $rel) -Name 'AutoRun'
+                if ($null -eq $val -or [string]$val -eq '') { continue }
+                $rows += [PSCustomObject]@{ Scope = $h.UserName; Key = $rel; Command = [string]$val }
+            }
+        }
+        $rows
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Persistence' -Name 'session_manager_boot' -Format 'Csv' -Description 'Session Manager BootExecute family (includes PFRO as a live fact)' -Script {
+        $rows = @()
+        $sm = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager'
+        foreach ($n in @('BootExecute', 'BootExecuteNoPnpSync', 'SetupExecute', 'Execute', 'S0InitialCommand', 'PendingFileRenameOperations')) {
+            $val = Get-FotonRegValue -Path $sm -Name $n
+            $shown = '(not set)'
+            if ($null -ne $val) {
+                $parts = @()
+                foreach ($x in @($val)) { if ([string]$x) { $parts += [string]$x } }
+                if ($parts.Count -gt 0) { $shown = ($parts -join ' ') }
+            }
+            $rows += [PSCustomObject]@{ Name = $n; Value = $shown }
+        }
+        $rows
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Persistence' -Name 'known_dlls' -Format 'Csv' -Description 'Session Manager KnownDLLs search-order map' -Script {
+        $rows = @()
+        foreach ($v in (Get-FotonRegValueList -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\KnownDLLs')) {
+            $rows += [PSCustomObject]@{ Name = $v.Name; MappedFile = $v.Value }
+        }
+        $rows
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Persistence' -Name 'winsock_lsp' -Format 'Csv' -Description 'Winsock protocol and namespace catalog LibraryPath' -Script {
+        $rows = @()
+        $protoRoot = 'HKLM:\SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\Protocol_Catalog9'
+        foreach ($leaf in @('Catalog_Entries', 'Catalog_Entries64')) {
+            $root = Join-Path $protoRoot $leaf
+            if (-not (Test-Path -LiteralPath $root)) { continue }
+            $kind = 'Protocol'
+            if ($leaf -eq 'Catalog_Entries64') { $kind = 'Protocol64' }
+            foreach ($sub in (Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue)) {
+                $packed = Get-FotonRegValue -Path $sub.PSPath -Name 'PackedCatalogItem'
+                $rows += [PSCustomObject]@{
+                    Kind        = $kind
+                    Entry       = $sub.PSChildName
+                    LibraryPath = Get-FotonWinsockPackedPath -Bytes $packed
+                }
+            }
+        }
+        $ns = 'HKLM:\SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\NameSpace_Catalog5\Catalog_Entries'
+        foreach ($sub in (Get-ChildItem -LiteralPath $ns -ErrorAction SilentlyContinue)) {
+            $lib = Get-FotonRegValue -Path $sub.PSPath -Name 'LibraryPath'
+            $shown = '(not set)'
+            if ($null -ne $lib -and [string]$lib -ne '') { $shown = [string]$lib }
+            $rows += [PSCustomObject]@{ Kind = 'Namespace'; Entry = $sub.PSChildName; LibraryPath = $shown }
+        }
+        $rows
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Persistence' -Name 'active_setup' -Format 'Csv' -Description 'HKLM Active Setup Installed Components StubPath' -Script {
+        $rows = @()
+        foreach ($root in @(
+                'HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components',
+                'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Active Setup\Installed Components'
+            )) {
+            if (-not (Test-Path -LiteralPath $root)) { continue }
+            foreach ($sub in (Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue)) {
+                $stub = Get-FotonRegValue -Path $sub.PSPath -Name 'StubPath'
+                $ver = Get-FotonRegValue -Path $sub.PSPath -Name 'Version'
+                $rows += [PSCustomObject]@{
+                    Key      = $root
+                    Guid     = $sub.PSChildName
+                    StubPath = $(if ($null -eq $stub -or [string]$stub -eq '') { '(not set)' } else { [string]$stub })
+                    Version  = $(if ($null -eq $ver -or [string]$ver -eq '') { '(not set)' } else { [string]$ver })
+                }
+            }
+        }
+        $rows
+    } | Out-Null
+
     Invoke-FotonCollection -Category 'Persistence' -Name 'com_hijack_candidates' -Format 'Csv' -Description 'Per-user COM CLSID overrides pointing to user-writable DLLs' -Script {
         $rows = @()
         foreach ($hiveRoot in (Get-FotonUserHiveRoot)) {

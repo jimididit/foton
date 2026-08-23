@@ -18,6 +18,15 @@ Describe 'Collect category functions (extracted)' {
         }
     }
 
+    It 'adds named persistence CSVs for CmdAutoRun, Session Manager, KnownDLLs, Winsock, Active Setup' {
+        $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonPersistenceCollection.ps1') -Raw
+        $src | Should -Match "Name 'cmd_autorun'"
+        $src | Should -Match "Name 'session_manager_boot'"
+        $src | Should -Match "Name 'known_dlls'"
+        $src | Should -Match "Name 'winsock_lsp'"
+        $src | Should -Match "Name 'active_setup'"
+    }
+
     It 'adds copy-into-package tasks for Prefetch, Amcache, and SRUM' {
         $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonFilesystemCollection.ps1') -Raw
         $src | Should -Match "Name 'prefetch_files'"
@@ -30,6 +39,7 @@ Describe 'Collect category functions (extracted)' {
         Get-Command -Module Foton | Select-Object -ExpandProperty Name | Sort-Object |
             Should -Be @(
                 'Compare-FotonBaseline'
+                'ConvertFrom-FotonEvtx'
                 'ConvertFrom-FotonLnk'
                 'ConvertFrom-FotonPrefetch'
                 'Get-FotonPackage'

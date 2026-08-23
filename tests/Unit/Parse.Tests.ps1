@@ -51,6 +51,32 @@ Describe 'ConvertFrom-FotonLnk' {
     }
 }
 
+Describe 'ConvertFrom-FotonEvtx' {
+    It 'emits unsupported for non-evtx bytes' {
+        $r = ConvertFrom-FotonEvtx -Path (Join-Path $script:Fx 'prefetch-not.bin')
+        $r.Format | Should -Be 'Unsupported-NotEvtx'
+        $r.Supported | Should -Be $false
+    }
+
+    It 'parses selected IDs from a wevtutil export when Application log is readable' {
+        $tmp = Join-Path $env:TEMP ('foton-evtx-' + [guid]::NewGuid().ToString('N') + '.evtx')
+        try {
+            $null = & wevtutil.exe epl Application $tmp '/q:*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]' /ow:true 2>&1
+            if (-not (Test-Path -LiteralPath $tmp) -or (Get-Item -LiteralPath $tmp).Length -lt 16) {
+                Set-ItResult -Skipped -Because 'wevtutil did not export Application.evtx'
+                return
+            }
+            $rows = @(ConvertFrom-FotonEvtx -Path $tmp -MaxEvents 5)
+            $rows.Count | Should -BeGreaterThan 0
+            $rows[0].Format | Should -Be 'EVTX'
+            $rows[0].Supported | Should -Be $true
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Describe 'Invoke-FotonParse' {
     It 'says so when a package has no .pf or .lnk files' {
         $case = Join-Path $env:TEMP ('foton-parse-empty-' + [guid]::NewGuid().ToString('N'))

@@ -57,7 +57,7 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | Users | Local users/groups, profiles, sessions, RDP, secedit (admin), credential manager listing |
 | Processes | Process list + tree, nonstandard modules, PS history, RecentDocs |
 | Network | Connections, listeners, IP/ARP/DNS/hosts, firewall, shares, proxy, Wi-Fi profiles |
-| Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
+| Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, **cmd_autorun**, **session_manager_boot**, **known_dlls**, **winsock_lsp**, **active_setup**, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
 | Security | Defender status/prefs/detections, hardening CSV, auditpol (admin), SMB/WinRM, PS policy, non-MS roots, AppLocker/WDAC summary |
 | EventLogs | Capped queries + log configuration |
 | Filesystem | User-writable executables, recent System32 churn, Prefetch listing + **copied `.pf`** (capped), **Amcache.hve** (+ logs), **SRUM** (+ WAL/SHM), ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
@@ -70,7 +70,7 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | done (1.2.0) | Copy Prefetch `.pf`, Amcache.hve, SRUM DB (capped) | Parse cannot run on a listing CSV | Locked files: `Copy-FotonHostFile` FileShare.ReadWrite; failures in the copy CSV |
 | P1 | BAM/DAM, Shimcache (AppCompatCache) export | Execution evidence when Prefetch is off | Registry/hive; admin |
 | P1 | Named pipes | Classic IR volatile | High churn; Collect only |
-| P1 | Command Processor `AutoRun`, BootExecute, KnownDLLs, print monitors, Winsock LSP as **named** tasks | Autoruns tabs Foton currently folds or skips | Prefer dedicated CSVs |
+| done (1.3.0) | Named CSVs: cmd_autorun, session_manager_boot, known_dlls, winsock_lsp, active_setup | Autoruns tabs as dedicated files | Folded winlogon_lsa CSV still exists |
 | P2 | Entra/workplace join, OneDrive/Teams local artifacts | Modern endpoints | Do not phone home |
 | P2 | Screensaver, SilentProcessExit, netsh helpers, time providers | Lower-volume ASEPs | |
 | P3 | Memory, pcap, full MFT | Wrong runtime | External tools |
@@ -79,11 +79,11 @@ Standard-user Collect is **intentional**. Security log, Prefetch, other users’
 
 ---
 
-## Baseline today (schema 1.11.0)
+## Baseline today (schema 1.12.0)
 
 See `src/Public/Baseline/README.md` for identity keys.
 
-Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, **PrintMonitor**, **BitsJob**, **CmdAutoRun**, **SessionManager**, **KnownDll**, **ProxyConfig**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
+Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, **PrintMonitor**, **BitsJob**, **CmdAutoRun**, **SessionManager**, **KnownDll**, **ProxyConfig**, **WinsockLsp**, **ActiveSetup**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
 
 **Baseline gaps (priority).** Prefer these over exotic ASEPs. Each needs a stable identity key and documented false positives.
 
@@ -97,10 +97,10 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 | done (1.10.0) | SessionManager | Kind + Name | BootExecute family + AppCertDlls. **Not** PFRO. FP: autocheck, disk tools |
 | done (1.11.0) | KnownDll | Name | Search-order map. FP: feature updates |
 | done (1.11.0) | ProxyConfig | Scope + Setting | WinHTTP + IE settings. FP: PAC. Not DefaultConnectionSettings |
-| P2 | ComHijack | Hive + CLSID | Noisy; maybe Collect-only unless identity is tight |
-| P2 | OfficeAddin | Path + name | Collect has it; user churn |
-| P2 | WinsockLsp | Catalog id | Rare, high impact |
-| P2 | ActiveSetup | Component GUID | Logon once-per-user |
+| done (1.12.0) | WinsockLsp | Kind + Entry | Catalog LibraryPath. FP: VPN/EDR |
+| done (1.12.0) | ActiveSetup | Key + Guid | HKLM StubPath. Version = Info. HKCU once-run is Collect-only |
+| Collect-only | ComHijack | — | `com_hijack_candidates` CSV; too noisy for a stable baseline |
+| Collect-only | OfficeAddin | — | `office_addins_and_templates`; user churn |
 | P2 | OptionalFeature / Appx (pinned) | Name | Noisy on consumer SKUs |
 | P3 | Codecs, gadgets, IE BHO | — | Low ROI unless hunting a specific family |
 | never | Ephemeral UDP, PIDs, last-run, bytes-in-flight | — | Destroys payload hash |
@@ -113,7 +113,7 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 
 | Layer | Have | Next (useful DFIR, still offline) |
 |-------|------|-----------------------------------|
-| Parse | Prefetch (uncompressed SCCA), LNK | EVTX (selected IDs), jumplists, Amcache *parser*, shellbags, SRUM *parser*, browser DB - **fixtures first**. Collect now copies the files. |
+| Parse | Prefetch (uncompressed SCCA), LNK, **EVTX (selected IDs, capped)** | Jumplists, Amcache *parser* (raw hive, not invented fields), shellbags, SRUM *parser* (ESE), browser DB - **fixtures first**. Collect copies Amcache/SRUM; do not fake a parse. |
 | Analyze | Triage heuristics + IOC file | Rules that consume *parsed* rows and baseline diffs; never live WMI |
 | Carve | MZ/PE signature scan of a blob | Not NTFS unallocated in PS |
 

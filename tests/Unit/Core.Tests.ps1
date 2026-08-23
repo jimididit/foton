@@ -341,6 +341,29 @@ putty
             }
             Get-FotonBaselineChangeSeverity -Change $a | Should -Be 'Medium'
         }
+        It 'ranks WinsockLsp and ActiveSetup StubPath as High and ActiveSetup Version as Info' {
+            $w = [PSCustomObject]@{
+                RecordType = 'WinsockLsp'
+                Identity   = 'Protocol|000000000001'
+                ChangeType = 'Modified'
+                Field      = 'LibraryPath'
+            }
+            Get-FotonBaselineChangeSeverity -Change $w | Should -Be 'High'
+            $s = [PSCustomObject]@{
+                RecordType = 'ActiveSetup'
+                Identity   = 'HKLM\{guid}'
+                ChangeType = 'Modified'
+                Field      = 'StubPath'
+            }
+            Get-FotonBaselineChangeSeverity -Change $s | Should -Be 'High'
+            $v = [PSCustomObject]@{
+                RecordType = 'ActiveSetup'
+                Identity   = 'HKLM\{guid}'
+                ChangeType = 'Modified'
+                Field      = 'Version'
+            }
+            Get-FotonBaselineChangeSeverity -Change $v | Should -Be 'Info'
+        }
         It 'still ranks software version bumps as Info' {
             $c = [PSCustomObject]@{
                 RecordType = 'InstalledSoftware'
