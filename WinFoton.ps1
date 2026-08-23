@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    WinFoton - Windows DFIR triage collector.
+    WinFoton - Windows DFIR triage collector. FROZEN VERSION.
 
 .DESCRIPTION
     Collects forensically relevant host state from a live Windows endpoint, organizes it
