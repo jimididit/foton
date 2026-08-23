@@ -42,6 +42,8 @@ Describe 'Baseline providers and diff' {
                 Should -Contain 'RemoteAccessConfig'
             @($script:FotonBaselineProviders | ForEach-Object RecordType) |
                 Should -Contain 'LsaPackage'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'PrintMonitor'
         }
     }
 
@@ -78,6 +80,16 @@ Describe 'Baseline providers and diff' {
             $kinds | Should -Contain 'Security Packages'
             $blob = (@($rows | ForEach-Object { $_.Package }) -join ' ').ToLowerInvariant()
             $blob | Should -Match 'msv1_0|kerberos|schannel'
+        }
+    }
+
+    It 'enumerates print monitor subkeys with a Driver field' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'PrintMonitor' })[0]
+            $rows = @(& $prov.Collect)
+            $rows.Count | Should -BeGreaterThan 0
+            $rows[0].PSObject.Properties.Name | Should -Contain 'Name'
+            $rows[0].PSObject.Properties.Name | Should -Contain 'Driver'
         }
     }
 

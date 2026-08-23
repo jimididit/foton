@@ -275,6 +275,15 @@ putty
             }
             Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
         }
+        It 'ranks PrintMonitor Driver changes as High' {
+            $c = [PSCustomObject]@{
+                RecordType = 'PrintMonitor'
+                Identity   = 'Evil Monitor'
+                ChangeType = 'Modified'
+                Field      = 'Driver'
+            }
+            Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
+        }
         It 'still ranks software version bumps as Info' {
             $c = [PSCustomObject]@{
                 RecordType = 'InstalledSoftware'

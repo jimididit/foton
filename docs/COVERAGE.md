@@ -79,11 +79,11 @@ Standard-user Collect is **intentional**. Security log, Prefetch, other users’
 
 ---
 
-## Baseline today (schema 1.6.0)
+## Baseline today (schema 1.7.0)
 
 See `src/Public/Baseline/README.md` for identity keys.
 
-Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
+Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, **PrintMonitor**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
 
 **Baseline gaps (priority).** Prefer these over exotic ASEPs. Each needs a stable identity key and documented false positives.
 
@@ -91,7 +91,7 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 |----------|----------------------|-----------------|----------|
 | done (1.5.0) | RemoteAccessConfig | Setting | RDP NLA/port/layer; WinRM policy; SMBv1 DWORD. FP: helpdesk RDP. Enable flag remains HardeningRegistry |
 | done (1.6.0) | LsaPackage | Kind + Package | T1547.005. One token per row. FP: MFA/EDR SSP |
-| P1 | PrintMonitor | Monitor name | Spooler SYSTEM DLL. FP: printer installs |
+| done (1.7.0) | PrintMonitor | Name | Spooler SYSTEM DLL. FP: printer installs |
 | P1 | BitsJob | JobId | T1197. Compare type/flags, **not** bytes transferred |
 | P1 | CmdAutoRun | Hive + value | IFEO-adjacent. FP: autorun scripts |
 | P1 | BootExecute / SessionManager | Value name | Native boot images |

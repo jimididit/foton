@@ -28,7 +28,7 @@ That inventory (use cases, Collect vs Baseline, ASEP gaps, parse backlog) is
 | Add a finding property | FindingsSchemaVersion |
 | Only document a *planned* provider | Nothing - edit COVERAGE.md |
 
-Collect packages: **1.2.0** (`prefetch_files`, `amcache_hive`, `srum_database` copies under `08_Filesystem/`). Baseline **1.6.0** (LsaPackage). Older JSON will not compare across baseline schema bumps.
+Collect packages: **1.2.0** (`prefetch_files`, `amcache_hive`, `srum_database` copies under `08_Filesystem/`). Baseline **1.7.0** (PrintMonitor). Older JSON will not compare across baseline schema bumps.
 
 Empty tables are allowed; empty *because we never mapped the artifact* (Settings
 startup vs Startup folder) is a coverage bug, not a schema event, until the

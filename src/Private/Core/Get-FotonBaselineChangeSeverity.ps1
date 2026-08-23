@@ -31,5 +31,6 @@ function Get-FotonBaselineChangeSeverity {
     if ($c.RecordType -eq 'DefenderPreference' -and $c.Identity -like 'Switch|DisableRealtimeMonitoring') { $sev = 'High' }
     if ($c.RecordType -eq 'RemoteAccessConfig' -and $c.ChangeType -in @('Added', 'Removed', 'Modified')) { $sev = 'High' }
     if ($c.RecordType -eq 'LsaPackage' -and $c.ChangeType -in @('Added', 'Removed')) { $sev = 'High' }
+    if ($c.RecordType -eq 'PrintMonitor' -and ($c.ChangeType -in @('Added', 'Removed') -or $c.Field -eq 'Driver')) { $sev = 'High' }
     return $sev
 }
