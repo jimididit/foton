@@ -1,6 +1,7 @@
 #Requires -Version 5.1
 <#
-    Foton console banner. Cosmetic only.
+    Cosmetic only. The Windows-pane ASCII mark is parked (commented at
+    render time) until it is refined; the FOTON wordmark still prints.
 
     NOT EVIDENCE. Nothing here reaches collection.log, the manifest, or any
     packaged artifact. Every render path is wrapped so a console, codepage,
@@ -405,10 +406,7 @@ function Write-FotonBanner {
     try {
         $colorMode = if ($Color -eq 'Auto') { Get-FotonColorMode } else { $Color }
         $blockOk   = Test-FotonBlockGlyph
-        $markStyle = if ($Style -eq 'Auto') { if ($blockOk) { 'Solid' } else { 'Hatch' } } else { $Style }
-        if ($markStyle -eq 'Solid' -and -not $blockOk) {
-            Write-Verbose 'Console encoding cannot carry U+2588; Solid was requested anyway.'
-        }
+        # $markStyle = if ($Style -eq 'Auto') { if ($blockOk) { 'Solid' } else { 'Hatch' } } else { $Style }
 
         # Figlet ANSI Shadow "FOTON", UTF-8 base64 so this file stays ASCII.
         $enc = [Text.Encoding]::UTF8
@@ -439,7 +437,6 @@ function Write-FotonBanner {
         )
 
         $word      = if ($blockOk) { $wordShadow } else { $wordAscii }
-        $grid      = Get-FotonMarkCells -Style $markStyle
         $wordWidth = ($word | Measure-Object -Property Length -Maximum).Maximum
         if (-not $wordWidth) { $wordWidth = 1 }
 
@@ -461,10 +458,12 @@ function Write-FotonBanner {
             Write-FotonCells -Cells $cells -Mode $colorMode
         }
 
-        Write-Host ''
-        foreach ($row in $grid) {
-            Write-FotonCells -Cells (@($gap) * 2 + $row) -Mode $colorMode
-        }
+        # Windows-pane mark parked until the crack/logo is refined.
+        # $grid = Get-FotonMarkCells -Style $markStyle
+        # Write-Host ''
+        # foreach ($row in $grid) {
+        #     Write-FotonCells -Cells (@($gap) * 2 + $row) -Mode $colorMode
+        # }
     }
     catch {
         # Cosmetics must never take down a run.
@@ -472,7 +471,7 @@ function Write-FotonBanner {
         Write-Host ''
         Write-Host '  FOTON'
         Write-Host ''
-        foreach ($line in $script:FotonMarkHatch) { Write-Host ('  ' + $line) }
+        # foreach ($line in $script:FotonMarkHatch) { Write-Host ('  ' + $line) }
     }
 
     Write-Host ''
