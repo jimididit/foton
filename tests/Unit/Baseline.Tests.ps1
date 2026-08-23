@@ -103,6 +103,8 @@ Describe 'New-FotonBaselineReport' {
             $html | Should -Match 'PC1'
             $html | Should -Match 'Spooler'
             $html | Should -Match 'Baseline snapshot'
+            $html | Should -Match 'id="foton-q"'
+            $html | Should -Match 'id="foton-toc"'
             $html | Should -Not -Match '<script src="https://'
         }
         finally {
@@ -134,6 +136,9 @@ Describe 'New-FotonBaselineCompareReport' {
             $html | Should -Match 'Added'
             $html | Should -Match 'LocalGroupMember'
             $html | Should -Match 'High'
+            $html | Should -Match 'id="foton-q"'
+            $html | Should -Match 'id="foton-toc"'
+            $html | Should -Match 'data-change'
             $html | Should -Not -Match '<script src="https://'
         }
         finally {

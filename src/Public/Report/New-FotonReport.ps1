@@ -126,6 +126,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
 .hidden{display:none!important}
 </style>
 '@
+    $css = $css + (Get-FotonReportNavCss)
 
     $js = @'
 <script>
@@ -140,7 +141,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
       applyFilters();
     }
   });
-  var box=document.getElementById("q");
+  var box=document.getElementById("foton-q");
   if(box){box.addEventListener("input",applyFilters);}
   function applyFilters(){
     var active=document.querySelector(".btn[data-sev].on");
@@ -166,7 +167,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine('<meta name="viewport" content="width=device-width,initial-scale=1">')
     $null = $sb.AppendLine("<title>Foton Triage Report - $(ConvertTo-FotonSafeHtml $hostName)</title>")
     $null = $sb.AppendLine($css)
-    $null = $sb.AppendLine('</head><body><div class="wrap">')
+    $null = $sb.AppendLine('</head><body><div class="wrap" id="top">')
 
     # ---- Hero ----
     $verDisplay = ConvertTo-FotonSafeHtml ([string]$script:FotonSession.Version)
@@ -181,7 +182,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine('<div class="brand-text">')
     $null = $sb.AppendLine('<h1>Foton</h1>')
     $null = $sb.AppendLine('<div class="tagline">Windows DFIR triage report - light through the glass</div>')
-    $null = $sb.AppendLine("<div class=""credits"">jimididit &middot; v$verDisplay &middot; updated 2026-08-22</div>")
+    $null = $sb.AppendLine("<div class=""credits"">v$verDisplay</div>")
     $null = $sb.AppendLine('</div></div>')
     $null = $sb.AppendLine('<div class="meta">')
     $null = $sb.AppendLine("<div><b>Hostname</b>$(ConvertTo-FotonSafeHtml $hostName)</div>")
@@ -202,9 +203,9 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine('</div>')
     $null = $sb.AppendLine('<div class="notice"><b>Read this first.</b> Every item below is an automated observation produced by pattern matching, not a conclusion. Nothing here establishes that this host is compromised. Each finding cites the artifact file it came from - verify against that artifact, and against the host owner''s expectations, before it goes anywhere near a report or a remediation decision.</div>')
     $null = $sb.AppendLine('</header>')
+    $null = $sb.AppendLine((Get-FotonReportNavBarHtml))
 
-    # ---- Counts ----
-    $null = $sb.AppendLine('<h2>Triage Summary</h2>')
+    $null = $sb.AppendLine('<h2 id="sec-summary">Triage Summary</h2>')
     $null = $sb.AppendLine('<div class="cards">')
     $null = $sb.AppendLine("<div class=""card c-high""><div class=""n"">$($counts['High'])</div><div class=""l"">High attention</div></div>")
     $null = $sb.AppendLine("<div class=""card c-med""><div class=""n"">$($counts['Medium'])</div><div class=""l"">Medium</div></div>")
@@ -227,10 +228,9 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine('</div>')
 
     # ---- Findings ----
-    $null = $sb.AppendLine('<h2>Observations<small>click any row to expand</small></h2>')
+    $null = $sb.AppendLine('<h2 id="sec-observations">Observations<small>click any row to expand</small></h2>')
     $null = $sb.AppendLine('<div class="controls">')
     $null = $sb.AppendLine('<button class="btn on" data-sev="all">All</button><button class="btn" data-sev="High">High</button><button class="btn" data-sev="Medium">Medium</button><button class="btn" data-sev="Low">Low</button><button class="btn" data-sev="Info">Info</button>')
-    $null = $sb.AppendLine('<input id="q" type="search" placeholder="Filter observations (e.g. defender, persistence, rdp)">')
     $null = $sb.AppendLine('</div>')
 
     foreach ($f in $findings) {
@@ -269,7 +269,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
         $admins = @($script:FotonSession.Data['local_group_membership'] | Where-Object { $_.Group -eq 'Administrators' -and $_.Member -ne '(none)' })
     }
     if ($admins.Count -gt 0) {
-        $null = $sb.AppendLine('<h2>Local Administrators<small>compare against the expected baseline</small></h2><table><tr><th>Member</th><th>Type</th><th>Source</th><th>SID</th></tr>')
+        $null = $sb.AppendLine('<h2 id="sec-admins">Local Administrators<small>compare against the expected baseline</small></h2><table><tr><th>Member</th><th>Type</th><th>Source</th><th>SID</th></tr>')
         foreach ($a in $admins) {
             $null = $sb.AppendLine("<tr><td>$(ConvertTo-FotonSafeHtml $a.Member)</td><td>$(ConvertTo-FotonSafeHtml $a.ObjectClass)</td><td>$(ConvertTo-FotonSafeHtml $a.PrincipalSource)</td><td class=""dim"">$(ConvertTo-FotonSafeHtml $a.SID)</td></tr>")
         }
@@ -281,7 +281,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
         $ext = @($script:FotonSession.Data['active_connections'] | Where-Object { $_.RemoteIsExternal -eq $true } | Select-Object -First 40)
     }
     if ($ext.Count -gt 0) {
-        $null = $sb.AppendLine('<h2>External Network Connections<small>point-in-time snapshot at collection</small></h2><table><tr><th>Process</th><th>PID</th><th>Remote</th><th>State</th><th>Path</th></tr>')
+        $null = $sb.AppendLine('<h2 id="sec-connections">External Network Connections<small>point-in-time snapshot at collection</small></h2><table><tr><th>Process</th><th>PID</th><th>Remote</th><th>State</th><th>Path</th></tr>')
         foreach ($c in $ext) {
             $pathClass = 'dim'
             if ($c.UserWritablePath -eq $true) { $pathClass = 'warn' }
@@ -293,7 +293,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     if ($script:FotonSession.Data['hardening_registry_settings']) {
         $mismatch = @($script:FotonSession.Data['hardening_registry_settings'] | Where-Object { $_.MatchesRecommended -eq $false -and $_.RecommendedValue -ne '' })
         if ($mismatch.Count -gt 0) {
-            $null = $sb.AppendLine('<h2>Hardening Settings Not At Recommended Value<small>configuration review, not compromise indicators</small></h2><table><tr><th>Setting</th><th>Current</th><th>Recommended</th><th>Meaning</th></tr>')
+            $null = $sb.AppendLine('<h2 id="sec-hardening">Hardening Settings Not At Recommended Value<small>configuration review, not compromise indicators</small></h2><table><tr><th>Setting</th><th>Current</th><th>Recommended</th><th>Meaning</th></tr>')
             foreach ($m in $mismatch) {
                 $null = $sb.AppendLine("<tr><td>$(ConvertTo-FotonSafeHtml $m.Setting)</td><td class=""warn"">$(ConvertTo-FotonSafeHtml $m.Value)</td><td class=""dim"">$(ConvertTo-FotonSafeHtml $m.RecommendedValue)</td><td>$(ConvertTo-FotonSafeHtml $m.Meaning)</td></tr>")
             }
@@ -302,7 +302,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     }
 
     # ---- Manifest ----
-    $null = $sb.AppendLine('<h2>Collection Manifest<small>every artifact in this package</small></h2><table><tr><th>Category</th><th>Artifact</th><th>What it contains</th><th>Records</th><th>Status</th></tr>')
+    $null = $sb.AppendLine('<h2 id="sec-manifest">Collection Manifest<small>every artifact in this package</small></h2><table><tr><th>Category</th><th>Artifact</th><th>What it contains</th><th>Records</th><th>Status</th></tr>')
     foreach ($m in $script:FotonSession.Manifest) {
         $statusClass = 'ok'
         if ($m.Status -eq 'NoData') { $statusClass = 'dim' }
@@ -313,7 +313,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine('</table>')
 
     if ($script:FotonSession.Errors.Count -gt 0) {
-        $null = $sb.AppendLine('<h2>Collection Errors<small>gaps to disclose in any report built from this data</small></h2><table><tr><th>Task</th><th>Error</th></tr>')
+        $null = $sb.AppendLine('<h2 id="sec-errors">Collection Errors<small>gaps to disclose in any report built from this data</small></h2><table><tr><th>Task</th><th>Error</th></tr>')
         foreach ($e in $script:FotonSession.Errors) {
             $null = $sb.AppendLine("<tr><td>$(ConvertTo-FotonSafeHtml $e.Task)</td><td class=""warn"">$(ConvertTo-FotonSafeHtml $e.Error)</td></tr>")
         }
@@ -321,7 +321,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     }
 
     # ---- Methodology ----
-    $null = $sb.AppendLine('<h2>Methodology, Tiers, and Limitations</h2>')
+    $null = $sb.AppendLine('<h2 id="sec-method">Methodology, Tiers, and Limitations</h2>')
     $null = $sb.AppendLine(@'
 <details class="method" open><summary>How to read the tiers</summary>
 <p><b>Tier 1 - Observed artifact.</b> Directly present in the collected data, no interpretation applied. A registry value, an event ID, a signature status. State these as fact.</p>
@@ -344,9 +344,10 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
 </details>
 '@)
 
-    $null = $sb.AppendLine("<footer>Foton v$(ConvertTo-FotonSafeHtml $script:FotonSession.Version) &middot; J. Flynn / jimididit &middot; collected $(ConvertTo-FotonSafeHtml $collectedUtc) UTC on $(ConvertTo-FotonSafeHtml $hostName) by $(ConvertTo-FotonSafeHtml $examinerDisplay) &middot; verify artifact hashes in 00_Collection/hashes.csv before analysis</footer>")
+    $null = $sb.AppendLine("<footer>Foton v$(ConvertTo-FotonSafeHtml $script:FotonSession.Version) &middot; collected $(ConvertTo-FotonSafeHtml $collectedUtc) UTC on $(ConvertTo-FotonSafeHtml $hostName) by $(ConvertTo-FotonSafeHtml $examinerDisplay) &middot; verify artifact hashes in 00_Collection/hashes.csv before analysis</footer>")
     $null = $sb.AppendLine('</div>')
     $null = $sb.AppendLine($js)
+    $null = $sb.AppendLine((Get-FotonReportNavScript))
     $null = $sb.AppendLine('</body></html>')
 
     $sb.ToString() | Out-File -FilePath $Path -Encoding UTF8

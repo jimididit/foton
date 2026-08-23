@@ -45,7 +45,7 @@ Do not grow giant functions. Add a file:
 | A new file format parser | `src/Public/Parse/ConvertFrom-Foton*.ps1` + `tests/Fixtures/` + Pester |
 | A new heuristic | `src/Public/Analyze` rule file: one mock that fires, one that must not |
 | A new IOC source | feed `Invoke-FotonIocMatch` (when implemented); do not scrape the live host |
-| Report styling | `src/Public/Report` only; escape with `ConvertTo-FotonSafeHtml` |
+| Report styling | `src/Public/Report` only; escape with `ConvertTo-FotonSafeHtml`; include `Get-FotonReportNav*` chrome |
 
 Register public functions in `Foton.psd1` `FunctionsToExport`. `Foton.psm1` dotsources by convention.
 
@@ -154,6 +154,7 @@ Operator-visible “startup apps” in Settings/Task Manager are **StartupApprov
 - Never shadow automatics: `$profile`, `$Event`, `$host`, `$input`, `$matches`, `$error`.
 - Registry via `Get-FotonRegValue` / `Get-FotonRegValueList`; hashing `Get-FotonSafeHash`; per-user `Get-FotonUserProfile` / `Get-FotonUserHiveRoot` (names after extract).
 - Report strings through `ConvertTo-FotonSafeHtml`. CSS/JS in `'@` here-strings, closer at column 0.
+- **Every HTML report** must include offline search + section navigation (`Get-FotonReportNavCss` / `NavBarHtml` / `NavScript`). No CDN. Do not ship a scroll-only dump of every table.
 - Comments explain forensic *why* and, for contributors, *where to extend*.
 
 ## Verification loop

@@ -121,6 +121,7 @@ tr:last-child td{border-bottom:none}
 footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#6f8399;font-size:12px}
 </style>
 '@
+    $css = $css + (Get-FotonReportNavCss)
 
     $added = @($rows | Where-Object { $_.ChangeType -eq 'Added' }).Count
     $removed = @($rows | Where-Object { $_.ChangeType -eq 'Removed' }).Count
@@ -142,7 +143,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine('<meta name="viewport" content="width=device-width,initial-scale=1">')
     $null = $sb.AppendLine("<title>Foton Baseline Compare - $(ConvertTo-FotonSafeHtml $difHost)</title>")
     $null = $sb.AppendLine($css)
-    $null = $sb.AppendLine('</head><body><div class="wrap">')
+    $null = $sb.AppendLine('</head><body><div class="wrap" id="top">')
     $null = $sb.AppendLine('<header class="hero">')
     $null = $sb.AppendLine('<h1>Foton</h1>')
     $null = $sb.AppendLine('<div class="tagline">Baseline compare - field-level change between two observations. Not a compromise verdict. Not a clean-host certificate.</div>')
@@ -157,8 +158,9 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $caveat = 'Diff proves change between two snapshots, never when or who. High attention marks persistence and trust surfaces that deserve review against change control. Software updates, GPO, and lab DNS overrides are common benign sources.'
     $null = $sb.AppendLine("<div class=""notice""><b>Read this first.</b> $(ConvertTo-FotonSafeHtml $caveat)</div>")
     $null = $sb.AppendLine('</header>')
+    $null = $sb.AppendLine((Get-FotonReportNavBarHtml))
 
-    $null = $sb.AppendLine('<h2>Change counts</h2><div class="cards">')
+    $null = $sb.AppendLine('<h2 id="sec-counts">Change counts</h2><div class="cards">')
     $null = $sb.AppendLine("<div class=""card""><div class=""n"">$($rows.Count)</div><div class=""l"">Total</div></div>")
     $null = $sb.AppendLine("<div class=""card""><div class=""n"">$added</div><div class=""l"">Added</div></div>")
     $null = $sb.AppendLine("<div class=""card""><div class=""n"">$removed</div><div class=""l"">Removed</div></div>")
@@ -166,34 +168,48 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine("<div class=""card""><div class=""n"">$high</div><div class=""l"">High attention</div></div>")
     $null = $sb.AppendLine('</div>')
 
-    $null = $sb.AppendLine("<h2>Changes <small>$($shown.Count) rows$extra</small></h2>")
+    $null = $sb.AppendLine('<div class="controls">')
+    $null = $sb.AppendLine('<button type="button" class="btn on" data-change="all">All</button>')
+    $null = $sb.AppendLine('<button type="button" class="btn" data-change="Added">Added</button>')
+    $null = $sb.AppendLine('<button type="button" class="btn" data-change="Removed">Removed</button>')
+    $null = $sb.AppendLine('<button type="button" class="btn" data-change="Modified">Modified</button>')
+    $null = $sb.AppendLine("</div>")
+
     if ($shown.Count -eq 0) {
+        $null = $sb.AppendLine('<h2 id="sec-changes">Changes</h2>')
         $null = $sb.AppendLine('<p class="dim">No field-level differences in the compared payload.</p>')
     }
     else {
-        $null = $sb.AppendLine('<table><thead><tr>')
-        foreach ($col in @('Attention', 'Change', 'RecordType', 'Identity', 'Field', 'OldValue', 'NewValue')) {
-            $null = $sb.AppendLine("<th>$(ConvertTo-FotonSafeHtml $col)</th>")
+        $typeOrder = @($shown | ForEach-Object { [string]$_.RecordType } | Sort-Object -Unique)
+        foreach ($type in $typeOrder) {
+            $chunk = @($shown | Where-Object { [string]$_.RecordType -eq $type })
+            $sid = Get-FotonReportSectionId -Name $type
+            $null = $sb.AppendLine("<h2 id=""$sid"">$(ConvertTo-FotonSafeHtml $type) <small>$($chunk.Count) change(s)$extra</small></h2>")
+            $null = $sb.AppendLine('<table><thead><tr>')
+            foreach ($col in @('Attention', 'Change', 'Identity', 'Field', 'OldValue', 'NewValue')) {
+                $null = $sb.AppendLine("<th>$(ConvertTo-FotonSafeHtml $col)</th>")
+            }
+            $null = $sb.AppendLine('</tr></thead><tbody>')
+            foreach ($c in $chunk) {
+                $sev = Get-FotonBaselineChangeSeverity -Change $c
+                $ct = [string]$c.ChangeType
+                $null = $sb.AppendLine("<tr data-change=""$ct"">")
+                $null = $sb.AppendLine("<td class=""sev-$sev"">$(ConvertTo-FotonSafeHtml $sev)</td>")
+                $null = $sb.AppendLine("<td class=""ct-$ct"">$(ConvertTo-FotonSafeHtml $ct)</td>")
+                $null = $sb.AppendLine("<td>$(ConvertTo-FotonSafeHtml ([string]$c.Identity))</td>")
+                $null = $sb.AppendLine("<td>$(ConvertTo-FotonSafeHtml ([string]$c.Field))</td>")
+                $null = $sb.AppendLine("<td>$(ConvertTo-FotonSafeHtml ([string]$c.OldValue))</td>")
+                $null = $sb.AppendLine("<td>$(ConvertTo-FotonSafeHtml ([string]$c.NewValue))</td>")
+                $null = $sb.AppendLine('</tr>')
+            }
+            $null = $sb.AppendLine('</tbody></table>')
         }
-        $null = $sb.AppendLine('</tr></thead><tbody>')
-        foreach ($c in $shown) {
-            $sev = Get-FotonBaselineChangeSeverity -Change $c
-            $ct = [string]$c.ChangeType
-            $null = $sb.AppendLine('<tr>')
-            $null = $sb.AppendLine("<td class=""sev-$sev"">$(ConvertTo-FotonSafeHtml $sev)</td>")
-            $null = $sb.AppendLine("<td class=""ct-$ct"">$(ConvertTo-FotonSafeHtml $ct)</td>")
-            $null = $sb.AppendLine("<td>$(ConvertTo-FotonSafeHtml ([string]$c.RecordType))</td>")
-            $null = $sb.AppendLine("<td>$(ConvertTo-FotonSafeHtml ([string]$c.Identity))</td>")
-            $null = $sb.AppendLine("<td>$(ConvertTo-FotonSafeHtml ([string]$c.Field))</td>")
-            $null = $sb.AppendLine("<td>$(ConvertTo-FotonSafeHtml ([string]$c.OldValue))</td>")
-            $null = $sb.AppendLine("<td>$(ConvertTo-FotonSafeHtml ([string]$c.NewValue))</td>")
-            $null = $sb.AppendLine('</tr>')
-        }
-        $null = $sb.AppendLine('</tbody></table>')
     }
 
     $null = $sb.AppendLine("<footer>Foton baseline compare &middot; $(ConvertTo-FotonSafeHtml $cmpMode) &middot; schema $(ConvertTo-FotonSafeHtml ([string]$refHeader.BaselineSchemaVersion)) &middot; source of truth remains baseline.json</footer>")
-    $null = $sb.AppendLine('</div></body></html>')
+    $null = $sb.AppendLine('</div>')
+    $null = $sb.AppendLine((Get-FotonReportNavScript))
+    $null = $sb.AppendLine('</body></html>')
 
     $dir = Split-Path -Parent $OutputPath
     if ($dir -and -not (Test-Path -LiteralPath $dir)) {

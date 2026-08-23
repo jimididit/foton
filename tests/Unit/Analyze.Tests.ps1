@@ -57,6 +57,8 @@ Describe 'Get-FotonPackage and offline analysis' {
             $html | Should -Match 'FIXTURE-PC'
             $html | Should -Not -Match '<script src="https://'
             $html | Should -Match 'What was observed'
+            $html | Should -Match 'id="foton-q"'
+            $html | Should -Match 'id="foton-toc"'
         }
         finally {
             Remove-Item -LiteralPath $htmlPath -Force -ErrorAction SilentlyContinue

@@ -88,13 +88,14 @@ tr:last-child td{border-bottom:none}
 footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#6f8399;font-size:12px}
 </style>
 '@
+    $css = $css + (Get-FotonReportNavCss)
 
     $sb = New-Object System.Text.StringBuilder
     $null = $sb.AppendLine('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">')
     $null = $sb.AppendLine('<meta name="viewport" content="width=device-width,initial-scale=1">')
     $null = $sb.AppendLine("<title>Foton Baseline Snapshot - $(ConvertTo-FotonSafeHtml $hostName)</title>")
     $null = $sb.AppendLine($css)
-    $null = $sb.AppendLine('</head><body><div class="wrap">')
+    $null = $sb.AppendLine('</head><body><div class="wrap" id="top">')
     $null = $sb.AppendLine('<header class="hero">')
     $null = $sb.AppendLine('<h1>Foton</h1>')
     $null = $sb.AppendLine('<div class="tagline">Baseline snapshot - one observation of stable configuration. Not a triage report. Not a clean-host certificate.</div>')
@@ -114,12 +115,14 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     }
     $null = $sb.AppendLine("<div class=""notice""><b>Read this first.</b> $(ConvertTo-FotonSafeHtml $caveat) Full tables live in baseline.json. This HTML is a capped preview.</div>")
     $null = $sb.AppendLine('</header>')
+    $null = $sb.AppendLine((Get-FotonReportNavBarHtml))
 
-    $null = $sb.AppendLine('<h2>Record counts</h2><div class="cards">')
+    $null = $sb.AppendLine('<h2 id="sec-counts">Record counts</h2><div class="cards">')
     $typeNames = @($doc.Records.PSObject.Properties.Name | Sort-Object)
     foreach ($type in $typeNames) {
         $n = @($doc.Records.$type).Count
-        $null = $sb.AppendLine("<div class=""card""><div class=""n"">$n</div><div class=""l"">$(ConvertTo-FotonSafeHtml $type)</div></div>")
+        $sid = Get-FotonReportSectionId -Name $type
+        $null = $sb.AppendLine("<a class=""card"" href=""#$sid""><div class=""n"">$n</div><div class=""l"">$(ConvertTo-FotonSafeHtml $type)</div></a>")
     }
     $null = $sb.AppendLine('</div>')
 
@@ -140,7 +143,8 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
             $extra = " (showing $MaxRows of $shown)"
             $rows = @($rows | Select-Object -First $MaxRows)
         }
-        $null = $sb.AppendLine("<h2>$(ConvertTo-FotonSafeHtml $type) <small>$($rows.Count) rows$extra</small></h2>")
+        $sid = Get-FotonReportSectionId -Name $type
+        $null = $sb.AppendLine("<h2 id=""$sid"">$(ConvertTo-FotonSafeHtml $type) <small>$($rows.Count) rows$extra</small></h2>")
         if ($meta -and $meta.FalsePositives) {
             $null = $sb.AppendLine("<p class=""dim"">$(ConvertTo-FotonSafeHtml ([string]$meta.FalsePositives))</p>")
         }
@@ -164,7 +168,9 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     }
 
     $null = $sb.AppendLine("<footer>Foton baseline snapshot v$(ConvertTo-FotonSafeHtml $tool) &middot; schema $(ConvertTo-FotonSafeHtml $schema) &middot; $(ConvertTo-FotonSafeHtml $hostName) &middot; compare with Compare-FotonBaseline against baseline.json</footer>")
-    $null = $sb.AppendLine('</div></body></html>')
+    $null = $sb.AppendLine('</div>')
+    $null = $sb.AppendLine((Get-FotonReportNavScript))
+    $null = $sb.AppendLine('</body></html>')
 
     $dir = Split-Path -Parent $OutputPath
     if ($dir -and -not (Test-Path -LiteralPath $dir)) {

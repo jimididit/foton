@@ -52,6 +52,8 @@ $e=$null;$t=$null
 
 ScriptAnalyzer: see AGENTS.md accepted rule exceptions (`PSAvoidUsingWriteHost`, empty catch on best-effort collect, etc.).
 
+HTML reports: include the shared search/nav chrome (`Get-FotonReportNavCss` and friends). No CDN.
+
 ## What we will not accept
 
 - Remediation, process kill, quarantine, or “repair” switches.
