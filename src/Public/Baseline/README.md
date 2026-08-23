@@ -1,6 +1,6 @@
 # Public/Baseline
 
-Normalized snapshots of **stable** configuration. Schema **1.4.0** (recapture day0 after this version; Compare refuses a mismatch).
+Normalized snapshots of **stable** configuration. Schema **1.5.0** (recapture day0 after this version; Compare refuses a mismatch).
 
 | RecordType | Identity | Compared | False-positive notes |
 |------------|----------|----------|----------------------|
@@ -24,10 +24,11 @@ Normalized snapshots of **stable** configuration. Schema **1.4.0** (recapture da
 | StartupFile | `Scope` + `FileName` | Sha256, Length | Vendor .lnk updaters. Settings "Startup apps" are **not** this folder |
 | StartupApproved | `Scope` + `Store` + `ValueName` | State | Task Manager / Settings enable-disable (REG_BINARY). Users toggling Teams/OneDrive |
 | DefenderPreference | `Kind` + `Name` | Value | MpPreference switches and exclusion rows. Intune/GPO |
+| RemoteAccessConfig | `Setting` | Value | RDP NLA/port/SecurityLayer/AllowRemoteRPC; WinRM *policy* Basic/unencrypted; LanmanServer SMB1. Helpdesk RDP and GPO WinRM. **RDP enable** is HardeningRegistry `fDenyTSConnections` |
 | ImageFileExecution | `ImageName` | Debugger | App Verifier / GFlags |
 | Winlogon | `Name` | Value | EDR/MFA Userinit/Shell |
 | AppInitDll | `Key` + `Name` | Value | Legacy injectors |
 
-Volatile fields (PID, service State, ephemeral UDP, connection tuples) are not captured. Planned providers (UserAutorun, Defender preferences, LSA, print monitors, …): [docs/COVERAGE.md](../../../docs/COVERAGE.md).
+Volatile fields (PID, service State, ephemeral UDP, connection tuples) are not captured. Planned providers: [docs/COVERAGE.md](../../../docs/COVERAGE.md).
 
-`New-FotonBaseline` captures on a live host (`-Path` JSON, or `-OutputPath` package folder with HTML/hashes/ZIP). Flattened endpoint script: `dist/Foton-Baseline.ps1`. `Compare-FotonBaseline` is offline (JSON or package folder) and **refuses** a schema mismatch; it writes `Foton_BaselineCompare.html` beside the difference JSON unless `-NoHtml`. Diffs are Tier 1 change facts; High attention for persistence/trust surfaces (service/driver PathName, IFEO, Winlogon Userinit/Shell, new shares, hosts adds, WMI consumers, System32 hash change) - still not a conclusion.
+`New-FotonBaseline` captures on a live host (`-Path` JSON, or `-OutputPath` package folder with HTML/hashes/ZIP). Flattened endpoint script: `dist/Foton-Baseline.ps1`. `Compare-FotonBaseline` is offline (JSON or package folder) and **refuses** a schema mismatch; it writes `Foton_BaselineCompare.html` beside the difference JSON unless `-NoHtml`. Diffs are Tier 1 change facts; High attention for persistence/trust surfaces (service/driver PathName, IFEO, Winlogon Userinit/Shell, RemoteAccessConfig, new shares, hosts adds, WMI consumers, System32 hash change) - still not a conclusion.

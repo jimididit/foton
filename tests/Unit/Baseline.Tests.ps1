@@ -38,6 +38,8 @@ Describe 'Baseline providers and diff' {
                 Should -Contain 'UserAutorun'
             @($script:FotonBaselineProviders | ForEach-Object RecordType) |
                 Should -Contain 'DefenderPreference'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'RemoteAccessConfig'
         }
     }
 
@@ -51,6 +53,18 @@ Describe 'Baseline providers and diff' {
             & $prov.Collect | Out-Null
             $script:FotonSession.StartTimeUtc | Should -Be $stamp
             @($script:FotonSession.HardeningRegistryChecks).Count | Should -BeGreaterThan 0
+        }
+    }
+
+    It 'captures RemoteAccessConfig settings with a Setting identity' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'RemoteAccessConfig' })[0]
+            $rows = @(& $prov.Collect)
+            $names = @($rows | ForEach-Object { $_.Setting })
+            $names | Should -Contain 'RdpNla'
+            $names | Should -Contain 'Smb1LanmanServer'
+            $names | Should -Contain 'WinRmPolicyAllowBasic'
+            @($rows | Where-Object { $_.Setting -eq 'RdpNla' }).Count | Should -Be 1
         }
     }
 

@@ -79,17 +79,17 @@ Standard-user Collect is **intentional**. Security log, Prefetch, other users’
 
 ---
 
-## Baseline today (schema 1.4.0)
+## Baseline today (schema 1.5.0)
 
 See `src/Public/Baseline/README.md` for identity keys.
 
-Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
+Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
 
 **Baseline gaps (priority).** Prefer these over exotic ASEPs. Each needs a stable identity key and documented false positives.
 
 | Priority | RecordType (proposed) | Identity sketch | Why / FP |
 |----------|----------------------|-----------------|----------|
-| P0 | RemoteAccessConfig | Setting (RDP NLA, WinRM, SMBv1 feature) | Audit/IR. FP: helpdesk enabling RDP |
+| done (1.5.0) | RemoteAccessConfig | Setting | RDP NLA/port/layer; WinRM policy; SMBv1 DWORD. FP: helpdesk RDP. Enable flag remains HardeningRegistry |
 | P1 | LsaPackage | ValueName + package string | T1547.005. FP: third-party MFA |
 | P1 | PrintMonitor | Monitor name | Spooler SYSTEM DLL. FP: printer installs |
 | P1 | BitsJob | JobId | T1197. Compare type/flags, **not** bytes transferred |

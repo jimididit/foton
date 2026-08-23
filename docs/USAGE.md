@@ -45,7 +45,7 @@ Parse writes `analysis\Foton_Parse.html` and `parsed_records.csv`. Analyze write
 
 - Live collect **changes the host**. The report says so.
 - Findings are **observations**. The wrapper will not say “infected.”
-- A baseline taken after an incident is a picture of that state. Recapture after provider/schema changes (see BaselineSchemaVersion). Schema **1.4.0** cannot compare against **1.3.0** JSON.
+- A baseline taken after an incident is a picture of that state. Recapture after provider/schema changes (see BaselineSchemaVersion). Schema **1.5.0** cannot compare against **1.4.0** JSON.
 
 ## Gaps before a public release (testing / UX)
 

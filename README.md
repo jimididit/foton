@@ -8,7 +8,7 @@ Foton captures host state into a hashed case **package**, then lets you compare 
 
 Photons penetrate glass; Foton is meant to make Windows state legible - not to declare compromise.
 
-**Module 1.9.1** - baseline schema **1.4.0**, collect schema **1.2.0** (Prefetch/Amcache/SRUM copies). Recapture baselines after schema bumps. Workstation path: `Foton.cmd help` ([docs/USAGE.md](docs/USAGE.md)).
+**Module 1.10.0** - baseline schema **1.5.0** (RemoteAccessConfig), collect schema **1.2.0**. Recapture baselines after schema bumps. Workstation path: `Foton.cmd help` ([docs/USAGE.md](docs/USAGE.md)).
 
 ## Quick start (v1 collector)
 

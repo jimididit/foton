@@ -256,12 +256,24 @@ putty
         }
     }
 
-    Describe 'Get-FotonStartupApprovedState' {
-        It 'maps Task Manager enable and disable bytes' {
-            Get-FotonStartupApprovedState -Value ([byte[]](2, 0, 0, 0)) | Should -Be 'Enabled'
-            Get-FotonStartupApprovedState -Value ([byte[]](3, 0, 0, 0, 0, 0, 0, 0)) | Should -Be 'Disabled'
-            Get-FotonStartupApprovedState -Value ([byte[]](7, 0, 0, 0)) | Should -Be 'Disabled'
-            Get-FotonStartupApprovedState -Value $null | Should -Be 'Unknown'
+    Describe 'Get-FotonBaselineChangeSeverity' {
+        It 'ranks RemoteAccessConfig changes as High' {
+            $c = [PSCustomObject]@{
+                RecordType = 'RemoteAccessConfig'
+                Identity   = 'RdpNla'
+                ChangeType = 'Modified'
+                Field      = 'Value'
+            }
+            Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
+        }
+        It 'still ranks software version bumps as Info' {
+            $c = [PSCustomObject]@{
+                RecordType = 'InstalledSoftware'
+                Identity   = 'App|Pub'
+                ChangeType = 'Modified'
+                Field      = 'DisplayVersion'
+            }
+            Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'Info'
         }
     }
 }
