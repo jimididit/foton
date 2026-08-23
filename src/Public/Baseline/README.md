@@ -1,6 +1,6 @@
 # Public/Baseline
 
-Normalized snapshots of **stable** configuration. Schema **1.12.0** (recapture day0 after this version; Compare refuses a mismatch).
+Normalized snapshots of **stable** configuration. Schema **1.13.0** (recapture day0 after this version; Compare refuses a mismatch).
 
 | RecordType | Identity | Compared | False-positive notes |
 |------------|----------|----------|----------------------|
@@ -34,10 +34,13 @@ Normalized snapshots of **stable** configuration. Schema **1.12.0** (recapture d
 | ProxyConfig | `Scope` + `Setting` | Value | Machine / MachinePolicy / WinHttp / SID. PAC is noisy; skip DefaultConnectionSettings |
 | WinsockLsp | `Kind` + `Entry` | LibraryPath | Protocol_Catalog9 PackedCatalogItem + NameSpace LibraryPath. VPN/EDR LSPs |
 | ActiveSetup | `Key` + `Guid` | StubPath, Version, IsInstalled | HKLM Installed Components only. Version bumps are Info |
+| SilentProcessExit | `ImageName` | MonitorProcess, ReportingMode, LocalDumpFolder | Procmon/debug dump configs. IFEO GlobalFlag is Collect-only |
+| NetshHelper | `Key` + `Name` | Dll | Inbox dhcpmon/fwmon; VPN/EDR helpers |
+| TimeProvider | `Name` | DllName, Enabled, InputProvider | NtpClient/NtpServer usual. Enabled often GPO. Not NTP peers |
 | ImageFileExecution | `ImageName` | Debugger | App Verifier / GFlags |
 | Winlogon | `Name` | Value | EDR/MFA Userinit/Shell |
 | AppInitDll | `Key` + `Name` | Value | Legacy injectors |
 
 Volatile fields (PID, service State, ephemeral UDP, connection tuples) are not captured. Planned providers: [docs/COVERAGE.md](../../../docs/COVERAGE.md).
 
-`New-FotonBaseline` captures on a live host (`-Path` JSON, or `-OutputPath` package folder with HTML/hashes/ZIP). Flattened endpoint script: `dist/Foton-Baseline.ps1`. `Compare-FotonBaseline` is offline (JSON or package folder) and **refuses** a schema mismatch; it writes `Foton_BaselineCompare.html` beside the difference JSON unless `-NoHtml`. Diffs are Tier 1 change facts; High attention for persistence/trust surfaces (service/driver PathName, IFEO, Winlogon Userinit/Shell, RemoteAccessConfig, LsaPackage Added/Removed, PrintMonitor Name/Driver, BitsJob NotifyCmdLine, CmdAutoRun, SessionManager, KnownDll, ProxyServer/WinHttp, WinsockLsp, ActiveSetup StubPath, new shares, hosts adds, WMI consumers, System32 hash change) - still not a conclusion.
+`New-FotonBaseline` captures on a live host (`-Path` JSON, or `-OutputPath` package folder with HTML/hashes/ZIP). Flattened endpoint script: `dist/Foton-Baseline.ps1`. `Compare-FotonBaseline` is offline (JSON or package folder) and **refuses** a schema mismatch; it writes `Foton_BaselineCompare.html` beside the difference JSON unless `-NoHtml`. Diffs are Tier 1 change facts; High attention for persistence/trust surfaces (service/driver PathName, IFEO, Winlogon Userinit/Shell, RemoteAccessConfig, LsaPackage Added/Removed, PrintMonitor Name/Driver, BitsJob NotifyCmdLine, CmdAutoRun, SessionManager, KnownDll, ProxyServer/WinHttp, WinsockLsp, ActiveSetup StubPath, SilentProcessExit MonitorProcess, NetshHelper Dll, TimeProvider DllName, new shares, hosts adds, WMI consumers, System32 hash change) - still not a conclusion.

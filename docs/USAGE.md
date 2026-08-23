@@ -46,6 +46,6 @@ Parse → `analysis\Foton_Parse.html` + `parsed_records.csv`. Analyze → `Foton
 
 - Live collect **changes the host**.
 - Findings are **observations**, not “infected.”
-- A baseline taken after an incident is a picture of that state. Schema **1.12.0** cannot compare against older baseline JSON.
+- A baseline taken after an incident is a picture of that state. Schema **1.13.0** cannot compare against older baseline JSON.
 
 Until the public-release bar in [TODO.md](TODO.md) is mostly green, treat Foton as a lab/internal tool.

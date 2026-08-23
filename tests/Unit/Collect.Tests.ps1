@@ -25,6 +25,10 @@ Describe 'Collect category functions (extracted)' {
         $src | Should -Match "Name 'known_dlls'"
         $src | Should -Match "Name 'winsock_lsp'"
         $src | Should -Match "Name 'active_setup'"
+        $src | Should -Match "Name 'silent_process_exit'"
+        $src | Should -Match "Name 'netsh_helpers'"
+        $src | Should -Match "Name 'time_providers'"
+        $src | Should -Match "Name 'screensaver'"
     }
 
     It 'adds copy-into-package tasks for Prefetch, Amcache, and SRUM' {

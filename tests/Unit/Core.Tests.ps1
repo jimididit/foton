@@ -461,6 +461,38 @@ putty
             }
             Get-FotonBaselineChangeSeverity -Change $v | Should -Be 'Info'
         }
+        It 'ranks SilentProcessExit MonitorProcess and NetshHelper as High' {
+            $s = [PSCustomObject]@{
+                RecordType = 'SilentProcessExit'
+                Identity   = 'lsass.exe'
+                ChangeType = 'Added'
+                Field      = ''
+            }
+            Get-FotonBaselineChangeSeverity -Change $s | Should -Be 'High'
+            $n = [PSCustomObject]@{
+                RecordType = 'NetshHelper'
+                Identity   = 'HKLM:\SOFTWARE\Microsoft\NetSh|evil'
+                ChangeType = 'Modified'
+                Field      = 'Dll'
+            }
+            Get-FotonBaselineChangeSeverity -Change $n | Should -Be 'High'
+        }
+        It 'ranks TimeProvider DllName as High and Enabled as Medium' {
+            $d = [PSCustomObject]@{
+                RecordType = 'TimeProvider'
+                Identity   = 'NtpClient'
+                ChangeType = 'Modified'
+                Field      = 'DllName'
+            }
+            Get-FotonBaselineChangeSeverity -Change $d | Should -Be 'High'
+            $e = [PSCustomObject]@{
+                RecordType = 'TimeProvider'
+                Identity   = 'NtpClient'
+                ChangeType = 'Modified'
+                Field      = 'Enabled'
+            }
+            Get-FotonBaselineChangeSeverity -Change $e | Should -Be 'Medium'
+        }
         It 'still ranks software version bumps as Info' {
             $c = [PSCustomObject]@{
                 RecordType = 'InstalledSoftware'

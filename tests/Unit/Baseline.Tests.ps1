@@ -58,6 +58,12 @@ Describe 'Baseline providers and diff' {
                 Should -Contain 'WinsockLsp'
             @($script:FotonBaselineProviders | ForEach-Object RecordType) |
                 Should -Contain 'ActiveSetup'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'SilentProcessExit'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'NetshHelper'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'TimeProvider'
         }
     }
 
@@ -197,6 +203,42 @@ Describe 'Baseline providers and diff' {
             $rows.Count | Should -BeGreaterThan 0
             $rows[0].PSObject.Properties.Name | Should -Contain 'StubPath'
             $rows[0].Key | Should -Match 'Active Setup'
+        }
+    }
+
+    It 'defines SilentProcessExit as ImageName with MonitorProcess' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'SilentProcessExit' })[0]
+            $prov.IdentityFields | Should -Contain 'ImageName'
+            $prov.ComparedFields | Should -Contain 'MonitorProcess'
+            $rows = @(& $prov.Collect)
+            if ($rows.Count -gt 0) {
+                $rows[0].PSObject.Properties.Name | Should -Contain 'MonitorProcess'
+                $rows[0].PSObject.Properties.Name | Should -Not -Contain 'IfeoGlobalFlag'
+            }
+        }
+    }
+
+    It 'captures NetshHelper DLL map from HKLM NetSh' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'NetshHelper' })[0]
+            $prov.IdentityFields | Should -Contain 'Name'
+            $rows = @(& $prov.Collect)
+            $rows.Count | Should -BeGreaterThan 0
+            $rows[0].PSObject.Properties.Name | Should -Contain 'Dll'
+            $rows[0].Key | Should -Match 'NetSh'
+        }
+    }
+
+    It 'captures TimeProvider NtpClient without NTP peer lists' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'TimeProvider' })[0]
+            $prov.IdentityFields | Should -Contain 'Name'
+            $rows = @(& $prov.Collect)
+            $names = @($rows | ForEach-Object { $_.Name })
+            $names | Should -Contain 'NtpClient'
+            $rows[0].PSObject.Properties.Name | Should -Contain 'DllName'
+            $rows[0].PSObject.Properties.Name | Should -Not -Contain 'NtpServer'
         }
     }
 

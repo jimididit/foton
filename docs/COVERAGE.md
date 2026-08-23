@@ -57,7 +57,7 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | Users | Local users/groups, profiles, sessions, RDP, secedit (admin), credential manager listing |
 | Processes | Process list + tree, **named pipes**, nonstandard modules, PS history, RecentDocs |
 | Network | Connections, listeners, IP/ARP/DNS/hosts, firewall, shares, proxy, Wi-Fi profiles |
-| Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, **cmd_autorun**, **session_manager_boot**, **known_dlls**, **winsock_lsp**, **active_setup**, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
+| Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, **cmd_autorun**, **session_manager_boot**, **known_dlls**, **winsock_lsp**, **active_setup**, **silent_process_exit**, **netsh_helpers**, **time_providers**, **screensaver**, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
 | Security | Defender status/prefs/detections, hardening CSV, auditpol (admin), SMB/WinRM, PS policy, non-MS roots, AppLocker/WDAC summary |
 | EventLogs | Capped queries + log configuration |
 | Filesystem | User-writable executables, recent System32 churn, Prefetch listing + **copied `.pf`** (capped), **Amcache.hve** (+ logs), **SRUM** (+ WAL/SHM), **BAM/DAM UserSettings**, **AppCompatCache.bin export**, **OneDrive/Teams local inventory**, ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
@@ -73,18 +73,18 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | done (1.3.0) | Named CSVs: cmd_autorun, session_manager_boot, known_dlls, winsock_lsp, active_setup | Autoruns tabs as dedicated files | Folded winlogon_lsa CSV still exists |
 | done (1.6.0) | Entra / workplace join / MDM enrollment facts | Modern endpoints | Local registry only. No dsregcmd, Graph, or tenant lookup. Unloaded hives are a visibility gap |
 | done (1.7.0) | OneDrive/Teams local artifacts | Modern endpoints | Inventory only. No Graph, no cookie/IndexedDB copy, no cloud-tree walk |
-| P2 | Screensaver, SilentProcessExit, netsh helpers, time providers | Lower-volume ASEPs | |
+| done (1.8.0) | Screensaver, SilentProcessExit, netsh helpers, time providers | Lower-volume ASEPs | Screensaver Collect-only (user churn). Others also baseline 1.13.0 |
 | P3 | Memory, pcap, full MFT | Wrong runtime | External tools |
 
 Standard-user Collect is **intentional**. Security log, Prefetch, other users’ hives stay skipped, not empty-success.
 
 ---
 
-## Baseline today (schema 1.12.0)
+## Baseline today (schema 1.13.0)
 
 See `src/Public/Baseline/README.md` for identity keys.
 
-Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, **PrintMonitor**, **BitsJob**, **CmdAutoRun**, **SessionManager**, **KnownDll**, **ProxyConfig**, **WinsockLsp**, **ActiveSetup**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
+Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, **PrintMonitor**, **BitsJob**, **CmdAutoRun**, **SessionManager**, **KnownDll**, **ProxyConfig**, **WinsockLsp**, **ActiveSetup**, **SilentProcessExit**, **NetshHelper**, **TimeProvider**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
 
 **Baseline gaps (priority).** Prefer these over exotic ASEPs. Each needs a stable identity key and documented false positives.
 
@@ -100,6 +100,10 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 | done (1.11.0) | ProxyConfig | Scope + Setting | WinHTTP + IE settings. FP: PAC. Not DefaultConnectionSettings |
 | done (1.12.0) | WinsockLsp | Kind + Entry | Catalog LibraryPath. FP: VPN/EDR |
 | done (1.12.0) | ActiveSetup | Key + Guid | HKLM StubPath. Version = Info. HKCU once-run is Collect-only |
+| done (1.13.0) | SilentProcessExit | ImageName | MonitorProcess ASEP. FP: procmon/debug dumps |
+| done (1.13.0) | NetshHelper | Key + Name | T1546.007. FP: VPN/EDR helpers |
+| done (1.13.0) | TimeProvider | Name | W32Time DLLs. FP: VMIC/GPO Enabled. Not NTP peers |
+| Collect-only | Screensaver | - | `screensaver` CSV; Desktop/policy SCRNSAVE.EXE. User churn |
 | Collect-only | ComHijack | - | `com_hijack_candidates` CSV; too noisy for a stable baseline |
 | Collect-only | OfficeAddin | - | `office_addins_and_templates`; user churn |
 | P2 | OptionalFeature / Appx (pinned) | Name | Noisy on consumer SKUs |

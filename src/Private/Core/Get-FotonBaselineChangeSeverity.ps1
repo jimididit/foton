@@ -41,5 +41,9 @@ function Get-FotonBaselineChangeSeverity {
     if ($c.RecordType -eq 'WinsockLsp') { $sev = 'High' }
     if ($c.RecordType -eq 'ActiveSetup' -and ($c.ChangeType -in @('Added', 'Removed') -or $c.Field -eq 'StubPath')) { $sev = 'High' }
     if ($c.RecordType -eq 'ActiveSetup' -and $c.Field -eq 'Version') { $sev = 'Info' }
+    if ($c.RecordType -eq 'SilentProcessExit' -and ($c.ChangeType -in @('Added', 'Removed') -or $c.Field -eq 'MonitorProcess')) { $sev = 'High' }
+    if ($c.RecordType -eq 'NetshHelper') { $sev = 'High' }
+    if ($c.RecordType -eq 'TimeProvider' -and ($c.ChangeType -in @('Added', 'Removed') -or $c.Field -eq 'DllName')) { $sev = 'High' }
+    if ($c.RecordType -eq 'TimeProvider' -and $c.Field -in @('Enabled', 'InputProvider')) { $sev = 'Medium' }
     return $sev
 }

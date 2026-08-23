@@ -2,7 +2,7 @@
 Register-FotonBaselineProvider -RecordType 'ImageFileExecution' `
     -IdentityFields @('ImageName') `
     -ComparedFields @('Debugger') `
-    -FalsePositives 'Application Verifier, GFlags, and some debuggers set Debugger. SilentProcessExit is not collected here.' `
+    -FalsePositives 'Application Verifier, GFlags, and some debuggers set Debugger. SilentProcessExit is a separate RecordType.' `
     -Collect {
         $rows = @()
         $root = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options'

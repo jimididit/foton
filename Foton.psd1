@@ -12,7 +12,7 @@
 #
 @{
     RootModule        = 'Foton.psm1'
-    ModuleVersion     = '1.21.0'
+    ModuleVersion     = '1.22.0'
     GUID              = 'b7e4c1a2-8d3f-4a91-9c6e-2f0d5a8b1e73'
     Author            = 'JDI Consulting'
     CompanyName       = 'JDI Consulting'
@@ -57,13 +57,13 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = '1.21.0: collect schema 1.7.0 onedrive_teams_local (folder/account inventory; no Graph, no cookie/DB copy).'
+            ReleaseNotes = '1.22.0: collect schema 1.8.0 screensaver/silent_process_exit/netsh_helpers/time_providers. Baseline schema 1.13.0 SilentProcessExit, NetshHelper, TimeProvider (screensaver is Collect-only).'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.
-            CollectSchemaVersion  = '1.7.0'
+            CollectSchemaVersion  = '1.8.0'
             # Baseline payload identity keys and compared fields. Diff must refuse a mismatch.
-            BaselineSchemaVersion = '1.12.0'
+            BaselineSchemaVersion = '1.13.0'
             # Findings object shape (Severity, Tier, Artifact, ...).
             FindingsSchemaVersion = '1.0.0'
         }

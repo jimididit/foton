@@ -356,6 +356,95 @@ function Invoke-FotonPersistenceCollection {
         $rows
     } | Out-Null
 
+    Invoke-FotonCollection -Category 'Persistence' -Name 'silent_process_exit' -Format 'Csv' -Description 'SilentProcessExit MonitorProcess/ReportingMode (and IFEO GlobalFlag when present)' -Script {
+        $rows = @()
+        $root = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SilentProcessExit'
+        $ifeo = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options'
+        if (Test-Path -LiteralPath $root) {
+            foreach ($sub in (Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue)) {
+                $name = [string]$sub.PSChildName
+                $gflag = Get-FotonRegValue -Path (Join-Path $ifeo $name) -Name 'GlobalFlag'
+                $gShown = '(not set)'
+                if ($null -ne $gflag -and [string]$gflag -ne '') { $gShown = [string]$gflag }
+                $mon = Get-FotonRegValue -Path $sub.PSPath -Name 'MonitorProcess'
+                $mode = Get-FotonRegValue -Path $sub.PSPath -Name 'ReportingMode'
+                $dump = Get-FotonRegValue -Path $sub.PSPath -Name 'LocalDumpFolder'
+                $monS = '(not set)'; if ($null -ne $mon -and [string]$mon -ne '') { $monS = [string]$mon }
+                $modeS = '(not set)'; if ($null -ne $mode -and [string]$mode -ne '') { $modeS = [string]$mode }
+                $dumpS = '(not set)'; if ($null -ne $dump -and [string]$dump -ne '') { $dumpS = [string]$dump }
+                $rows += [PSCustomObject]@{
+                    ImageName       = $name
+                    MonitorProcess  = $monS
+                    ReportingMode   = $modeS
+                    LocalDumpFolder = $dumpS
+                    IfeoGlobalFlag  = $gShown
+                }
+            }
+        }
+        $rows
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Persistence' -Name 'netsh_helpers' -Format 'Csv' -Description 'Netsh helper DLL registrations (HKLM NetSh)' -Script {
+        $rows = @()
+        foreach ($root in @('HKLM:\SOFTWARE\Microsoft\NetSh', 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\NetSh')) {
+            foreach ($v in (Get-FotonRegValueList -Path $root)) {
+                if (-not $v.Name -or $v.Name -eq '(default)') { continue }
+                $rows += [PSCustomObject]@{ Key = $root; Name = $v.Name; Dll = $v.Value }
+            }
+        }
+        $rows
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Persistence' -Name 'time_providers' -Format 'Csv' -Description 'W32Time TimeProviders DllName (not NTP peer churn)' -Script {
+        $rows = @()
+        $root = 'HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\TimeProviders'
+        if (Test-Path -LiteralPath $root) {
+            foreach ($sub in (Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue)) {
+                $dll = Get-FotonRegValue -Path $sub.PSPath -Name 'DllName'
+                $en = Get-FotonRegValue -Path $sub.PSPath -Name 'Enabled'
+                $inp = Get-FotonRegValue -Path $sub.PSPath -Name 'InputProvider'
+                $dllS = '(not set)'; if ($null -ne $dll -and [string]$dll -ne '') { $dllS = [string]$dll }
+                $enS = '(not set)'; if ($null -ne $en -and [string]$en -ne '') { $enS = [string]$en }
+                $inpS = '(not set)'; if ($null -ne $inp -and [string]$inp -ne '') { $inpS = [string]$inp }
+                $rows += [PSCustomObject]@{
+                    Name          = $sub.PSChildName
+                    DllName       = $dllS
+                    Enabled       = $enS
+                    InputProvider = $inpS
+                }
+            }
+        }
+        $rows
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Persistence' -Name 'screensaver' -Format 'Csv' -Description 'Screensaver executable from Desktop and policy keys (loaded hives). User churn; not a baseline.' -Script {
+        $rows = @()
+        $names = @('SCRNSAVE.EXE', 'ScreenSaveActive', 'ScreenSaverIsSecure', 'ScreenSaveTimeOut')
+        $emitKey = {
+            param($Scope, $User, $Source, $Path)
+            if (-not (Test-Path -LiteralPath $Path)) { return }
+            $any = $false
+            $got = @()
+            foreach ($n in $names) {
+                $val = Get-FotonRegValue -Path $Path -Name $n
+                if ($null -eq $val -or [string]$val -eq '') { continue }
+                $any = $true
+                $got += [PSCustomObject]@{ Scope = $Scope; User = $User; Source = $Source; ValueName = $n; Value = [string]$val }
+            }
+            if ($any) { $got }
+        }
+        foreach ($r in @(& $emitKey 'Machine' 'N/A' 'Policy' 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Control Panel\Desktop')) {
+            $rows += $r
+        }
+        foreach ($h in @(Get-FotonUserHiveRoot)) {
+            $desktop = Join-Path $h.Root 'Control Panel\Desktop'
+            $policy = Join-Path $h.Root 'Software\Policies\Microsoft\Windows\Control Panel\Desktop'
+            foreach ($r in @(& $emitKey 'User' $h.UserName 'Desktop' $desktop)) { $rows += $r }
+            foreach ($r in @(& $emitKey 'User' $h.UserName 'Policy' $policy)) { $rows += $r }
+        }
+        $rows
+    } | Out-Null
+
     Invoke-FotonCollection -Category 'Persistence' -Name 'com_hijack_candidates' -Format 'Csv' -Description 'Per-user COM CLSID overrides pointing to user-writable DLLs' -Script {
         $rows = @()
         foreach ($hiveRoot in (Get-FotonUserHiveRoot)) {

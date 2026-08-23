@@ -12,8 +12,7 @@ Ordered. Prefer the next Collect P1 over exotic ASEPs.
 
 1. **Jumplist parser** - Collect already inventories LNKs/jumplists; parse copied files offline with fixtures first.
 2. **Amcache parser** - Collect copies `Amcache.hve`. Parse only if we can do it correctly (offline hive), otherwise emit unsupported + point at a hive tool. Do not invent timestamps.
-3. **Screensaver / SilentProcessExit / netsh helpers / time providers** - Collect P2, lower-volume ASEPs.
-4. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips.
+3. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips.
 
 **SRUM:** Collect copies the DB + WAL/SHM. A real ESE parser in PowerShell is unlikely to be correct; prefer “copied, not parsed” until a dedicated approach exists.
 
@@ -50,7 +49,7 @@ Do not treat a GitHub release as ready for first-time DFIR users until most of t
 **Lab (admin + standard user)**
 
 - [x] Collect → open `Foton_Report.html` from the case folder (`file://`)
-- [x] Recapture baseline after schema bumps; Compare day0 vs day1 (schema **1.12.0**)
+- [x] Recapture baseline after schema bumps; Compare day0 vs day1 (schema **1.13.0**)
 - [ ] `Get-FotonPackage` on a historical `WinFoton_*` zip **and** a `Foton_*` flatten folder
 - [ ] Parse `.pf` / EVTX already in the package (not live Prefetch)
 - [ ] IOC txt + csv against `tests/Fixtures`
