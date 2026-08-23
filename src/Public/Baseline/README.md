@@ -1,6 +1,6 @@
 # Public/Baseline
 
-Normalized snapshots of **stable** configuration. Schema **1.7.0** (recapture day0 after this version; Compare refuses a mismatch).
+Normalized snapshots of **stable** configuration. Schema **1.11.0** (recapture day0 after this version; Compare refuses a mismatch).
 
 | RecordType | Identity | Compared | False-positive notes |
 |------------|----------|----------|----------------------|
@@ -27,10 +27,15 @@ Normalized snapshots of **stable** configuration. Schema **1.7.0** (recapture da
 | RemoteAccessConfig | `Setting` | Value | RDP NLA/port/SecurityLayer/AllowRemoteRPC; WinRM *policy* Basic/unencrypted; LanmanServer SMB1. Helpdesk RDP and GPO WinRM. **RDP enable** is HardeningRegistry `fDenyTSConnections` |
 | LsaPackage | `Kind` + `Package` | *(Added/Removed)* | MULTI_SZ tokens (Authentication/Notification/Security Packages), OSConfig AP, SecurityProviders. MFA/EDR SSPs |
 | PrintMonitor | `Name` | Driver | Print\Monitors subkeys. Printer installs add TCP/IP/WSD/vendor monitors |
+| BitsJob | `JobId` | DisplayName, TransferType, OwnerAccount, Priority, ProxyUsage, NotifyCmdLine | **Not** bytes or JobState. Windows Update JobIds churn; NotifyCmdLine is T1197 |
+| CmdAutoRun | `Hive` + `Key` | Command | cmd.exe `Command Processor\AutoRun` only. HKLM always (including (not set)); HKCU when set. doskey/clink/conda |
+| SessionManager | `Kind` + `Name` | Value | BootExecute / SetupExecute / Execute / S0InitialCommand / BootExecuteNoPnpSync; AppCertDlls rows. **Not** PendingFileRenameOperations |
+| KnownDll | `Name` | MappedFile | KnownDLLs value names. OS upgrades add entries; do not hash the DLL |
+| ProxyConfig | `Scope` + `Setting` | Value | Machine / MachinePolicy / WinHttp / SID. PAC is noisy; skip DefaultConnectionSettings |
 | ImageFileExecution | `ImageName` | Debugger | App Verifier / GFlags |
 | Winlogon | `Name` | Value | EDR/MFA Userinit/Shell |
 | AppInitDll | `Key` + `Name` | Value | Legacy injectors |
 
 Volatile fields (PID, service State, ephemeral UDP, connection tuples) are not captured. Planned providers: [docs/COVERAGE.md](../../../docs/COVERAGE.md).
 
-`New-FotonBaseline` captures on a live host (`-Path` JSON, or `-OutputPath` package folder with HTML/hashes/ZIP). Flattened endpoint script: `dist/Foton-Baseline.ps1`. `Compare-FotonBaseline` is offline (JSON or package folder) and **refuses** a schema mismatch; it writes `Foton_BaselineCompare.html` beside the difference JSON unless `-NoHtml`. Diffs are Tier 1 change facts; High attention for persistence/trust surfaces (service/driver PathName, IFEO, Winlogon Userinit/Shell, RemoteAccessConfig, LsaPackage Added/Removed, PrintMonitor Name/Driver, new shares, hosts adds, WMI consumers, System32 hash change) - still not a conclusion.
+`New-FotonBaseline` captures on a live host (`-Path` JSON, or `-OutputPath` package folder with HTML/hashes/ZIP). Flattened endpoint script: `dist/Foton-Baseline.ps1`. `Compare-FotonBaseline` is offline (JSON or package folder) and **refuses** a schema mismatch; it writes `Foton_BaselineCompare.html` beside the difference JSON unless `-NoHtml`. Diffs are Tier 1 change facts; High attention for persistence/trust surfaces (service/driver PathName, IFEO, Winlogon Userinit/Shell, RemoteAccessConfig, LsaPackage Added/Removed, PrintMonitor Name/Driver, BitsJob NotifyCmdLine, CmdAutoRun, SessionManager, KnownDll, ProxyServer/WinHttp, new shares, hosts adds, WMI consumers, System32 hash change) - still not a conclusion.

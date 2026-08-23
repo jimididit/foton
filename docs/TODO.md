@@ -45,7 +45,7 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 **Layers to exercise on a lab VM (admin + standard user)**
 
 - [x] Collect → open `Foton_Report.html` from the case folder (file://)
-- [x] Recapture baseline after every `BaselineSchemaVersion` bump; Compare day0 vs day1 (now **1.7.0**)
+- [x] Recapture baseline after every `BaselineSchemaVersion` bump; Compare day0 vs day1 (now **1.11.0**; P1 complete — recapture day0)
 - [ ] `Get-FotonPackage` on a `WinFoton_*` v1 zip and a `Foton_*` flatten folder
 - [ ] Parse `.pf` already copied into `08_Filesystem/prefetch` (not live `%SystemRoot%\Prefetch`)
 - [ ] IOC txt + csv against a known fixture package
@@ -62,7 +62,7 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 **Still later**
 
 - In-report CSV browser (this file, above)
-- Baseline/Collect gaps in **[docs/COVERAGE.md](COVERAGE.md)** (next: BitsJob; EVTX parser; Amcache/SRUM *parsers*; MAM Prefetch inflate later)
+- Baseline/Collect gaps in **[docs/COVERAGE.md](COVERAGE.md)** (next: P2 ComHijack / Collect named tasks; EVTX parser; Amcache/SRUM *parsers*; MAM Prefetch inflate later)
 - EVTX / jumplist / Amcache / SRUM parsers (files are now in the collect package)
 - Real NTFS carve engine (see `docs/CARVE.md`)
 

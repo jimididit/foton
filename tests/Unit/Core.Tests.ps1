@@ -284,6 +284,63 @@ putty
             }
             Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
         }
+        It 'ranks BitsJob NotifyCmdLine as High and other BitsJob adds as Medium' {
+            $n = [PSCustomObject]@{
+                RecordType = 'BitsJob'
+                Identity   = '{00000000-0000-0000-0000-000000000001}'
+                ChangeType = 'Modified'
+                Field      = 'NotifyCmdLine'
+            }
+            Get-FotonBaselineChangeSeverity -Change $n | Should -Be 'High'
+            $a = [PSCustomObject]@{
+                RecordType = 'BitsJob'
+                Identity   = '{00000000-0000-0000-0000-000000000001}'
+                ChangeType = 'Added'
+                Field      = ''
+            }
+            Get-FotonBaselineChangeSeverity -Change $a | Should -Be 'Medium'
+        }
+        It 'ranks CmdAutoRun changes as High' {
+            $c = [PSCustomObject]@{
+                RecordType = 'CmdAutoRun'
+                Identity   = 'HKLM|SOFTWARE\Microsoft\Command Processor'
+                ChangeType = 'Modified'
+                Field      = 'Command'
+            }
+            Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
+        }
+        It 'ranks SessionManager changes as High' {
+            $c = [PSCustomObject]@{
+                RecordType = 'SessionManager'
+                Identity   = 'SessionValue|BootExecute'
+                ChangeType = 'Modified'
+                Field      = 'Value'
+            }
+            Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
+        }
+        It 'ranks KnownDll and ProxyServer as High and AutoConfigURL as Medium' {
+            $k = [PSCustomObject]@{
+                RecordType = 'KnownDll'
+                Identity   = 'evil'
+                ChangeType = 'Added'
+                Field      = ''
+            }
+            Get-FotonBaselineChangeSeverity -Change $k | Should -Be 'High'
+            $p = [PSCustomObject]@{
+                RecordType = 'ProxyConfig'
+                Identity   = 'Machine|ProxyServer'
+                ChangeType = 'Modified'
+                Field      = 'Value'
+            }
+            Get-FotonBaselineChangeSeverity -Change $p | Should -Be 'High'
+            $a = [PSCustomObject]@{
+                RecordType = 'ProxyConfig'
+                Identity   = 'Machine|AutoConfigURL'
+                ChangeType = 'Modified'
+                Field      = 'Value'
+            }
+            Get-FotonBaselineChangeSeverity -Change $a | Should -Be 'Medium'
+        }
         It 'still ranks software version bumps as Info' {
             $c = [PSCustomObject]@{
                 RecordType = 'InstalledSoftware'

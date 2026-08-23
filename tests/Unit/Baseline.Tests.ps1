@@ -44,6 +44,16 @@ Describe 'Baseline providers and diff' {
                 Should -Contain 'LsaPackage'
             @($script:FotonBaselineProviders | ForEach-Object RecordType) |
                 Should -Contain 'PrintMonitor'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'BitsJob'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'CmdAutoRun'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'SessionManager'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'KnownDll'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'ProxyConfig'
         }
     }
 
@@ -90,6 +100,72 @@ Describe 'Baseline providers and diff' {
             $rows.Count | Should -BeGreaterThan 0
             $rows[0].PSObject.Properties.Name | Should -Contain 'Name'
             $rows[0].PSObject.Properties.Name | Should -Contain 'Driver'
+        }
+    }
+
+    It 'defines BitsJob as JobId with no byte-count fields' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'BitsJob' })[0]
+            $prov.IdentityFields | Should -Contain 'JobId'
+            $prov.ComparedFields | Should -Contain 'NotifyCmdLine'
+            $prov.ComparedFields | Should -Not -Contain 'BytesTransferred'
+            $prov.ComparedFields | Should -Not -Contain 'JobState'
+            $rows = @(& $prov.Collect)
+            foreach ($r in $rows) {
+                $r.PSObject.Properties.Name | Should -Not -Contain 'BytesTransferred'
+            }
+        }
+    }
+
+    It 'captures HKLM Command Processor AutoRun as CmdAutoRun' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'CmdAutoRun' })[0]
+            $prov.IdentityFields | Should -Contain 'Hive'
+            $prov.IdentityFields | Should -Contain 'Key'
+            $rows = @(& $prov.Collect)
+            $hlm = @($rows | Where-Object { $_.Hive -eq 'HKLM' })
+            $hlm.Count | Should -BeGreaterThan 0
+            $hlm[0].Key | Should -Match 'Command Processor'
+            $hlm[0].PSObject.Properties.Name | Should -Contain 'Command'
+        }
+    }
+
+    It 'captures SessionManager BootExecute and omits PendingFileRenameOperations' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'SessionManager' })[0]
+            $prov.IdentityFields | Should -Contain 'Kind'
+            $prov.IdentityFields | Should -Contain 'Name'
+            $rows = @(& $prov.Collect)
+            $boot = @($rows | Where-Object { $_.Kind -eq 'SessionValue' -and $_.Name -eq 'BootExecute' })
+            $boot.Count | Should -Be 1
+            $boot[0].Value | Should -Match 'autocheck|autochk|\(not set\)'
+            @($rows | Where-Object { $_.Name -eq 'PendingFileRenameOperations' }).Count | Should -Be 0
+        }
+    }
+
+    It 'captures KnownDll mapped files from Session Manager' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'KnownDll' })[0]
+            $prov.IdentityFields | Should -Contain 'Name'
+            $rows = @(& $prov.Collect)
+            $rows.Count | Should -BeGreaterThan 0
+            $names = @($rows | ForEach-Object { $_.Name })
+            ($names -join ' ') | Should -Match 'ntdll|kernel32|DllDirectory'
+            $rows[0].PSObject.Properties.Name | Should -Contain 'MappedFile'
+        }
+    }
+
+    It 'captures ProxyConfig machine settings and not DefaultConnectionSettings' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'ProxyConfig' })[0]
+            $prov.IdentityFields | Should -Contain 'Scope'
+            $prov.IdentityFields | Should -Contain 'Setting'
+            $rows = @(& $prov.Collect)
+            $machine = @($rows | Where-Object { $_.Scope -eq 'Machine' } | ForEach-Object Setting)
+            $machine | Should -Contain 'ProxyEnable'
+            $machine | Should -Contain 'AutoConfigURL'
+            @($rows | Where-Object { $_.Scope -eq 'WinHttp' -and $_.Setting -eq 'WinHttpSettings' }).Count | Should -Be 1
+            @($rows | Where-Object { $_.Setting -eq 'DefaultConnectionSettings' }).Count | Should -Be 0
         }
     }
 

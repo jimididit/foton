@@ -79,11 +79,11 @@ Standard-user Collect is **intentional**. Security log, Prefetch, other users’
 
 ---
 
-## Baseline today (schema 1.7.0)
+## Baseline today (schema 1.11.0)
 
 See `src/Public/Baseline/README.md` for identity keys.
 
-Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, **PrintMonitor**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
+Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, **PrintMonitor**, **BitsJob**, **CmdAutoRun**, **SessionManager**, **KnownDll**, **ProxyConfig**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
 
 **Baseline gaps (priority).** Prefer these over exotic ASEPs. Each needs a stable identity key and documented false positives.
 
@@ -92,11 +92,11 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 | done (1.5.0) | RemoteAccessConfig | Setting | RDP NLA/port/layer; WinRM policy; SMBv1 DWORD. FP: helpdesk RDP. Enable flag remains HardeningRegistry |
 | done (1.6.0) | LsaPackage | Kind + Package | T1547.005. One token per row. FP: MFA/EDR SSP |
 | done (1.7.0) | PrintMonitor | Name | Spooler SYSTEM DLL. FP: printer installs |
-| P1 | BitsJob | JobId | T1197. Compare type/flags, **not** bytes transferred |
-| P1 | CmdAutoRun | Hive + value | IFEO-adjacent. FP: autorun scripts |
-| P1 | BootExecute / SessionManager | Value name | Native boot images |
-| P1 | KnownDll | Name | Search-order override |
-| P1 | ProxyConfig | Scope + value | WinHTTP/user proxy. FP: PAC changes |
+| done (1.8.0) | BitsJob | JobId | T1197. Type/notify, **not** bytes. FP: Windows Update jobs |
+| done (1.9.0) | CmdAutoRun | Hive + Key | cmd.exe AutoRun. FP: doskey/clink/conda |
+| done (1.10.0) | SessionManager | Kind + Name | BootExecute family + AppCertDlls. **Not** PFRO. FP: autocheck, disk tools |
+| done (1.11.0) | KnownDll | Name | Search-order map. FP: feature updates |
+| done (1.11.0) | ProxyConfig | Scope + Setting | WinHTTP + IE settings. FP: PAC. Not DefaultConnectionSettings |
 | P2 | ComHijack | Hive + CLSID | Noisy; maybe Collect-only unless identity is tight |
 | P2 | OfficeAddin | Path + name | Collect has it; user churn |
 | P2 | WinsockLsp | Catalog id | Rare, high impact |

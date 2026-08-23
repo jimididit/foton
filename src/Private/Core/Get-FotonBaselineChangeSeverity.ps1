@@ -32,5 +32,11 @@ function Get-FotonBaselineChangeSeverity {
     if ($c.RecordType -eq 'RemoteAccessConfig' -and $c.ChangeType -in @('Added', 'Removed', 'Modified')) { $sev = 'High' }
     if ($c.RecordType -eq 'LsaPackage' -and $c.ChangeType -in @('Added', 'Removed')) { $sev = 'High' }
     if ($c.RecordType -eq 'PrintMonitor' -and ($c.ChangeType -in @('Added', 'Removed') -or $c.Field -eq 'Driver')) { $sev = 'High' }
+    if ($c.RecordType -eq 'BitsJob' -and $c.Field -eq 'NotifyCmdLine') { $sev = 'High' }
+    if ($c.RecordType -eq 'CmdAutoRun') { $sev = 'High' }
+    if ($c.RecordType -eq 'SessionManager') { $sev = 'High' }
+    if ($c.RecordType -eq 'KnownDll') { $sev = 'High' }
+    if ($c.RecordType -eq 'ProxyConfig') { $sev = 'High' }
+    if ($c.RecordType -eq 'ProxyConfig' -and [string]$c.Identity -like '*|AutoConfigURL') { $sev = 'Medium' }
     return $sev
 }
