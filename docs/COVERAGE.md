@@ -53,14 +53,14 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 
 | Category | In tree (high level) |
 |----------|----------------------|
-| System | OS, time sync, hotfixes, Secure Boot/TPM/BitLocker, disks, env, VSS |
+| System | OS, time sync, **Entra/workplace join / MDM enrollment (local registry)**, hotfixes, Secure Boot/TPM/BitLocker, disks, env, VSS |
 | Users | Local users/groups, profiles, sessions, RDP, secedit (admin), credential manager listing |
 | Processes | Process list + tree, **named pipes**, nonstandard modules, PS history, RecentDocs |
 | Network | Connections, listeners, IP/ARP/DNS/hosts, firewall, shares, proxy, Wi-Fi profiles |
 | Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, **cmd_autorun**, **session_manager_boot**, **known_dlls**, **winsock_lsp**, **active_setup**, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
 | Security | Defender status/prefs/detections, hardening CSV, auditpol (admin), SMB/WinRM, PS policy, non-MS roots, AppLocker/WDAC summary |
 | EventLogs | Capped queries + log configuration |
-| Filesystem | User-writable executables, recent System32 churn, Prefetch listing + **copied `.pf`** (capped), **Amcache.hve** (+ logs), **SRUM** (+ WAL/SHM), **BAM/DAM UserSettings**, **AppCompatCache.bin export**, ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
+| Filesystem | User-writable executables, recent System32 churn, Prefetch listing + **copied `.pf`** (capped), **Amcache.hve** (+ logs), **SRUM** (+ WAL/SHM), **BAM/DAM UserSettings**, **AppCompatCache.bin export**, **OneDrive/Teams local inventory**, ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
 | Software | Uninstall keys, drivers, browser extensions, RAT name hits, AppX |
 
 **Collect gaps (priority).** Common in IR kits and still thin or missing as *package artifacts*:
@@ -71,7 +71,8 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | done (1.5.0) | BAM/DAM UserSettings + raw AppCompatCache.bin | Execution evidence when Prefetch is off | Admin. Shimcache entries not parsed |
 | done (1.4.0) | Named pipes | Classic IR volatile | Collect only; names churn |
 | done (1.3.0) | Named CSVs: cmd_autorun, session_manager_boot, known_dlls, winsock_lsp, active_setup | Autoruns tabs as dedicated files | Folded winlogon_lsa CSV still exists |
-| P2 | Entra/workplace join, OneDrive/Teams local artifacts | Modern endpoints | Do not phone home |
+| done (1.6.0) | Entra / workplace join / MDM enrollment facts | Modern endpoints | Local registry only. No dsregcmd, Graph, or tenant lookup. Unloaded hives are a visibility gap |
+| done (1.7.0) | OneDrive/Teams local artifacts | Modern endpoints | Inventory only. No Graph, no cookie/IndexedDB copy, no cloud-tree walk |
 | P2 | Screensaver, SilentProcessExit, netsh helpers, time providers | Lower-volume ASEPs | |
 | P3 | Memory, pcap, full MFT | Wrong runtime | External tools |
 

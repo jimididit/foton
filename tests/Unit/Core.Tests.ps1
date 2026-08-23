@@ -28,6 +28,81 @@ InModuleScope Foton {
         }
     }
 
+    Describe 'Get-FotonCloudJoinRows' {
+        It 'reads JoinInfo from a caller-supplied key and skips empty MDM GUIDs' {
+            $root = 'HKCU:\Software\_FotonCloudJoinTest_' + [guid]::NewGuid().ToString('N')
+            $joinGuid = '{' + [guid]::NewGuid().ToString() + '}'
+            $emptyEnroll = '{' + [guid]::NewGuid().ToString() + '}'
+            $mdmGuid = '{' + [guid]::NewGuid().ToString() + '}'
+            New-Item -Path (Join-Path $root "JoinInfo\$joinGuid") -Force | Out-Null
+            New-ItemProperty -Path (Join-Path $root "JoinInfo\$joinGuid") -Name 'TenantId' -Value '11111111-1111-1111-1111-111111111111' -PropertyType String | Out-Null
+            New-ItemProperty -Path (Join-Path $root "JoinInfo\$joinGuid") -Name 'DeviceId' -Value '22222222-2222-2222-2222-222222222222' -PropertyType String | Out-Null
+            New-ItemProperty -Path (Join-Path $root "JoinInfo\$joinGuid") -Name 'UserEmail' -Value 'user@contoso.test' -PropertyType String | Out-Null
+            New-Item -Path (Join-Path $root "Enrollments\$emptyEnroll") -Force | Out-Null
+            New-Item -Path (Join-Path $root "Enrollments\$mdmGuid") -Force | Out-Null
+            New-ItemProperty -Path (Join-Path $root "Enrollments\$mdmGuid") -Name 'UPN' -Value 'mdm@contoso.test' -PropertyType String | Out-Null
+            New-ItemProperty -Path (Join-Path $root "Enrollments\$mdmGuid") -Name 'EnrollmentType' -Value 6 -PropertyType DWord | Out-Null
+            try {
+                $rows = @(Get-FotonCloudJoinRows -JoinInfoRoot (Join-Path $root 'JoinInfo') -TenantInfoRoot (Join-Path $root 'NoTenant') -EnrollmentRoot (Join-Path $root 'Enrollments') -UserHiveRoots @())
+                ($rows | Where-Object { $_.Kind -eq 'AzureAdJoin' }).Count | Should -Be 1
+                $aad = $rows | Where-Object { $_.Kind -eq 'AzureAdJoin' } | Select-Object -First 1
+                $aad.TenantId | Should -Be '11111111-1111-1111-1111-111111111111'
+                $aad.UPN | Should -Be 'user@contoso.test'
+                $aad.Note | Should -Match 'not a live tenant lookup'
+                ($rows | Where-Object { $_.Kind -eq 'MdmEnrollment' }).Count | Should -Be 1
+                $mdm = $rows | Where-Object { $_.Kind -eq 'MdmEnrollment' } | Select-Object -First 1
+                $mdm.UPN | Should -Be 'mdm@contoso.test'
+                $mdm.EnrollmentType | Should -Be '6'
+            }
+            finally {
+                Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        It 'does not treat missing join keys as a join' {
+            $missing = 'HKCU:\Software\_FotonCloudJoinMissing_' + [guid]::NewGuid().ToString('N')
+            @(Get-FotonCloudJoinRows -JoinInfoRoot $missing -TenantInfoRoot $missing -EnrollmentRoot $missing -UserHiveRoots @()).Count | Should -Be 0
+        }
+    }
+
+    Describe 'Get-FotonOneDriveTeamsRows' {
+        It 'inventories a sync root and Teams log without reading contents or walking cloud files' {
+            $prof = Join-Path $env:TEMP ('foton-odt-' + [guid]::NewGuid().ToString('N'))
+            $od = Join-Path $prof 'OneDrive'
+            $cloud = Join-Path $od 'cloud-child'
+            $logs = Join-Path $prof 'AppData\Local\Microsoft\OneDrive\logs\Business1'
+            $teams = Join-Path $prof 'AppData\Roaming\Microsoft\Teams'
+            New-Item -Path $cloud, $logs, $teams -ItemType Directory -Force | Out-Null
+            'secret-cloud' | Set-Content -LiteralPath (Join-Path $cloud 'payload.txt') -Encoding ascii
+            'log-body' | Set-Content -LiteralPath (Join-Path $logs 'sync.log') -Encoding ascii
+            'teams-body' | Set-Content -LiteralPath (Join-Path $teams 'logs.txt') -Encoding ascii
+            $reg = 'HKCU:\Software\_FotonOdt_' + [guid]::NewGuid().ToString('N')
+            $acct = Join-Path $reg 'Software\Microsoft\OneDrive\Accounts\Business1'
+            New-Item -Path $acct -Force | Out-Null
+            New-ItemProperty -Path $acct -Name 'UserFolder' -Value $od -PropertyType String | Out-Null
+            New-ItemProperty -Path $acct -Name 'UserEmail' -Value 'user@contoso.test' -PropertyType String | Out-Null
+            New-ItemProperty -Path $acct -Name 'cid' -Value 'cid-1' -PropertyType String | Out-Null
+            $profile = [PSCustomObject]@{ UserName = 'alice'; ProfilePath = $prof; Exists = $true; SID = 'S-1-5-21-1' }
+            $hive = [PSCustomObject]@{ UserName = 'alice'; SID = 'S-1-5-21-1'; Root = $reg }
+            try {
+                $rows = @(Get-FotonOneDriveTeamsRows -UserProfiles @($profile) -UserHiveRoots @($hive) -MachineOneDriveRoot ($reg + '\NoMachine'))
+                $acctRow = $rows | Where-Object { $_.Kind -eq 'OneDriveAccount' } | Select-Object -First 1
+                $acctRow.Email | Should -Be 'user@contoso.test'
+                $acctRow.Note | Should -Match 'Token values are omitted'
+                ($rows | Where-Object { $_.Kind -eq 'OneDriveFolder' -and $_.Path -eq $od }).Count | Should -Be 1
+                ($rows | Where-Object { $_.Path -like '*payload.txt' }).Count | Should -Be 0
+                ($rows | Where-Object { $_.Kind -eq 'OneDriveLog' }).Count | Should -Be 1
+                $tlog = $rows | Where-Object { $_.Kind -eq 'TeamsLog' } | Select-Object -First 1
+                $tlog.Identity | Should -Be 'logs.txt'
+                $tlog.Note | Should -Match 'Contents not read'
+            }
+            finally {
+                Remove-Item -LiteralPath $prof -Recurse -Force -ErrorAction SilentlyContinue
+                Remove-Item -LiteralPath $reg -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
     Describe 'ConvertFrom-FotonFileTimeUtc' {
         It 'decodes a known UTC FILETIME' {
             $dt = [datetime]::SpecifyKind([datetime]'2020-01-15 12:00:00', 'Utc')

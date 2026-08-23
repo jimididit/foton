@@ -12,9 +12,8 @@ Ordered. Prefer the next Collect P1 over exotic ASEPs.
 
 1. **Jumplist parser** - Collect already inventories LNKs/jumplists; parse copied files offline with fixtures first.
 2. **Amcache parser** - Collect copies `Amcache.hve`. Parse only if we can do it correctly (offline hive), otherwise emit unsupported + point at a hive tool. Do not invent timestamps.
-3. **Entra / workplace join facts** - Collect P2. Do not phone home.
-4. **Screensaver / SilentProcessExit / netsh helpers / time providers** - Collect P2, lower-volume ASEPs.
-5. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips.
+3. **Screensaver / SilentProcessExit / netsh helpers / time providers** - Collect P2, lower-volume ASEPs.
+4. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips.
 
 **SRUM:** Collect copies the DB + WAL/SHM. A real ESE parser in PowerShell is unlikely to be correct; prefer “copied, not parsed” until a dedicated approach exists.
 

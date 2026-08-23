@@ -35,6 +35,10 @@ function Invoke-FotonSystemCollection {
         }
     } | Out-Null
 
+    Invoke-FotonCollection -Category 'System' -Name 'entra_workplace_join' -Format 'Csv' -Description 'Entra/Azure AD join, workplace join, and MDM enrollment from local registry (no dsregcmd, no Graph)' -Script {
+        Get-FotonCloudJoinRows
+    } | Out-Null
+
     Invoke-FotonCollection -Category 'System' -Name 'time_sync' -Format 'Txt' -Description 'NTP/time source configuration (timestamp reliability)' -Script {
         $out = @()
         $out += '--- w32tm /query /status ---'

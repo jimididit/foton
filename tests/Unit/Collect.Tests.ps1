@@ -35,6 +35,15 @@ Describe 'Collect category functions (extracted)' {
         $src | Should -Match "Name 'prefetch_listing'"
         $src | Should -Match "Name 'bam_dam_user_settings'"
         $src | Should -Match "Name 'appcompatcache_export'"
+        $src | Should -Match "Name 'onedrive_teams_local'"
+        $src | Should -Not -Match 'graph\.microsoft'
+    }
+
+    It 'adds entra_workplace_join on the System collector' {
+        $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonSystemCollection.ps1') -Raw
+        $src | Should -Match "Name 'entra_workplace_join'"
+        $src | Should -Not -Match 'dsregcmd\.exe'
+        $src | Should -Match 'Get-FotonCloudJoinRows'
     }
 
     It 'adds a named_pipes collect task' {

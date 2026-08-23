@@ -278,6 +278,10 @@ function Invoke-FotonFilesystemCollection {
         $rows | Sort-Object ModifiedUtc -Descending
     } | Out-Null
 
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'onedrive_teams_local' -Format 'Csv' -Description 'OneDrive/Teams local folders and account registry (no Graph, no cookie/DB copy)' -Script {
+        Get-FotonOneDriveTeamsRows
+    } | Out-Null
+
     Invoke-FotonCollection -Category 'Filesystem' -Name 'hidden_or_odd_root_items' -Format 'Csv' -Description 'Hidden or unexpected items at drive roots and ProgramData' -Script {
         $rows = @()
         foreach ($drive in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {

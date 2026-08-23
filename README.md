@@ -4,7 +4,7 @@ Windows DFIR, baseline comparison, and security-audit toolkit.
 
 Foton captures host state into a hashed **package**, then you parse, compare baselines, and analyze **offline**. Findings are observations, not a verdict.
 
-**Module 1.19.0** - collect schema **1.5.0**, baseline schema **1.12.0**. Operator path: [docs/USAGE.md](docs/USAGE.md).
+**Module 1.21.0** - collect schema **1.7.0**, baseline schema **1.12.0**. Operator path: [docs/USAGE.md](docs/USAGE.md).
 
 ## What to run
 

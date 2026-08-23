@@ -12,7 +12,7 @@
 #
 @{
     RootModule        = 'Foton.psm1'
-    ModuleVersion     = '1.19.0'
+    ModuleVersion     = '1.21.0'
     GUID              = 'b7e4c1a2-8d3f-4a91-9c6e-2f0d5a8b1e73'
     Author            = 'JDI Consulting'
     CompanyName       = 'JDI Consulting'
@@ -57,11 +57,11 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = '1.19.0: collect schema 1.5.0 BAM/DAM UserSettings CSV + raw AppCompatCache.bin export (no Shimcache entry parse).'
+            ReleaseNotes = '1.21.0: collect schema 1.7.0 onedrive_teams_local (folder/account inventory; no Graph, no cookie/DB copy).'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.
-            CollectSchemaVersion  = '1.5.0'
+            CollectSchemaVersion  = '1.7.0'
             # Baseline payload identity keys and compared fields. Diff must refuse a mismatch.
             BaselineSchemaVersion = '1.12.0'
             # Findings object shape (Severity, Tier, Artifact, ...).
