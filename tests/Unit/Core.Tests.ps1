@@ -18,6 +18,18 @@ InModuleScope Foton {
         }
     }
 
+    Describe 'ConvertFrom-FotonFileTimeUtc' {
+        It 'decodes a known UTC FILETIME' {
+            $dt = [datetime]::SpecifyKind([datetime]'2020-01-15 12:00:00', 'Utc')
+            $bytes = [BitConverter]::GetBytes($dt.ToFileTimeUtc())
+            ConvertFrom-FotonFileTimeUtc -Bytes $bytes | Should -Be '2020-01-15 12:00:00'
+        }
+        It 'does not invent a time for empty or zero' {
+            ConvertFrom-FotonFileTimeUtc -Bytes $null | Should -Be '(not set)'
+            ConvertFrom-FotonFileTimeUtc -Bytes ([byte[]]@(0, 0, 0, 0, 0, 0, 0, 0)) | Should -Be '(not set)'
+        }
+    }
+
     Describe 'Test-FotonUserWritablePath' {
         BeforeEach { Initialize-FotonSession }
         It 'flags AppData-style paths' {

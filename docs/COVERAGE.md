@@ -60,7 +60,7 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, **cmd_autorun**, **session_manager_boot**, **known_dlls**, **winsock_lsp**, **active_setup**, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
 | Security | Defender status/prefs/detections, hardening CSV, auditpol (admin), SMB/WinRM, PS policy, non-MS roots, AppLocker/WDAC summary |
 | EventLogs | Capped queries + log configuration |
-| Filesystem | User-writable executables, recent System32 churn, Prefetch listing + **copied `.pf`** (capped), **Amcache.hve** (+ logs), **SRUM** (+ WAL/SHM), ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
+| Filesystem | User-writable executables, recent System32 churn, Prefetch listing + **copied `.pf`** (capped), **Amcache.hve** (+ logs), **SRUM** (+ WAL/SHM), **BAM/DAM UserSettings**, **AppCompatCache.bin export**, ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
 | Software | Uninstall keys, drivers, browser extensions, RAT name hits, AppX |
 
 **Collect gaps (priority).** Common in IR kits and still thin or missing as *package artifacts*:
@@ -68,7 +68,7 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | Priority | Gap | Why it matters | Note |
 |----------|-----|----------------|------|
 | done (1.2.0) | Copy Prefetch `.pf`, Amcache.hve, SRUM DB (capped) | Parse cannot run on a listing CSV | Locked files: `Copy-FotonHostFile` FileShare.ReadWrite; failures in the copy CSV |
-| P1 | BAM/DAM, Shimcache (AppCompatCache) export | Execution evidence when Prefetch is off | Registry/hive; admin |
+| done (1.5.0) | BAM/DAM UserSettings + raw AppCompatCache.bin | Execution evidence when Prefetch is off | Admin. Shimcache entries not parsed |
 | done (1.4.0) | Named pipes | Classic IR volatile | Collect only; names churn |
 | done (1.3.0) | Named CSVs: cmd_autorun, session_manager_boot, known_dlls, winsock_lsp, active_setup | Autoruns tabs as dedicated files | Folded winlogon_lsa CSV still exists |
 | P2 | Entra/workplace join, OneDrive/Teams local artifacts | Modern endpoints | Do not phone home |

@@ -99,6 +99,78 @@ function Invoke-FotonFilesystemCollection {
         Copy-FotonHostFileFamily -SourcePath $src -DestinationDirectory $dest -PackageRelativeDirectory $rel -MaxTotalBytes 104857600
     } | Out-Null
 
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'bam_dam_user_settings' -Format 'Csv' -Description 'BAM/DAM UserSettings (path = value name; FILETIME in data). Admin. Not a baseline.' -RequiresElevation -Script {
+        $rows = @()
+        $pairs = @(
+            @{ Kind = 'BAM'; Root = 'HKLM:\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings' },
+            @{ Kind = 'BAM'; Root = 'HKLM:\SYSTEM\CurrentControlSet\Services\bam\UserSettings' },
+            @{ Kind = 'DAM'; Root = 'HKLM:\SYSTEM\CurrentControlSet\Services\dam\State\UserSettings' },
+            @{ Kind = 'DAM'; Root = 'HKLM:\SYSTEM\CurrentControlSet\Services\dam\UserSettings' }
+        )
+        foreach ($p in $pairs) {
+            $rows += @(Get-FotonBamDamRows -Kind $p.Kind -Root $p.Root)
+        }
+        $seen = @{}
+        $out = @()
+        foreach ($r in $rows) {
+            $k = '{0}|{1}|{2}' -f $r.Kind, $r.SID, $r.Path
+            if ($seen.ContainsKey($k)) { continue }
+            $seen[$k] = $true
+            $out += $r
+        }
+        $out | Sort-Object Kind, SID, Path
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'appcompatcache_export' -Format 'Csv' -Description 'Raw AppCompatCache (Shimcache) blob copied into the package; entries are not parsed' -RequiresElevation -Script {
+        $key = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache'
+        $blob = Get-FotonRegValue -Path $key -Name 'AppCompatCache'
+        $destDir = Join-Path $script:FotonSession.Dirs['Filesystem'] 'appcompat'
+        $dest = Join-Path $destDir 'AppCompatCache.bin'
+        $row = [PSCustomObject]@{
+            SourceKey  = $key
+            DestName   = 'AppCompatCache.bin'
+            SizeBytes  = 0
+            SHA256     = ''
+            Status     = 'Missing'
+            HeaderHex  = ''
+            Note       = ''
+        }
+        if ($null -eq $blob) {
+            $row.Note = 'AppCompatCache value not present or not readable. Visibility gap, not proof Shimcache was empty.'
+            return @($row)
+        }
+        $bytes = $null
+        if ($blob -is [byte[]]) { $bytes = $blob }
+        else {
+            try { $bytes = [byte[]]$blob } catch { }
+        }
+        if ($null -eq $bytes -or $bytes.Length -eq 0) {
+            $row.Status = 'CopyError'
+            $row.Note = 'Value was not REG_BINARY. Structured Shimcache parse was not attempted.'
+            return @($row)
+        }
+        try {
+            if (-not (Test-Path -LiteralPath $destDir)) {
+                New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+            }
+            [IO.File]::WriteAllBytes($dest, $bytes)
+            $item = Get-Item -LiteralPath $dest -Force -ErrorAction Stop
+            $n = [Math]::Min(8, $bytes.Length)
+            $hdr = New-Object byte[] $n
+            [Array]::Copy($bytes, $hdr, $n)
+            $row.SizeBytes = $item.Length
+            $row.SHA256 = Get-FotonSafeHash -Path $dest
+            $row.Status = 'Copied'
+            $row.HeaderHex = ([BitConverter]::ToString($hdr) -replace '-', '').ToLowerInvariant()
+            $row.Note = 'Raw blob at 08_Filesystem/appcompat/AppCompatCache.bin. Entry-level Shimcache parse is not implemented; wrong execution times would be worse than this export.'
+        }
+        catch {
+            $row.Status = 'CopyError'
+            $row.Note = $_.Exception.Message
+        }
+        @($row)
+    } | Out-Null
+
     Invoke-FotonCollection -Category 'Filesystem' -Name 'alternate_data_streams' -Format 'Csv' -Description 'Non-default NTFS streams in user paths (Zone.Identifier and beyond)' -Script {
         $rows = @()
         $roots = @("$env:PUBLIC")

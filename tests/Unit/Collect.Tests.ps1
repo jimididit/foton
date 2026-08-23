@@ -33,6 +33,8 @@ Describe 'Collect category functions (extracted)' {
         $src | Should -Match "Name 'amcache_hive'"
         $src | Should -Match "Name 'srum_database'"
         $src | Should -Match "Name 'prefetch_listing'"
+        $src | Should -Match "Name 'bam_dam_user_settings'"
+        $src | Should -Match "Name 'appcompatcache_export'"
     }
 
     It 'adds a named_pipes collect task' {

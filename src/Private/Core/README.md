@@ -33,4 +33,6 @@ Name mapping from the historical v1 collector (if `WinFoton.ps1` is still in the
 
 `Copy-FotonHostFile` / `Copy-FotonCappedHostFiles` / `Copy-FotonHostFileFamily` copy live files with `FileShare.ReadWrite` (Prefetch, Amcache, SRUM). Parse the copies only.
 
+`ConvertFrom-FotonFileTimeUtc` / `Get-FotonBamDamRows` support Collect BAM/DAM. AppCompatCache is a raw blob export, not a parsed Shimcache table.
+
 Hive mount prefix is `Foton_<SID>`. `Get-FotonUserHiveRoot` also accepts historical `WinFoton_<SID>` mounts.
