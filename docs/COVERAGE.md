@@ -99,11 +99,11 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 | done (1.11.0) | ProxyConfig | Scope + Setting | WinHTTP + IE settings. FP: PAC. Not DefaultConnectionSettings |
 | done (1.12.0) | WinsockLsp | Kind + Entry | Catalog LibraryPath. FP: VPN/EDR |
 | done (1.12.0) | ActiveSetup | Key + Guid | HKLM StubPath. Version = Info. HKCU once-run is Collect-only |
-| Collect-only | ComHijack | — | `com_hijack_candidates` CSV; too noisy for a stable baseline |
-| Collect-only | OfficeAddin | — | `office_addins_and_templates`; user churn |
+| Collect-only | ComHijack | - | `com_hijack_candidates` CSV; too noisy for a stable baseline |
+| Collect-only | OfficeAddin | - | `office_addins_and_templates`; user churn |
 | P2 | OptionalFeature / Appx (pinned) | Name | Noisy on consumer SKUs |
-| P3 | Codecs, gadgets, IE BHO | — | Low ROI unless hunting a specific family |
-| never | Ephemeral UDP, PIDs, last-run, bytes-in-flight | — | Destroys payload hash |
+| P3 | Codecs, gadgets, IE BHO | - | Low ROI unless hunting a specific family |
+| never | Ephemeral UDP, PIDs, last-run, bytes-in-flight | - | Destroys payload hash |
 
 **Hive load:** per-user baseline rows (StartupApproved, UserAutorun) only see **loaded** NTUSER hives unless we add optional `reg load` (always `finally`, disclose footprint). Document visibility gaps in `coverage.json`.
 

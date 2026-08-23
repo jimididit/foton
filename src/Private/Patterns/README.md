@@ -9,7 +9,7 @@ Heuristic **data**, not code (plain text/CSV so Core .ps1 files are not AMSI-fla
 | `RemoteAccessToolNames.txt` | Software collect `remote_access_tool_indicators` - substring presence in installed software, processes, services |
 | `HardeningRegistryChecks.csv` | Security collect `hardening_registry_settings` - Name, Path, Expected, Note |
 
-Edit these files in `src/Private/Patterns/` only. The flatten build embeds them. Historical v1 scripts, if present in git, may still contain inline copies — do not treat those as the source of truth.
+Edit these files in `src/Private/Patterns/` only. The flatten build embeds them. Historical v1 scripts, if present in git, may still contain inline copies - do not treat those as the source of truth.
 
 The standalone collector build must **embed** these files (or their contents) - a module tree is not deployed to endpoints.
 

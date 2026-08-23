@@ -10,11 +10,11 @@ The v1 → module extract is **done** ([MIGRATION.md](MIGRATION.md)). Endpoint f
 
 Ordered. Prefer the next Collect P1 over exotic ASEPs.
 
-1. **BAM/DAM + Shimcache (AppCompatCache) export** — Collect, admin/registry. Execution evidence when Prefetch is off.
-2. **Jumplist parser** — Collect already inventories LNKs/jumplists; parse copied files offline with fixtures first.
-3. **Amcache parser** — Collect copies `Amcache.hve`. Parse only if we can do it correctly (offline hive), otherwise emit unsupported + point at a hive tool. Do not invent timestamps.
-4. **Entra / workplace join facts** — Collect P2. Do not phone home.
-5. **Screensaver / SilentProcessExit / netsh helpers / time providers** — Collect P2, lower-volume ASEPs.
+1. **BAM/DAM + Shimcache (AppCompatCache) export** - Collect, admin/registry. Execution evidence when Prefetch is off.
+2. **Jumplist parser** - Collect already inventories LNKs/jumplists; parse copied files offline with fixtures first.
+3. **Amcache parser** - Collect copies `Amcache.hve`. Parse only if we can do it correctly (offline hive), otherwise emit unsupported + point at a hive tool. Do not invent timestamps.
+4. **Entra / workplace join facts** - Collect P2. Do not phone home.
+5. **Screensaver / SilentProcessExit / netsh helpers / time providers** - Collect P2, lower-volume ASEPs.
 6. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips.
 
 **SRUM:** Collect copies the DB + WAL/SHM. A real ESE parser in PowerShell is unlikely to be correct; prefer “copied, not parsed” until a dedicated approach exists.
@@ -25,14 +25,14 @@ Ordered. Prefer the next Collect P1 over exotic ASEPs.
 
 Propose before building.
 
-- **In-report artifact browser** — navigable CSV/JSON inside `Foton_Report.html`. Offline only; cap rows; escape cells. Decide `file://` vs embed vs local HTTP first. Findings-first HTML already exists.
-- **TUI / GUI workstation shell** — wrap Collect/Baseline/open HTML. Does **not** replace one-file IR scripts. No risk score. Prefer TUI before a signed exe. Blocked on public-release bar being mostly green.
-- **MAM Prefetch inflate** — Win10+ `.pf` names stay empty until we inflate correctly.
-- **NTFS unallocated carve** — not in PowerShell; see [CARVE.md](CARVE.md).
+- **In-report artifact browser** - navigable CSV/JSON inside `Foton_Report.html`. Offline only; cap rows; escape cells. Decide `file://` vs embed vs local HTTP first. Findings-first HTML already exists.
+- **TUI / GUI workstation shell** - wrap Collect/Baseline/open HTML. Does **not** replace one-file IR scripts. No risk score. Prefer TUI before a signed exe. Blocked on public-release bar being mostly green.
+- **MAM Prefetch inflate** - Win10+ `.pf` names stay empty until we inflate correctly.
+- **NTFS unallocated carve** - not in PowerShell; see [CARVE.md](CARVE.md).
 - **Authenticode** for flatten scripts / ExecutionPolicy story.
 - **Analyze zip** that does not require cloning the repo.
-- **OptionalFeature / Appx** as baseline — noisy on consumer SKUs.
-- **Codecs, gadgets, IE BHO** — low ROI.
+- **OptionalFeature / Appx** as baseline - noisy on consumer SKUs.
+- **Codecs, gadgets, IE BHO** - low ROI.
 
 ---
 

@@ -4,7 +4,7 @@ Windows DFIR, baseline comparison, and security-audit toolkit.
 
 Foton captures host state into a hashed **package**, then you parse, compare baselines, and analyze **offline**. Findings are observations, not a verdict.
 
-**Module 1.18.0** — collect schema **1.4.0**, baseline schema **1.12.0**. Operator path: [docs/USAGE.md](docs/USAGE.md).
+**Module 1.18.0** - collect schema **1.4.0**, baseline schema **1.12.0**. Operator path: [docs/USAGE.md](docs/USAGE.md).
 
 ## What to run
 
@@ -79,7 +79,7 @@ See `docs/CARVE.md` (MZ/PE signature scan; not NTFS). Recapture baselines after 
 | `-SkipEvtxExport` | off | Skip raw `.evtx` (parsed CSVs still collected) |
 | `-SkipHashing` | off | Skip SHA-256 of process/file images; folder still hashed |
 | `-LoadUserHives` | off | Mount NTUSER.DAT for users not logged on (`finally` unload) |
-| `-IncludeFileTimeline` | off | Deeper user-writable exe sweep — not a MACB timeline |
+| `-IncludeFileTimeline` | off | Deeper user-writable exe sweep - not a MACB timeline |
 | `-NoZip` | off | Leave the case folder uncompressed |
 | `-RequireAdministrator` | off | Exit if not elevated |
 
@@ -107,7 +107,7 @@ Send the **ZIP and hash file** (or the whole folder), not HTML alone. Historical
 
 ## Extending Foton
 
-Add files under `src/` — collectors, baseline providers, parsers, rules. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
+Add files under `src/` - collectors, baseline providers, parsers, rules. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## Docs
 
