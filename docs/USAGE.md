@@ -13,11 +13,11 @@ On a trusted workstation:
 .\build\Build-BaselineStandalone.ps1
 ```
 
-Copy **only** `dist\Foton-Collect.ps1` and/or `dist\Foton-Baseline.ps1` to the target (USB, RMM, email).
+Copy **one** flatten script to the target (USB, RMM, email). Prefer the versioned leaf from `dist\` (example: `Foton-Baseline_v1.23.0_schema1.13.0.ps1`) so the module and schema are in the filename. `Foton-Collect.ps1` / `Foton-Baseline.ps1` are the same bytes as the latest rebuild.
 
 ```
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.23.0_schema1.8.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.23.0_schema1.13.0.ps1
 ```
 
 Default output is the current user’s **Desktop**. Open `Foton_Report.html` or `Foton_Baseline.html` **inside** the new folder.

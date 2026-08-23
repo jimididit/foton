@@ -11,8 +11,8 @@ ehthumbs.db
 Desktop.ini
 
 # Generated / local
-dist/Foton-Collect.ps1
-dist/Foton-Baseline.ps1
+dist/Foton-Collect*.ps1
+dist/Foton-Baseline*.ps1
 *.zip
 
 # LLM files (AGENTS.md is tracked - shared invariants)

@@ -3112,7 +3112,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
 
     # ---- Hero ----
     $null = $sb.AppendLine('<header class="hero">')
-    $null = $sb.AppendLine('<div class="brand"><h1>Win<span>Foton</span></h1><div class="tagline">Windows DFIR triage collection - See through the panes</div></div>')
+    $null = $sb.AppendLine('<div class="brand"><h1>Win<span>Foton</span></h1><div class="tagline">Windows DFIR triage collection - Opening a window...closes a door</div></div>')
     $null = $sb.AppendLine('<div class="meta">')
     $null = $sb.AppendLine("<div><b>Hostname</b>$(ConvertTo-SafeHtml $env:COMPUTERNAME)</div>")
     if ($osInfo) {
@@ -3358,7 +3358,7 @@ function Show-Banner {
     Write-Host '  |     Windows DFIR triage collector                      |' -ForegroundColor Gray
     Write-Host '  |                                                        |' -ForegroundColor DarkCyan
     Write-Host '  +--------------------------------------------------------+' -ForegroundColor DarkCyan
-    Write-Host "   v$Script:Version   See through the panes." -ForegroundColor DarkGray
+    Write-Host "   v$Script:Version   Opening a window...closes a door." -ForegroundColor DarkGray
     Write-Host ''
 }
 

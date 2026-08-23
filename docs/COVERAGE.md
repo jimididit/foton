@@ -118,7 +118,7 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 
 | Layer | Have | Next (useful DFIR, still offline) |
 |-------|------|-----------------------------------|
-| Parse | Prefetch (uncompressed SCCA), LNK, **EVTX (selected IDs, capped)** | Jumplists, Amcache *parser* (raw hive, not invented fields), shellbags, SRUM *parser* (ESE), browser DB - **fixtures first**. Collect copies Amcache/SRUM; do not fake a parse. |
+| Parse | Prefetch (uncompressed SCCA), LNK, **EVTX (selected IDs, capped)**, **jumplists (DestList + custom LNK)** | Amcache *parser* (raw hive, not invented fields), shellbags, SRUM *parser* (ESE), browser DB - **fixtures first**. Collect copies Amcache/SRUM; do not fake a parse. |
 | Analyze | Triage heuristics + IOC file | Rules that consume *parsed* rows and baseline diffs; never live WMI |
 | Carve | MZ/PE signature scan of a blob | Not NTFS unallocated in PS |
 

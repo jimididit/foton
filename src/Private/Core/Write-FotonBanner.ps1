@@ -378,7 +378,7 @@ function Write-FotonBanner {
         [string]$Color = 'Auto'
     )
 
-    $ver = '1.22.0'
+    $ver = '1.23.0'
     if ($script:FotonSession -and $script:FotonSession.Version) {
         $ver = [string]$script:FotonSession.Version
     }
@@ -480,6 +480,6 @@ function Write-FotonBanner {
     Write-Host ("     Version     {0}" -f $ver) -ForegroundColor DarkGray
     Write-Host '     Updated     08-22-2026' -ForegroundColor DarkGray
     Write-Host ("     Mode        {0}" -f $mode) -ForegroundColor Gray
-    Write-Host '     See through the panes' -ForegroundColor DarkGray
+    Write-Host '     Opening a window...closes a door' -ForegroundColor DarkGray
     Write-Host ''
 }

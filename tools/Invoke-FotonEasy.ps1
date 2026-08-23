@@ -91,7 +91,7 @@ switch ($cmd) {
         Write-Host '  Open Foton_BaselineCompare.html next to the second baseline JSON.' -ForegroundColor Green
     }
     'parse' {
-        if (-not $Target) { throw 'Usage: Foton.cmd parse <case-folder-or-zip | file.pf | file.lnk>' }
+        if (-not $Target) { throw 'Usage: Foton.cmd parse <case-folder-or-zip | file.pf | file.lnk | jumplist>' }
         $rows = @(Invoke-FotonParse -Path $Target)
         if ($rows.Count -eq 0) {
             Write-Host '  Nothing to show. Parse needs copied .pf/.lnk inside the package (08_Filesystem\prefetch), not a listing CSV.' -ForegroundColor Yellow

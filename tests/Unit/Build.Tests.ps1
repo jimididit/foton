@@ -22,6 +22,11 @@ Describe 'Build-Standalone' {
             Remove-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue
         }
     }
+
+    It 'default dist leaf includes module version and collect schema' {
+        $src = Get-Content -LiteralPath $script:BuildScript -Raw
+        $src | Should -Match 'Foton-Collect_v\$\{version\}_schema\$\{collectSchema\}'
+    }
 }
 
 Describe 'Build-BaselineStandalone' {
@@ -45,5 +50,10 @@ Describe 'Build-BaselineStandalone' {
         finally {
             Remove-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue
         }
+    }
+
+    It 'default dist leaf includes module version and baseline schema' {
+        $src = Get-Content -LiteralPath $script:BaselineBuild -Raw
+        $src | Should -Match 'Foton-Baseline_v\$\{version\}_schema\$\{baseSchema\}'
     }
 }

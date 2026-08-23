@@ -51,6 +51,68 @@ Describe 'ConvertFrom-FotonLnk' {
     }
 }
 
+Describe 'ConvertFrom-FotonJumplist' {
+    It 'parses DestList v1 path and FILETIME from a synthetic stream' {
+        InModuleScope Foton {
+            $bytes = [IO.File]::ReadAllBytes((Join-Path $script:FotonModuleRoot 'tests\Fixtures\Parse\jumplist-destlist-v1.bin'))
+            $rows = @(ConvertFrom-FotonDestListBytes -Bytes $bytes)
+            $rows.Count | Should -Be 1
+            $rows[0].Supported | Should -Be $true
+            $rows[0].Identity | Should -Be 'C:\Windows\notepad.exe'
+            $rows[0].LastAccessUtc | Should -Be '2020-01-15 12:00:00'
+            $rows[0].PinStatus | Should -Be 'Unpinned'
+            $rows[0].Hostname | Should -Be 'HOST'
+        }
+    }
+
+    It 'does not invent DestList fields for an unknown version' {
+        InModuleScope Foton {
+            $b = New-Object byte[] 32
+            [BitConverter]::GetBytes([uint32]99).CopyTo($b, 0)
+            $rows = @(ConvertFrom-FotonDestListBytes -Bytes $b)
+            $rows[0].Supported | Should -Be $false
+            $rows[0].Identity | Should -Be ''
+            $rows[0].Note | Should -Match 'not 1, 2, 3, or 4'
+        }
+    }
+
+    It 'reads an embedded LNK from a custom destinations wrapper' {
+        $lnk = Join-Path $env:TEMP ('foton-jl-lnk-' + [guid]::NewGuid().ToString('N') + '.lnk')
+        $jl = Join-Path $env:TEMP ('foton-jl-' + [guid]::NewGuid().ToString('N') + '.customDestinations-ms')
+        try {
+            $w = New-Object -ComObject WScript.Shell
+            $s = $w.CreateShortcut($lnk)
+            $s.TargetPath = "$env:SystemRoot\System32\notepad.exe"
+            $s.Save()
+            $lnkBytes = [IO.File]::ReadAllBytes($lnk)
+            $clsid = [byte[]](0x01, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46)
+            $footer = [byte[]](0xAB, 0xFB, 0xBF, 0xBA)
+            $hdr = New-Object byte[] 12
+            [BitConverter]::GetBytes([uint32]2).CopyTo($hdr, 0)
+            [BitConverter]::GetBytes([uint32]1).CopyTo($hdr, 4)
+            $ms = New-Object IO.MemoryStream
+            $ms.Write($hdr, 0, $hdr.Length)
+            $ms.Write($clsid, 0, $clsid.Length)
+            $ms.Write($lnkBytes, 0, $lnkBytes.Length)
+            $ms.Write($footer, 0, $footer.Length)
+            [IO.File]::WriteAllBytes($jl, $ms.ToArray())
+            $rows = @(ConvertFrom-FotonJumplist -Path $jl)
+            $hit = $rows | Where-Object { $_.Supported -eq $true -and $_.LocalBasePath -match 'notepad\.exe' } | Select-Object -First 1
+            $hit | Should -Not -BeNullOrEmpty
+            $hit.Format | Should -Be 'CustomDestinations'
+        }
+        finally {
+            Remove-Item -LiteralPath $lnk, $jl -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'emits unsupported for non-jumplist bytes' {
+        $r = @(ConvertFrom-FotonJumplist -Path (Join-Path $script:Fx 'jumplist-not.bin'))
+        $r[0].Format | Should -Match 'Unsupported'
+        $r[0].Supported | Should -Be $false
+    }
+}
+
 Describe 'ConvertFrom-FotonEvtx' {
     It 'emits unsupported for non-evtx bytes' {
         $r = ConvertFrom-FotonEvtx -Path (Join-Path $script:Fx 'prefetch-not.bin')

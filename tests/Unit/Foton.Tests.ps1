@@ -19,7 +19,7 @@ Describe 'Foton module scaffold' {
         Import-Module $script:FotonPsd1 -Force
         $v = Get-FotonVersion
         $v.ProductName | Should -Be 'Foton'
-        $v.ModuleVersion | Should -Be '1.22.0'
+        $v.ModuleVersion | Should -Be '1.23.0'
         $v.CollectSchemaVersion | Should -Be '1.8.0'
         $v.BaselineSchemaVersion | Should -Be '1.13.0'
         $v.FindingsSchemaVersion | Should -Be '1.0.0'
@@ -31,6 +31,7 @@ Describe 'Foton module scaffold' {
             Should -Be @(
                 'Compare-FotonBaseline'
                 'ConvertFrom-FotonEvtx'
+                'ConvertFrom-FotonJumplist'
                 'ConvertFrom-FotonLnk'
                 'ConvertFrom-FotonPrefetch'
                 'Get-FotonPackage'

@@ -176,7 +176,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine((Get-FotonReportMarkSvg))
     $null = $sb.AppendLine('<div class="brand-text">')
     $null = $sb.AppendLine('<h1>Foton</h1>')
-    $null = $sb.AppendLine('<div class="tagline">Windows DFIR triage report - See through the panes</div>')
+    $null = $sb.AppendLine('<div class="tagline">Windows DFIR triage report - Opening a window...closes a door</div>')
     $null = $sb.AppendLine("<div class=""credits"">v$verDisplay</div>")
     $null = $sb.AppendLine('</div></div>')
     $null = $sb.AppendLine('<div class="meta">')

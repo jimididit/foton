@@ -12,7 +12,7 @@
 #
 @{
     RootModule        = 'Foton.psm1'
-    ModuleVersion     = '1.22.0'
+    ModuleVersion     = '1.23.0'
     GUID              = 'b7e4c1a2-8d3f-4a91-9c6e-2f0d5a8b1e73'
     Author            = 'JDI Consulting'
     CompanyName       = 'JDI Consulting'
@@ -45,6 +45,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
         'ConvertFrom-FotonPrefetch'
         'ConvertFrom-FotonLnk'
         'ConvertFrom-FotonEvtx'
+        'ConvertFrom-FotonJumplist'
         'Invoke-FotonParse'
         'New-FotonParseReport'
         'Invoke-FotonCarve'
@@ -57,7 +58,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = '1.22.0: collect schema 1.8.0 screensaver/silent_process_exit/netsh_helpers/time_providers. Baseline schema 1.13.0 SilentProcessExit, NetshHelper, TimeProvider (screensaver is Collect-only).'
+            ReleaseNotes = '1.23.0: ConvertFrom-FotonJumplist (DestList v1/2/3/4 + custom destinations LNK CLSID scan). Collect/baseline schemas unchanged.'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.

@@ -60,6 +60,7 @@ Describe 'Collect category functions (extracted)' {
             Should -Be @(
                 'Compare-FotonBaseline'
                 'ConvertFrom-FotonEvtx'
+                'ConvertFrom-FotonJumplist'
                 'ConvertFrom-FotonLnk'
                 'ConvertFrom-FotonPrefetch'
                 'Get-FotonPackage'

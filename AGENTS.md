@@ -4,8 +4,8 @@ You are working on **Foton**, a Windows forensic, baseline-comparison, and secur
 
 The product name is **Foton**. Historical v1 artifacts used WinFoton (`WinFoton_*` folders, sample HTML). Operators run **flatten scripts**, not a frozen 3k-line collector.
 
-- **Endpoint Collect:** `dist/Foton-Collect.ps1` (rebuild `build/Build-Standalone.ps1`). Standard-user coverage; `-RequireAdministrator` fail-fast.
-- **Endpoint Baseline:** `dist/Foton-Baseline.ps1`.
+- **Endpoint Collect:** `dist/Foton-Collect_v{module}_schema{collect}.ps1` (rebuild `build/Build-Standalone.ps1`; also writes `Foton-Collect.ps1`). Standard-user coverage; `-RequireAdministrator` fail-fast.
+- **Endpoint Baseline:** `dist/Foton-Baseline_v{module}_schema{baseline}.ps1` (also writes `Foton-Baseline.ps1`).
 - **Workstation:** `Foton.cmd` / `Import-Module .\Foton.psd1`. Public commands use the `Foton` noun.
 
 A `WinFoton.ps1` file in git, if present, is a **frozen v1 reference** for tests and old packages. Do not rename internals. Do not tell operators to run it. Do not gitignore it.
@@ -71,8 +71,8 @@ Foton/
       Analyze/                 # Invoke-FotonAnalysis, rules, Invoke-FotonIocMatch
       Report/                  # New-FotonReport, HTML/CSS/JS
   build/
-    Build-Standalone.ps1       # flattens Collect + Core into dist/Foton-Collect.ps1
-  dist/                        # generated endpoint script
+    Build-Standalone.ps1       # flattens Collect + Core into dist/Foton-Collect_v*_schema*.ps1 (+ alias)
+  dist/                        # generated endpoint scripts (versioned + unversioned alias)
   tests/
     Unit/
     Fixtures/
@@ -83,7 +83,7 @@ Foton/
 
 The collector runs on possibly compromised endpoints, often over a constrained channel, often via RMM, sometimes where you cannot install anything. **A module tree is not the Collect deployment format.**
 
-Develop modular, ship flat. `build/Build-Standalone.ps1` concatenates Private/Core + Public/Collect + Public/Report + a generated entry point into `dist/Foton-Collect.ps1` with no `Import-Module`. Parse, Carve, and Analyze run as a normal imported module on the analyst box.
+Develop modular, ship flat. `build/Build-Standalone.ps1` concatenates Private/Core + Public/Collect + Public/Report + a generated entry point into `dist/Foton-Collect_v{module}_schema{collect}.ps1` (and `Foton-Collect.ps1`) with no `Import-Module`. Parse, Carve, and Analyze run as a normal imported module on the analyst box.
 
 ## Public command surface
 
@@ -96,6 +96,7 @@ New-FotonBaselineCompareReport # HTML Added/Removed/Modified (workstation)
 Compare-FotonBaseline  # diff two snapshots into field-level change records + findings (+ HTML unless -NoHtml)
 ConvertFrom-FotonPrefetch
 ConvertFrom-FotonLnk
+ConvertFrom-FotonJumplist
 ConvertFrom-FotonEvtx     # selected Event IDs from package EVTX; capped
 Invoke-FotonParse         # parse .pf/.lnk/.evtx in a package; writes parsed_records.csv + Foton_Parse.html
 New-FotonParseReport   # HTML for those rows (not findings)
@@ -106,7 +107,7 @@ New-FotonReport        # render HTML from findings + data
 Get-FotonPackage       # open/validate a case package, verify hashes
 ```
 
-Operators who do not want cmdlets: `Foton.cmd` (`docs/USAGE.md`). Collect on an endpoint is still one file: `dist/Foton-Collect.ps1`. Baseline capture on an endpoint is `dist/Foton-Baseline.ps1`.
+Operators who do not want cmdlets: `Foton.cmd` (`docs/USAGE.md`). Collect on an endpoint is still one file: the Collect flatten (prefer the versioned `dist/Foton-Collect_v*_schema*.ps1` leaf). Baseline capture is the Baseline flatten.
 
 Every command (except Version) works against a **package** (case folder or ZIP) as the unit of I/O so layers compose.
 

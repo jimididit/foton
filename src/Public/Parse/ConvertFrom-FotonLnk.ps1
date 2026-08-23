@@ -28,62 +28,14 @@ function ConvertFrom-FotonLnk {
     $item = Get-Item -LiteralPath $Path
     $bytes = [IO.File]::ReadAllBytes($item.FullName)
     $sha = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
-    $out = [PSCustomObject]@{
+    $parsed = Get-FotonLnkParseFromBytes -Bytes $bytes
+    [PSCustomObject]@{
         SourcePath     = $item.FullName
         SizeBytes      = $bytes.Length
         SHA256         = $sha
-        Format         = 'Unknown'
-        Supported      = $false
-        LocalBasePath  = ''
-        Note           = ''
+        Format         = $parsed.Format
+        Supported      = $parsed.Supported
+        LocalBasePath  = $parsed.LocalBasePath
+        Note           = $parsed.Note
     }
-    if ($bytes.Length -lt 0x4C) {
-        $out.Format = 'Unsupported-TooSmall'
-        $out.Note = 'Shorter than a Shell Link header. Path not guessed.'
-        return $out
-    }
-    $headerSize = [BitConverter]::ToUInt32($bytes, 0)
-    if ($headerSize -ne 0x4C) {
-        $out.Format = 'Unsupported-NotLnk'
-        $out.Note = 'HeaderSize is not 0x4C. Wrong fields would be worse than this record.'
-        return $out
-    }
-    $out.Format = 'LNK'
-    $flags = [BitConverter]::ToUInt32($bytes, 20)
-    $pos = 0x4C
-    try {
-        if (($flags -band 0x01) -ne 0) {
-            if (($pos + 2) -gt $bytes.Length) { throw 'truncated IDList' }
-            $idSize = [BitConverter]::ToUInt16($bytes, $pos)
-            $pos = $pos + 2 + $idSize
-        }
-        if (($flags -band 0x02) -ne 0) {
-            if (($pos + 20) -gt $bytes.Length) { throw 'truncated LinkInfo' }
-            $localOff = [BitConverter]::ToUInt32($bytes, $pos + 16)
-            $pathAt = $pos + [int]$localOff
-            if ($pathAt -ge $bytes.Length -or $localOff -eq 0) {
-                $out.Note = 'LinkInfo present but LocalBasePath offset is empty or past EOF.'
-                return $out
-            }
-            $chars = @()
-            for ($i = $pathAt; $i -lt $bytes.Length; $i++) {
-                if ($bytes[$i] -eq 0) { break }
-                $chars += [char]$bytes[$i]
-            }
-            $out.LocalBasePath = -join $chars
-            if ($out.LocalBasePath) {
-                $out.Supported = $true
-                $out.Note = 'LocalBasePath from LinkInfo (ANSI). Arguments and timestamps are not parsed in this version.'
-            }
-            else {
-                $out.Note = 'LinkInfo contained no ANSI local path.'
-            }
-            return $out
-        }
-        $out.Note = 'No LinkInfo block (flags). Network or IDList-only shortcuts are not expanded here.'
-    }
-    catch {
-        $out.Note = "Parse stopped: $($_.Exception.Message). Partial fields are not invented."
-    }
-    return $out
 }

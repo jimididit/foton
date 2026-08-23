@@ -5,7 +5,7 @@ This project is designed so someone new can add a **collector**, **baseline prov
 ## Before you write code
 
 1. Read [AGENTS.md](../AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [USAGE.md](USAGE.md), [LAB.md](LAB.md), and **[COVERAGE.md](COVERAGE.md)** (in vs missing artifacts).
-2. Live Collect/Baseline on an endpoint is `dist/Foton-Collect.ps1` / `Foton-Baseline.ps1`. Do not add features by editing a frozen v1 script if one remains in git.
+2. Live Collect/Baseline on an endpoint is the flatten script (`Foton-Collect_v*_schema*.ps1` / `Foton-Baseline_v*_schema*.ps1`, plus unversioned aliases). Do not add features by editing a frozen v1 script if one remains in git.
 3. If the change is a large new capability (especially Carve/NTFS), propose it first.
 4. Prefer filling a **P0/P1** row in COVERAGE.md over a novel ASEP. Map the operator UI to the real artifact before coding.
 
