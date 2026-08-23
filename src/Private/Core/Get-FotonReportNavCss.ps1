@@ -7,7 +7,9 @@ function Get-FotonReportSectionId {
 }
 
 function Get-FotonReportNavCss {
+    # Complete <style> element: callers append this after their own </style>.
     @'
+<style>
 .foton-bar{position:sticky;top:0;z-index:50;background:rgba(11,16,22,.94);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:16px 0 8px}
 .foton-bar-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .foton-bar input[type=search]{flex:1;min-width:200px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;color:var(--text);padding:8px 14px;font-size:13px}
@@ -25,6 +27,7 @@ function Get-FotonReportNavCss {
 a.card{text-decoration:none;color:inherit;display:block}
 a.card:hover{border-color:var(--beam)}
 html{scroll-behavior:smooth;scroll-padding-top:84px}
+</style>
 '@
 }
 
