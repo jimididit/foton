@@ -18,6 +18,16 @@ InModuleScope Foton {
         }
     }
 
+    Describe 'Get-FotonReportMarkSvg' {
+        It 'is a wave packet, not the old diamond-and-dot' {
+            $svg = Get-FotonReportMarkSvg
+            $svg | Should -Match '<path '
+            $svg | Should -Match 'polygon points="1.2,24'
+            $svg | Should -Not -Match 'points="24,7 41,24 24,41 7,24"'
+            $svg | Should -Not -Match '<circle'
+        }
+    }
+
     Describe 'ConvertFrom-FotonFileTimeUtc' {
         It 'decodes a known UTC FILETIME' {
             $dt = [datetime]::SpecifyKind([datetime]'2020-01-15 12:00:00', 'Utc')

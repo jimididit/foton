@@ -248,6 +248,7 @@ Describe 'New-FotonBaselineReport' {
             $html = Get-Content -LiteralPath $htmlPath -Raw
             $html | Should -Match 'PC1'
             $html | Should -Match 'Spooler'
+            $html | Should -Match 'class="mark"'
             $html | Should -Match 'Baseline snapshot'
             $html | Should -Match 'id="foton-q"'
             $html | Should -Match 'id="foton-toc"'

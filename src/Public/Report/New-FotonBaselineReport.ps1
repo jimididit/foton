@@ -68,6 +68,8 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 "Segoe UI",s
 header.hero{border:1px solid var(--line);border-radius:14px;padding:26px 28px;background:
   radial-gradient(1100px 200px at 12% -40%,rgba(55,214,255,.18),transparent 60%),
   linear-gradient(180deg,#121b26,#0e151e)}
+.brand{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.mark{flex:0 0 auto;display:block;color:var(--beam)}
 h1{margin:0;font-size:28px;letter-spacing:3px;font-weight:700;color:var(--beam);text-transform:uppercase}
 .tagline{color:#93a7bb;font-size:13px;font-style:italic;margin-top:6px}
 .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px 26px;margin-top:20px}
@@ -97,8 +99,12 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine($css)
     $null = $sb.AppendLine('</head><body><div class="wrap" id="top">')
     $null = $sb.AppendLine('<header class="hero">')
+    $null = $sb.AppendLine('<div class="brand">')
+    $null = $sb.AppendLine((Get-FotonReportMarkSvg))
+    $null = $sb.AppendLine('<div class="brand-text">')
     $null = $sb.AppendLine('<h1>Foton</h1>')
     $null = $sb.AppendLine('<div class="tagline">Baseline snapshot - one observation of stable configuration. Not a triage report. Not a clean-host certificate.</div>')
+    $null = $sb.AppendLine('</div></div>')
     $null = $sb.AppendLine('<div class="meta">')
     $null = $sb.AppendLine("<div><b>Hostname</b>$(ConvertTo-FotonSafeHtml $hostName)</div>")
     $null = $sb.AppendLine("<div><b>Captured (UTC)</b>$(ConvertTo-FotonSafeHtml $captured)</div>")

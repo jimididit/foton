@@ -1,0 +1,13 @@
+function Get-FotonReportMarkSvg {
+    <#
+        Offline report brand mark: a wave packet (photon), not a diamond.
+        Stroke uses currentColor so CSS .mark { color: var(--beam) } sets the hue.
+        Left arrow matches the reference glyph; amplitude tapers at both ends.
+    #>
+    @'
+<svg class="mark" width="56" height="56" viewBox="0 0 48 48" aria-hidden="true">
+<polygon points="1.2,24 8,19.6 8,28.4" fill="currentColor"/>
+<path fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" d="M 8.0,23.5 L 8.7,23.0 L 9.3,23.0 L 10.0,23.5 L 10.7,24.3 L 11.4,25.3 L 12.0,26.0 L 12.7,25.7 L 13.4,24.1 L 14.0,21.6 L 14.7,19.5 L 15.4,19.4 L 16.1,22.1 L 16.7,26.9 L 17.4,31.5 L 18.1,33.0 L 18.7,29.7 L 19.4,22.4 L 20.1,14.6 L 20.8,10.7 L 21.4,13.5 L 22.1,22.2 L 22.8,32.4 L 23.4,38.8 L 24.1,37.8 L 24.8,29.9 L 25.5,19.3 L 26.1,11.5 L 26.8,10.5 L 27.5,16.0 L 28.1,24.6 L 28.8,31.7 L 29.5,34.0 L 30.2,31.2 L 30.8,25.7 L 31.5,20.7 L 32.2,18.4 L 32.8,19.3 L 33.5,22.0 L 34.2,24.8 L 34.9,26.4 L 35.5,26.3 L 36.2,25.3 L 36.9,24.1 L 37.5,23.3 L 38.2,22.9 L 38.9,23.1 L 39.6,23.7 L 40.2,24.4 L 40.9,25.0 L 41.6,25.0 L 42.2,24.6 L 42.9,23.8 L 43.6,23.2 L 44.3,22.9 L 44.9,23.2 L 45.6,23.9"/>
+</svg>
+'@
+}

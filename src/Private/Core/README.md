@@ -31,6 +31,8 @@ Name mapping from the historical v1 collector (if `WinFoton.ps1` is still in the
 
 `Get-FotonPatternLines` is module-only (no WinFoton equivalent). Pattern files live in `src/Private/Patterns/`.
 
+`Get-FotonReportMarkSvg` is the HTML brand mark (wave packet). `Get-FotonReportNavCss` / `NavBarHtml` / `NavScript` are report chrome.
+
 `Copy-FotonHostFile` / `Copy-FotonCappedHostFiles` / `Copy-FotonHostFileFamily` copy live files with `FileShare.ReadWrite` (Prefetch, Amcache, SRUM). Parse the copies only.
 
 `ConvertFrom-FotonFileTimeUtc` / `Get-FotonBamDamRows` support Collect BAM/DAM. AppCompatCache is a raw blob export, not a parsed Shimcache table.

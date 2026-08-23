@@ -70,7 +70,7 @@ header.hero{border:1px solid var(--line);border-radius:14px;padding:26px 28px;ba
   radial-gradient(1100px 200px at 12% -40%,rgba(55,214,255,.20),transparent 60%),
   linear-gradient(180deg,#121b26,#0e151e)}
 .brand{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
-.mark{flex:0 0 auto;display:block}
+.mark{flex:0 0 auto;display:block;color:var(--beam)}
 .brand-text h1{margin:0;font-size:32px;letter-spacing:4px;font-weight:700;color:var(--beam);text-transform:uppercase}
 .tagline{color:#93a7bb;font-size:13px;font-style:italic;margin-top:4px}
 .credits{color:#6f8399;font-size:12px;margin-top:6px;letter-spacing:.2px}
@@ -173,12 +173,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $verDisplay = ConvertTo-FotonSafeHtml ([string]$script:FotonSession.Version)
     $null = $sb.AppendLine('<header class="hero">')
     $null = $sb.AppendLine('<div class="brand">')
-    $null = $sb.AppendLine('<svg class="mark" width="56" height="56" viewBox="0 0 48 48" aria-hidden="true">')
-    $null = $sb.AppendLine('<defs><linearGradient id="fotonBeam" x1="0" y1="24" x2="48" y2="24"><stop offset="0" stop-color="#37d6ff" stop-opacity=".15"/><stop offset=".45" stop-color="#37d6ff"/><stop offset="1" stop-color="#7cf5c4" stop-opacity=".7"/></linearGradient></defs>')
-    $null = $sb.AppendLine('<line x1="1" y1="24" x2="47" y2="24" stroke="url(#fotonBeam)" stroke-width="2.2"/>')
-    $null = $sb.AppendLine('<polygon points="24,7 41,24 24,41 7,24" fill="rgba(55,214,255,.08)" stroke="#37d6ff" stroke-width="1.8"/>')
-    $null = $sb.AppendLine('<circle cx="24" cy="24" r="4" fill="#37d6ff"/>')
-    $null = $sb.AppendLine('</svg>')
+    $null = $sb.AppendLine((Get-FotonReportMarkSvg))
     $null = $sb.AppendLine('<div class="brand-text">')
     $null = $sb.AppendLine('<h1>Foton</h1>')
     $null = $sb.AppendLine('<div class="tagline">Windows DFIR triage report - See through the panes</div>')
