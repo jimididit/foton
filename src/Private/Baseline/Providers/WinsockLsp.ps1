@@ -3,7 +3,7 @@
 Register-FotonBaselineProvider -RecordType 'WinsockLsp' `
     -IdentityFields @('Kind', 'Entry') `
     -ComparedFields @('LibraryPath') `
-    -FalsePositives 'VPN, filter, and endpoint-security products register LSPs and namespace providers. Stock Catalog_Entries are many; a new LibraryPath outside System32 is the review item, not the numeric index itself.' `
+    -FalsePositives 'VPN, filter, and endpoint-security products register LSPs and namespace providers. Stock Catalog_Entries are many (often mswsock.dll). A new LibraryPath outside System32 is the review item, not the numeric index itself.' `
     -Collect {
         $rows = @()
         $protoRoot = 'HKLM:\SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\Protocol_Catalog9'

@@ -181,6 +181,11 @@ Describe 'Baseline providers and diff' {
             $rows = @(& $prov.Collect)
             $rows.Count | Should -BeGreaterThan 0
             $rows[0].PSObject.Properties.Name | Should -Contain 'LibraryPath'
+            $proto = @($rows | Where-Object { $_.Kind -eq 'Protocol' } | Select-Object -First 1)
+            if ($proto) {
+                $proto.LibraryPath | Should -Match '\.dll|\(not set\)'
+                $proto.LibraryPath | Should -Not -Match '[\u4e00-\u9fff]'
+            }
         }
     }
 
