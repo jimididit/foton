@@ -266,6 +266,15 @@ putty
             }
             Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
         }
+        It 'ranks LsaPackage Added as High' {
+            $c = [PSCustomObject]@{
+                RecordType = 'LsaPackage'
+                Identity   = 'Security Packages|evil'
+                ChangeType = 'Added'
+                Field      = ''
+            }
+            Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
+        }
         It 'still ranks software version bumps as Info' {
             $c = [PSCustomObject]@{
                 RecordType = 'InstalledSoftware'

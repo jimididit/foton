@@ -40,6 +40,8 @@ Describe 'Baseline providers and diff' {
                 Should -Contain 'DefenderPreference'
             @($script:FotonBaselineProviders | ForEach-Object RecordType) |
                 Should -Contain 'RemoteAccessConfig'
+            @($script:FotonBaselineProviders | ForEach-Object RecordType) |
+                Should -Contain 'LsaPackage'
         }
     }
 
@@ -65,6 +67,17 @@ Describe 'Baseline providers and diff' {
             $names | Should -Contain 'Smb1LanmanServer'
             $names | Should -Contain 'WinRmPolicyAllowBasic'
             @($rows | Where-Object { $_.Setting -eq 'RdpNla' }).Count | Should -Be 1
+        }
+    }
+
+    It 'splits LSA MULTI_SZ into Kind and Package rows' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'LsaPackage' })[0]
+            $rows = @(& $prov.Collect)
+            $kinds = @($rows | ForEach-Object { $_.Kind })
+            $kinds | Should -Contain 'Security Packages'
+            $blob = (@($rows | ForEach-Object { $_.Package }) -join ' ').ToLowerInvariant()
+            $blob | Should -Match 'msv1_0|kerberos|schannel'
         }
     }
 
