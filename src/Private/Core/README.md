@@ -8,7 +8,7 @@ Windows PowerShell 5.1 syntax only. Empty catch blocks on best-effort paths are 
 Session state lives in `$script:FotonSession` (see `Initialize-FotonSession.ps1`).
 Call `Initialize-FotonSession` at the start of a collect/baseline run.
 
-Name mapping from frozen `WinFoton.ps1`:
+Name mapping from the historical v1 collector (if `WinFoton.ps1` is still in the tree for tests):
 
 | WinFoton.ps1              | Foton                          |
 |---------------------------|--------------------------------|
@@ -33,4 +33,4 @@ Name mapping from frozen `WinFoton.ps1`:
 
 `Copy-FotonHostFile` / `Copy-FotonCappedHostFiles` / `Copy-FotonHostFileFamily` copy live files with `FileShare.ReadWrite` (Prefetch, Amcache, SRUM). Parse the copies only.
 
-Hive mount prefix is `Foton_<SID>` (v1 used `WinFoton_<SID>`). `Get-FotonUserHiveRoot` accepts both.
+Hive mount prefix is `Foton_<SID>`. `Get-FotonUserHiveRoot` also accepts historical `WinFoton_<SID>` mounts.

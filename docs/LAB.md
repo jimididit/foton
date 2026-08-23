@@ -19,10 +19,10 @@ Get-FotonVersion
 .\dist\Foton-Baseline.ps1 -NoZip -OutputPath C:\Baselines
 ```
 
-Frozen v1 collect is still `.\WinFoton.ps1` (do not rename internals). Compare collect **task names, file names, column sets, and finding titles** against a v1 package from the same snapshot - not PIDs or connection counts.
+Also exercise **standard-user** Collect (no admin): Security log and Prefetch copies should be `SkippedNotElevated`, not empty-success.
 
-After a **BaselineSchemaVersion** bump, recapture day0. Compare refuses mismatched schemas. Workstation wrapper: `Foton.cmd help` (`docs/USAGE.md`).
+After a **BaselineSchemaVersion** bump, recapture day0. Compare refuses mismatched schemas. Workstation: `Foton.cmd help` ([USAGE.md](USAGE.md)).
 
-Optional: Windows Security exclusion on the VM clone path while iterating (pattern files look like attacker strings).
+Optional: Windows Security exclusion on the VM clone path while iterating.
 
-This file is for **people building Foton**, not for operators. Operator docs: `docs/USAGE.md`.
+This file is for **people building Foton**, not operators. Operators: [USAGE.md](USAGE.md).

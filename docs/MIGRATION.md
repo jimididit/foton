@@ -1,27 +1,15 @@
-# Migration plan (v1 WinFoton.ps1 → Foton module)
+# Migration (v1 → Foton module)
 
-Approved sequence. **Do not start a later step until the previous one is reviewable.**
+The extract from a single live-triage script into the modular tree is **complete**. Product work is [COVERAGE.md](COVERAGE.md) and [TODO.md](TODO.md).
 
-`WinFoton.ps1` remains the live collector (do not rename internals). Privilege/coverage behavior in that file is part of the reference for extract.
+Live collect/baseline on an endpoint is `dist/Foton-Collect.ps1` / `dist/Foton-Baseline.ps1`. Analyze/parse/compare on a workstation is `Foton.cmd` / `Import-Module .\Foton.psd1`.
 
-## Status
+A frozen `WinFoton.ps1` may remain in git as a **historical v1 reference** (helper names, hardening-count tests, old `WinFoton_*` packages). It is **not** the operator collector. Do not rename strings inside it if you keep it. Do not send it to endpoints.
 
 | Step | Description | Status |
 |------|-------------|--------|
-| 0 | Scaffold module, tests, docs, Foton naming | **Done** (this tree) |
-| 1 | Extract Core helpers verbatim with `Foton` prefix; prove helper behavior vs `WinFoton.ps1` | **Done** |
-| 2 | Split nine collection sections into `Public/Collect/*` | **Done** (extract). Live endpoint runs still use `WinFoton.ps1`. Collect functions are not exported; `Invoke-FotonTriage` is step 4/5. |
-| 3 | Patterns + remaining hardening tables as data files | **Done** (module). `WinFoton.ps1` still has inline copies until flatten. |
-| 4 | Findings engine → `Public/Analyze`; HTML → `Public/Report`; **load `$script:FotonSession.Data` from package files** so re-report works offline | **Done** (module). `Get-FotonPackage` / `Invoke-FotonAnalysis` / `New-FotonReport`. Live collect still `WinFoton.ps1`. |
-| 5 | `Build-Standalone.ps1` writes `dist/Foton-Collect.ps1`; VM run | **Done** (build + admin and standard-user VM runs) |
-| 6 | New capabilities: Baseline first, then IOC, then one parser with fixture, then carve **proposal** | **Done** (1.3.0) |
+| 0–4 | Scaffold, Core, Collect files, patterns, Analyze/Report from package | **Done** |
+| 5 | Flatten Collect; VM runs | **Done** |
+| 6 | Baseline, IOC, parsers, carve proposal | **Done** (ongoing product: schema bumps) |
 
-Post-migration product work (not a blocked step): collect **1.3.0**, baseline **1.12.0**, EVTX parse, `Foton.cmd`. Recapture day0 after this baseline schema. See `docs/USAGE.md`, `docs/COVERAGE.md`, and `docs/TODO.md`.
-
-## Equivalence (step 1–5)
-
-Do not compare two live runs field-for-field (PIDs and connections will differ). Compare **task names, file names, column sets, and finding titles** against a gold v1 package from the same host class.
-
-## After step 4
-
-`Get-FotonPackage` should open a v1 ZIP produced by `WinFoton.ps1` so historical cases still analyze. Folder prefix `WinFoton_*` remains valid input even when new collects use `Foton_*`.
+`Get-FotonPackage` should still open a historical `WinFoton_*` folder/ZIP as well as `Foton_*`.

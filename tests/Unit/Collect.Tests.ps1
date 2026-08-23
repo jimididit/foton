@@ -35,6 +35,11 @@ Describe 'Collect category functions (extracted)' {
         $src | Should -Match "Name 'prefetch_listing'"
     }
 
+    It 'adds a named_pipes collect task' {
+        $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonProcessCollection.ps1') -Raw
+        $src | Should -Match "Name 'named_pipes'"
+    }
+
     It 'does not export Collect commands on the public module surface yet' {
         Get-Command -Module Foton | Select-Object -ExpandProperty Name | Sort-Object |
             Should -Be @(

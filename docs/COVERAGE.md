@@ -55,7 +55,7 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 |----------|----------------------|
 | System | OS, time sync, hotfixes, Secure Boot/TPM/BitLocker, disks, env, VSS |
 | Users | Local users/groups, profiles, sessions, RDP, secedit (admin), credential manager listing |
-| Processes | Process list + tree, nonstandard modules, PS history, RecentDocs |
+| Processes | Process list + tree, **named pipes**, nonstandard modules, PS history, RecentDocs |
 | Network | Connections, listeners, IP/ARP/DNS/hosts, firewall, shares, proxy, Wi-Fi profiles |
 | Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, **cmd_autorun**, **session_manager_boot**, **known_dlls**, **winsock_lsp**, **active_setup**, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
 | Security | Defender status/prefs/detections, hardening CSV, auditpol (admin), SMB/WinRM, PS policy, non-MS roots, AppLocker/WDAC summary |
@@ -69,7 +69,7 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 |----------|-----|----------------|------|
 | done (1.2.0) | Copy Prefetch `.pf`, Amcache.hve, SRUM DB (capped) | Parse cannot run on a listing CSV | Locked files: `Copy-FotonHostFile` FileShare.ReadWrite; failures in the copy CSV |
 | P1 | BAM/DAM, Shimcache (AppCompatCache) export | Execution evidence when Prefetch is off | Registry/hive; admin |
-| P1 | Named pipes | Classic IR volatile | High churn; Collect only |
+| done (1.4.0) | Named pipes | Classic IR volatile | Collect only; names churn |
 | done (1.3.0) | Named CSVs: cmd_autorun, session_manager_boot, known_dlls, winsock_lsp, active_setup | Autoruns tabs as dedicated files | Folded winlogon_lsa CSV still exists |
 | P2 | Entra/workplace join, OneDrive/Teams local artifacts | Modern endpoints | Do not phone home |
 | P2 | Screensaver, SilentProcessExit, netsh helpers, time providers | Lower-volume ASEPs | |

@@ -1,6 +1,6 @@
 # Invoke-FotonPersistenceCollection
 # Live facts only. Called from Invoke-FotonTriage when that exists.
-# Endpoint runs still use WinFoton.ps1 until the standalone flatten build.
+# Endpoint collect. Rebuild dist/Foton-Collect.ps1 after edits.
 
 function Invoke-FotonPersistenceCollection {
     Write-FotonStatus 'Collecting persistence mechanisms (autoruns, tasks, services, WMI)' 'Step'

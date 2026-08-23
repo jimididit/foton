@@ -19,5 +19,3 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 Open `Foton_Report.html` (collect) or `Foton_Baseline.html` (baseline) from **inside** the new folder.
 
 Do not hand-edit generated scripts. Change `src/` and rebuild.
-
-`WinFoton.ps1` remains the frozen v1 collect reference.

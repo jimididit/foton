@@ -1,6 +1,6 @@
 # Invoke-FotonEventLogCollection
 # Live facts only. Called from Invoke-FotonTriage when that exists.
-# Endpoint runs still use WinFoton.ps1 until the standalone flatten build.
+# Endpoint collect. Rebuild dist/Foton-Collect.ps1 after edits.
 
 function Invoke-FotonEventLogCollection {
     $eventLogDays = $script:FotonSession.EventLogDays

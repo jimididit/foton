@@ -2,14 +2,15 @@
 
 You are working on **Foton**, a Windows forensic, baseline-comparison, and security-audit toolkit written in PowerShell.
 
-The product name is **Foton**. Older artifacts still say WinFoton:
+The product name is **Foton**. Historical v1 artifacts used WinFoton (`WinFoton_*` folders, sample HTML). Operators run **flatten scripts**, not a frozen 3k-line collector.
 
-- `WinFoton.ps1` is the **live triage collector** (do not rename strings inside that file). Standard-user coverage is supported; `-RequireAdministrator` opts into fail-fast.
-- `WinFoton-sample-report.html` is a sample produced by that script.
+- **Endpoint Collect:** `dist/Foton-Collect.ps1` (rebuild `build/Build-Standalone.ps1`). Standard-user coverage; `-RequireAdministrator` fail-fast.
+- **Endpoint Baseline:** `dist/Foton-Baseline.ps1`.
+- **Workstation:** `Foton.cmd` / `Import-Module .\Foton.psd1`. Public commands use the `Foton` noun.
 
-New code, docs, module files, and the flattened collector use **Foton**. Public commands use the `Foton` noun (`Get-FotonVersion`, `Invoke-FotonTriage`, `New-FotonBaseline`, …).
+A `WinFoton.ps1` file in git, if present, is a **frozen v1 reference** for tests and old packages. Do not rename internals. Do not tell operators to run it. Do not gitignore it.
 
-Version 1.0.0 exists as a single ~3,270-line script (`WinFoton.ps1`) that does live triage collection and HTML reporting. That behavior is the Collect-layer reference. The repo is being restructured into a modular toolkit; **do not skip the migration steps** in `docs/MIGRATION.md`.
+The v1 → module extract is complete ([docs/MIGRATION.md](docs/MIGRATION.md)). New work is coverage, parsers, and the public-release bar ([docs/TODO.md](docs/TODO.md)).
 
 ## What Foton is for
 
@@ -26,7 +27,7 @@ Streamline forensic analysis and security audits by capturing machine state into
 
 | Layer | Purpose | Runs where |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| **Collect** | Live triage acquisition from a running endpoint (what `WinFoton.ps1` does today) | Target endpoint; **Administrator preferred**, standard user supported |
+| **Collect** | Live triage acquisition (`dist/Foton-Collect.ps1` / `Invoke-FotonTriage`) | Target endpoint; **Administrator preferred**, standard user supported |
 | **Baseline** | Capture a normalized known-state snapshot; diff two snapshots for added/removed/modified | Target endpoint (capture) / anywhere (diff) |
 | **Parse** | Turn raw artifacts into structured records - prefetch, EVTX, LNK/jumplists, Amcache, shellbags, SRUM, browser databases, registry hives | Analyst workstation, against a collected package |
 | **Carve** | Recover structured data from unallocated space, slack, deleted registry cells, and file remnants | Analyst workstation, against images/blobs |
@@ -53,9 +54,9 @@ Register public functions in `Foton.psd1` `FunctionsToExport`. `Foton.psm1` dots
 
 ```
 Foton/
-  WinFoton.ps1                 # FROZEN v1.0.0 live collector - do not rename internals
   Foton.psd1                   # module manifest (RootModule = Foton.psm1)
   Foton.psm1                   # dotsources Private/ then Public/, exports via manifest
+  Foton.cmd                    # workstation wrapper
   src/
     Private/
       Core/                    # Write-FotonStatus, Invoke-FotonCollection, Add-FotonFinding, …
@@ -119,7 +120,7 @@ Operator-visible “startup apps” in Settings/Task Manager are **StartupApprov
 2. **Stable identity key per record type.** Service → `Name`. Task → `TaskPath` + `TaskName`. Autorun → `Key` + `ValueName`. Account → `SID`, never username. Driver → `Name`. Software → `DisplayName` + `Publisher`. Firewall → rule `Name` + direction. Certificate → `Store` + `Thumbprint`. Listener → protocol + address + port. Document the key with each provider.
 3. **Field-level diffs.** `{ RecordType, Identity, ChangeType (Added|Removed|Modified), Field, OldValue, NewValue }`.
 4. **Provider model**, not one giant function.
-5. **Schema versioning.** Stamp WinFoton-era packages as collect 1.0; Foton baselines carry BaselineSchemaVersion. Refuse incompatible diffs.
+5. **Schema versioning.** Historical WinFoton-era packages as collect 1.0; Foton baselines carry BaselineSchemaVersion. Refuse incompatible diffs.
 6. **Diffs feed findings.** The change itself is Tier 1; interpretation is Tier 2. Weight by what changed (new admin, new root CA, Winlogon change = High; software version bump = Info).
 7. **Two modes.** Temporal (same host, two times) and fleet (host vs golden/role). Same engine, different report framing.
 8. **Provenance caveat.** A baseline taken after intrusion is a picture of the compromised state. Diff proves change between observations - never when or who. Prefer capture at provisioning, hash, store off-host.
@@ -178,8 +179,9 @@ Invoke-ScriptAnalyzer -Path .\src -Recurse -Severity Error,Warning |
 # 3. Pester
 .\tests\Invoke-FotonTests.ps1
 
-# 4. After Collect extract: build, then run dist/Foton-Collect.ps1 elevated on a VM
+# 4. After Collect/Baseline source changes: rebuild flatten, run on a VM
 .\build\Build-Standalone.ps1
+.\build\Build-BaselineStandalone.ps1
 ```
 
 ## Working style

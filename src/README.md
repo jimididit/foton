@@ -18,4 +18,4 @@ Foton source. `Foton.psm1` dotsources **Private** then **Public**.
 
 **Do not** add network calls or live registry/WMI reads under Parse, Carve, or Analyze.
 
-Live triage behavior for v1 equivalence still lives in the frozen `WinFoton.ps1` at the repo root until Collect is extracted here and `build/Build-Standalone.ps1` produces `dist/Foton-Collect.ps1`.
+Live Collect/Baseline for endpoints: rebuild `dist/Foton-Collect.ps1` and `dist/Foton-Baseline.ps1`.

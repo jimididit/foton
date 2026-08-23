@@ -1,6 +1,6 @@
 # Invoke-FotonFilesystemCollection
 # Live facts only. Called from Invoke-FotonTriage when that exists.
-# Endpoint runs still use WinFoton.ps1 until the standalone flatten build.
+# Endpoint collect. Rebuild dist/Foton-Collect.ps1 after edits.
 
 function Invoke-FotonFilesystemCollection {
     Write-FotonStatus 'Collecting filesystem artifacts, execution evidence, and device history' 'Step'

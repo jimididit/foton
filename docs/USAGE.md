@@ -1,31 +1,34 @@
 # Operator usage (keep this short)
 
-Foton has two different machines in mind. Mixing them is what feels “too much PowerShell.”
+Foton has two different machines. Mixing them is what feels like “too much PowerShell.”
 
-## 1. The PC you are collecting from (endpoint)
+## 1. Endpoint (collect / baseline capture)
 
 You do **not** install a module. You do **not** run `Import-Module`.
 
-1. On a trusted lab/workstation: `.\build\Build-Standalone.ps1`
-2. Copy **only** `dist\Foton-Collect.ps1` to the target (USB, RMM, email - whatever you already use).
-3. Right-click → Run with PowerShell, or:
-   `powershell -ExecutionPolicy Bypass -File .\Foton-Collect.ps1`
-4. Open **`Foton_Report.html` inside the new case folder**. That is the whole collect loop.
+On a trusted workstation:
 
-Optional: `-NoZip`, `-RequireAdministrator`, same switches as `WinFoton.ps1`.
+```powershell
+.\build\Build-Standalone.ps1
+.\build\Build-BaselineStandalone.ps1
+```
 
-## 1b. Baseline on an endpoint (not Collect)
+Copy **only** `dist\Foton-Collect.ps1` and/or `dist\Foton-Baseline.ps1` to the target (USB, RMM, email).
 
-1. `.\build\Build-BaselineStandalone.ps1`
-2. Copy **only** `dist\Foton-Baseline.ps1` to the target.
-3. `powershell -ExecutionPolicy Bypass -File .\Foton-Baseline.ps1`
-4. Open **`Foton_Baseline.html`** inside `FotonBaseline_<HOST>_...Z`. Send the ZIP and `_PACKAGE_HASH.txt` like a collect package.
+```
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline.ps1
+```
 
-`Foton.cmd baseline D:\Baselines` writes a package. `Foton.cmd baseline D:\x.json` still writes a bare JSON. Compare accepts a folder that contains `baseline.json` and writes **`Foton_BaselineCompare.html`** next to the second JSON.
+Default output is the current user’s **Desktop**. Open `Foton_Report.html` or `Foton_Baseline.html` **inside** the new folder.
 
-## 2. The PC you analyze on (workstation, this repo)
+Send the **ZIP + `*_PACKAGE_HASH.txt`** (or the whole folder). HTML alone is not the package.
 
-Double-click **`Foton.cmd`** or:
+Useful switches: `-NoZip`, `-RequireAdministrator`, `-OutputPath D:\Cases`, `-CaseNumber CASE-0001`, `-EventLogDays 14`. Same collect switches as the flatten entry point (see root `README.md`).
+
+`Foton.cmd baseline D:\Baselines` on a workstation writes a package. `Foton.cmd baseline D:\x.json` still writes a bare JSON. Compare accepts a folder that contains `baseline.json` and writes **`Foton_BaselineCompare.html`** next to the second JSON.
+
+## 2. Workstation (this repo)
 
 ```
 Foton.cmd analyze   D:\Cases\Foton_HOSTNAME_...Z
@@ -37,16 +40,12 @@ Foton.cmd carve     D:\blob.bin
 Foton.cmd help
 ```
 
-Parse writes `analysis\Foton_Parse.html` and `parsed_records.csv` (Prefetch, LNK, selected-ID EVTX). Analyze writes `Foton_Report.html` and `analysis\findings.csv`. Those are different products.
-
-`Foton.cmd` is a wrapper. PowerShell cmdlets remain for people who already live in a shell.
+Parse → `analysis\Foton_Parse.html` + `parsed_records.csv`. Analyze → `Foton_Report.html` + `analysis\findings.csv`. Different products.
 
 ## What we will not hide
 
-- Live collect **changes the host**. The report says so.
-- Findings are **observations**. The wrapper will not say “infected.”
-- A baseline taken after an incident is a picture of that state. Recapture after provider/schema changes (see BaselineSchemaVersion). Schema **1.12.0** cannot compare against **1.11.0** JSON.
+- Live collect **changes the host**.
+- Findings are **observations**, not “infected.”
+- A baseline taken after an incident is a picture of that state. Schema **1.12.0** cannot compare against older baseline JSON.
 
-## Gaps before a public release (testing / UX)
-
-See `docs/TODO.md` section “Public-release bar” and `docs/COVERAGE.md` for artifact gaps. Until the release bar is ticked, treat Foton as a lab/internal tool.
+Until the public-release bar in [TODO.md](TODO.md) is mostly green, treat Foton as a lab/internal tool.

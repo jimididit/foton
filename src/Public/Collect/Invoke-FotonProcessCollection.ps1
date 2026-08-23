@@ -140,4 +140,20 @@ function Invoke-FotonProcessCollection {
         if ($out.Count -eq 0) { $out += 'No RecentDocs keys accessible.' }
         $out
     } | Out-Null
+
+    Invoke-FotonCollection -Category 'Processes' -Name 'named_pipes' -Format 'Csv' -Description 'Named pipe names (volatile; Collect only)' -Script {
+        $rows = @()
+        $max = 2000
+        try {
+            $names = @([System.IO.Directory]::GetFiles('\\.\pipe\'))
+            foreach ($p in ($names | Sort-Object)) {
+                if ($rows.Count -ge $max) { break }
+                $leaf = [IO.Path]::GetFileName($p)
+                if (-not $leaf) { $leaf = [string]$p }
+                $rows += [PSCustomObject]@{ Name = $leaf }
+            }
+        }
+        catch { }
+        $rows
+    } | Out-Null
 }

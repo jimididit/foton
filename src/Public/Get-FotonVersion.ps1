@@ -31,7 +31,7 @@ function Get-FotonVersion {
         CollectSchemaVersion    = [string]$meta.CollectSchemaVersion
         BaselineSchemaVersion   = [string]$meta.BaselineSchemaVersion
         FindingsSchemaVersion   = [string]$meta.FindingsSchemaVersion
-        ReferenceCollector      = 'WinFoton.ps1 (live triage; standard-user coverage supported)'
+        ReferenceCollector      = 'dist/Foton-Collect.ps1 (live triage; standard-user coverage supported)'
         ModuleRoot              = $script:FotonModuleRoot
     }
 }

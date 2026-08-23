@@ -12,7 +12,7 @@ Collect (endpoint)  →  package  →  Parse / Baseline diff / Analyze / Report 
 
 You should be able to collect on Monday, baseline-diff on Thursday, and re-render HTML without running anything on the target again.
 
-v1 (`WinFoton.ps1`) still analyzes in the same process as collection using an in-memory cache. Extracting Analyze to read the package from disk is what makes that loop real.
+Analyze reads the **package on disk** (`Get-FotonPackage`). Do not rely on an in-process collect cache.
 
 ## Layers
 
@@ -50,13 +50,11 @@ Layers say *where code runs*. [docs/COVERAGE.md](COVERAGE.md) says *which Window
 
 ## Later: in-report artifact viewer
 
-See [docs/TODO.md](TODO.md). Findings-first HTML is the v1 report; a navigable CSV/JSON viewer inside the same package is a planned extension, not part of the Collect extract.
+See [docs/TODO.md](TODO.md). Findings-first HTML with search/nav is the current report; a full CSV/JSON artifact browser is a **consideration**, not scheduled.
 
 ## Command prefix
 
-Public cmdlets: `Verb-FotonNoun` (e.g. `New-FotonBaseline`). Private helpers: `Verb-FotonNoun` as well so the flattened collector has unique names.
-
-The frozen file `WinFoton.ps1` keeps historical names (`Add-Finding`, `Get-SafeHash`).
+Public cmdlets: `Verb-FotonNoun` (e.g. `New-FotonBaseline`). Private helpers use the same prefix so the flattened collector has unique names.
 
 ## Standalone collect
 

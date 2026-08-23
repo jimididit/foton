@@ -2,147 +2,123 @@
 
 Windows DFIR, baseline comparison, and security-audit toolkit.
 
-Foton captures host state into a hashed case **package**, then lets you compare baselines over time, run heuristics, and (later) parse artifacts - without turning a 3,000-line script into the only extension point.
+Foton captures host state into a hashed **package**, then you parse, compare baselines, and analyze **offline**. Findings are observations, not a verdict.
 
-**v1.0.x live triage** still runs from frozen `WinFoton.ps1`. After `.\build\Build-Standalone.ps1`, the endpoint file is `dist/Foton-Collect.ps1` (same switches; case folders `Foton_*`).
+**Module 1.18.0** — collect schema **1.4.0**, baseline schema **1.12.0**. Operator path: [docs/USAGE.md](docs/USAGE.md).
 
-Photons penetrate glass; Foton is meant to make Windows state legible - not to declare compromise.
+## What to run
 
-**Module 1.17.0** - baseline schema **1.12.0** (WinsockLsp, ActiveSetup), collect schema **1.3.0**, `ConvertFrom-FotonEvtx`. Recapture baselines after schema bumps. Workstation path: `Foton.cmd help` ([docs/USAGE.md](docs/USAGE.md)).
+| Machine | File | Result |
+|---------|------|--------|
+| **Endpoint** (no install) | `dist/Foton-Collect.ps1` | Case folder `Foton_<HOST>_<UTC>Z/`, `Foton_Report.html`, ZIP + `*_PACKAGE_HASH.txt` |
+| **Endpoint** | `dist/Foton-Baseline.ps1` | `FotonBaseline_<HOST>_<UTC>Z/`, `Foton_Baseline.html`, ZIP + hash |
+| **Workstation** (this repo) | `Foton.cmd` | analyze, compare, parse, ioc, carve |
 
-## Quick start (v1 collector)
+Rebuild flatten scripts after Collect/Baseline source changes:
 
 ```powershell
-# Windows PowerShell 5.1 or PS7 on Windows. Elevation is optional (see coverage below).
 Set-ExecutionPolicy -Scope Process Bypass -Force
-.\WinFoton.ps1
+.\build\Build-Standalone.ps1
+.\build\Build-BaselineStandalone.ps1
 ```
 
-Typical **elevated** engagement:
+Copy **only** the generated `.ps1` to the target. Do not deploy the module tree. Default `-OutputPath` is the current user’s Desktop.
 
 ```powershell
-.\WinFoton.ps1 -CaseNumber "CASE-0001" -Examiner "A. Examiner" `
-               -OutputPath D:\Cases -EventLogDays 30 -LoadUserHives
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline.ps1
 ```
 
-**Work PC / no admin** (default - collects what the current user can read):
+Typical elevated collect:
 
 ```powershell
-.\WinFoton.ps1 -CaseNumber "SELF-AUDIT" -OutputPath $env:USERPROFILE\Desktop
+.\Foton-Collect.ps1 -CaseNumber "CASE-0001" -Examiner "A. Examiner" `
+    -OutputPath D:\Cases -EventLogDays 30 -LoadUserHives
 ```
 
-Refuse to run unless elevated (incident response that must include the Security log):
+Standard user (thin package; Security log / Prefetch copies / other users skipped):
 
 ```powershell
-.\WinFoton.ps1 -RequireAdministrator
+.\Foton-Collect.ps1 -CaseNumber "SELF-AUDIT"
 ```
 
-Fast triage on a slow or low-disk box:
+Fail if not admin: `-RequireAdministrator`. Fast/low disk: `-SkipEvtxExport -SkipHashing -EventLogDays 7`.
 
-```powershell
-.\WinFoton.ps1 -SkipEvtxExport -SkipHashing -EventLogDays 7
-```
+Open **`Foton_Report.html` from inside the case folder** so links resolve.
 
-Open `WinFoton_Report.html` **from inside the extracted case folder** so artifact links resolve.
-
-### Re-analyze a collected package (offline)
+### Workstation (offline)
 
 ```
-Foton.cmd analyze C:\FotonCases\Foton_HOST_20260101-120000Z
-```
-
-Or cmdlets:
-
-```powershell
-Import-Module .\Foton.psd1 -Force
-Get-FotonPackage -Path C:\FotonCases\WinFoton_HOST_20260101-120000Z
-Invoke-FotonAnalysis
-New-FotonReport
-```
-
-Open `Foton_Report.html` from inside that folder. Does not rewrite `hashes.csv`. Live collection: `.\WinFoton.ps1` or `.\dist\Foton-Collect.ps1`.
-
-### Baseline and parse (workstation)
-
-```
-Foton.cmd baseline D:\Baselines\host-day0.json
-Foton.cmd compare  D:\Baselines\host-day0.json D:\Baselines\host-day30.json
+Foton.cmd analyze  D:\Cases\Foton_HOSTNAME_...Z
 Foton.cmd parse    D:\Cases\Foton_HOSTNAME_...Z
+Foton.cmd compare  D:\Baselines\day0.json D:\Baselines\day1.json
+Foton.cmd ioc      D:\Cases\Foton_...Z D:\intel\iocs.txt
 Foton.cmd carve    D:\blob.bin
+Foton.cmd help
 ```
 
-See `docs/CARVE.md` (MZ/PE signature scan; not NTFS). Recapture baselines after a `BaselineSchemaVersion` bump.
+Or `Import-Module .\Foton.psd1 -Force`. Parse writes `analysis/Foton_Parse.html` (Prefetch, LNK, selected-ID EVTX). Analyze writes `Foton_Report.html` and `analysis/findings.csv`. Those are different products. Re-reporting does not rewrite collect `hashes.csv`.
+
+See `docs/CARVE.md` (MZ/PE signature scan; not NTFS). Recapture baselines after a `BaselineSchemaVersion` bump; Compare refuses a mismatch.
 
 ## Requirements
 
-- Windows only (`WinFoton.ps1` will refuse non-Windows).
-- PowerShell 5.1+ (or PowerShell 7 on Windows). No extra modules on the endpoint.
-- **Administrator recommended for full coverage**, not required. Without elevation, Foton (via `WinFoton.ps1`) uses a **StandardUser** coverage profile: current-user processes, readable network state, HKCU persistence, that user's profile artifacts, and any event logs the token can read. It skips Security log, Prefetch, VSS, auditpol/secedit, and other users' files (manifest `SkippedNotElevated`, `00_Collection/collection_coverage.json`). That is a visibility gap, not a clean host. Use `-RequireAdministrator` when a thin package is unacceptable.
-- Default `-OutputPath` is the **current user's Desktop**. When elevated, that is often the Administrator profile desktop.
+- Windows. PowerShell 5.1+ (or PowerShell 7 on Windows). No extra modules on the endpoint.
+- **Administrator recommended**, not required. Unelevated runs skip Security log, Prefetch/Amcache/SRUM copies, VSS, auditpol/secedit, and other users’ files (`SkippedNotElevated`, `collection_coverage.json`). That is a visibility gap, not a clean host.
+- When elevated, Desktop often means the **Administrator** profile desktop.
 
-## Parameters
+## Collect parameters
 
-| Parameter              | Default      | Notes |
-| ---------------------- | ------------ | ----- |
-| `-OutputPath`          | Desktop      | Case folder and ZIP land here |
-| `-CaseNumber`          | (empty)      | Chain-of-custody header |
-| `-Examiner`            | current user | Chain-of-custody header |
-| `-EventLogDays`        | 14           | Event log **and** recently-modified system file window |
-| `-MaxEventsPerLog`     | 3000         | Caps parsed events per query |
-| `-SkipEvtxExport`      | off          | Skip raw `.evtx` export (parsed CSVs still collected) |
-| `-SkipHashing`         | off          | Skip SHA-256 of **process/file images** via `Get-SafeHash`. The case folder is still hashed into `00_Collection/hashes.csv` |
-| `-LoadUserHives`       | off          | Mount NTUSER.DAT for users not logged on (registry write, logged) |
-| `-IncludeFileTimeline` | off          | Deeper recurse (depth 6 vs 3) of user-writable executable sweep - not a MACB timeline |
-| `-NoZip`               | off          | Leave the case folder uncompressed |
-| `-RequireAdministrator`| off          | Exit if not elevated. Default is StandardUser coverage |
+| Parameter | Default | Notes |
+|-----------|---------|--------|
+| `-OutputPath` | Desktop | Case folder and ZIP |
+| `-CaseNumber` | (empty) | Chain-of-custody header |
+| `-Examiner` | current user | Chain-of-custody header |
+| `-EventLogDays` | 14 | Event log and recently-modified system file window |
+| `-MaxEventsPerLog` | 3000 | Caps parsed events per query |
+| `-SkipEvtxExport` | off | Skip raw `.evtx` (parsed CSVs still collected) |
+| `-SkipHashing` | off | Skip SHA-256 of process/file images; folder still hashed |
+| `-LoadUserHives` | off | Mount NTUSER.DAT for users not logged on (`finally` unload) |
+| `-IncludeFileTimeline` | off | Deeper user-writable exe sweep — not a MACB timeline |
+| `-NoZip` | off | Leave the case folder uncompressed |
+| `-RequireAdministrator` | off | Exit if not elevated |
 
-## Output structure
+## Output (Collect)
 
 ```
-WinFoton_<HOST>_<UTCSTAMP>Z/          # v1 folder prefix (Foton-Collect will use Foton_)
-  WinFoton_Report.html
-  00_Collection/                      chain_of_custody.txt, collection.log, collection_manifest.csv,
-                                      hashes.csv, hashes.txt, collection_coverage.json;
-                                      findings.csv and collection_errors.csv only if non-empty
-  01_System/                          OS, firmware, TPM/BitLocker, time sync, disks, VSS
-  02_Users_and_Access/                accounts, groups, sessions, secpol, RDP, credentials
-  03_Processes_and_Volatile/          processes w/ hash+signature, tree, modules, PS history
-  04_Network/                         connections, listeners, DNS, hosts, firewall, shares
-  05_Persistence/                     autoruns, tasks, services, WMI subs, IFEO, COM, BITS
-  06_Security_Posture/                Defender, hardening keys, audit policy, roots, AppLocker
-  07_Event_Logs/                      parsed CSVs by intent + optional time-filtered .evtx
-  08_Filesystem/                      user-writable executables, prefetch listing + copied .pf, Amcache/SRUM copies, ADS, USB, recycle, LNKs
-  09_Software_and_Drivers/            software, drivers, browser extensions, RAT *name* presence, AppX
-WinFoton_<HOST>_<UTCSTAMP>Z.zip
-WinFoton_<HOST>_<UTCSTAMP>Z_PACKAGE_HASH.txt
+Foton_<HOST>_<UTCSTAMP>Z/
+  Foton_Report.html
+  00_Collection/     custody, log, manifest, hashes, coverage.json
+  01_System/ … 09_Software_and_Drivers/
+  analysis/          after workstation Parse/Analyze (not on a fresh collect)
+Foton_<HOST>_<UTCSTAMP>Z.zip
+Foton_<HOST>_<UTCSTAMP>Z_PACKAGE_HASH.txt
 ```
 
-See `00_Collection/collection_manifest.csv` for the full artifact list. `WinFoton-sample-report.html` is a v1 sample (historical branding).
+Send the **ZIP and hash file** (or the whole folder), not HTML alone. Historical `WinFoton_*` folders still open with `Get-FotonPackage`.
 
 ## Evidentiary handling
 
-- This is **live collection**. It alters the host (process creation, prefetch, file writes, event log entries). Capture memory/disk first if either is needed.
-- Collection order follows volatility: processes and network state first.
-- Every artifact file is SHA-256 hashed after collection (`hashes.csv`). The ZIP is hashed into `*_PACKAGE_HASH.txt`. Verify on receipt and at each custody transfer.
-- Findings are **automated observations**, tiered (Tier 1 observed artifact, Tier 2 supported inference). Each cites its source artifact. Pattern lists match legitimate admin tooling as readily as attacker tooling. **An empty findings list is not a clean host.**
-- Collection failures are recorded (`collection_errors.csv` when any exist, plus the report error table). Gaps must be disclosed.
+- Live collect **alters the host**. Capture memory/disk first if needed.
+- Volatility order: processes and network first.
+- SHA-256 on artifacts (`hashes.csv`) and the ZIP (`*_PACKAGE_HASH.txt`).
+- Findings are automated observations (Tier 1 fact, Tier 2 inference). Pattern lists match admin tools as readily as attacker tools. **Empty findings is not a clean host.**
+- Failures go to the manifest / error list. Gaps must be disclosed.
 
 ## Extending Foton
 
-Do not add detections by editing `WinFoton.ps1` going forward. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): new collectors, baseline providers, parsers, and rules are new files under `src/`.
-
-Until flatten (step 5), v1 still analyzes in-process inside `WinFoton.ps1`. The module path is `Get-FotonPackage` → `Invoke-FotonAnalysis` → `New-FotonReport`. Baseline, parse, IOC, and carve are module commands (not in the endpoint flatten). `Foton.cmd` wraps those on a workstation.
+Add files under `src/` — collectors, baseline providers, parsers, rules. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## Docs
 
 | Doc | For |
 |-----|-----|
-| [docs/USAGE.md](docs/USAGE.md) | Collect vs analyze; `Foton.cmd` |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, package, naming |
-| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to add a module/feature |
-| [docs/MIGRATION.md](docs/MIGRATION.md) | Extract plan from the frozen v1 script |
-| [docs/LAB.md](docs/LAB.md) | Isolated Windows VM for live collect/baseline (contributors) |
-| [docs/COVERAGE.md](docs/COVERAGE.md) | Collect vs baseline artifact inventory |
+| [docs/USAGE.md](docs/USAGE.md) | Endpoint vs workstation; `Foton.cmd` |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, package, privilege |
+| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to add a feature |
+| [docs/LAB.md](docs/LAB.md) | Contributor VM |
+| [docs/COVERAGE.md](docs/COVERAGE.md) | What is in vs missing |
 | [docs/CARVE.md](docs/CARVE.md) | Signature scan vs NTFS |
-| [docs/TODO.md](docs/TODO.md) | Later features (in-report artifact viewer, …) |
+| [docs/TODO.md](docs/TODO.md) | Will implement vs considering; public-release bar |
+| [docs/MIGRATION.md](docs/MIGRATION.md) | Completed v1 → module extract |
 | [AGENTS.md](AGENTS.md) | Invariants for human and AI contributors |
