@@ -95,7 +95,8 @@ New-FotonBaselineCompareReport # HTML Added/Removed/Modified (workstation)
 Compare-FotonBaseline  # diff two snapshots into field-level change records + findings (+ HTML unless -NoHtml)
 ConvertFrom-FotonPrefetch
 ConvertFrom-FotonLnk
-Invoke-FotonParse      # parse raw artifacts in a package into structured records
+Invoke-FotonParse      # parse .pf/.lnk in a package; writes parsed_records.csv + Foton_Parse.html
+New-FotonParseReport   # HTML for those rows (not findings)
 Invoke-FotonCarve      # MZ/PE signature scan of a capped blob (not NTFS)
 Invoke-FotonAnalysis   # run rules + IOC matching over collected/parsed/diff data
 Invoke-FotonIocMatch   # match an IOC list against a package

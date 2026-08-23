@@ -52,6 +52,19 @@ Describe 'ConvertFrom-FotonLnk' {
 }
 
 Describe 'Invoke-FotonParse' {
+    It 'says so when a package has no .pf or .lnk files' {
+        $case = Join-Path $env:TEMP ('foton-parse-empty-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path (Join-Path $case '00_Collection') -ItemType Directory -Force | Out-Null
+        try {
+            $rows = @(Invoke-FotonParse -Path $case)
+            $rows.Count | Should -Be 0
+            Test-Path -LiteralPath (Join-Path $case 'analysis\Foton_Parse.html') | Should -Be $true
+        }
+        finally {
+            Remove-Item -LiteralPath $case -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'parses a .pf already copied into a case folder' {
         $case = Join-Path $env:TEMP ('foton-parse-pkg-' + [guid]::NewGuid().ToString('N'))
         $pfDir = Join-Path $case '08_Filesystem\prefetch'
@@ -59,10 +72,17 @@ Describe 'Invoke-FotonParse' {
         New-Item -Path $pfDir -ItemType Directory -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path $script:Fx 'prefetch-scca-v23.bin') -Destination (Join-Path $pfDir 'NOTEPAD.EXE-1.pf')
         try {
-            $rows = @(Invoke-FotonParse -PackagePath $case)
+            $rows = @(Invoke-FotonParse -Path $case)
             $pf = $rows | Where-Object { $_.ExecutableName -eq 'NOTEPAD.EXE' } | Select-Object -First 1
             $pf | Should -Not -BeNullOrEmpty
             $pf.Format | Should -Be 'SCCA'
+            Test-Path -LiteralPath (Join-Path $case 'analysis\parsed_records.csv') | Should -Be $true
+            $html = Get-Content -LiteralPath (Join-Path $case 'analysis\Foton_Parse.html') -Raw
+            $html | Should -Match 'id="foton-q"'
+            $html | Should -Match 'id="foton-toc"'
+            $html | Should -Match '(?s)<style>.*\.foton-bar'
+            $html | Should -Not -Match '</style>\s*\.foton-bar'
+            $html | Should -Match 'NOTEPAD'
         }
         finally {
             Remove-Item -LiteralPath $case -Recurse -Force -ErrorAction SilentlyContinue

@@ -12,7 +12,7 @@
 #
 @{
     RootModule        = 'Foton.psm1'
-    ModuleVersion     = '1.9.0'
+    ModuleVersion     = '1.9.1'
     GUID              = 'b7e4c1a2-8d3f-4a91-9c6e-2f0d5a8b1e73'
     Author            = 'JDI Consulting'
     CompanyName       = 'JDI Consulting'
@@ -45,6 +45,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
         'ConvertFrom-FotonPrefetch'
         'ConvertFrom-FotonLnk'
         'Invoke-FotonParse'
+        'New-FotonParseReport'
         'Invoke-FotonCarve'
     )
     CmdletsToExport   = @()
@@ -55,7 +56,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = '1.9.0: Collect schema 1.2.0 copies Prefetch .pf (capped), Amcache.hve, and SRUM into 08_Filesystem for offline Parse.'
+            ReleaseNotes = '1.9.1: Parse accepts a case folder/ZIP, writes analysis/parsed_records.csv and analysis/Foton_Parse.html (not findings.csv). Collect 1.2.0 copies Prefetch/Amcache/SRUM.'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.

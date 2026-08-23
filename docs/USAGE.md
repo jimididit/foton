@@ -31,11 +31,13 @@ Double-click **`Foton.cmd`** or:
 Foton.cmd analyze   D:\Cases\Foton_HOSTNAME_...Z
 Foton.cmd baseline  D:\Baselines
 Foton.cmd compare   D:\Baselines\day0.json D:\Baselines\day1.json
-Foton.cmd parse     D:\file.lnk
+Foton.cmd parse     D:\Cases\Foton_HOSTNAME_...Z
 Foton.cmd ioc       D:\Cases\Foton_...Z D:\intel\iocs.txt
 Foton.cmd carve     D:\blob.bin
 Foton.cmd help
 ```
+
+Parse writes `analysis\Foton_Parse.html` and `parsed_records.csv`. Analyze writes `Foton_Report.html` and `analysis\findings.csv`. Those are different products.
 
 `Foton.cmd` is a wrapper. PowerShell cmdlets remain for people who already live in a shell.
 

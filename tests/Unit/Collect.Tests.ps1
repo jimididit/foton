@@ -42,6 +42,7 @@ Describe 'Collect category functions (extracted)' {
                 'New-FotonBaseline'
                 'New-FotonBaselineCompareReport'
                 'New-FotonBaselineReport'
+                'New-FotonParseReport'
                 'New-FotonReport'
             )
     }

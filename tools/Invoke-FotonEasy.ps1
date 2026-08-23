@@ -33,12 +33,12 @@ function Show-FotonEasyHelp {
     Write-Host '    Foton.cmd baseline C:\Baselines'
     Write-Host '    Foton.cmd baseline C:\Baselines\this-pc.json'
     Write-Host '    Foton.cmd compare  C:\Baselines\day0.json C:\Baselines\day1.json'
-    Write-Host '    Foton.cmd parse    C:\path\file.lnk'
+    Write-Host '    Foton.cmd parse    C:\FotonCases\Foton_HOST_...Z'
     Write-Host '    Foton.cmd ioc      C:\FotonCases\Foton_HOST_...Z C:\intel\iocs.txt'
     Write-Host '    Foton.cmd carve    C:\blob.bin'
     Write-Host '    Foton.cmd collect  C:\FotonCases     (runs dist\Foton-Collect.ps1 if built)'
     Write-Host ''
-    Write-Host '  Open Foton_Report.html from INSIDE the case folder after analyze.'
+    Write-Host '  Open Foton_Report.html after analyze. Open analysis\Foton_Parse.html after parse.'
     Write-Host '  Findings are observations, not conclusions.'
     Write-Host ''
 }
@@ -91,8 +91,16 @@ switch ($cmd) {
         Write-Host '  Open Foton_BaselineCompare.html next to the second baseline JSON.' -ForegroundColor Green
     }
     'parse' {
-        if (-not $Target) { throw 'Usage: Foton.cmd parse <file.pf|file.lnk>' }
-        Invoke-FotonParse -Path $Target | Format-List
+        if (-not $Target) { throw 'Usage: Foton.cmd parse <case-folder-or-zip | file.pf | file.lnk>' }
+        $rows = @(Invoke-FotonParse -Path $Target)
+        if ($rows.Count -eq 0) {
+            Write-Host '  Nothing to show. Parse needs copied .pf/.lnk inside the package (08_Filesystem\prefetch), not a listing CSV.' -ForegroundColor Yellow
+            return
+        }
+        $rows | Select-Object SourcePath, Format, Supported, ExecutableName, LocalBasePath, Note |
+            Format-Table -AutoSize -Wrap
+        Write-Host '  HTML: analysis\Foton_Parse.html (folder) or <zip>_Parse.html (ZIP). Not findings.csv.' -ForegroundColor Green
+        Write-Host '  CSV:  analysis\parsed_records.csv. Win10+ Prefetch is often MAM-compressed (file seen, name not decoded).' -ForegroundColor DarkGray
     }
     'ioc' {
         $iocFile = $Rest | Select-Object -First 1

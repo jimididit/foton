@@ -5,7 +5,7 @@ no writes except what the caller asked for.
 
 - `ConvertFrom-FotonPrefetch` - SCCA executable name; MAM is unsupported, not guessed.
 - `ConvertFrom-FotonLnk` - ANSI LocalBasePath from LinkInfo when present.
-- `Invoke-FotonParse` - walks a package for `.pf` / `.lnk` (typically `08_Filesystem/prefetch` after Collect 1.2.0).
+- `Invoke-FotonParse` - case folder, ZIP, or one `.pf`/`.lnk`. Writes `analysis/parsed_records.csv` and `analysis/Foton_Parse.html`. Does not invent names for MAM Prefetch. Does not write `findings.csv`.
 
 Fixtures: `tests/Fixtures/Parse/` (prefetch). LNK tests create a shortcut via COM.
 
