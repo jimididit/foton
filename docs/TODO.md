@@ -10,8 +10,7 @@ The v1 → module extract is **done** ([MIGRATION.md](MIGRATION.md)). Endpoint f
 
 Ordered. Prefer the next Collect P1 over exotic ASEPs.
 
-1. **Amcache parser** - Collect copies `Amcache.hve`. Parse only if we can do it correctly (offline hive), otherwise emit unsupported + point at a hive tool. Do not invent timestamps.
-2. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips.
+1. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips.
 
 **SRUM:** Collect copies the DB + WAL/SHM. A real ESE parser in PowerShell is unlikely to be correct; prefer “copied, not parsed” until a dedicated approach exists.
 

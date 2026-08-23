@@ -21,7 +21,7 @@ Foton must not become Autoruns, Velociraptor, WinPmem, or a CIS benchmark scorer
 | **What changed?** | Baseline temporal | Two snapshots of *stable* config; field-level Added/Removed/Modified; HTML compare |
 | **Host vs golden** | Baseline fleet | Same engine; wording says role image, not a clean-host certificate |
 | **Harden / audit snapshot** | Baseline + Collect security tasks | UAC/WDigest/SMB/Defender facts; drift vs a provisioning baseline |
-| **Offline execution evidence** | Parse | Prefetch, LNK, later Amcache/EVTX/SRUM from files *in the package* |
+| **Offline execution evidence** | Parse | Prefetch, LNK, Amcache InventoryApplicationFile, EVTX (selected IDs), later SRUM from files *in the package* |
 | **IOC sweep** | Analyze | Text/CSV IOC against package rows, not a live host |
 
 ## Use cases (out of scope unless we change product charter)
@@ -118,7 +118,7 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 
 | Layer | Have | Next (useful DFIR, still offline) |
 |-------|------|-----------------------------------|
-| Parse | Prefetch (uncompressed SCCA), LNK, **EVTX (selected IDs, capped)**, **jumplists (DestList + custom LNK)** | Amcache *parser* (raw hive, not invented fields), shellbags, SRUM *parser* (ESE), browser DB - **fixtures first**. Collect copies Amcache/SRUM; do not fake a parse. |
+| Parse | Prefetch (uncompressed SCCA), LNK, **EVTX (selected IDs, capped)**, **jumplists (DestList + custom LNK)**, **Amcache InventoryApplicationFile (named values)** | shellbags, SRUM *parser* (ESE), browser DB - **fixtures first**. Legacy Amcache `File\*` is unsupported (no guessed FILETIME). Collect copies SRUM; do not fake an ESE parse. |
 | Analyze | Triage heuristics + IOC file | Rules that consume *parsed* rows and baseline diffs; never live WMI |
 | Carve | MZ/PE signature scan of a blob | Not NTFS unallocated in PS |
 

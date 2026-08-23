@@ -4,15 +4,15 @@ Windows DFIR, baseline comparison, and security-audit toolkit.
 
 Foton captures host state into a hashed **package**, then you parse, compare baselines, and analyze **offline**. Findings are observations, not a verdict.
 
-**Module 1.23.0** - collect schema **1.8.0**, baseline schema **1.13.0**. Operator path: [docs/USAGE.md](docs/USAGE.md).
+**Module 1.24.0** - collect schema **1.8.0**, baseline schema **1.13.0**. Operator path: [docs/USAGE.md](docs/USAGE.md).
 
 ## What to run
 
 | Machine | File | Result |
 |---------|------|--------|
-| **Endpoint** (no install) | `dist/Foton-Collect_v1.23.0_schema1.8.0.ps1` (alias `Foton-Collect.ps1`) | Case folder `Foton_<HOST>_<UTC>Z/`, `Foton_Report.html`, ZIP + `*_PACKAGE_HASH.txt` |
-| **Endpoint** | `dist/Foton-Baseline_v1.23.0_schema1.13.0.ps1` (alias `Foton-Baseline.ps1`) | `FotonBaseline_<HOST>_<UTC>Z/`, `Foton_Baseline.html`, ZIP + hash |
-| **Workstation** (this repo) | `Foton.cmd` | analyze, compare, parse, ioc, carve |
+| **Endpoint** (no install) | `dist/Foton-Collect_v1.24.0_schema1.8.0.ps1` (alias `Foton-Collect.ps1`) | Case folder `Foton_<HOST>_<UTC>Z/`, `Foton_Report.html`, ZIP + `*_PACKAGE_HASH.txt` |
+| **Endpoint** | `dist/Foton-Baseline_v1.24.0_schema1.13.0.ps1` (alias `Foton-Baseline.ps1`) | `FotonBaseline_<HOST>_<UTC>Z/`, `Foton_Baseline.html`, ZIP + hash |
+| **Workstation** (this repo) | `Foton.cmd` or `Import-Module .\Foton.psd1` | Full command list: [docs/USAGE.md](docs/USAGE.md) |
 
 Rebuild flatten scripts after Collect/Baseline source changes:
 
@@ -57,7 +57,7 @@ Foton.cmd carve    D:\blob.bin
 Foton.cmd help
 ```
 
-Or `Import-Module .\Foton.psd1 -Force`. Parse writes `analysis/Foton_Parse.html` (Prefetch, LNK, selected-ID EVTX). Analyze writes `Foton_Report.html` and `analysis/findings.csv`. Those are different products. Re-reporting does not rewrite collect `hashes.csv`.
+Or `Import-Module .\Foton.psd1 -Force`. **Every public command** (purpose + example) is in [docs/USAGE.md](docs/USAGE.md). Parse writes `analysis/Foton_Parse.html` (Prefetch, LNK, jumplist, selected-ID EVTX, Amcache `InventoryApplicationFile`). Analyze writes `Foton_Report.html` and `analysis/findings.csv`. Those are different products. Re-reporting does not rewrite collect `hashes.csv`.
 
 See `docs/CARVE.md` (MZ/PE signature scan; not NTFS). Recapture baselines after a `BaselineSchemaVersion` bump; Compare refuses a mismatch.
 

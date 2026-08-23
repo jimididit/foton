@@ -59,6 +59,7 @@ Describe 'Collect category functions (extracted)' {
         Get-Command -Module Foton | Select-Object -ExpandProperty Name | Sort-Object |
             Should -Be @(
                 'Compare-FotonBaseline'
+                'ConvertFrom-FotonAmcache'
                 'ConvertFrom-FotonEvtx'
                 'ConvertFrom-FotonJumplist'
                 'ConvertFrom-FotonLnk'

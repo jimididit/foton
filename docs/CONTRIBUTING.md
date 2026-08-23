@@ -14,6 +14,7 @@ This project is designed so someone new can add a **collector**, **baseline prov
 - One public function per file; file name = function name (`New-FotonBaseline.ps1`).
 - Add the function to `FunctionsToExport` in `Foton.psd1`.
 - Comment-based help with `.SYNOPSIS`, `.DESCRIPTION`, and at least one `.EXAMPLE` that looks like a real engagement.
+- Update **[USAGE.md](USAGE.md)** in the same change: command, purpose, and a copy-paste example (`CASE-0001`, `D:\Cases`, `HOSTNAME`). Update the `Foton.cmd` table if the wrapper grows. Point README at USAGE; do not leave a cmdlet only in AGENTS.md.
 - Comments: forensic *why* (why this artifact, why this identity key) and extension *how* (where the next provider goes). Avoid narrating `foreach` line-by-line.
 
 ## Add a live collection task (after Collect exists)

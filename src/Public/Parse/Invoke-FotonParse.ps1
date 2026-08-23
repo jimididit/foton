@@ -6,12 +6,13 @@ function Invoke-FotonParse {
     .DESCRIPTION
         Offline only. Prefetch (.pf) already in the package (typically
         08_Filesystem/prefetch), shortcuts (.lnk), jumplists
-        (.automaticDestinations-ms / .customDestinations-ms), and exported EVTX
-        under 07_Event_Logs/evtx. Does not read %SystemRoot% or live event logs.
+        (.automaticDestinations-ms / .customDestinations-ms), exported EVTX
+        under 07_Event_Logs/evtx, and copied Amcache.hve under 08_Filesystem/amcache.
+        Does not read %SystemRoot% or live event logs.
 
-        A case folder or ZIP is a package: every .pf/.lnk/.evtx/jumplist under it
-        is parsed except analysis/. A single .pf, .lnk, .evtx, or jumplist is
-        parsed in isolation.
+        A case folder or ZIP is a package: every .pf/.lnk/.evtx/jumplist/Amcache.hve
+        under it is parsed except analysis/. A single .pf, .lnk, .evtx, jumplist,
+        or .hve is parsed in isolation.
         Windows 10+ Prefetch is often MAM-compressed; those rows are Format
         MAM-compressed, not executable names. EVTX rows are selected Event IDs only.
 
@@ -29,7 +30,7 @@ function Invoke-FotonParse {
     .EXAMPLE
         Invoke-FotonParse -Path D:\Cases\Foton_HOSTNAME_20260823-011150Z
 
-        Parses copied Prefetch, LNK, jumplist, and EVTX files in that package.
+        Parses copied Prefetch, LNK, jumplist, EVTX, and Amcache.hve in that package.
 
     .EXAMPLE
         Invoke-FotonParse -Path C:\lab\note.lnk
@@ -75,15 +76,17 @@ function Invoke-FotonParse {
                 Where-Object {
                     ($_.Extension -match '\.(pf|lnk|evtx)$' -or
                      $_.Name -like '*.automaticDestinations-ms' -or
-                     $_.Name -like '*.customDestinations-ms') -and
+                     $_.Name -like '*.customDestinations-ms' -or
+                     $_.Name -ieq 'Amcache.hve' -or
+                     ($_.Extension -ieq '.hve' -and $_.Directory.Name -ieq 'amcache')) -and
                     $_.DirectoryName -notmatch '[\\/]analysis([\\/]|$)'
                 })
     }
     else {
-        throw 'Pass a .pf/.lnk/.evtx/jumplist file, a case folder, or a case ZIP.'
+        throw 'Pass a .pf/.lnk/.evtx/jumplist/Amcache.hve file, a case folder, or a case ZIP.'
     }
 
-    Write-FotonStatus ("Parsing {0} Prefetch/LNK/jumplist/EVTX file(s) (offline)" -f $files.Count) 'Step'
+    Write-FotonStatus ("Parsing {0} Prefetch/LNK/jumplist/EVTX/Amcache file(s) (offline)" -f $files.Count) 'Step'
 
     $out = @()
     foreach ($f in $files) {
@@ -95,6 +98,9 @@ function Invoke-FotonParse {
         elseif ($n -like '*.automaticdestinations-ms' -or $n -like '*.customdestinations-ms') {
             $out += ConvertFrom-FotonJumplist -Path $f.FullName
         }
+        elseif ($ext -eq '.hve') {
+            $out += ConvertFrom-FotonAmcache -Path $f.FullName
+        }
         else {
             Write-FotonStatus ("Skipped (not .pf/.lnk/.evtx): {0}" -f $f.Name) 'Info'
         }
@@ -102,7 +108,7 @@ function Invoke-FotonParse {
 
     $why = $null
     if ($out.Count -eq 0) {
-        $why = 'No .pf, .lnk, jumplist, or .evtx files were in that path. Parse does not read live Prefetch or event logs.'
+        $why = 'No .pf, .lnk, jumplist, .evtx, or Amcache.hve files were in that path. Parse does not read live Prefetch, event logs, or Amcache.'
         $pfTask = @($script:FotonSession.Manifest | Where-Object { $_.Task -eq 'prefetch_files' }) | Select-Object -First 1
         if ($pfTask -and $pfTask.Status -eq 'SkippedNotElevated') {
             $why = 'prefetch_files was skipped (not elevated). This package has no copied .pf files. Re-collect elevated with Foton-Collect.ps1 that includes Collect schema 1.2.0.'
@@ -132,6 +138,7 @@ function Invoke-FotonParse {
         if (-not $identity -and $r.PSObject.Properties['ExecutableName']) { $identity = [string]$r.ExecutableName }
         if (-not $identity -and $r.PSObject.Properties['LocalBasePath']) { $identity = [string]$r.LocalBasePath }
         if (-not $identity -and $r.PSObject.Properties['Path']) { $identity = [string]$r.Path }
+        if (-not $identity -and $r.PSObject.Properties['LowerCaseLongPath']) { $identity = [string]$r.LowerCaseLongPath }
         $srcShow = [string]$r.SourcePath
         $srcNorm = $srcShow.ToLowerInvariant()
         if ($rootNorm -and $srcNorm.StartsWith($rootNorm)) {

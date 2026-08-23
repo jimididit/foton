@@ -104,7 +104,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     $null = $sb.AppendLine("<div><b>MAM-compressed</b>$mam</div>")
     $null = $sb.AppendLine("<div><b>LNK</b>$lnk</div>")
     $null = $sb.AppendLine('</div>')
-    $caveat = 'CSV is the source of truth (analysis/parsed_records.csv). This HTML is a capped preview. MAM-compressed Prefetch is not inflated. EVTX rows are selected Event IDs only, capped. Amcache hive and SRUM ESE copies are not parsed here (wrong fields would be worse than missing ones).'
+    $caveat = 'CSV is the source of truth (analysis/parsed_records.csv). This HTML is a capped preview. MAM-compressed Prefetch is not inflated. EVTX rows are selected Event IDs only, capped. Amcache KeyLastWriteUtc is hive key last-write, not proof of execution. Legacy Amcache File keys and SRUM ESE copies are not parsed here.'
     $null = $sb.AppendLine("<div class=""notice""><b>Read this first.</b> $(ConvertTo-FotonSafeHtml $caveat)</div>")
     $null = $sb.AppendLine('</header>')
     $null = $sb.AppendLine((Get-FotonReportNavBarHtml))

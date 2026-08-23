@@ -98,7 +98,8 @@ ConvertFrom-FotonPrefetch
 ConvertFrom-FotonLnk
 ConvertFrom-FotonJumplist
 ConvertFrom-FotonEvtx     # selected Event IDs from package EVTX; capped
-Invoke-FotonParse         # parse .pf/.lnk/.evtx in a package; writes parsed_records.csv + Foton_Parse.html
+ConvertFrom-FotonAmcache  # InventoryApplicationFile named values; legacy File\* unsupported
+Invoke-FotonParse         # parse .pf/.lnk/.evtx/Amcache.hve in a package; writes parsed_records.csv + Foton_Parse.html
 New-FotonParseReport   # HTML for those rows (not findings)
 Invoke-FotonCarve      # MZ/PE signature scan of a capped blob (not NTFS)
 Invoke-FotonAnalysis   # run rules + IOC matching over collected/parsed/diff data
@@ -190,5 +191,6 @@ Invoke-ScriptAnalyzer -Path .\src -Recurse -Severity Error,Warning |
 - Plan before large refactors; focused edits otherwise. Don't reformat regions you aren't changing.
 - When adding a heuristic or baseline provider, state expected false-positive sources, not just the rule. Update [docs/COVERAGE.md](docs/COVERAGE.md).
 - Public operator docs (`README.md`, `docs/USAGE.md`) use placeholders (`CASE-0001`, `D:\Cases`, `HOSTNAME`). Contributor VM workflow stays in [docs/LAB.md](docs/LAB.md). Do not put editor, hypervisor, or personal host names in shipped operator docs.
+- When you add or change a public command, flatten switch, or `Foton.cmd` verb, update [docs/USAGE.md](docs/USAGE.md) in the same change (purpose + how). USAGE is the operator catalog; AGENTS.md is not.
 - Bump module and schema versions on behavior or format changes; keep docs in sync.
 - If a capability can't be done correctly in PowerShell, say so and propose the alternative. In forensics, a wrong answer is more expensive than a missing one.

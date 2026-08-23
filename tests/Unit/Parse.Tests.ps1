@@ -177,3 +177,152 @@ Describe 'Invoke-FotonParse' {
         }
     }
 }
+
+Describe 'ConvertFrom-FotonAmcache' {
+    BeforeAll {
+        $script:NewFotonSyntheticRegfHive = {
+            param($Kind)
+    $buf = New-Object byte[] 0x3000
+    $null = [Text.Encoding]::ASCII.GetBytes('regf').CopyTo($buf, 0)
+    $null = [Text.Encoding]::ASCII.GetBytes('hbin').CopyTo($buf, 0x1000)
+    [BitConverter]::GetBytes([int]0x2000).CopyTo($buf, 0x1008)
+    $script:FotonHiveNext = 0x20
+    $add = {
+        param([byte[]]$Payload)
+        $len = 4 + $Payload.Length
+        $pad = (8 - ($len % 8)) % 8
+        $total = $len + $pad
+        $off = $script:FotonHiveNext
+        $pos = 0x1000 + $off
+        [BitConverter]::GetBytes(-$total).CopyTo($buf, $pos)
+        [Array]::Copy($Payload, 0, $buf, ($pos + 4), $Payload.Length)
+        $script:FotonHiveNext += $total
+        return $off
+    }
+    $ft = [datetime]::SpecifyKind([datetime]'2020-01-15 12:00:00', 'Utc').ToFileTimeUtc()
+    $mkNk = {
+        param($Name, $SubCount, $SubList, $ValCount, $ValList)
+        $nb = New-Object System.Collections.Generic.List[byte]
+        $null = $nb.AddRange([byte[]](0x6E, 0x6B))
+        $null = $nb.AddRange([BitConverter]::GetBytes([uint16]0x0020))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int64]$ft))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]0))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]0))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]$SubCount))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]0))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]$SubList))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]0))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]$ValCount))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]$ValList))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]-1))
+        $null = $nb.AddRange([BitConverter]::GetBytes([int32]-1))
+        1..5 | ForEach-Object { $null = $nb.AddRange([BitConverter]::GetBytes([int32]0)) }
+        $nameBytes = [Text.Encoding]::ASCII.GetBytes($Name)
+        $null = $nb.AddRange([BitConverter]::GetBytes([uint16]$nameBytes.Length))
+        $null = $nb.AddRange([BitConverter]::GetBytes([uint16]0))
+        $null = $nb.AddRange($nameBytes)
+        return ,$nb.ToArray()
+    }
+    $mkLf = {
+        param([int]$ChildOff)
+        $lb = New-Object System.Collections.Generic.List[byte]
+        $null = $lb.AddRange([byte[]](0x6C, 0x66))
+        $null = $lb.AddRange([BitConverter]::GetBytes([uint16]1))
+        $null = $lb.AddRange([BitConverter]::GetBytes([int32]$ChildOff))
+        $null = $lb.AddRange([BitConverter]::GetBytes([int32]0))
+        return ,$lb.ToArray()
+    }
+    if ($Kind -eq 'AmcacheFile') {
+        $path = "c:\windows\notepad.exe`0"
+        $pathData = [Text.Encoding]::Unicode.GetBytes($path)
+        $dataOff = & $add $pathData
+        $vk = New-Object System.Collections.Generic.List[byte]
+        $vname = [Text.Encoding]::ASCII.GetBytes('LowerCaseLongPath')
+        $null = $vk.AddRange([byte[]](0x76, 0x6B))
+        $null = $vk.AddRange([BitConverter]::GetBytes([uint16]$vname.Length))
+        $null = $vk.AddRange([BitConverter]::GetBytes([uint32]$pathData.Length))
+        $null = $vk.AddRange([BitConverter]::GetBytes([int32]$dataOff))
+        $null = $vk.AddRange([BitConverter]::GetBytes([int32]1))
+        $null = $vk.AddRange([BitConverter]::GetBytes([uint16]1))
+        $null = $vk.AddRange([BitConverter]::GetBytes([uint16]0))
+        $null = $vk.AddRange($vname)
+        $vkOff = & $add $vk.ToArray()
+        $vlist = [BitConverter]::GetBytes([int32]$vkOff)
+        $vlistOff = & $add $vlist
+        $fileNk = & $mkNk 'aabbcc' 0 -1 1 $vlistOff
+        $fileOff = & $add $fileNk
+        $invLf = & $mkLf $fileOff
+        $invLfOff = & $add $invLf
+        $invNk = & $mkNk 'InventoryApplicationFile' 1 $invLfOff 0 -1
+        $invOff = & $add $invNk
+        $rootLf = & $mkLf $invOff
+        $rootLfOff = & $add $rootLf
+        $rootNk = & $mkNk 'ROOT' 1 $rootLfOff 0 -1
+        $rootOff = & $add $rootNk
+    }
+    else {
+        $leaf = & $mkNk '1234' 0 -1 0 -1
+        $leafOff = & $add $leaf
+        $volLf = & $mkLf $leafOff
+        $volLfOff = & $add $volLf
+        $volNk = & $mkNk 'volume' 1 $volLfOff 0 -1
+        $volOff = & $add $volNk
+        $fileLf = & $mkLf $volOff
+        $fileLfOff = & $add $fileLf
+        $fileNk = & $mkNk 'File' 1 $fileLfOff 0 -1
+        $fileOff = & $add $fileNk
+        $rootLf = & $mkLf $fileOff
+        $rootLfOff = & $add $rootLf
+        $rootNk = & $mkNk 'ROOT' 1 $rootLfOff 0 -1
+        $rootOff = & $add $rootNk
+    }
+    [BitConverter]::GetBytes([int32]$rootOff).CopyTo($buf, 0x24)
+    return $buf
+        }
+    }
+
+    It 'reads InventoryApplicationFile LowerCaseLongPath from a synthetic hive' {
+        $hiv = Join-Path $env:TEMP ('foton-amcache-' + [guid]::NewGuid().ToString('N') + '.hve')
+        try {
+            [IO.File]::WriteAllBytes($hiv, (& $script:NewFotonSyntheticRegfHive 'AmcacheFile'))
+            $rows = @(ConvertFrom-FotonAmcache -Path $hiv)
+            $hit = $rows | Where-Object { $_.Format -eq 'AmcacheFile' } | Select-Object -First 1
+            $hit | Should -Not -BeNullOrEmpty
+            $hit.Supported | Should -Be $true
+            $hit.LowerCaseLongPath | Should -Be 'c:\windows\notepad.exe'
+            $hit.KeyLastWriteUtc | Should -Be '2020-01-15 12:00:00'
+            $hit.Note | Should -Match 'not proof of execution'
+        }
+        finally {
+            Remove-Item -LiteralPath $hiv -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'does not map legacy File numeric value IDs' {
+        $hiv = Join-Path $env:TEMP ('foton-amcache-leg-' + [guid]::NewGuid().ToString('N') + '.hve')
+        try {
+            [IO.File]::WriteAllBytes($hiv, (& $script:NewFotonSyntheticRegfHive 'LegacyFile'))
+            $r = @(ConvertFrom-FotonAmcache -Path $hiv) | Select-Object -First 1
+            $r.Format | Should -Be 'Amcache-LegacyFile'
+            $r.Supported | Should -Be $false
+            $r.Identity | Should -Be ''
+        }
+        finally {
+            Remove-Item -LiteralPath $hiv -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'emits unsupported for non-hive bytes' {
+        $tmp = Join-Path $env:TEMP ('foton-amcache-not-' + [guid]::NewGuid().ToString('N') + '.bin')
+        try {
+            $junk = New-Object byte[] 0x1200
+            [IO.File]::WriteAllBytes($tmp, $junk)
+            $r = @(ConvertFrom-FotonAmcache -Path $tmp)
+            $r[0].Format | Should -Be 'Unsupported-NotHive'
+            $r[0].Supported | Should -Be $false
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

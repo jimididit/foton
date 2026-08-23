@@ -20,12 +20,12 @@ function Show-FotonEasyHelp {
     Write-Host ''
     Write-Host '  Collect on a Windows PC (copy ONE file, no module install):'
     Write-Host '    1. On a lab box:  .\build\Build-Standalone.ps1'
-    Write-Host '    2. Copy dist\Foton-Collect.ps1 to the target'
+    Write-Host '    2. Copy dist\Foton-Collect_v*_schema*.ps1 (or Foton-Collect.ps1) to the target'
     Write-Host '    3. Double-click it or:  powershell -File Foton-Collect.ps1'
     Write-Host ''
     Write-Host '  Baseline (known-state snapshot, different file):'
     Write-Host '    .\build\Build-BaselineStandalone.ps1'
-    Write-Host '    Copy dist\Foton-Baseline.ps1 to the target, then run it.'
+    Write-Host '    Copy dist\Foton-Baseline_v*_schema*.ps1 (or Foton-Baseline.ps1) to the target, then run it.'
     Write-Host '    Open Foton_Baseline.html inside FotonBaseline_HOST_...Z'
     Write-Host ''
     Write-Host '  On this repo (workstation):'
@@ -39,7 +39,7 @@ function Show-FotonEasyHelp {
     Write-Host '    Foton.cmd collect  C:\FotonCases     (runs dist\Foton-Collect.ps1 if built)'
     Write-Host ''
     Write-Host '  Open Foton_Report.html after analyze. Open analysis\Foton_Parse.html after parse.'
-    Write-Host '  Findings are observations, not conclusions.'
+    Write-Host '  Findings are observations, not conclusions. Full command list: docs\USAGE.md'
     Write-Host ''
 }
 
@@ -91,7 +91,7 @@ switch ($cmd) {
         Write-Host '  Open Foton_BaselineCompare.html next to the second baseline JSON.' -ForegroundColor Green
     }
     'parse' {
-        if (-not $Target) { throw 'Usage: Foton.cmd parse <case-folder-or-zip | file.pf | file.lnk | jumplist>' }
+        if (-not $Target) { throw 'Usage: Foton.cmd parse <case-folder-or-zip | file.pf | file.lnk | jumplist | Amcache.hve>' }
         $rows = @(Invoke-FotonParse -Path $Target)
         if ($rows.Count -eq 0) {
             Write-Host '  Nothing to show. Parse needs copied .pf/.lnk inside the package (08_Filesystem\prefetch), not a listing CSV.' -ForegroundColor Yellow
@@ -100,7 +100,7 @@ switch ($cmd) {
         $rows | Select-Object SourcePath, Format, Supported, ExecutableName, LocalBasePath, Note |
             Format-Table -AutoSize -Wrap
         Write-Host '  HTML: analysis\Foton_Parse.html (folder) or <zip>_Parse.html (ZIP). Not findings.csv.' -ForegroundColor Green
-        Write-Host '  CSV:  analysis\parsed_records.csv. Win10+ Prefetch is often MAM-compressed (file seen, name not decoded).' -ForegroundColor DarkGray
+        Write-Host '  CSV:  analysis\parsed_records.csv. Win10+ Prefetch is often MAM-compressed (file seen, name not decoded). Amcache LinkDate is a stored string, not converted to UTC.' -ForegroundColor DarkGray
     }
     'ioc' {
         $iocFile = $Rest | Select-Object -First 1
