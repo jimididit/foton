@@ -18,7 +18,7 @@ Live triage acquisition. **This layer may touch a running Windows host.**
 
 Collectors emit **facts**. Do not call `Add-FotonFinding` from Collect.
 
-**Coverage:** Collect includes per-user Run keys, **startup_approved**, BITS, COM candidates, LSA/IFEO. Prefetch/Amcache/SRUM are still listings unless copied into the package. Gap list: [docs/COVERAGE.md](../../../docs/COVERAGE.md).
+**Coverage:** Collect includes per-user Run keys, **startup_approved**, BITS, COM candidates, LSA/IFEO. Prefetch `.pf`, Amcache.hve, and SRUM are **copied** (capped, locked-file copy) into `08_Filesystem/{prefetch,amcache,srum}` with a CSV index. Gap list: [docs/COVERAGE.md](../../../docs/COVERAGE.md).
 
 **Privilege:** `-RequiresElevation` on the collection wrapper for admin-only tasks.
 

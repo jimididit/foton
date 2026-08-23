@@ -26,7 +26,9 @@ function Write-FotonCollectionCoverage {
         )
         NotCollectedWithoutAdmin = @(
             'Security event log (parsed and EVTX export)',
-            'Prefetch directory listing',
+            'Prefetch listing and copied .pf files',
+            'Amcache hive copy',
+            'SRUM database copy',
             'Volume shadow copy listing (vssadmin)',
             'auditpol / secedit exports',
             'Offline NTUSER.DAT for other users',

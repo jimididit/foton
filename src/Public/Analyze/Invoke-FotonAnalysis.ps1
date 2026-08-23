@@ -45,7 +45,7 @@ function Invoke-FotonAnalysis {
         Add-FotonFinding -Severity 'Info' -Category 'Collection' -Tier 1 -Title 'Collection ran without Administrator rights' `
             -Observation ("Coverage profile {0} as {1}. {2} task(s) were skipped because they require an elevated token (see collection_coverage.json)." -f `
                 $cov.CoverageProfile, $cov.CollectionAccount, $cov.SkippedTaskCount) `
-            -WhyItMatters 'Standard-user collection still captures the current user''s process list, readable network state, HKCU persistence, and profile artifacts. It does not capture the Security log, Prefetch, VSS, audit policy export, or other users'' files. Missing those artifacts is a visibility gap, not evidence they were empty. Re-run elevated when the host owner can grant it.' `
+            -WhyItMatters 'Standard-user collection still captures the current user''s process list, readable network state, HKCU persistence, and profile artifacts. It does not capture the Security log, Prefetch copies, Amcache, SRUM, VSS, audit policy export, or other users'' files. Missing those artifacts is a visibility gap, not evidence they were empty. Re-run elevated when the host owner can grant it.' `
             -Artifact (Get-FotonArtifactPath 'Collection' 'collection_coverage' 'json') `
             -NextStep 'If this is an incident, obtain an elevated collection or a disk/memory image. If this is a self-audit on a locked-down work PC, treat skipped tasks as out of scope and verify remaining artifacts against that user''s activity only.'
     }

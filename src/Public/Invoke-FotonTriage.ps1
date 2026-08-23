@@ -66,7 +66,7 @@ function Invoke-FotonTriage {
         Write-Host '  [!] Standard-user coverage (not Administrator).' -ForegroundColor Yellow
         Write-Host '      Still collected: this user''s processes, readable network state,' -ForegroundColor Yellow
         Write-Host '      HKCU persistence, profile files, and any logs the token can read.' -ForegroundColor Yellow
-        Write-Host '      Skipped: Security log, Prefetch, VSS, auditpol/secedit, other users.' -ForegroundColor Yellow
+        Write-Host '      Skipped: Security log, Prefetch copies, Amcache, SRUM, VSS, auditpol/secedit, other users.' -ForegroundColor Yellow
         Write-Host ''
     }
 

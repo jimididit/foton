@@ -27,6 +27,8 @@ When picking this up: propose the `file:` vs embed tradeoff before writing a lar
 
 ---
 
+
+
 ## Public-release bar (usability + testing)
 
 Do not treat a GitHub release as “ready for first-time DFIR users” until most of this is true.
@@ -42,10 +44,10 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 
 **Layers to exercise on a lab VM (admin + standard user)**
 
-- [ ] Collect → open `Foton_Report.html` from the case folder (file://)
-- [ ] Recapture baseline after every `BaselineSchemaVersion` bump; Compare day0 vs day1 (now **1.4.0**)
+- [x] Collect → open `Foton_Report.html` from the case folder (file://)
+- [x] Recapture baseline after every `BaselineSchemaVersion` bump; Compare day0 vs day1 (now **1.4.0**)
 - [ ] `Get-FotonPackage` on a `WinFoton_*` v1 zip and a `Foton_*` flatten folder
-- [ ] Parse `.pf` and `.lnk` copied into a case (not live reads)
+- [ ] Parse `.pf` already copied into `08_Filesystem/prefetch` (not live `%SystemRoot%\Prefetch`)
 - [ ] IOC txt + csv against a known fixture package
 - [ ] Carve on a tiny PE blob; confirm missing-file throws
 - [ ] Locked/missing artifacts: manifest errors, no crash, Info visibility gaps
@@ -60,11 +62,13 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 **Still later**
 
 - In-report CSV browser (this file, above)
-- Baseline/Collect gaps in **[docs/COVERAGE.md](COVERAGE.md)** (next: Prefetch/Amcache copy-into-package, RemoteAccessConfig, EVTX parser)
-- EVTX / jumplist / Amcache parsers
+- Baseline/Collect gaps in **[docs/COVERAGE.md](COVERAGE.md)** (next: RemoteAccessConfig baseline, then EVTX parser; Amcache/SRUM *parsers*)
+- EVTX / jumplist / Amcache / SRUM parsers (files are now in the collect package)
 - Real NTFS carve engine (see `docs/CARVE.md`)
 
 ---
+
+
 
 ## Flattened baseline package (same shipping idea as Collect)
 
@@ -76,11 +80,11 @@ Do not treat a GitHub release as “ready for first-time DFIR users” until mos
 
 1. `build/Build-BaselineStandalone.ps1` emits `dist/Foton-Baseline.ps1`.
 2. Default output is a **package folder**, not a naked JSON on the Desktop:
-   `FotonBaseline_<HOST>_<UTCSTAMP>Z/`
-   - `baseline.json` (schema-stamped; compared payload still hashed in the header)
-   - `hashes.csv` / `*_PACKAGE_HASH.txt` after optional ZIP (same custody loop as Collect)
-   - `coverage.json`: what providers failed / not elevated
-   - `Foton_Baseline.html` - **snapshot of this observation**, not a findings dump
+  `FotonBaseline_<HOST>_<UTCSTAMP>Z/`
+  - `baseline.json` (schema-stamped; compared payload still hashed in the header)
+  - `hashes.csv` / `*_PACKAGE_HASH.txt` after optional ZIP (same custody loop as Collect)
+  - `coverage.json`: what providers failed / not elevated
+  - `Foton_Baseline.html` - **snapshot of this observation**, not a findings dump
 3. Operator copies the ZIP + hash file off-host. Analyst runs `Compare-FotonBaseline` (or later `Foton.cmd compare`) on two packages / two JSON paths. Compare stays **offline**.
 
 **HTML snapshot - not too much if it stays dumb**
@@ -101,6 +105,8 @@ Worth doing. JSON is the source of truth; HTML is a capped, escaped table per `R
 
 ---
 
+
+
 ## Visualization: GUI executable and/or TUI (consideration)
 
 **Status:** Not started. Capture only - do not build until Collect + Baseline flatten + HTML snapshot exist and the public-release bar is mostly green. A GUI will not fix missing providers or a JSON-only day0.
@@ -119,4 +125,3 @@ Worth doing. JSON is the source of truth; HTML is a capped, escaped table per `R
 **Suggested order if picked up:** (1) TUI menu wrapping existing commands, (2) HTML snapshot/compare, (3) only then a packaged exe that launches those scripts + opens the HTML. Propose stack (WinForms vs WPF vs Avalonia vs “just mshta/WebView on the report”) before writing it.
 
 **Relate to in-report browser:** a GUI that is only a nicer `Foton_Report.html` host (local HTTP to dodge `file://` CORS) may be enough visualization without a full app.
-

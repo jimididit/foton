@@ -78,6 +78,27 @@ function Invoke-FotonFilesystemCollection {
             Sort-Object LastRunUtc_FileWrite -Descending
     } | Out-Null
 
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'prefetch_files' -Format 'Csv' -Description 'Copied Prefetch .pf files (capped; parse these, not the live directory)' -RequiresElevation -Script {
+        $pf = "$env:SystemRoot\Prefetch"
+        $dest = Join-Path $script:FotonSession.Dirs['Filesystem'] 'prefetch'
+        $rel = Join-Path $script:FotonSession.Categories['Filesystem'] 'prefetch'
+        Copy-FotonCappedHostFiles -SourceDirectory $pf -Filter '*.pf' -DestinationDirectory $dest -PackageRelativeDirectory $rel
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'amcache_hive' -Format 'Csv' -Description 'Copied Amcache.hve plus hive logs (locked-file copy)' -RequiresElevation -Script {
+        $src = Join-Path $env:SystemRoot 'AppCompat\Programs\Amcache.hve'
+        $dest = Join-Path $script:FotonSession.Dirs['Filesystem'] 'amcache'
+        $rel = Join-Path $script:FotonSession.Categories['Filesystem'] 'amcache'
+        Copy-FotonHostFileFamily -SourcePath $src -DestinationDirectory $dest -PackageRelativeDirectory $rel
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'srum_database' -Format 'Csv' -Description 'Copied SRUDB.dat plus WAL/SHM if present (capped; locked-file copy)' -RequiresElevation -Script {
+        $src = Join-Path $env:ProgramData 'Microsoft\Windows\SRUM\SRUDB.dat'
+        $dest = Join-Path $script:FotonSession.Dirs['Filesystem'] 'srum'
+        $rel = Join-Path $script:FotonSession.Categories['Filesystem'] 'srum'
+        Copy-FotonHostFileFamily -SourcePath $src -DestinationDirectory $dest -PackageRelativeDirectory $rel -MaxTotalBytes 104857600
+    } | Out-Null
+
     Invoke-FotonCollection -Category 'Filesystem' -Name 'alternate_data_streams' -Format 'Csv' -Description 'Non-default NTFS streams in user paths (Zone.Identifier and beyond)' -Script {
         $rows = @()
         $roots = @("$env:PUBLIC")

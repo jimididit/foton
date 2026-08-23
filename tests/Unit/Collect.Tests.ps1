@@ -18,6 +18,14 @@ Describe 'Collect category functions (extracted)' {
         }
     }
 
+    It 'adds copy-into-package tasks for Prefetch, Amcache, and SRUM' {
+        $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonFilesystemCollection.ps1') -Raw
+        $src | Should -Match "Name 'prefetch_files'"
+        $src | Should -Match "Name 'amcache_hive'"
+        $src | Should -Match "Name 'srum_database'"
+        $src | Should -Match "Name 'prefetch_listing'"
+    }
+
     It 'does not export Collect commands on the public module surface yet' {
         Get-Command -Module Foton | Select-Object -ExpandProperty Name | Sort-Object |
             Should -Be @(

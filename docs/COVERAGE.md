@@ -37,7 +37,7 @@ Foton must not become Autoruns, Velociraptor, WinPmem, or a CIS benchmark scorer
 
 ## Collect vs Baseline (do not conflate)
 
-**Collect** answers “what is on this host *right now*, including volatile evidence?” PIDs, connections, Prefetch *listing*, Defender detections, sessions. Coverage gaps (`SkippedNotElevated`) are findings.
+**Collect** answers “what is on this host *right now*, including volatile evidence?” PIDs, connections, Prefetch listing **and copied `.pf` files**, Amcache/SRUM copies, Defender detections, sessions. Coverage gaps (`SkippedNotElevated`) are findings.
 
 **Baseline** answers “did *stable configuration* change between two observations?” Same machine state must hash the same. Exclude PIDs, connection 4-tuples, uptime, last-run times, ephemeral UDP, BITS transfer progress.
 
@@ -60,14 +60,14 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
 | Security | Defender status/prefs/detections, hardening CSV, auditpol (admin), SMB/WinRM, PS policy, non-MS roots, AppLocker/WDAC summary |
 | EventLogs | Capped queries + log configuration |
-| Filesystem | User-writable executables, recent System32 churn, Prefetch *listing*, ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
+| Filesystem | User-writable executables, recent System32 churn, Prefetch listing + **copied `.pf`** (capped), **Amcache.hve** (+ logs), **SRUM** (+ WAL/SHM), ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
 | Software | Uninstall keys, drivers, browser extensions, RAT name hits, AppX |
 
-**Collect gaps (priority).** These are common in IR kits and still thin or missing as *package artifacts*:
+**Collect gaps (priority).** Common in IR kits and still thin or missing as *package artifacts*:
 
 | Priority | Gap | Why it matters | Note |
 |----------|-----|----------------|------|
-| P0 | **Copy** Prefetch `.pf`, Amcache.hve, SRUM DB (capped) into the package | Parse cannot run on a listing CSV | Locked files: copy, record failure |
+| done (1.2.0) | Copy Prefetch `.pf`, Amcache.hve, SRUM DB (capped) | Parse cannot run on a listing CSV | Locked files: `Copy-FotonHostFile` FileShare.ReadWrite; failures in the copy CSV |
 | P1 | BAM/DAM, Shimcache (AppCompatCache) export | Execution evidence when Prefetch is off | Registry/hive; admin |
 | P1 | Named pipes | Classic IR volatile | High churn; Collect only |
 | P1 | Command Processor `AutoRun`, BootExecute, KnownDLLs, print monitors, Winsock LSP as **named** tasks | Autoruns tabs Foton currently folds or skips | Prefer dedicated CSVs |
@@ -113,7 +113,7 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 
 | Layer | Have | Next (useful DFIR, still offline) |
 |-------|------|-----------------------------------|
-| Parse | Prefetch (uncompressed SCCA), LNK | EVTX (selected IDs), jumplists, Amcache, shellbags, SRUM, browser DB - **fixtures first** |
+| Parse | Prefetch (uncompressed SCCA), LNK | EVTX (selected IDs), jumplists, Amcache *parser*, shellbags, SRUM *parser*, browser DB - **fixtures first**. Collect now copies the files. |
 | Analyze | Triage heuristics + IOC file | Rules that consume *parsed* rows and baseline diffs; never live WMI |
 | Carve | MZ/PE signature scan of a blob | Not NTFS unallocated in PS |
 

@@ -4,7 +4,8 @@ function Invoke-FotonParse {
         Run available parsers over files in a loaded package or an explicit path.
 
     .DESCRIPTION
-        Offline only. Prefetch (.pf) and shortcuts (.lnk).
+        Offline only. Prefetch (.pf) already in the package (typically
+        08_Filesystem/prefetch) and shortcuts (.lnk). Does not read %SystemRoot%.
 
     .PARAMETER PackagePath
         Optional case folder. If omitted, uses session CaseRoot.
@@ -29,7 +30,10 @@ function Invoke-FotonParse {
     }
     elseif ($script:FotonSession.CaseRoot) {
         $files = @(Get-ChildItem -LiteralPath $script:FotonSession.CaseRoot -Recurse -File -ErrorAction SilentlyContinue |
-                Where-Object { $_.Extension -match '\.(pf|lnk)$' })
+                Where-Object {
+                    $_.Extension -match '\.(pf|lnk)$' -and
+                    $_.DirectoryName -notmatch '[\\/](evtx|analysis)([\\/]|$)'
+                })
     }
     else {
         throw 'Pass -Path or load a package that contains Prefetch or LNK files.'

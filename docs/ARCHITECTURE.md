@@ -37,7 +37,7 @@ Collect does **not** require Administrator. A locked-down work PC is a valid tar
 
 | Profile | When | What you get |
 |---------|------|----------------|
-| **Elevated** | Admin token | Full v1 surfaces including Security log, Prefetch, VSS, auditpol, other users (with `-LoadUserHives`) |
+| **Elevated** | Admin token | Full surfaces including Security log, Prefetch listing **and copies**, Amcache/SRUM copies, VSS, auditpol, other users (with `-LoadUserHives`) |
 | **StandardUser** | Default if not elevated | Current user's processes, HKCU, readable HKLM, network snapshot, that profile's files, logs the token can read |
 
 Tasks that cannot succeed without admin are **skipped** (`SkippedNotElevated` in the manifest), not failed. `collection_coverage.json` plus an Info finding state the gap. `-RequireAdministrator` exits instead of collecting thin.

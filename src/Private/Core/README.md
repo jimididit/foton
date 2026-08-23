@@ -31,4 +31,6 @@ Name mapping from frozen `WinFoton.ps1`:
 
 `Get-FotonPatternLines` is module-only (no WinFoton equivalent). Pattern files live in `src/Private/Patterns/`.
 
+`Copy-FotonHostFile` / `Copy-FotonCappedHostFiles` / `Copy-FotonHostFileFamily` copy live files with `FileShare.ReadWrite` (Prefetch, Amcache, SRUM). Parse the copies only.
+
 Hive mount prefix is `Foton_<SID>` (v1 used `WinFoton_<SID>`). `Get-FotonUserHiveRoot` accepts both.

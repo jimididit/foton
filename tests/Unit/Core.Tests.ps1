@@ -170,6 +170,92 @@ putty
         }
     }
 
+    Describe 'Copy-FotonHostFile' {
+        It 'copies a readable file and hashes the destination' {
+            $src = Join-Path $env:TEMP ('foton-cp-src-' + [guid]::NewGuid().ToString('N') + '.bin')
+            $dst = Join-Path $env:TEMP ('foton-cp-dst-' + [guid]::NewGuid().ToString('N') + '.bin')
+            [IO.File]::WriteAllBytes($src, [byte[]](1, 2, 3, 4))
+            try {
+                $row = Copy-FotonHostFile -SourcePath $src -DestinationPath $dst
+                $row.Status | Should -Be 'Copied'
+                $row.SizeBytes | Should -Be 4
+                $row.SHA256 | Should -Match '^[0-9A-F]{64}$'
+                [IO.File]::ReadAllBytes($dst) | Should -Be ([byte[]](1, 2, 3, 4))
+            }
+            finally {
+                Remove-Item -LiteralPath $src, $dst -Force -ErrorAction SilentlyContinue
+            }
+        }
+        It 'records Missing when the source leaf is absent' {
+            $dst = Join-Path $env:TEMP ('foton-cp-miss-' + [guid]::NewGuid().ToString('N') + '.bin')
+            $row = Copy-FotonHostFile -SourcePath 'C:\foton-no-such-file-9f3c.bin' -DestinationPath $dst
+            $row.Status | Should -Be 'Missing'
+            Test-Path -LiteralPath $dst | Should -Be $false
+        }
+        It 'records CopyError when the source is exclusively locked' {
+            $src = Join-Path $env:TEMP ('foton-cp-lock-' + [guid]::NewGuid().ToString('N') + '.bin')
+            $dst = Join-Path $env:TEMP ('foton-cp-lockd-' + [guid]::NewGuid().ToString('N') + '.bin')
+            [IO.File]::WriteAllBytes($src, [byte[]](9, 9))
+            $fs = [IO.File]::Open($src, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+            try {
+                $row = Copy-FotonHostFile -SourcePath $src -DestinationPath $dst
+                $row.Status | Should -Be 'CopyError'
+            }
+            finally {
+                $fs.Dispose()
+                Remove-Item -LiteralPath $src, $dst -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Describe 'Copy-FotonCappedHostFiles' {
+        It 'copies newest files first and records CappedSkip' {
+            $srcDir = Join-Path $env:TEMP ('foton-pf-src-' + [guid]::NewGuid().ToString('N'))
+            $dstDir = Join-Path $env:TEMP ('foton-pf-dst-' + [guid]::NewGuid().ToString('N'))
+            New-Item -Path $srcDir -ItemType Directory | Out-Null
+            try {
+                $old = Join-Path $srcDir 'OLD.EXE-1.pf'
+                $new = Join-Path $srcDir 'NEW.EXE-2.pf'
+                [IO.File]::WriteAllBytes($old, [byte[]](1, 1))
+                Start-Sleep -Milliseconds 20
+                [IO.File]::WriteAllBytes($new, [byte[]](2, 2))
+                $rows = @(Copy-FotonCappedHostFiles -SourceDirectory $srcDir -Filter '*.pf' -DestinationDirectory $dstDir -MaxFiles 1 -MaxTotalBytes 1000)
+                ($rows | Where-Object { $_.Status -eq 'Copied' }).Count | Should -Be 1
+                ($rows | Where-Object { $_.Status -eq 'CappedSkip' }).Count | Should -Be 1
+                ($rows | Where-Object { $_.Status -eq 'Copied' }).SourcePath | Should -Be $new
+            }
+            finally {
+                Remove-Item -LiteralPath $srcDir, $dstDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+        It 'records Missing when the source directory is absent' {
+            $dstDir = Join-Path $env:TEMP ('foton-pf-miss-' + [guid]::NewGuid().ToString('N'))
+            $rows = @(Copy-FotonCappedHostFiles -SourceDirectory (Join-Path $env:TEMP 'foton-no-prefetch-dir') -Filter '*.pf' -DestinationDirectory $dstDir)
+            $rows[0].Status | Should -Be 'Missing'
+        }
+    }
+
+    Describe 'Copy-FotonHostFileFamily' {
+        It 'copies the primary file and hive-style log sidecar' {
+            $srcDir = Join-Path $env:TEMP ('foton-fam-src-' + [guid]::NewGuid().ToString('N'))
+            $dstDir = Join-Path $env:TEMP ('foton-fam-dst-' + [guid]::NewGuid().ToString('N'))
+            New-Item -Path $srcDir -ItemType Directory | Out-Null
+            $hve = Join-Path $srcDir 'Amcache.hve'
+            $log = Join-Path $srcDir 'Amcache.hve.LOG1'
+            [IO.File]::WriteAllBytes($hve, [byte[]](10, 11))
+            [IO.File]::WriteAllBytes($log, [byte[]](12))
+            try {
+                $rows = @(Copy-FotonHostFileFamily -SourcePath $hve -DestinationDirectory $dstDir -PackageRelativeDirectory '08_Filesystem\amcache')
+                $rows.Count | Should -Be 2
+                ($rows | Where-Object { $_.Status -eq 'Copied' }).Count | Should -Be 2
+                Test-Path -LiteralPath (Join-Path $dstDir 'Amcache.hve.LOG1') | Should -Be $true
+            }
+            finally {
+                Remove-Item -LiteralPath $srcDir, $dstDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
     Describe 'Get-FotonStartupApprovedState' {
         It 'maps Task Manager enable and disable bytes' {
             Get-FotonStartupApprovedState -Value ([byte[]](2, 0, 0, 0)) | Should -Be 'Enabled'

@@ -50,3 +50,22 @@ Describe 'ConvertFrom-FotonLnk' {
         $r.Supported | Should -Be $false
     }
 }
+
+Describe 'Invoke-FotonParse' {
+    It 'parses a .pf already copied into a case folder' {
+        $case = Join-Path $env:TEMP ('foton-parse-pkg-' + [guid]::NewGuid().ToString('N'))
+        $pfDir = Join-Path $case '08_Filesystem\prefetch'
+        New-Item -Path (Join-Path $case '00_Collection') -ItemType Directory -Force | Out-Null
+        New-Item -Path $pfDir -ItemType Directory -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $script:Fx 'prefetch-scca-v23.bin') -Destination (Join-Path $pfDir 'NOTEPAD.EXE-1.pf')
+        try {
+            $rows = @(Invoke-FotonParse -PackagePath $case)
+            $pf = $rows | Where-Object { $_.ExecutableName -eq 'NOTEPAD.EXE' } | Select-Object -First 1
+            $pf | Should -Not -BeNullOrEmpty
+            $pf.Format | Should -Be 'SCCA'
+        }
+        finally {
+            Remove-Item -LiteralPath $case -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
