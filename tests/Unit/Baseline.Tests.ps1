@@ -242,6 +242,20 @@ Describe 'Baseline providers and diff' {
         }
     }
 
+    It 'defines WdacApplockerPolicy as Kind+Name with PolicyHash' {
+        InModuleScope Foton {
+            $prov = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq 'WdacApplockerPolicy' })[0]
+            $prov.IdentityFields | Should -Contain 'Kind'
+            $prov.IdentityFields | Should -Contain 'Name'
+            $prov.ComparedFields | Should -Contain 'PolicyHash'
+            $rows = @(& $prov.Collect)
+            $rows.Count | Should -BeGreaterThan 0
+            $kinds = @($rows | ForEach-Object { $_.Kind })
+            $kinds | Should -Contain 'Wdac'
+            $kinds | Should -Contain 'AppLocker'
+        }
+    }
+
     It 'diffs field-level changes and fires High on service PathName and new admin' {
         $changes = Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif -NoHtml
         $path = @($changes | Where-Object { $_.RecordType -eq 'Service' -and $_.Field -eq 'PathName' })

@@ -19,9 +19,9 @@ Describe 'Foton module scaffold' {
         Import-Module $script:FotonPsd1 -Force
         $v = Get-FotonVersion
         $v.ProductName | Should -Be 'Foton'
-        $v.ModuleVersion | Should -Be '1.24.0'
-        $v.CollectSchemaVersion | Should -Be '1.8.0'
-        $v.BaselineSchemaVersion | Should -Be '1.13.0'
+        $v.ModuleVersion | Should -Be '1.25.0'
+        $v.CollectSchemaVersion | Should -Be '1.9.0'
+        $v.BaselineSchemaVersion | Should -Be '1.14.0'
         $v.FindingsSchemaVersion | Should -Be '1.0.0'
     }
 
@@ -39,6 +39,7 @@ Describe 'Foton module scaffold' {
                 'Get-FotonVersion'
                 'Invoke-FotonAnalysis'
                 'Invoke-FotonCarve'
+                'Invoke-FotonExternalParse'
                 'Invoke-FotonIocMatch'
                 'Invoke-FotonParse'
                 'Invoke-FotonTriage'

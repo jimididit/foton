@@ -23,6 +23,8 @@ Streamline forensic analysis and security audits by capturing machine state into
 
 **Coverage intent:** automate the Windows DFIR loop that examiners actually run (live triage package, known-good vs later/golden diff, offline parse/IOC) without pretending to be Autoruns, EDR, or a memory imager. The inventory of what is in vs missing - and why Startup-folder ≠ Settings “Startup apps” - is **[docs/COVERAGE.md](docs/COVERAGE.md)**. Read that before adding a provider or collect task.
 
+**Development direction:** keep a full toolkit, but **compose specialists** instead of cloning them. PowerShell 5.1 for Collect/Baseline capture; EZ Tools / Hayabusa / optional Autoruns on the workstation for deep parse and EVTX hunt. Strategy, strengths, gaps, and planning constraints: **[docs/LANDSCAPE.md](docs/LANDSCAPE.md)**. Read that before adding a parser, hunt engine, or “completeness” ASEP provider.
+
 ## Five capability layers (one core, one findings model, one report engine)
 
 | Layer | Purpose | Runs where |
@@ -43,7 +45,7 @@ Do not grow giant functions. Add a file:
 |--------------|-----|
 | A new live artifact category | `src/Public/Collect/<Name>.ps1` + tests; add the task to [docs/COVERAGE.md](docs/COVERAGE.md) |
 | A new stable config surface for diffs | `src/Private/Baseline/Providers/<Name>.ps1` (record type, identity key, compared fields, false positives) + schema bump + COVERAGE.md |
-| A new file format parser | `src/Public/Parse/ConvertFrom-Foton*.ps1` + `tests/Fixtures/` + Pester |
+| A new file format parser | Prefer copy-in-package + EZ Tools on the workstation ([docs/LANDSCAPE.md](docs/LANDSCAPE.md)). Native `src/Public/Parse/ConvertFrom-Foton*.ps1` only when PowerShell can be *correct*; fixtures + Pester |
 | A new heuristic | `src/Public/Analyze` rule file: one mock that fires, one that must not |
 | A new IOC source | feed `Invoke-FotonIocMatch` (when implemented); do not scrape the live host |
 | Report styling | `src/Public/Report` only; escape with `ConvertTo-FotonSafeHtml`; include `Get-FotonReportNav*` chrome |
@@ -193,4 +195,4 @@ Invoke-ScriptAnalyzer -Path .\src -Recurse -Severity Error,Warning |
 - Public operator docs (`README.md`, `docs/USAGE.md`) use placeholders (`CASE-0001`, `D:\Cases`, `HOSTNAME`). Contributor VM workflow stays in [docs/LAB.md](docs/LAB.md). Do not put editor, hypervisor, or personal host names in shipped operator docs.
 - When you add or change a public command, flatten switch, or `Foton.cmd` verb, update [docs/USAGE.md](docs/USAGE.md) in the same change (purpose + how). USAGE is the operator catalog; AGENTS.md is not.
 - Bump module and schema versions on behavior or format changes; keep docs in sync.
-- If a capability can't be done correctly in PowerShell, say so and propose the alternative. In forensics, a wrong answer is more expensive than a missing one.
+- If a capability can't be done correctly in PowerShell, say so and propose the alternative (usually: copy the bytes, run EZ Tools / Hayabusa / KAPE). In forensics, a wrong answer is more expensive than a missing one. See [docs/LANDSCAPE.md](docs/LANDSCAPE.md).

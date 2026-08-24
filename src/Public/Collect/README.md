@@ -18,7 +18,7 @@ Ships to endpoints only via `dist/Foton-Collect.ps1` (rebuild after Collect edit
 
 Collectors emit **facts**. Do not call `Add-FotonFinding` from Collect.
 
-**Coverage:** Collect includes per-user Run keys, **startup_approved**, BITS, COM candidates, LSA/IFEO, **cmd_autorun / session_manager_boot / known_dlls / winsock_lsp / active_setup / silent_process_exit / netsh_helpers / time_providers / screensaver**, **named_pipes**, **entra_workplace_join**, **onedrive_teams_local**. Prefetch `.pf`, Amcache.hve, and SRUM are **copied** into `08_Filesystem/{prefetch,amcache,srum}`. BAM/DAM UserSettings CSV and raw **AppCompatCache.bin** live under Filesystem (admin). Gap list: [docs/COVERAGE.md](../../../docs/COVERAGE.md).
+**Coverage:** Collect includes per-user Run keys, **startup_approved**, BITS, COM candidates, LSA/IFEO, **cmd_autorun / session_manager_boot / known_dlls / winsock_lsp / active_setup / silent_process_exit / netsh_helpers / time_providers / screensaver**, **named_pipes**, **entra_workplace_join**, **onedrive_teams_local**. Prefetch `.pf`, Amcache.hve, SRUM, **registry hives**, **LNK/jumplists**, **Tasks XML**, **browser DBs**, and **host text logs** are **copied** into `08_Filesystem/...`. BAM/DAM UserSettings CSV and raw **AppCompatCache.bin** live under Filesystem (admin). Optional `-IncludeUsnJournal`. Gap list: [docs/COVERAGE.md](../../../docs/COVERAGE.md).
 
 **Privilege:** `-RequiresElevation` on the collection wrapper for admin-only tasks.
 

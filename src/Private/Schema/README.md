@@ -28,7 +28,7 @@ That inventory (use cases, Collect vs Baseline, ASEP gaps, parse backlog) is
 | Add a finding property | FindingsSchemaVersion |
 | Only document a *planned* provider | Nothing - edit COVERAGE.md |
 
-Collect packages: **1.8.0** (screensaver / silent_process_exit / netsh_helpers / time_providers + onedrive_teams_local + entra_workplace_join + BAM/DAM + AppCompatCache.bin + named_pipes + named ASEP CSVs + Prefetch/Amcache/SRUM copies). Baseline **1.13.0**.
+Collect packages: **1.9.0** (registry hive / LNK / jumplist / task XML / browser DB / host log copies + optional USN + expanded EVTX + prior Prefetch/Amcache/SRUM). Baseline **1.14.0** (WdacApplockerPolicy).
 
 Empty tables are allowed; empty *because we never mapped the artifact* (Settings
 startup vs Startup folder) is a coverage bug, not a schema event, until the

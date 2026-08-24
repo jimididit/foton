@@ -45,5 +45,6 @@ function Get-FotonBaselineChangeSeverity {
     if ($c.RecordType -eq 'NetshHelper') { $sev = 'High' }
     if ($c.RecordType -eq 'TimeProvider' -and ($c.ChangeType -in @('Added', 'Removed') -or $c.Field -eq 'DllName')) { $sev = 'High' }
     if ($c.RecordType -eq 'TimeProvider' -and $c.Field -in @('Enabled', 'InputProvider')) { $sev = 'Medium' }
+    if ($c.RecordType -eq 'WdacApplockerPolicy' -and ($c.ChangeType -in @('Added', 'Removed') -or $c.Field -eq 'PolicyHash')) { $sev = 'High' }
     return $sev
 }

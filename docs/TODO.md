@@ -47,7 +47,7 @@ Do not treat a GitHub release as ready for first-time DFIR users until most of t
 **Lab (admin + standard user)**
 
 - [x] Collect → open `Foton_Report.html` from the case folder (`file://`)
-- [x] Recapture baseline after schema bumps; Compare day0 vs day1 (schema **1.13.0**)
+- [x] Recapture baseline after schema bumps; Compare day0 vs day1 (schema **1.14.0** requires a new day0)
 - [ ] `Get-FotonPackage` on a historical `WinFoton_*` zip **and** a `Foton_*` flatten folder
 - [ ] Parse `.pf` / EVTX already in the package (not live Prefetch)
 - [ ] IOC txt + csv against `tests/Fixtures`

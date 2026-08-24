@@ -502,5 +502,40 @@ putty
             }
             Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'Info'
         }
+        It 'ranks WdacApplockerPolicy PolicyHash as High' {
+            $c = [PSCustomObject]@{
+                RecordType = 'WdacApplockerPolicy'
+                Identity   = 'Wdac|SiPolicy.p7b'
+                ChangeType = 'Modified'
+                Field      = 'PolicyHash'
+            }
+            Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
+        }
+    }
+
+    Describe 'Copy-FotonCappedHostFileList' {
+        It 'copies explicit DestRelative paths and caps byte budget' {
+            $srcDir = Join-Path $env:TEMP ('foton-list-src-' + [guid]::NewGuid().ToString('N'))
+            $dstDir = Join-Path $env:TEMP ('foton-list-dst-' + [guid]::NewGuid().ToString('N'))
+            New-Item -Path $srcDir -ItemType Directory | Out-Null
+            try {
+                $a = Join-Path $srcDir 'a.bin'
+                $b = Join-Path $srcDir 'b.bin'
+                [IO.File]::WriteAllBytes($a, [byte[]](1, 2, 3, 4))
+                Start-Sleep -Milliseconds 20
+                [IO.File]::WriteAllBytes($b, [byte[]](5, 6, 7, 8, 9, 10))
+                $items = @(
+                    [PSCustomObject]@{ SourcePath = $a; DestRelative = 'u1\a.bin' }
+                    [PSCustomObject]@{ SourcePath = $b; DestRelative = 'u2\b.bin' }
+                )
+                $rows = @(Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $dstDir -MaxFiles 10 -MaxTotalBytes 5)
+                ($rows | Where-Object { $_.Status -eq 'Copied' }).Count | Should -Be 1
+                ($rows | Where-Object { $_.Status -eq 'CappedSkip' }).Count | Should -Be 1
+                Test-Path -LiteralPath (Join-Path $dstDir 'u1\a.bin') | Should -Be $true
+            }
+            finally {
+                Remove-Item -LiteralPath $srcDir, $dstDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
 }

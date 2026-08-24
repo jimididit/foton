@@ -4,14 +4,14 @@ Windows DFIR, baseline comparison, and security-audit toolkit.
 
 Foton captures host state into a hashed **package**, then you parse, compare baselines, and analyze **offline**. Findings are observations, not a verdict.
 
-**Module 1.24.0** - collect schema **1.8.0**, baseline schema **1.13.0**. Operator path: [docs/USAGE.md](docs/USAGE.md).
+**Module 1.25.0** - collect schema **1.9.0**, baseline schema **1.14.0**. Operator path: [docs/USAGE.md](docs/USAGE.md).
 
 ## What to run
 
 | Machine | File | Result |
 |---------|------|--------|
-| **Endpoint** (no install) | `dist/Foton-Collect_v1.24.0_schema1.8.0.ps1` (alias `Foton-Collect.ps1`) | Case folder `Foton_<HOST>_<UTC>Z/`, `Foton_Report.html`, ZIP + `*_PACKAGE_HASH.txt` |
-| **Endpoint** | `dist/Foton-Baseline_v1.24.0_schema1.13.0.ps1` (alias `Foton-Baseline.ps1`) | `FotonBaseline_<HOST>_<UTC>Z/`, `Foton_Baseline.html`, ZIP + hash |
+| **Endpoint** (no install) | `dist/Foton-Collect_v1.25.0_schema1.9.0.ps1` (alias `Foton-Collect.ps1`) | Case folder `Foton_<HOST>_<UTC>Z/`, `Foton_Report.html`, ZIP + `*_PACKAGE_HASH.txt` |
+| **Endpoint** | `dist/Foton-Baseline_v1.25.0_schema1.14.0.ps1` (alias `Foton-Baseline.ps1`) | `FotonBaseline_<HOST>_<UTC>Z/`, `Foton_Baseline.html`, ZIP + hash |
 | **Workstation** (this repo) | `Foton.cmd` or `Import-Module .\Foton.psd1` | Full command list: [docs/USAGE.md](docs/USAGE.md) |
 
 Rebuild flatten scripts after Collect/Baseline source changes:
@@ -118,6 +118,7 @@ Add files under `src/` - collectors, baseline providers, parsers, rules. See [do
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to add a feature |
 | [docs/LAB.md](docs/LAB.md) | Contributor VM |
 | [docs/COVERAGE.md](docs/COVERAGE.md) | What is in vs missing |
+| [docs/LANDSCAPE.md](docs/LANDSCAPE.md) | Vs specialist tools; compose don’t clone; development direction |
 | [docs/CARVE.md](docs/CARVE.md) | Signature scan vs NTFS |
 | [docs/TODO.md](docs/TODO.md) | Will implement vs considering; public-release bar |
 | [docs/MIGRATION.md](docs/MIGRATION.md) | Completed v1 → module extract |

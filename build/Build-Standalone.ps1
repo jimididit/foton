@@ -103,6 +103,7 @@ param(
     [switch]`$SkipHashing,
     [switch]`$LoadUserHives,
     [switch]`$IncludeFileTimeline,
+    [switch]`$IncludeUsnJournal,
     [switch]`$NoZip,
     [switch]`$RequireAdministrator
 )

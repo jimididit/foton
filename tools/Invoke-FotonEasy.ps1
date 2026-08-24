@@ -34,6 +34,7 @@ function Show-FotonEasyHelp {
     Write-Host '    Foton.cmd baseline C:\Baselines\this-pc.json'
     Write-Host '    Foton.cmd compare  C:\Baselines\day0.json C:\Baselines\day1.json'
     Write-Host '    Foton.cmd parse    C:\FotonCases\Foton_HOST_...Z'
+    Write-Host '    Foton.cmd compose  C:\FotonCases\Foton_HOST_...Z'
     Write-Host '    Foton.cmd ioc      C:\FotonCases\Foton_HOST_...Z C:\intel\iocs.txt'
     Write-Host '    Foton.cmd carve    C:\blob.bin'
     Write-Host '    Foton.cmd collect  C:\FotonCases     (runs dist\Foton-Collect.ps1 if built)'
@@ -101,6 +102,14 @@ switch ($cmd) {
             Format-Table -AutoSize -Wrap
         Write-Host '  HTML: analysis\Foton_Parse.html (folder) or <zip>_Parse.html (ZIP). Not findings.csv.' -ForegroundColor Green
         Write-Host '  CSV:  analysis\parsed_records.csv. Win10+ Prefetch is often MAM-compressed (file seen, name not decoded). Amcache LinkDate is a stored string, not converted to UTC.' -ForegroundColor DarkGray
+    }
+    'compose' {
+        if (-not $Target) { throw 'Usage: Foton.cmd compose <case-folder-or-zip>' }
+        Get-FotonPackage -Path $Target | Out-Null
+        $rows = @(Invoke-FotonExternalParse -PackagePath $Target)
+        $rows | Select-Object Tool, Status, DestRelative, Note |
+            Format-Table -AutoSize -Wrap
+        Write-Host '  Inventory: analysis\external\external_parse_inventory.csv. Native Invoke-FotonParse if tools are missing.' -ForegroundColor Green
     }
     'ioc' {
         $iocFile = $Rest | Select-Object -First 1

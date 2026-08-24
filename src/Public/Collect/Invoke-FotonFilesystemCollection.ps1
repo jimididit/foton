@@ -99,6 +99,119 @@ function Invoke-FotonFilesystemCollection {
         Copy-FotonHostFileFamily -SourcePath $src -DestinationDirectory $dest -PackageRelativeDirectory $rel -MaxTotalBytes 104857600
     } | Out-Null
 
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'registry_hives_machine' -Format 'Csv' -Description 'Copied SYSTEM/SOFTWARE/SAM/SECURITY/DEFAULT hives plus .LOG* sidecars (locked-file copy; not parsed on the endpoint). For RECmd / Registry Explorer.' -RequiresElevation -Script {
+        $config = Join-Path $env:SystemRoot 'System32\config'
+        $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'hives\machine'
+        $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'hives\machine'
+        $rows = @()
+        $budget = [int64]419430400
+        foreach ($name in @('SYSTEM', 'SOFTWARE', 'SAM', 'SECURITY', 'DEFAULT')) {
+            $src = Join-Path $config $name
+            $fam = @(Copy-FotonHostFileFamily -SourcePath $src -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxTotalBytes $budget)
+            $rows += $fam
+            foreach ($r in $fam) {
+                if ($r.Status -eq 'Copied') { $budget = $budget - [int64]$r.SizeBytes }
+            }
+            if ($budget -le 0) { break }
+        }
+        $rows
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'registry_hives_user' -Format 'Csv' -Description 'Copied NTUSER.DAT and UsrClass.dat plus hive logs per profile (capped; not parsed on the endpoint).' -RequiresElevation -Script {
+        $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'hives\users'
+        $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'hives\users'
+        $rows = @()
+        $budget = [int64]209715200
+        foreach ($userProfile in (Get-FotonUserProfile)) {
+            if (-not $userProfile.Exists) { continue }
+            $seg = Get-FotonSafePathSegment -Name $userProfile.UserName
+            $userDest = Join-Path $destRoot $seg
+            $userRel = Join-Path $relRoot $seg
+            $nt = Join-Path $userProfile.ProfilePath 'NTUSER.DAT'
+            $uc = Join-Path $userProfile.ProfilePath 'AppData\Local\Microsoft\Windows\UsrClass.dat'
+            foreach ($src in @($nt, $uc)) {
+                if ($budget -le 0) { break }
+                $fam = @(Copy-FotonHostFileFamily -SourcePath $src -DestinationDirectory $userDest -PackageRelativeDirectory $userRel -MaxTotalBytes $budget)
+                $rows += $fam
+                foreach ($r in $fam) {
+                    if ($r.Status -eq 'Copied') { $budget = $budget - [int64]$r.SizeBytes }
+                }
+            }
+        }
+        if ($rows.Count -eq 0) {
+            return @([PSCustomObject]@{
+                    SourcePath = ''; DestRelative = ''; SizeBytes = 0; SHA256 = ''; Status = 'NoData'
+                    Note       = 'No profile hives were copied. Standard-user collect skips other users; missing NTUSER is a visibility gap.'
+                })
+        }
+        $rows
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'usn_journal' -Format 'Csv' -Description 'USN queryjournal metadata; optional $J copy when -IncludeUsnJournal is set. $MFT is not copied (use KAPE/ORC).' -RequiresElevation -Script {
+        $destDir = Join-Path $script:FotonSession.Dirs['Filesystem'] 'usn'
+        $rel = Join-Path $script:FotonSession.Categories['Filesystem'] 'usn'
+        if (-not (Test-Path -LiteralPath $destDir)) {
+            New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+        }
+        $rows = @()
+        $drive = $env:SystemDrive
+        if (-not $drive) { $drive = 'C:' }
+        $metaPath = Join-Path $destDir 'usn_queryjournal.txt'
+        try {
+            $out = & fsutil.exe usn queryjournal $drive 2>&1 | Out-String
+            Set-Content -LiteralPath $metaPath -Value $out -Encoding UTF8
+            $hash = Get-FotonSafeHash -Path $metaPath
+            $len = (Get-Item -LiteralPath $metaPath).Length
+            $rows += [PSCustomObject]@{
+                SourcePath = ("fsutil usn queryjournal {0}" -f $drive)
+                DestRelative = (Join-Path $rel 'usn_queryjournal.txt')
+                SizeBytes  = $len
+                SHA256     = $hash
+                Status     = 'Copied'
+                Note       = 'Journal metadata only. Not a full USN parse.'
+            }
+        }
+        catch {
+            $rows += [PSCustomObject]@{
+                SourcePath = ("fsutil usn queryjournal {0}" -f $drive)
+                DestRelative = ''
+                SizeBytes  = 0
+                SHA256     = ''
+                Status     = 'CopyError'
+                Note       = $_.Exception.Message
+            }
+        }
+        if ($script:FotonSession.IncludeUsnJournal) {
+            $jPath = Join-Path $drive '\$Extend\$UsnJrnl:$J'
+            $jDest = Join-Path $destDir 'UsnJrnl_J.bin'
+            $copy = Copy-FotonHostFile -SourcePath $jPath -DestinationPath $jDest
+            $jRel = Join-Path $rel 'UsnJrnl_J.bin'
+            $note = $copy.Note
+            if ($copy.Status -ne 'Copied') {
+                $note = 'Optional $J copy failed or is unsupported on this volume. Use KAPE/ORC for USN. ' + [string]$copy.Note
+            }
+            $rows += [PSCustomObject]@{
+                SourcePath   = $jPath
+                DestRelative = $jRel
+                SizeBytes    = $copy.SizeBytes
+                SHA256       = $copy.SHA256
+                Status       = $copy.Status
+                Note         = $note
+            }
+        }
+        else {
+            $rows += [PSCustomObject]@{
+                SourcePath   = '$Extend\$UsnJrnl:$J'
+                DestRelative = ''
+                SizeBytes    = 0
+                SHA256       = ''
+                Status       = 'Skipped'
+                Note         = 'Full USN $J copy is off by default (size). Re-collect with -IncludeUsnJournal. $MFT is never copied by Foton.'
+            }
+        }
+        $rows
+    } | Out-Null
+
     Invoke-FotonCollection -Category 'Filesystem' -Name 'bam_dam_user_settings' -Format 'Csv' -Description 'BAM/DAM UserSettings (path = value name; FILETIME in data). Admin. Not a baseline.' -RequiresElevation -Script {
         $rows = @()
         $pairs = @(
@@ -276,6 +389,119 @@ function Invoke-FotonFilesystemCollection {
             }
         }
         $rows | Sort-Object ModifiedUtc -Descending
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'shortcut_and_jumplist_files' -Format 'Csv' -Description 'Copied Recent .lnk and jumplist files (capped). Parse these copies, not the live profile.' -RequiresElevation -Script {
+        $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'lnk_jumplist'
+        $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'lnk_jumplist'
+        $items = @()
+        foreach ($userProfile in (Get-FotonUserProfile)) {
+            if (-not $userProfile.Exists) { continue }
+            $seg = Get-FotonSafePathSegment -Name $userProfile.UserName
+            $spec = @(
+                @{ Dir = (Join-Path $userProfile.ProfilePath 'AppData\Roaming\Microsoft\Windows\Recent'); Filter = '*.lnk'; Folder = 'Recent' }
+                @{ Dir = (Join-Path $userProfile.ProfilePath 'AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations'); Filter = '*.automaticDestinations-ms'; Folder = 'AutomaticDestinations' }
+                @{ Dir = (Join-Path $userProfile.ProfilePath 'AppData\Roaming\Microsoft\Windows\Recent\CustomDestinations'); Filter = '*.customDestinations-ms'; Folder = 'CustomDestinations' }
+            )
+            foreach ($s in $spec) {
+                if (-not (Test-FotonPathAccessible -Path $s.Dir)) { continue }
+                foreach ($f in (Get-ChildItem -LiteralPath $s.Dir -Filter $s.Filter -File -Force -ErrorAction SilentlyContinue)) {
+                    $items += [PSCustomObject]@{
+                        SourcePath   = $f.FullName
+                        DestRelative = (Join-Path $seg (Join-Path $s.Folder $f.Name))
+                    }
+                }
+            }
+        }
+        Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxFiles 400 -MaxTotalBytes 83886080
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'scheduled_task_xml' -Format 'Csv' -Description 'Copied %SystemRoot%\System32\Tasks XML (capped). Complements the task CSV; not parsed on the endpoint.' -RequiresElevation -Script {
+        $srcRoot = Join-Path $env:SystemRoot 'System32\Tasks'
+        $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'task_xml'
+        $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'task_xml'
+        $items = @()
+        if (Test-Path -LiteralPath $srcRoot) {
+            foreach ($f in (Get-ChildItem -LiteralPath $srcRoot -File -Recurse -Force -ErrorAction SilentlyContinue)) {
+                $rel = $f.FullName.Substring($srcRoot.Length).TrimStart('\')
+                $items += [PSCustomObject]@{ SourcePath = $f.FullName; DestRelative = $rel }
+            }
+        }
+        Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxFiles 500 -MaxTotalBytes 52428800
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'browser_databases' -Format 'Csv' -Description 'Copied browser History/Cookies/places.sqlite (capped). No cookie decryption, no Graph. Locked files are coverage gaps.' -RequiresElevation -Script {
+        $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'browser_db'
+        $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'browser_db'
+        $items = @()
+        foreach ($userProfile in (Get-FotonUserProfile)) {
+            if (-not $userProfile.Exists) { continue }
+            $seg = Get-FotonSafePathSegment -Name $userProfile.UserName
+            $local = Join-Path $userProfile.ProfilePath 'AppData\Local'
+            $roam = Join-Path $userProfile.ProfilePath 'AppData\Roaming'
+            $candidates = @(
+                (Join-Path $local 'Google\Chrome\User Data\Default\History'),
+                (Join-Path $local 'Google\Chrome\User Data\Default\Cookies'),
+                (Join-Path $local 'Google\Chrome\User Data\Default\Login Data'),
+                (Join-Path $local 'Microsoft\Edge\User Data\Default\History'),
+                (Join-Path $local 'Microsoft\Edge\User Data\Default\Cookies'),
+                (Join-Path $local 'Microsoft\Edge\User Data\Default\Login Data'),
+                (Join-Path $roam 'Mozilla\Firefox\Profiles')
+            )
+            foreach ($c in $candidates) {
+                if ($c -like '*Firefox\Profiles') {
+                    if (-not (Test-Path -LiteralPath $c)) { continue }
+                    foreach ($ff in (Get-ChildItem -LiteralPath $c -Directory -ErrorAction SilentlyContinue)) {
+                        foreach ($leaf in @('places.sqlite', 'cookies.sqlite')) {
+                            $p = Join-Path $ff.FullName $leaf
+                            if (Test-Path -LiteralPath $p -PathType Leaf) {
+                                $items += [PSCustomObject]@{
+                                    SourcePath   = $p
+                                    DestRelative = (Join-Path $seg (Join-Path ('Firefox_' + $ff.Name) $leaf))
+                                }
+                            }
+                        }
+                    }
+                    continue
+                }
+                if (Test-Path -LiteralPath $c -PathType Leaf) {
+                    $brand = 'Chrome'
+                    if ($c -match 'Microsoft\\Edge') { $brand = 'Edge' }
+                    $items += [PSCustomObject]@{
+                        SourcePath   = $c
+                        DestRelative = (Join-Path $seg (Join-Path $brand ([IO.Path]::GetFileName($c))))
+                    }
+                }
+            }
+        }
+        Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxFiles 80 -MaxTotalBytes 104857600
+    } | Out-Null
+
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'host_text_logs' -Format 'Csv' -Description 'Copied setupapi.dev.log, CBS.log (capped), and PowerShell transcripts if the policy path exists.' -RequiresElevation -Script {
+        $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'host_logs'
+        $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'host_logs'
+        $items = @()
+        $setup = Join-Path $env:SystemRoot 'inf\setupapi.dev.log'
+        if (Test-Path -LiteralPath $setup) {
+            $items += [PSCustomObject]@{ SourcePath = $setup; DestRelative = 'setupapi.dev.log' }
+        }
+        $cbs = Join-Path $env:SystemRoot 'Logs\CBS\CBS.log'
+        if (Test-Path -LiteralPath $cbs) {
+            $items += [PSCustomObject]@{ SourcePath = $cbs; DestRelative = 'CBS.log' }
+        }
+        $tx = Get-FotonRegValue -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription' -Name 'OutputDirectory'
+        if ($tx -and (Test-Path -LiteralPath ([string]$tx))) {
+            foreach ($f in (Get-ChildItem -LiteralPath ([string]$tx) -Filter '*.txt' -File -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 40)) {
+                $items += [PSCustomObject]@{ SourcePath = $f.FullName; DestRelative = (Join-Path 'powershell_transcript' $f.Name) }
+            }
+        }
+        $ci = Join-Path $env:SystemRoot 'System32\CodeIntegrity'
+        if (Test-Path -LiteralPath $ci) {
+            foreach ($f in (Get-ChildItem -LiteralPath $ci -Include '*.cip', '*.p7b', 'SiPolicy.p7b' -File -Force -ErrorAction SilentlyContinue)) {
+                $items += [PSCustomObject]@{ SourcePath = $f.FullName; DestRelative = (Join-Path 'codeintegrity' $f.Name) }
+            }
+        }
+        Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxFiles 50 -MaxTotalBytes 52428800
     } | Out-Null
 
     Invoke-FotonCollection -Category 'Filesystem' -Name 'onedrive_teams_local' -Format 'Csv' -Description 'OneDrive/Teams local folders and account registry (no Graph, no cookie/DB copy)' -Script {

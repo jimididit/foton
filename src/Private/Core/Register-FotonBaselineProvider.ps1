@@ -40,5 +40,5 @@ function Get-FotonBaselineSchemaVersion {
         $man = Import-PowerShellDataFile -LiteralPath $psd1
         return [string]$man.PrivateData.Foton.BaselineSchemaVersion
     }
-    return '1.13.0'
+    return '1.14.0'
 }

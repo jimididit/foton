@@ -631,6 +631,93 @@ function Invoke-FotonAnalysis {
             -Artifact (Get-FotonArtifactPath 'Security' 'audit_policy' 'txt')
     }
 
+    # ---------- Parsed records + baseline diff (offline files; Import-FotonPackageData skips analysis/) ----------
+    $caseRoot = $script:FotonSession.CaseRoot
+    if ($caseRoot -and (Test-Path -LiteralPath $caseRoot)) {
+        $parsedPath = Join-Path $caseRoot 'analysis\parsed_records.csv'
+        if (-not (Test-Path -LiteralPath $parsedPath)) {
+            $parsedPath = Join-Path $caseRoot 'analysis\parsed_records.csv'
+        }
+        if (Test-Path -LiteralPath $parsedPath) {
+            try {
+                $parsed = @(Import-Csv -LiteralPath $parsedPath)
+                $hits = @()
+                foreach ($r in $parsed) {
+                    $p = [string]$r.LocalBasePath
+                    if (-not $p) { $p = [string]$r.Path }
+                    if (-not $p) { $p = [string]$r.LowerCaseLongPath }
+                    if (-not $p) { $p = [string]$r.Identity }
+                    if (-not $p) { continue }
+                    if (Test-FotonUserWritablePath -Path $p) {
+                        $hits += $p
+                    }
+                }
+                $hits = @($hits | Select-Object -Unique)
+                if ($hits.Count -gt 0) {
+                    $sample = ($hits | Select-Object -First 8) -join '; '
+                    Add-FotonFinding -Severity 'Medium' -Category 'Execution' -Tier 2 -Title 'Parsed artifacts reference user-writable paths' `
+                        -Observation ("analysis/parsed_records.csv contains {0} distinct path(s) under user-writable locations. Sample: {1}" -f $hits.Count, $sample) `
+                        -WhyItMatters 'Prefetch/LNK/Amcache rows are observations about files that were referenced. A user-writable path is a review item (updater, user binary, or unexpected drop). This is not a verdict of compromise.' `
+                        -Artifact 'analysis/parsed_records.csv' `
+                        -NextStep 'Open the parsed row, hash the file if it is still in the package, and compare to software inventory / baseline diffs.'
+                }
+            }
+            catch { }
+        }
+
+        $diffPath = Join-Path $caseRoot 'analysis\baseline_diff.csv'
+        if (Test-Path -LiteralPath $diffPath) {
+            try {
+                $diffs = @(Import-Csv -LiteralPath $diffPath)
+                $svc = @($diffs | Where-Object {
+                        $_.RecordType -eq 'Service' -and (
+                            ($_.ChangeType -eq 'Added') -or
+                            ($_.ChangeType -eq 'Modified' -and $_.Field -eq 'PathName')
+                        )
+                    })
+                if ($svc.Count -gt 0) {
+                    $ids = (@($svc | ForEach-Object { $_.Identity } | Select-Object -First 8) -join '; ')
+                    Add-FotonFinding -Severity 'High' -Category 'Persistence' -Tier 1 -Title 'Baseline diff: service ImagePath or new service' `
+                        -Observation ("Compare-FotonBaseline records show {0} service Added or PathName Modified. Identities: {1}" -f $svc.Count, $ids) `
+                        -WhyItMatters 'A new service or a changed ImagePath is a stable-config fact between two snapshots. Patching also replaces binaries. This does not establish who changed it or that the host is compromised.' `
+                        -Artifact 'analysis/baseline_diff.csv' `
+                        -NextStep 'Diff the PathName strings against the day0 baseline and the collected service CSV.'
+                }
+                $adm = @($diffs | Where-Object { $_.RecordType -eq 'LocalGroupMember' -and $_.ChangeType -eq 'Added' -and [string]$_.Identity -like 'Administrators|*' })
+                if ($adm.Count -gt 0) {
+                    Add-FotonFinding -Severity 'High' -Category 'Users' -Tier 1 -Title 'Baseline diff: Administrators membership added' `
+                        -Observation ("{0} Added LocalGroupMember row(s) for Administrators in analysis/baseline_diff.csv." -f $adm.Count) `
+                        -WhyItMatters 'Local admin membership is a high-attention trust change. Helpdesk, LAPS, and domain join also add members.' `
+                        -Artifact 'analysis/baseline_diff.csv'
+                }
+                $def = @($diffs | Where-Object { $_.RecordType -eq 'DefenderPreference' -and [string]$_.Identity -like '*DisableRealtimeMonitoring*' })
+                if ($def.Count -gt 0) {
+                    Add-FotonFinding -Severity 'High' -Category 'Security' -Tier 1 -Title 'Baseline diff: Defender real-time monitoring setting changed' `
+                        -Observation 'DefenderPreference DisableRealtimeMonitoring changed between baselines (see baseline_diff.csv).' `
+                        -WhyItMatters 'The change is a fact. Tampering, troubleshooting, and GPO/Intune all flip this switch.' `
+                        -Artifact 'analysis/baseline_diff.csv'
+                }
+            }
+            catch { }
+        }
+
+        $hay = Join-Path $caseRoot 'analysis\external\hayabusa'
+        if (Test-Path -LiteralPath $hay) {
+            $hFiles = @(Get-ChildItem -LiteralPath $hay -Filter '*.csv' -File -ErrorAction SilentlyContinue)
+            $n = 0
+            foreach ($hf in $hFiles) {
+                try { $n += @(Import-Csv -LiteralPath $hf.FullName).Count } catch { }
+            }
+            if ($n -gt 0) {
+                Add-FotonFinding -Severity 'Medium' -Category 'EventLogs' -Tier 2 -Title 'Hayabusa reported hits on copied EVTX' `
+                    -Observation ("Hayabusa CSV under analysis/external/hayabusa contains {0} row(s). These are that tool's rule hits, not a Foton engine." -f $n) `
+                    -WhyItMatters 'Rule hits are inferences from an external hunt tool. Benign software and noisy Sigma rules are common. Name Hayabusa in the report; do not treat a hit as compromise.' `
+                    -Artifact 'analysis/external/hayabusa' `
+                    -NextStep 'Open the Hayabusa CSV, record rule IDs, and corroborate with native EVTX rows or other artifacts.'
+            }
+        }
+    }
+
     Write-FotonStatus ("Findings generated: {0}" -f $script:FotonSession.Findings.Count) 'Good'
 
     $caseRoot = $script:FotonSession.CaseRoot

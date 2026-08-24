@@ -18,6 +18,7 @@ A small C# `Add-Type` or a well-known offline tool whose output we ingest: offse
 ## Out of scope
 
 - Walking `$MFT` or unallocated clusters in `ConvertFrom-Foton*`
+- Collecting `$MFT` in Foton-Collect (use KAPE/ORC). Optional `-IncludeUsnJournal` copies `$J` only; default is `fsutil usn queryjournal` text.
 - Writing NTFS from Foton
 - Using carve output as Collect facts
 - Downloading carving tools at runtime (Analyze stays offline)

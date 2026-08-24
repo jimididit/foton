@@ -4,7 +4,7 @@ This project is designed so someone new can add a **collector**, **baseline prov
 
 ## Before you write code
 
-1. Read [AGENTS.md](../AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [USAGE.md](USAGE.md), [LAB.md](LAB.md), and **[COVERAGE.md](COVERAGE.md)** (in vs missing artifacts).
+1. Read [AGENTS.md](../AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [USAGE.md](USAGE.md), [LAB.md](LAB.md), **[COVERAGE.md](COVERAGE.md)** (in vs missing artifacts), and **[LANDSCAPE.md](LANDSCAPE.md)** (compose specialists; do not rebuild KAPE/Hayabusa/EZ Tools in PowerShell).
 2. Live Collect/Baseline on an endpoint is the flatten script (`Foton-Collect_v*_schema*.ps1` / `Foton-Baseline_v*_schema*.ps1`, plus unversioned aliases). Do not add features by editing a frozen v1 script if one remains in git.
 3. If the change is a large new capability (especially Carve/NTFS), propose it first.
 4. Prefer filling a **P0/P1** row in COVERAGE.md over a novel ASEP. Map the operator UI to the real artifact before coding.
@@ -38,7 +38,9 @@ State likely false positives in the PR (e.g. software `DisplayName` churn from p
 
 ## Add a parser
 
-Pure function over a path or byte array. Commit a small fixture under `tests/Fixtures/`. No client data.
+If EZ Tools (or Hayabusa for EVTX) already parse the format correctly, prefer **copy the artifact into the package** and document or invoke that tool on the workstation. See [LANDSCAPE.md](LANDSCAPE.md).
+
+A native `ConvertFrom-Foton*` is appropriate only when PowerShell can emit *correct* fields. Pure function over a path or byte array. Commit a small fixture under `tests/Fixtures/`. No client data. Unsupported formats get an explicit record, not guessed columns.
 
 ## Verification
 

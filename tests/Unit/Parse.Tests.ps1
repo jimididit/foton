@@ -326,3 +326,23 @@ Describe 'ConvertFrom-FotonAmcache' {
         }
     }
 }
+
+Describe 'Invoke-FotonExternalParse' {
+    It 'records NotOnPath when EZ tools are absent' {
+        $tmp = Join-Path $env:TEMP ('foton-ext-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path $tmp -ItemType Directory | Out-Null
+        try {
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $rows = @(Invoke-FotonExternalParse)
+                @($rows | Where-Object { $_.Status -eq 'NotOnPath' }).Count | Should -BeGreaterThan 0
+            }
+            Test-Path -LiteralPath (Join-Path $tmp 'analysis\external\external_parse_inventory.csv') | Should -Be $true
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

@@ -40,7 +40,22 @@ Describe 'Collect category functions (extracted)' {
         $src | Should -Match "Name 'bam_dam_user_settings'"
         $src | Should -Match "Name 'appcompatcache_export'"
         $src | Should -Match "Name 'onedrive_teams_local'"
+        $src | Should -Match "Name 'registry_hives_machine'"
+        $src | Should -Match "Name 'registry_hives_user'"
+        $src | Should -Match "Name 'usn_journal'"
+        $src | Should -Match "Name 'shortcut_and_jumplist_files'"
+        $src | Should -Match "Name 'scheduled_task_xml'"
+        $src | Should -Match "Name 'browser_databases'"
+        $src | Should -Match "Name 'host_text_logs'"
+        $src | Should -Match 'IncludeUsnJournal'
         $src | Should -Not -Match 'graph\.microsoft'
+    }
+
+    It 'exports additional EVTX channels for hunt compose' {
+        $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonEventLogCollection.ps1') -Raw
+        $src | Should -Match 'Microsoft-Windows-Bits-Client/Operational'
+        $src | Should -Match 'Microsoft-Windows-Sysmon/Operational'
+        $src | Should -Match 'Microsoft-Windows-Windows Firewall With Advanced Security/Firewall'
     }
 
     It 'adds entra_workplace_join on the System collector' {
@@ -68,6 +83,7 @@ Describe 'Collect category functions (extracted)' {
                 'Get-FotonVersion'
                 'Invoke-FotonAnalysis'
                 'Invoke-FotonCarve'
+                'Invoke-FotonExternalParse'
                 'Invoke-FotonIocMatch'
                 'Invoke-FotonParse'
                 'Invoke-FotonTriage'
