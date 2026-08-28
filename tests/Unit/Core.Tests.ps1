@@ -538,4 +538,29 @@ putty
             }
         }
     }
+
+    Describe 'Get-FotonNestedDuplicateRoot' {
+        It 'finds a case tree copied inside itself' {
+            $root = Join-Path $env:TEMP ('foton-nest-' + [guid]::NewGuid().ToString('N'))
+            $case = Join-Path $root 'Foton_HOST_20260101-000000Z'
+            $inner = Join-Path $case 'Foton_HOST_20260101-000000Z'
+            New-Item -Path (Join-Path $case '00_Collection') -ItemType Directory -Force | Out-Null
+            New-Item -Path (Join-Path $inner '00_Collection') -ItemType Directory -Force | Out-Null
+            try {
+                Get-FotonNestedDuplicateRoot -CaseRoot $case | Should -Be $inner
+            }
+            finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+
+        It 'returns nothing for a well-formed single-tree package' {
+            $root = Join-Path $env:TEMP ('foton-nest-ok-' + [guid]::NewGuid().ToString('N'))
+            $case = Join-Path $root 'Foton_HOST_20260101-000000Z'
+            New-Item -Path (Join-Path $case '00_Collection') -ItemType Directory -Force | Out-Null
+            New-Item -Path (Join-Path $case '08_Filesystem') -ItemType Directory -Force | Out-Null
+            try {
+                Get-FotonNestedDuplicateRoot -CaseRoot $case | Should -BeNullOrEmpty
+            }
+            finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+    }
 }

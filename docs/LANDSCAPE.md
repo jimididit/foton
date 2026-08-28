@@ -2,7 +2,7 @@
 
 Contributor and agent guidance: **how Foton should grow relative to specialist Windows DFIR tools.** Artifact inventory stays in [COVERAGE.md](COVERAGE.md). The public-release checklist stays in [TODO.md](TODO.md). This file is the **strategy**: what to keep, what to compose, what not to rebuild in PowerShell.
 
-Landscape snapshot: August 2026. Foton versions at the time of writing: module **1.24.0**, collect schema **1.8.0**, baseline schema **1.13.0**. Tool capabilities change; the *composition* rule does not.
+Landscape snapshot: August 2026. Written against module **1.24.0**, collect schema **1.8.0**, baseline schema **1.13.0**; current is module **1.26.0**, collect schema **1.9.0**, baseline schema **1.14.0**. Tool capabilities change; the *composition* rule does not.
 
 When you write a development plan from this document, treat the **Recommended build strategy** and **Planning constraints** sections as requirements, not suggestions.
 
@@ -85,9 +85,9 @@ Deterministic baseline hash; field-level Added/Removed/Modified with documented 
 
 | Area | Gap | Why it matters | Direction |
 |------|-----|----------------|-----------|
-| Raw artifact copies | Full hive copies, USN/`$LogFile`, browser DBs, more EVTX, optional MFT *listing* | Parse/carve and EZ Tools need **bytes**, not CSV summaries. | Collect more files (KAPE-style targets). Do not parse them in PS 5.1 on the endpoint. |
-| Analyze automation | Heuristics are live-CSV triage; parsed Prefetch/Amcache/diff rows are barely consumed | Highest ROI without new collect. COVERAGE.md already says this. | Rules that read `analysis/parsed_records.csv` and `Compare-FotonBaseline` output. Still observations, not verdicts. |
-| EVTX hunting | Capped selected IDs vs Sigma timelines | Wrong to rebuild Hayabusa in PowerShell. | Export EVTX; workstation Hayabusa/Chainsaw; ingest hits. |
+| Raw artifact copies | **Largely closed in collect 1.9.0**: machine + user hives with sidecars, LNK/jumplists, Tasks XML, browser DBs, host text logs, wider EVTX, optional USN `$J`. `$MFT` and `$LogFile` still not copied. | Parse/carve and EZ Tools need **bytes**, not CSV summaries. | Remaining: decide whether `$MFT` belongs here or stays a KAPE/ORC job. Do not parse any of it in PS 5.1 on the endpoint. |
+| Analyze automation | **Started in 1.25.0-1.26.0**: rules now read `analysis/parsed_records.csv`, `analysis/baseline_diff.csv`, and external engine output. Coverage is still thin - a handful of rules, and parsed-row rules are starved when native parsing yields no paths. | Highest ROI without new collect. COVERAGE.md already says this. | More rules over parsed rows and diffs, and rules that survive MAM-empty prefetch. Still observations, not verdicts. |
+| EVTX hunting | **Implemented in 1.25.0-1.26.0** via `Invoke-FotonExternalParse`: Hayabusa (v2/v3 `csv-timeline` and v4 `dfir-timeline`) runs on copied EVTX, output is hashed into `analysis/external/`, and hits become findings banded by the tool's own level with rule titles named. Chainsaw wiring is untested against a real binary. | Wrong to rebuild Hayabusa in PowerShell. | Verify the Chainsaw path; consider an EvtxECmd-driven timeline once EZ Tools are validated. |
 | Parse correctness | MAM Prefetch, SRUM ESE, shellbags, Shimcache *entries*, legacy Amcache `File\*` | PowerShell is the wrong runtime. | Copy + EZ Tools (or documented “unsupported,” never guessed fields). |
 | Operator packaging | Authenticode, analyze-without-clone zip, public-release lab ticks | This is what makes the tool feel “not ready,” not missing another Winlogon value. | Finish [TODO.md](TODO.md) public-release bar. |
 | ASEP completeness | Codecs, gadgets, IE BHO marked low ROI; COM too noisy for baseline | Correct product call. | Use Autoruns when hunting those families. Do not add those providers “for completeness.” |

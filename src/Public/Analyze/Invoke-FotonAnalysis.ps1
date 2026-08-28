@@ -703,30 +703,128 @@ function Invoke-FotonAnalysis {
 
         $hay = Join-Path $caseRoot 'analysis\external\hayabusa'
         if (Test-Path -LiteralPath $hay) {
-            $hFiles = @(Get-ChildItem -LiteralPath $hay -Filter '*.csv' -File -ErrorAction SilentlyContinue)
-            $n = 0
-            foreach ($hf in $hFiles) {
-                try { $n += @(Import-Csv -LiteralPath $hf.FullName).Count } catch { }
+            # A Hayabusa timeline is routinely hundreds of MB, so stream it and pull
+            # only RuleTitle and Level (fields 2 and 3, ahead of the free-text
+            # Details column). A single "it found hits" row is useless at this volume:
+            # band the hits by the tool's own level so the operator sees which rules
+            # fired, not just that something did.
+            $counts = @{}
+            $titles = @{}
+            $read = 0
+            $capped = $false
+            $maxLines = 2000000
+            foreach ($hf in @(Get-ChildItem -LiteralPath $hay -Filter '*.csv' -File -ErrorAction SilentlyContinue)) {
+                $reader = $null
+                try {
+                    $reader = [IO.StreamReader]::new($hf.FullName)
+                    $null = $reader.ReadLine()
+                    while ($null -ne ($line = $reader.ReadLine())) {
+                        $read++
+                        if ($read -gt $maxLines) { $capped = $true; break }
+                        $m = [regex]::Match($line, '^"[^"]*","(?<t>[^"]*)","(?<l>[^"]*)"')
+                        if (-not $m.Success) { continue }
+                        $lvl = $m.Groups['l'].Value.ToLowerInvariant()
+                        $ttl = $m.Groups['t'].Value
+                        if (-not $counts.ContainsKey($lvl)) {
+                            $counts[$lvl] = 0
+                            $titles[$lvl] = @{}
+                        }
+                        $counts[$lvl] = $counts[$lvl] + 1
+                        if (-not $titles[$lvl].ContainsKey($ttl)) { $titles[$lvl][$ttl] = 0 }
+                        $titles[$lvl][$ttl] = $titles[$lvl][$ttl] + 1
+                    }
+                }
+                catch { }
+                finally { if ($reader) { $reader.Dispose() } }
             }
-            if ($n -gt 0) {
-                Add-FotonFinding -Severity 'Medium' -Category 'EventLogs' -Tier 2 -Title 'Hayabusa reported hits on copied EVTX' `
-                    -Observation ("Hayabusa CSV under analysis/external/hayabusa contains {0} row(s). These are that tool's rule hits, not a Foton engine." -f $n) `
-                    -WhyItMatters 'Rule hits are inferences from an external hunt tool. Benign software and noisy Sigma rules are common. Name Hayabusa in the report; do not treat a hit as compromise.' `
+
+            $describe = {
+                param($Level)
+                $t = $titles[$Level]
+                if (-not $t) { return '' }
+                $top = @($t.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 6)
+                return (($top | ForEach-Object { "{0} ({1})" -f $_.Key, $_.Value }) -join '; ')
+            }
+            $capNote = ''
+            if ($capped) { $capNote = (" Row scan capped at {0} lines; counts are a floor, not a total." -f $maxLines) }
+
+            # Hayabusa abbreviates levels in CSV output unless -b is passed, so a
+            # timeline says "med" and "crit". Accept both spellings or whole bands
+            # silently vanish from the findings.
+            $sevBand = @(
+                @{ Levels = @('emergency', 'emer', 'critical', 'crit'); Severity = 'High'; Label = 'critical-level' }
+                @{ Levels = @('high'); Severity = 'High'; Label = 'high-level' }
+                @{ Levels = @('medium', 'med'); Severity = 'Medium'; Label = 'medium-level' }
+            )
+            foreach ($band in $sevBand) {
+                $total = 0
+                $samples = @()
+                foreach ($l in $band.Levels) {
+                    if ($counts.ContainsKey($l)) {
+                        $total += $counts[$l]
+                        $d = & $describe $l
+                        if ($d) { $samples += $d }
+                    }
+                }
+                if ($total -le 0) { continue }
+                Add-FotonFinding -Severity $band.Severity -Category 'EventLogs' -Tier 2 `
+                    -Title ("Hayabusa reported {0} rule hits on copied EVTX" -f $band.Label) `
+                    -Observation ("{0} {1} detection(s) in analysis/external/hayabusa. Top rules: {2}.{3}" -f $total, $band.Label, ($samples -join '; '), $capNote) `
+                    -WhyItMatters 'These are Hayabusa/Sigma rule hits, not a Foton engine and not a verdict. Sigma rules fire on legitimate administration, backup software, and management agents, and a Foton collection can itself trigger hive-access and script-execution rules. Judge each rule against what was expected on this host.' `
                     -Artifact 'analysis/external/hayabusa' `
-                    -NextStep 'Open the Hayabusa CSV, record rule IDs, and corroborate with native EVTX rows or other artifacts.'
+                    -NextStep 'Filter the Hayabusa CSV to these RuleTitle values, note the RuleID and Timestamp, and corroborate against process, persistence, and account artifacts before drawing any conclusion.'
+            }
+
+            $lowVol = 0
+            foreach ($l in @('low', 'info', 'informational')) {
+                if ($counts.ContainsKey($l)) { $lowVol += $counts[$l] }
+            }
+            if ($lowVol -gt 0) {
+                Add-FotonFinding -Severity 'Info' -Category 'EventLogs' -Tier 1 -Title 'Hayabusa low and informational event volume' `
+                    -Observation ("{0} low/informational Hayabusa row(s) recorded. These are mostly normal telemetry (process execution, DNS queries, file creation) and are context for a timeline, not indicators.{1}" -f $lowVol, $capNote) `
+                    -WhyItMatters 'Volume here reflects how much Sysmon/audit telemetry the host was producing. It is useful for timeline coverage and for spotting where telemetry stops.' `
+                    -Artifact 'analysis/external/hayabusa' `
+                    -NextStep 'Use these rows to bound the observable window rather than as suspicion.'
             }
         }
     }
 
     Write-FotonStatus ("Findings generated: {0}" -f $script:FotonSession.Findings.Count) 'Good'
 
+    # Collect already ran these same rules on the endpoint before zipping, so a
+    # workstation re-run over an untouched package reproduces that report rather
+    # than adding detection. Say so instead of letting it look like new analysis.
     $caseRoot = $script:FotonSession.CaseRoot
+    if ($caseRoot -and (Test-Path -LiteralPath $caseRoot)) {
+        $endpointFindings = Join-Path $caseRoot '00_Collection\findings.csv'
+        $extraInputs = @(
+            (Join-Path $caseRoot 'analysis\parsed_records.csv')
+            (Join-Path $caseRoot 'analysis\baseline_diff.csv')
+            (Join-Path $caseRoot 'analysis\external')
+        )
+        $haveExtra = $false
+        foreach ($p in $extraInputs) {
+            if (Test-Path -LiteralPath $p) { $haveExtra = $true }
+        }
+        if ((Test-Path -LiteralPath $endpointFindings) -and -not $haveExtra) {
+            Write-FotonStatus 'These heuristics already ran on the endpoint during Collect (00_Collection\findings.csv), so this run reproduces that report rather than adding detection. New findings come from Invoke-FotonParse, Invoke-FotonExternalParse (compose), Invoke-FotonIocMatch, or Compare-FotonBaseline - then re-run analyze.' 'Warn'
+        }
+    }
+
     if ($caseRoot -and (Test-Path -LiteralPath $caseRoot)) {
         $analysisDir = Join-Path $caseRoot 'analysis'
         New-Item -Path $analysisDir -ItemType Directory -Force | Out-Null
         $findingsPath = Join-Path $analysisDir 'findings.csv'
         if ($script:FotonSession.Findings.Count -gt 0) {
             $script:FotonSession.Findings | Export-Csv -Path $findingsPath -NoTypeInformation -Encoding UTF8
+            # For a ZIP the case root is a temp extraction the operator never sees.
+            # Drop a second copy beside the ZIP so the findings survive cleanup.
+            $pkgMeta = $script:FotonSession.Package
+            if ($pkgMeta -and $pkgMeta.Kind -eq 'Zip' -and $pkgMeta.SourcePath) {
+                $stem = [IO.Path]::GetFileNameWithoutExtension($pkgMeta.SourcePath)
+                $beside = Join-Path (Split-Path -Parent $pkgMeta.SourcePath) ($stem + '_findings.csv')
+                $script:FotonSession.Findings | Export-Csv -Path $beside -NoTypeInformation -Encoding UTF8
+            }
         }
     }
 }

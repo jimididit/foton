@@ -12,7 +12,7 @@
 #
 @{
     RootModule        = 'Foton.psm1'
-    ModuleVersion     = '1.25.0'
+    ModuleVersion     = '1.26.0'
     GUID              = 'b7e4c1a2-8d3f-4a91-9c6e-2f0d5a8b1e73'
     Author            = 'JDI Consulting'
     CompanyName       = 'JDI Consulting'
@@ -60,7 +60,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = '1.25.0: Collect hive/LNK/EVTX/browser copies; optional USN; Invoke-FotonExternalParse; WdacApplockerPolicy baseline; analyze parsed_records + baseline_diff.'
+            ReleaseNotes = '1.26.0: ZIP analyze writes <zip-stem>_Report.html/_findings.csv beside the ZIP; New-FotonReport returns its path. Detect and skip packages that contain a copy of themselves. Analyze says when it is reproducing the endpoint Collect report. Hayabusa v4 (dfir-timeline, -w) supported and hits are banded by level with rule names instead of one generic row.'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.

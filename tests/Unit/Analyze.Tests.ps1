@@ -81,6 +81,45 @@ Describe 'Get-FotonPackage and offline analysis' {
         }
     }
 
+    It 'bands Hayabusa hits by level and understands abbreviated level names' {
+        $tmp = Join-Path $env:TEMP ('foton-haya-' + [guid]::NewGuid().ToString('N'))
+        $hay = Join-Path $tmp 'analysis\external\hayabusa'
+        New-Item -Path $hay -ItemType Directory -Force | Out-Null
+        try {
+            # Hayabusa abbreviates: crit/med, not critical/medium.
+            $lines = @(
+                '"Timestamp","RuleTitle","Level","Computer","Channel","EventID","RecordID","Details","ExtraFieldInfo","RuleID"'
+                '"2026-01-01 00:00:00 +00:00","Nasty Rule","crit","H","Sec",1,1,"d, with comma","x","id1"'
+                '"2026-01-01 00:00:01 +00:00","Dumping Hives","high","H","Sec",1,2,"d","x","id2"'
+                '"2026-01-01 00:00:02 +00:00","Perms Changed","med","H","Sec",1,3,"d","x","id3"'
+                '"2026-01-01 00:00:03 +00:00","Proc Exec","info","H","Sec",1,4,"d","x","id4"'
+            )
+            Set-Content -LiteralPath (Join-Path $hay 'hayabusa.csv') -Value $lines -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+
+                $crit = @($script:FotonSession.Findings | Where-Object { $_.Title -like '*critical-level*' })
+                $crit | Should -HaveCount 1
+                $crit[0].Severity | Should -Be 'High'
+                $crit[0].Observation | Should -Match 'Nasty Rule'
+
+                $med = @($script:FotonSession.Findings | Where-Object { $_.Title -like '*medium-level*' })
+                $med | Should -HaveCount 1
+                $med[0].Severity | Should -Be 'Medium'
+
+                @($script:FotonSession.Findings | Where-Object { $_.Title -like '*low and informational*' }) |
+                    Should -HaveCount 1
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'fires on baseline_diff service PathName and not on DisplayVersion' {
         $tmp = Join-Path $env:TEMP ('foton-diff-' + [guid]::NewGuid().ToString('N'))
         New-Item -Path (Join-Path $tmp 'analysis') -ItemType Directory -Force | Out-Null

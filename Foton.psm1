@@ -47,8 +47,23 @@ Initialize-FotonSession
 
 $manifestPath = Join-Path $script:FotonModuleRoot 'Foton.psd1'
 if (Test-Path -LiteralPath $manifestPath) {
-    $man = Import-PowerShellDataFile -LiteralPath $manifestPath
-    $script:FotonSession.Version = [string]$man.ModuleVersion
+    # Import-PowerShellDataFile is a Utility cmdlet and is not always resolvable
+    # from module scope during import. A missing version stamp must never fail
+    # the import, so fall back to reading ModuleVersion out of the manifest text.
+    $ver = ''
+    try {
+        $man = Import-PowerShellDataFile -LiteralPath $manifestPath -ErrorAction Stop
+        $ver = [string]$man.ModuleVersion
+    }
+    catch {
+        try {
+            $raw = [IO.File]::ReadAllText($manifestPath)
+            $m = [regex]::Match($raw, "ModuleVersion\s*=\s*'([^']+)'")
+            if ($m.Success) { $ver = $m.Groups[1].Value }
+        }
+        catch { }
+    }
+    if ($ver) { $script:FotonSession.Version = $ver }
 }
 
 # Public exports are declared in Foton.psd1 (FunctionsToExport).

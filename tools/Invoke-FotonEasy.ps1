@@ -73,8 +73,8 @@ switch ($cmd) {
         if (-not $Target) { throw 'Usage: Foton.cmd analyze <case-folder-or-zip>' }
         Get-FotonPackage -Path $Target | Out-Null
         Invoke-FotonAnalysis
-        New-FotonReport
-        Write-Host "  Report: $(Join-Path $Target 'Foton_Report.html')" -ForegroundColor Green
+        $reportPath = New-FotonReport
+        Write-Host "  Report: $reportPath" -ForegroundColor Green
     }
     'baseline' {
         if (-not $Target) { throw 'Usage: Foton.cmd baseline <output-folder-or.json>' }

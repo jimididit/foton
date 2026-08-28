@@ -29,9 +29,22 @@ function New-FotonReport {
     if ($null -eq $script:FotonSession -or $null -eq $script:FotonSession.Data) {
         throw 'No package data loaded. Call Get-FotonPackage (and typically Invoke-FotonAnalysis) first.'
     }
+    # A ZIP package is extracted to a temp CaseRoot that the operator never sees and
+    # that gets cleaned up. Default beside the ZIP instead, same as Invoke-FotonParse.
+    $fromZip = $false
     if (-not $Path) {
-        if (-not $script:FotonSession.CaseRoot) { throw 'Specify -Path or load a package with a CaseRoot.' }
-        $Path = Join-Path $script:FotonSession.CaseRoot 'Foton_Report.html'
+        $pkgMeta = $script:FotonSession.Package
+        if ($pkgMeta -and $pkgMeta.Kind -eq 'Zip' -and $pkgMeta.SourcePath) {
+            $fromZip = $true
+            $stem = [IO.Path]::GetFileNameWithoutExtension($pkgMeta.SourcePath)
+            $Path = Join-Path (Split-Path -Parent $pkgMeta.SourcePath) ($stem + '_Report.html')
+        }
+        elseif ($script:FotonSession.CaseRoot) {
+            $Path = Join-Path $script:FotonSession.CaseRoot 'Foton_Report.html'
+        }
+        else {
+            throw 'Specify -Path or load a package with a CaseRoot.'
+        }
     }
     Write-FotonStatus 'Building HTML overview report' 'Step'
 
@@ -307,6 +320,40 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
     }
     $null = $sb.AppendLine('</table>')
 
+    # ---- External tool passes (compose) ----
+    # Methodology disclosure: the report must say which third-party engines touched
+    # this package, whether they ran, and the hash of what they produced. Their hits
+    # already appear as findings; this section is provenance, not detection.
+    if ($script:FotonSession.CaseRoot) {
+        $invPath = Join-Path $script:FotonSession.CaseRoot 'analysis\external\external_parse_inventory.csv'
+        if (Test-Path -LiteralPath $invPath) {
+            $inv = @()
+            try { $inv = @(Import-Csv -LiteralPath $invPath) } catch { }
+            if ($inv.Count -gt 0) {
+                $ran = @($inv | Where-Object { $_.Status -eq 'Copied' })
+                $null = $sb.AppendLine('<h2 id="sec-external">External Tool Passes<small>who parsed what, and the hash of their output</small></h2>')
+                $null = $sb.AppendLine("<p class=""dim"">Third-party engines run on <b>copied</b> package files only. Their rule hits are that engine's inferences, named to the tool in the findings above - not a Foton verdict. Tools shown as NotOnPath are a coverage gap on this workstation, not a parse failure: $(ConvertTo-FotonSafeHtml ([string]$ran.Count)) of $(ConvertTo-FotonSafeHtml ([string]$inv.Count)) inventory row(s) produced output.</p>")
+                $null = $sb.AppendLine('<table><tr><th>Tool</th><th>Status</th><th>Output</th><th>SHA-256</th><th>Note</th></tr>')
+                foreach ($row in $inv) {
+                    $cls = 'dim'
+                    if ($row.Status -eq 'Copied') { $cls = 'ok' }
+                    elseif ($row.Status -eq 'ToolError') { $cls = 'bad' }
+                    elseif ($row.Status -eq 'NoInput' -or $row.Status -eq 'NoOutput') { $cls = 'warn' }
+                    $shortHash = [string]$row.SHA256
+                    if ($shortHash.Length -gt 16) { $shortHash = $shortHash.Substring(0, 16) + '...' }
+                    $outCell = [string]$row.DestRelative
+                    if ($outCell) {
+                        $link = ($outCell -replace '\\', '/')
+                        $outCell = "<a href=""$(ConvertTo-FotonSafeHtml $link)"">$(ConvertTo-FotonSafeHtml $outCell)</a>"
+                    }
+                    else { $outCell = '<span class="dim">-</span>' }
+                    $null = $sb.AppendLine("<tr><td>$(ConvertTo-FotonSafeHtml $row.Tool)</td><td class=""$cls"">$(ConvertTo-FotonSafeHtml $row.Status)</td><td>$outCell</td><td class=""dim"">$(ConvertTo-FotonSafeHtml $shortHash)</td><td>$(ConvertTo-FotonSafeHtml $row.Note)</td></tr>")
+                }
+                $null = $sb.AppendLine('</table>')
+            }
+        }
+    }
+
     if ($script:FotonSession.Errors.Count -gt 0) {
         $null = $sb.AppendLine('<h2 id="sec-errors">Collection Errors<small>gaps to disclose in any report built from this data</small></h2><table><tr><th>Task</th><th>Error</th></tr>')
         foreach ($e in $script:FotonSession.Errors) {
@@ -335,6 +382,11 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
 <li><b>No anti-rootkit capability.</b> All data is gathered through the operating system''s own APIs. Kernel-level tampering could render any of it unreliable.</li>
 <li><b>Standard-user coverage.</b> If this package was collected without Administrator rights, the Security log, Prefetch copies, Amcache, SRUM, VSS, secedit/auditpol, and other users'' artifacts were skipped by design. See 00_Collection/collection_coverage.json. Do not read those gaps as a clean host.</li>
 <li><b>Timestamps.</b> All times are UTC as reported by this host. Verify the host clock against the time source data before building a timeline, and note that file MACB times are trivially modifiable.</li>
+'@)
+    if ($fromZip) {
+        $null = $sb.AppendLine('<li><b>Rendered from a ZIP.</b> This report sits beside the source ZIP, not inside the case folder, so relative artifact links such as 06_Security_Posture/defender_status.json do not resolve from here. Extract the ZIP and re-run analyze against the folder if you need those links.</li>')
+    }
+    $null = $sb.AppendLine(@'
 </ul>
 </details>
 '@)
@@ -347,5 +399,6 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
 
     $sb.ToString() | Out-File -FilePath $Path -Encoding UTF8
     Write-FotonStatus "Report written: $Path" 'Good'
+    return $Path
 }
 

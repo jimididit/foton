@@ -114,7 +114,7 @@ function Invoke-FotonTriage {
 
     Write-FotonManifestFiles
     $reportPath = Join-Path $script:FotonSession.CaseRoot 'Foton_Report.html'
-    New-FotonReport -Path $reportPath
+    New-FotonReport -Path $reportPath | Out-Null
     $artifactCount = Write-FotonArtifactHashes
 
     $zipPath = $null

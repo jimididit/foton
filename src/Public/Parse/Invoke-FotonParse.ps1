@@ -72,6 +72,10 @@ function Invoke-FotonParse {
         $files = @($single)
     }
     elseif ($script:FotonSession.CaseRoot) {
+        # A package that contains a copy of itself would otherwise parse every
+        # artifact twice and report double the rows for the same evidence.
+        $skip = $null
+        if ($script:FotonSession.Package) { $skip = [string]$script:FotonSession.Package['NestedDuplicate'] }
         $files = @(Get-ChildItem -LiteralPath $script:FotonSession.CaseRoot -Recurse -File -ErrorAction SilentlyContinue |
                 Where-Object {
                     ($_.Extension -match '\.(pf|lnk|evtx)$' -or
@@ -79,7 +83,8 @@ function Invoke-FotonParse {
                      $_.Name -like '*.customDestinations-ms' -or
                      $_.Name -ieq 'Amcache.hve' -or
                      ($_.Extension -ieq '.hve' -and $_.Directory.Name -ieq 'amcache')) -and
-                    $_.DirectoryName -notmatch '[\\/]analysis([\\/]|$)'
+                    $_.DirectoryName -notmatch '[\\/]analysis([\\/]|$)' -and
+                    (-not $skip -or -not $_.FullName.StartsWith($skip, [StringComparison]::OrdinalIgnoreCase))
                 })
     }
     else {

@@ -9,7 +9,7 @@ Foton has **two machines**. Mixing them is what feels like too much PowerShell.
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-Current stamps (from `Foton.psd1`): module **1.25.0**, collect schema **1.9.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+Current stamps (from `Foton.psd1`): module **1.26.0**, collect schema **1.9.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
 
 ---
 
@@ -24,14 +24,14 @@ On a trusted box, rebuild after Collect/Baseline source changes:
 
 That writes a **versioned** leaf and an unversioned alias (same bytes):
 
-- `dist\Foton-Collect_v1.25.0_schema1.9.0.ps1` and `dist\Foton-Collect.ps1`
-- `dist\Foton-Baseline_v1.25.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
+- `dist\Foton-Collect_v1.26.0_schema1.9.0.ps1` and `dist\Foton-Collect.ps1`
+- `dist\Foton-Baseline_v1.26.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
 
 Copy **one** file to the target (USB, RMM, email). Prefer the versioned leaf so the module and schema stay in the filename.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.25.0_schema1.9.0.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.25.0_schema1.14.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.26.0_schema1.9.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.26.0_schema1.14.0.ps1
 ```
 
 Default `-OutputPath` is the current user’s **Desktop**. Open `Foton_Report.html` or `Foton_Baseline.html` **inside** the new folder. Send **ZIP + `*_PACKAGE_HASH.txt`** (or the whole folder). HTML alone is not the package.
@@ -101,11 +101,13 @@ Foton.cmd carve    D:\blob.bin
 | `compare` | Diff two baselines | Table + `Foton_BaselineCompare.html` beside the second JSON |
 | `parse` | Offline Prefetch / LNK / jumplist / EVTX / Amcache | `analysis\parsed_records.csv`, `analysis\Foton_Parse.html` |
 | `compose` | If EZ Tools / Hayabusa / Chainsaw are on PATH, run them on copied files | `analysis\external\<tool>\` hashed CSV; inventory CSV. Native parse if missing |
-| `analyze` | Load package, run heuristics, write HTML | `Foton_Report.html`, `analysis\findings.csv` |
+| `analyze` | Load package, run heuristics, write HTML | Case folder: `Foton_Report.html`, `analysis\findings.csv`. ZIP: `<zip-stem>_Report.html` + `<zip-stem>_findings.csv` **beside the ZIP** |
 | `ioc` | Match a text/CSV/JSON IOC list to the package | Match table (Tier 2 hits) |
 | `carve` | MZ/PE signature scan of a blob (capped) | Hit table. Not NTFS unallocated |
 
 Parse HTML is **not** findings. Analyze HTML is **not** a parsed artifact dump. Re-reporting does not rewrite collect `hashes.csv`.
+
+Pointing `analyze`, `parse`, or `compose` at a **ZIP** extracts it to a temp folder that is not preserved, so those commands write their reports next to the ZIP instead. The report's relative artifact links (`06_Security_Posture\...`) only resolve when you analyze an **extracted case folder** — the HTML says so in its limitations section.
 
 ---
 
@@ -188,6 +190,10 @@ New-FotonReport
 ```
 
 Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are inventory rows (`NotOnPath`), not failures. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. Copy `Foton-Collect.ps1` does not parse Prefetch/EVTX/hives on the endpoint.
+
+Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard), because without it the tool waits for keyboard input and compose looks hung. Rules are loaded from the `rules\` folder beside the binary, so keep the release layout intact rather than copying a lone `hayabusa.exe` onto PATH. Findings are banded by Hayabusa's own level with the top rule titles named; note that a Foton collection can itself trigger hive-access and script-execution rules.
+
+Why this matters for `analyze`: **Collect already ran the heuristics on the endpoint**, so `analyze` on an untouched package reproduces `00_Collection\findings.csv` rather than adding detection, and it now says so. Parse, compose, `ioc`, and baseline compare are what add new findings — run them, then analyze again.
 
 ### Analyze, IOC, report, carve
 

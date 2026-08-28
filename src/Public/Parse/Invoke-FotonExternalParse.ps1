@@ -74,7 +74,27 @@ function Invoke-FotonExternalParse {
             } }
         @{ Tool = 'RECmd'; Names = @('RECmd.exe', 'RECmd'); NeedDir = $hives; Args = { param($exe, $in, $out) @('-d', $in, '--csv', $out, '--csvf', 'recmd.csv') } }
         @{ Tool = 'Hayabusa'; Names = @('hayabusa.exe', 'hayabusa'); NeedDir = $evtx; Args = { param($exe, $in, $out)
-                @( 'csv-timeline', '-d', $in, '-o', (Join-Path $out 'hayabusa.csv'), '-q')
+                # v4 renamed csv-timeline to dfir-timeline. Probe the built-in help
+                # rather than guessing, so both generations work.
+                $sub = 'dfir-timeline'
+                try {
+                    $help = & $exe '--help' 2>&1 | Out-String
+                    if ($help -match 'csv-timeline') { $sub = 'csv-timeline' }
+                }
+                catch { }
+                # -w skips the interactive rule wizard; without it the process waits
+                # forever for keyboard input and the compose step looks hung.
+                # Rules resolve relative to the working directory, so point -r/-c at
+                # the install tree next to the binary.
+                $exeDir = Split-Path -Parent $exe
+                $a = @($sub, '-d', $in, '-o', (Join-Path $out 'hayabusa.csv'), '-w', '-C')
+                $rules = Join-Path $exeDir 'rules'
+                if (Test-Path -LiteralPath $rules) {
+                    $a += @('-r', $rules)
+                    $rcfg = Join-Path $rules 'config'
+                    if (Test-Path -LiteralPath $rcfg) { $a += @('-c', $rcfg) }
+                }
+                $a
             } }
         @{ Tool = 'Chainsaw'; Names = @('chainsaw.exe', 'chainsaw'); NeedDir = $evtx; Args = { param($exe, $in, $out)
                 @( 'dump', $in, '-o', (Join-Path $out 'chainsaw'))
