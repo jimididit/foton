@@ -110,6 +110,16 @@ if ($parseErrors -and $parseErrors.Count -gt 0) {
     throw "Generated $OutputPath has parse errors."
 }
 
+# See Build-Standalone.ps1: ParseFile does not invoke AMSI, so check the load path
+# before publishing under the stable alias name.
+$amsiCheck = Join-Path $PSScriptRoot 'Test-FotonAmsiLoad.ps1'
+if (Test-Path -LiteralPath $amsiCheck) {
+    & $amsiCheck -Path $OutputPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Generated $OutputPath is blocked by antivirus at load time. It would fail on the endpoint."
+    }
+}
+
 if ($aliasPath) {
     Copy-Item -LiteralPath $OutputPath -Destination $aliasPath -Force
 }

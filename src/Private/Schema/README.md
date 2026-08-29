@@ -28,7 +28,16 @@ That inventory (use cases, Collect vs Baseline, ASEP gaps, parse backlog) is
 | Add a finding property | FindingsSchemaVersion |
 | Only document a *planned* provider | Nothing - edit COVERAGE.md |
 
-Collect packages: **1.9.0** (registry hive / LNK / jumplist / task XML / browser DB / host log copies + optional USN + expanded EVTX + prior Prefetch/Amcache/SRUM). Baseline **1.14.0** (WdacApplockerPolicy).
+Collect packages: **1.10.0** (`SuspiciousHits` / `SuspiciousCmdHits` are now written empty - the columns remain, but the matching moved to Analyze; see below). **1.9.0** added registry hive / LNK / jumplist / task XML / browser DB / host log copies + optional USN + expanded EVTX + prior Prefetch/Amcache/SRUM. Baseline **1.14.0** (WdacApplockerPolicy).
+
+The suspicious-command pattern list is deliberately **not** embedded in the Collect
+flatten: inlined as a literal array it is a contiguous list of credential-theft and
+LOLBin strings, and Defender AMSI blocks the whole file as
+`Trojan:PowerShell/PSAttackTool.A` at load. Collect preserves the raw
+`Command` / `Actions` / `CommandLine` values; `Invoke-FotonAnalysis` derives the hits
+on the workstation and raises an Info visibility-gap finding when no pattern list is
+loaded. Packages at collect schema &lt; 1.10.0 carry endpoint-computed hits, and those
+are trusted as-is so old cases keep reproducing.
 
 Empty tables are allowed; empty *because we never mapped the artifact* (Settings
 startup vs Startup folder) is a coverage bug, not a schema event, until the

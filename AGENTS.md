@@ -186,7 +186,17 @@ Invoke-ScriptAnalyzer -Path .\src -Recurse -Severity Error,Warning |
 # 4. After Collect/Baseline source changes: rebuild flatten, run on a VM
 .\build\Build-Standalone.ps1
 .\build\Build-BaselineStandalone.ps1
+
+# 5. AMSI load check - step 1 CANNOT catch this. ParseFile reads the file directly
+# and never invokes AMSI, so an embedded list of LOLBin/credential-theft strings
+# passes every check above and is still blocked on the endpoint. Both builds run
+# this automatically; run it standalone when changing embedded data.
+.\build\Test-FotonAmsiLoad.ps1 -Path .\dist\Foton-Collect.ps1
 ```
+
+Never respond to an AMSI block by encoding, splitting, or obfuscating strings. Move
+the interpretation to the workstation Analyze layer (where it belongs anyway) and
+leave the flatten readable.
 
 ## Working style
 

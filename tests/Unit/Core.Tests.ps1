@@ -139,6 +139,43 @@ InModuleScope Foton {
         }
     }
 
+    Describe 'Resolve-FotonSuspiciousHits' {
+        BeforeEach { Initialize-FotonSession }
+
+        It 'computes hits from raw text when the collected column is empty' {
+            # Collect schema 1.10.0 onward: the endpoint writes the column empty
+            # because the pattern list cannot ship in the flatten.
+            $row = [PSCustomObject]@{ SuspiciousCmdHits = ''; CommandLine = 'powershell -encodedcommand ABC' }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousCmdHits' -TextProperty 'CommandLine' |
+                Should -Match 'encodedcommand'
+        }
+
+        It 'trusts hits already stored by an older endpoint collection' {
+            $row = [PSCustomObject]@{ SuspiciousHits = 'legacy-hit'; Command = 'notepad.exe' }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousHits' -TextProperty 'Command' |
+                Should -Be 'legacy-hit'
+        }
+
+        It 'returns empty for a benign row' {
+            $row = [PSCustomObject]@{ SuspiciousHits = ''; Command = 'notepad.exe C:\temp\notes.txt' }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousHits' -TextProperty 'Command' |
+                Should -BeNullOrEmpty
+        }
+
+        It 'returns empty when no pattern list is loaded, as inside the flatten' {
+            $script:FotonSession.SuspiciousCommandPatterns = @()
+            $row = [PSCustomObject]@{ SuspiciousCmdHits = ''; CommandLine = 'powershell -encodedcommand ABC' }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousCmdHits' -TextProperty 'CommandLine' |
+                Should -BeNullOrEmpty
+        }
+
+        It 'tolerates a row missing both properties' {
+            $row = [PSCustomObject]@{ Other = 1 }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousHits' -TextProperty 'Command' |
+                Should -BeNullOrEmpty
+        }
+    }
+
     Describe 'Get-FotonArtifactPath' {
         BeforeEach { Initialize-FotonSession }
         It 'builds a relative package path' {

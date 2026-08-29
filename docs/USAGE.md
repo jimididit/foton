@@ -9,7 +9,7 @@ Foton has **two machines**. Mixing them is what feels like too much PowerShell.
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-Current stamps (from `Foton.psd1`): module **1.26.0**, collect schema **1.9.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+Current stamps (from `Foton.psd1`): module **1.27.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
 
 ---
 
@@ -24,15 +24,34 @@ On a trusted box, rebuild after Collect/Baseline source changes:
 
 That writes a **versioned** leaf and an unversioned alias (same bytes):
 
-- `dist\Foton-Collect_v1.26.0_schema1.9.0.ps1` and `dist\Foton-Collect.ps1`
-- `dist\Foton-Baseline_v1.26.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
+- `dist\Foton-Collect_v1.27.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
+- `dist\Foton-Baseline_v1.27.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
 
 Copy **one** file to the target (USB, RMM, email). Prefer the versioned leaf so the module and schema stay in the filename.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.26.0_schema1.9.0.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.26.0_schema1.14.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.27.0_schema1.10.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.27.0_schema1.14.0.ps1
 ```
+
+### If antivirus blocks the collector
+
+Endpoint security products scan PowerShell content at load through AMSI, and DFIR
+tooling reads like attack tooling. If the collector is blocked, you will see a
+scanner alert naming the script and PowerShell will refuse to run it with *"This
+script contains malicious content and has been blocked by your antivirus software."*
+
+Foton no longer embeds its suspicious-command pattern list in the flatten for exactly
+this reason (Defender flagged it as `Trojan:PowerShell/PSAttackTool.A`), so a current
+build should load cleanly. If your product still blocks it:
+
+- Verify locally before deployment: `.\build\Test-FotonAmsiLoad.ps1 -Path .\dist\Foton-Collect.ps1`. This compiles the script through AMSI without collecting anything.
+- Report it to your vendor as a false positive, and attach the package hash.
+- If your engagement authority permits it, add a **scoped, temporary** exclusion for the collector path on the target, and record it in the case notes - it changes the host's security posture during collection, which belongs in the methodology disclosure.
+- Do not modify the script to evade the scanner. An obfuscated collector is not defensible in a report, and the output would no longer match the published package hash.
+
+A block is also itself an observation worth recording: it tells you the host had an
+active scanner at collection time.
 
 Default `-OutputPath` is the current user’s **Desktop**. Open `Foton_Report.html` or `Foton_Baseline.html` **inside** the new folder. Send **ZIP + `*_PACKAGE_HASH.txt`** (or the whole folder). HTML alone is not the package.
 

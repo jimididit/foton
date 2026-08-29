@@ -18,6 +18,28 @@ Describe 'Collect category functions (extracted)' {
         }
     }
 
+    It 'does not interpret command text during collection' {
+        # Collectors never interpret, and the pattern list cannot ship in the flatten
+        # (Defender AMSI blocks it as Trojan:PowerShell/PSAttackTool.A). Matching
+        # belongs to Invoke-FotonAnalysis.
+        foreach ($leaf in @('Invoke-FotonProcessCollection.ps1', 'Invoke-FotonPersistenceCollection.ps1')) {
+            $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\..\src\Public\Collect\$leaf") -Raw
+            $src | Should -Not -Match 'Test-FotonSuspiciousCommand'
+        }
+    }
+
+    It 'keeps the suspicious-command pattern list out of the generated flatten' {
+        $build = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\build\Build-Standalone.ps1') -Raw
+        $build | Should -Match 'SuspiciousCommandPatterns\s*=\s*@\(\)'
+
+        $flat = Join-Path $PSScriptRoot '..\..\dist\Foton-Collect.ps1'
+        if (Test-Path -LiteralPath $flat) {
+            # One representative string from the blocked array. Its presence means the
+            # embed came back and the collector will be quarantined on the endpoint.
+            (Get-Content -LiteralPath $flat -Raw) | Should -Not -Match 'sekurlsa'
+        }
+    }
+
     It 'adds named persistence CSVs for CmdAutoRun, Session Manager, KnownDLLs, Winsock, Active Setup' {
         $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonPersistenceCollection.ps1') -Raw
         $src | Should -Match "Name 'cmd_autorun'"

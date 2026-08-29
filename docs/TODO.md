@@ -24,7 +24,7 @@ Propose before building.
 - **TUI / GUI workstation shell** - wrap Collect/Baseline/open HTML. Does **not** replace one-file IR scripts. No risk score. Prefer TUI before a signed exe. Blocked on public-release bar being mostly green.
 - **MAM Prefetch inflate** - Win10+ `.pf` names stay empty until we inflate correctly.
 - **NTFS unallocated carve** - not in PowerShell; see [CARVE.md](CARVE.md).
-- **Authenticode** for flatten scripts / ExecutionPolicy story.
+- **Authenticode** for flatten scripts / ExecutionPolicy story. Note that signing does **not** prevent AMSI content scanning: the 1.27.0 Defender block was on script content, not trust.
 - **Analyze zip** that does not require cloning the repo.
 - **OptionalFeature / Appx** as baseline - noisy on consumer SKUs.
 - **Codecs, gadgets, IE BHO** - low ROI.
@@ -42,6 +42,8 @@ Do not treat a GitHub release as ready for first-time DFIR users until most of t
 - [x] Workstation wrapper: `Foton.cmd` / USAGE.md
 - [x] Desktop default `-OutputPath` on flatten (double-click still blocked by unsigned ExecutionPolicy)
 - [ ] Documented Authenticode / ExecutionPolicy story
+- [x] Collector loads past AMSI on a Defender-protected host (1.27.0; guarded by `build/Test-FotonAmsiLoad.ps1`, operator guidance in USAGE.md)
+- [ ] Verify the collector loads under at least one non-Microsoft endpoint product before release
 - [ ] Installer or zip that analyzes a case without cloning the repo
 
 **Lab (admin + standard user)**

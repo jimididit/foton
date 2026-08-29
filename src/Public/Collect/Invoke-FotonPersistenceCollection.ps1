@@ -23,7 +23,8 @@ function Invoke-FotonPersistenceCollection {
             foreach ($v in (Get-FotonRegValueList -Path $k)) {
                 $rows += [PSCustomObject]@{
                     Scope = 'Machine'; User = 'N/A'; Key = $v.Key; ValueName = $v.Name; Command = $v.Value
-                    SuspiciousHits = (Test-FotonSuspiciousCommand -Text $v.Value)
+                    # Analyze derives this from Command; patterns cannot ship in the flatten.
+                    SuspiciousHits = ''
                     UserWritableTarget = (Test-FotonUserWritablePath -Path $v.Value)
                 }
             }
@@ -41,7 +42,7 @@ function Invoke-FotonPersistenceCollection {
                 foreach ($v in (Get-FotonRegValueList -Path $full)) {
                     $rows += [PSCustomObject]@{
                         Scope = 'User'; User = $hiveRoot.UserName; Key = $v.Key; ValueName = $v.Name; Command = $v.Value
-                        SuspiciousHits = (Test-FotonSuspiciousCommand -Text $v.Value)
+                        SuspiciousHits = ''
                         UserWritableTarget = (Test-FotonUserWritablePath -Path $v.Value)
                     }
                 }
@@ -111,7 +112,7 @@ function Invoke-FotonPersistenceCollection {
                     LastResult     = if ($info) { $info.LastTaskResult } else { '' }
                     NextRunTime    = if ($info) { [string]$info.NextRunTime } else { '' }
                     Description    = $t.Description
-                    SuspiciousHits = (Test-FotonSuspiciousCommand -Text $actionText)
+                    SuspiciousHits = ''
                     UserWritableTarget = (Test-FotonUserWritablePath -Path $exePath)
                     SHA256         = (Get-FotonSafeHash -Path $exePath)
                 }

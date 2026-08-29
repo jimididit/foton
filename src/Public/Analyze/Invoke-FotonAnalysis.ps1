@@ -246,10 +246,13 @@ function Invoke-FotonAnalysis {
                 -Artifact (Get-FotonArtifactPath 'Processes' 'running_processes' 'csv') `
                 -NextStep 'Submit the SHA-256 values in the artifact to threat intelligence, and check parent process and creation time for each.'
         }
-        $suspCmd = @($procs | Where-Object { $_.SuspiciousCmdHits })
+        $suspCmd = @($procs | ForEach-Object {
+                $hits = Resolve-FotonSuspiciousHits -Row $_ -StoredProperty 'SuspiciousCmdHits' -TextProperty 'CommandLine'
+                if ($hits) { [PSCustomObject]@{ Name = $_.Name; Hits = $hits } }
+            })
         if ($suspCmd.Count -gt 0) {
             Add-FotonFinding -Severity 'High' -Category 'Processes' -Tier 2 -Title 'Running process command lines contain high-risk patterns' `
-                -Observation ("{0} process(es) matched: {1}." -f $suspCmd.Count, (ConvertTo-FotonSample ($suspCmd | ForEach-Object { "$($_.Name) [$($_.SuspiciousCmdHits)]" }))) `
+                -Observation ("{0} process(es) matched: {1}." -f $suspCmd.Count, (ConvertTo-FotonSample ($suspCmd | ForEach-Object { "$($_.Name) [$($_.Hits)]" }))) `
                 -WhyItMatters 'Patterns such as encoded commands, in-memory download-and-execute, and shadow copy deletion are heavily used in intrusions. They also appear in legitimate management tooling, so each match needs to be read in context.' `
                 -Artifact (Get-FotonArtifactPath 'Processes' 'running_processes' 'csv') `
                 -NextStep 'Decode any base64 command lines and review the full CommandLine column in the artifact before drawing conclusions.'
@@ -271,7 +274,9 @@ function Invoke-FotonAnalysis {
 
     $psHist = $script:FotonSession.Data['powershell_console_history']
     if ($psHist) {
-        $flagged = @($psHist | Where-Object { $_.SuspiciousHits })
+        $flagged = @($psHist | Where-Object {
+                Resolve-FotonSuspiciousHits -Row $_ -StoredProperty 'SuspiciousHits' -TextProperty 'Command'
+            })
         if ($flagged.Count -gt 0) {
             Add-FotonFinding -Severity 'High' -Category 'Processes' -Tier 2 -Title 'PowerShell console history contains high-risk commands' `
                 -Observation ("{0} matching line(s) across profiles. Sample: {1}." -f $flagged.Count, (ConvertTo-FotonSample ($flagged | ForEach-Object { "$($_.User): $($_.Command)" }) 4)) `
@@ -284,7 +289,10 @@ function Invoke-FotonAnalysis {
     # ---------- Persistence ----------
     $autoruns = $script:FotonSession.Data['autorun_registry_keys']
     if ($autoruns) {
-        $badRuns = @($autoruns | Where-Object { $_.SuspiciousHits -or $_.UserWritableTarget -eq $true })
+        $badRuns = @($autoruns | Where-Object {
+                $_.UserWritableTarget -eq $true -or
+                (Resolve-FotonSuspiciousHits -Row $_ -StoredProperty 'SuspiciousHits' -TextProperty 'Command')
+            })
         if ($badRuns.Count -gt 0) {
             Add-FotonFinding -Severity 'High' -Category 'Persistence' -Tier 2 -Title 'Autostart entries point to user-writable locations or contain risky patterns' `
                 -Observation ("{0} of {1} autostart entries flagged. Sample: {2}." -f $badRuns.Count, @($autoruns).Count, (ConvertTo-FotonSample ($badRuns | ForEach-Object { "$($_.ValueName) = $($_.Command)" }) 4)) `
@@ -296,7 +304,10 @@ function Invoke-FotonAnalysis {
 
     $tasks = $script:FotonSession.Data['scheduled_tasks']
     if ($tasks) {
-        $badTasks = @($tasks | Where-Object { $_.SuspiciousHits -or $_.UserWritableTarget -eq $true })
+        $badTasks = @($tasks | Where-Object {
+                $_.UserWritableTarget -eq $true -or
+                (Resolve-FotonSuspiciousHits -Row $_ -StoredProperty 'SuspiciousHits' -TextProperty 'Actions')
+            })
         if ($badTasks.Count -gt 0) {
             Add-FotonFinding -Severity 'High' -Category 'Persistence' -Tier 2 -Title 'Scheduled tasks reference user-writable paths or risky commands' `
                 -Observation ("{0} task(s) flagged. Sample: {1}." -f $badTasks.Count, (ConvertTo-FotonSample ($badTasks | ForEach-Object { "$($_.TaskPath)$($_.TaskName): $($_.Actions)" }) 4)) `
@@ -787,6 +798,19 @@ function Invoke-FotonAnalysis {
                     -NextStep 'Use these rows to bound the observable window rather than as suspicion.'
             }
         }
+    }
+
+    # Absence is not evidence. The endpoint flatten ships without the
+    # suspicious-command pattern list (Defender AMSI blocks the flatten when it is
+    # embedded - see build/Build-Standalone.ps1), so every rule that depends on it
+    # is silently inert there. Say so rather than letting a pattern-free run read as
+    # a clean result.
+    if (@($script:FotonSession.SuspiciousCommandPatterns).Count -eq 0) {
+        Add-FotonFinding -Severity 'Info' -Category 'Methodology' -Tier 1 -Title 'Suspicious-command pattern matching did not run' `
+            -Observation 'No suspicious-command pattern list was loaded in this session, so process command lines, PowerShell console history, autostart values, and scheduled task actions were not matched against high-risk patterns. Any other finding in this report is unaffected.' `
+            -WhyItMatters 'This is a visibility gap, not a negative result: the absence of pattern findings here says nothing about whether such commands ran. The endpoint collector intentionally ships without the pattern list because embedding it causes antivirus to block the collector at load.' `
+            -Artifact 'src/Private/Patterns/SuspiciousCommandPatterns.txt' `
+            -NextStep 'Re-run Invoke-FotonAnalysis against this package from the Foton module on an analyst workstation, where the pattern list loads and these rules evaluate.'
     }
 
     Write-FotonStatus ("Findings generated: {0}" -f $script:FotonSession.Findings.Count) 'Good'

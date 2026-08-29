@@ -16,7 +16,13 @@ Describe 'Build-Standalone' {
             $raw | Should -Match 'function Invoke-FotonTriage'
             $raw | Should -Match 'function Invoke-FotonSystemCollection'
             $raw | Should -Not -Match '(?m)^\s*Import-Module\b'
-            $raw | Should -Match "'iex '"
+            # Benign pattern tables still embed; the endpoint needs them offline.
+            $raw | Should -Match 'UserWritablePatterns'
+            $raw | Should -Match 'HardeningCsv'
+            # The suspicious-command list must not. Embedding it makes Defender block
+            # the whole collector at load as Trojan:PowerShell/PSAttackTool.A.
+            $raw | Should -Match 'SuspiciousCommandPatterns\s*=\s*@\(\)'
+            $raw | Should -Not -Match 'sekurlsa'
         }
         finally {
             Remove-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue

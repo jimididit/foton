@@ -43,7 +43,10 @@ function Invoke-FotonProcessCollection {
                 IsOSBinary        = $sig.IsOSBinary
                 SHA256            = (Get-FotonSafeHash -Path $path)
                 UserWritablePath  = (Test-FotonUserWritablePath -Path $path)
-                SuspiciousCmdHits = (Test-FotonSuspiciousCommand -Text $p.CommandLine)
+                # Column retained for schema continuity; Analyze now derives the hits
+                # from CommandLine. See Build-Standalone.ps1 for why the patterns
+                # cannot ship inside the endpoint flatten.
+                SuspiciousCmdHits = ''
             }
         }
         $rows
@@ -119,7 +122,7 @@ function Invoke-FotonProcessCollection {
                         HistoryFile    = $hist
                         LineNumber     = $lineNo
                         Command        = $line
-                        SuspiciousHits = (Test-FotonSuspiciousCommand -Text $line)
+                        SuspiciousHits = ''
                     }
                 }
             }

@@ -81,9 +81,17 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | done (1.9.0) | Expand raw EVTX copy set | Hayabusa on the workstation | Still capped; selected-ID CSVs kept |
 | done (1.9.0) | Browser DB + setupapi/CBS/PS transcript copies | File facts for later parsers | No decrypt, no Graph; lock = coverage gap |
 | done (1.9.0) | Optional `-IncludeUsnJournal` | USN `$J` when the operator asks | Default is queryjournal text. `$MFT` is KAPE/ORC, not Foton |
+| done (1.10.0) | Stop interpreting command text during collection | The embedded pattern list made Defender block the whole collector at load | `SuspiciousHits` / `SuspiciousCmdHits` columns remain but ship empty; Analyze derives them from `Command` / `Actions` / `CommandLine` on the workstation |
 | P3 | Memory, pcap, full MFT | Wrong runtime | External tools |
 
 Standard-user Collect is **intentional**. Security log, Prefetch, other users’ hives stay skipped, not empty-success.
+
+Antivirus is a coverage factor, not just an annoyance: a collector the endpoint refuses
+to load captures nothing. Since collect 1.10.0 the suspicious-command pattern list is
+not embedded in the flatten (see [src/Private/Patterns/README.md](../src/Private/Patterns/README.md)),
+so the matching rules are inert during endpoint collection and Analyze raises an Info
+visibility-gap finding to say so. Run `Invoke-FotonAnalysis` from the module on a
+workstation to evaluate them.
 
 ---
 

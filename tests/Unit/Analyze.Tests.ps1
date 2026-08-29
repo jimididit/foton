@@ -32,6 +32,56 @@ Describe 'Get-FotonPackage and offline analysis' {
         Test-Path -LiteralPath $analysisCsv | Should -Be $true
     }
 
+    It 'derives suspicious-command hits from raw columns when Collect left them empty' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            # Collect schema 1.10.0: endpoint writes the column empty, raw text stays.
+            $script:FotonSession.Data['running_processes'] = @(
+                [PSCustomObject]@{
+                    Name = 'powershell.exe'; PID = 4242; Path = 'C:\Windows\System32\powershell.exe'
+                    SuspiciousCmdHits = ''; CommandLine = 'powershell -encodedcommand ZQBjAGgAbwA='
+                }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+
+            $hit = @($script:FotonSession.Findings |
+                    Where-Object { $_.Title -eq 'Running process command lines contain high-risk patterns' })
+            $hit | Should -HaveCount 1
+            $hit[0].Observation | Should -Match 'encodedcommand'
+        }
+    }
+
+    It 'raises a visibility-gap finding when no suspicious-command patterns are loaded' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            # This is the state inside the endpoint flatten: absence of pattern
+            # findings there must not read as a clean result.
+            $script:FotonSession.SuspiciousCommandPatterns = @()
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+
+            $gap = @($script:FotonSession.Findings |
+                    Where-Object { $_.Title -eq 'Suspicious-command pattern matching did not run' })
+            $gap | Should -HaveCount 1
+            $gap[0].Severity | Should -Be 'Info'
+            $gap[0].Tier | Should -Be 1
+        }
+    }
+
+    It 'does not raise the visibility gap when patterns are loaded' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            @($script:FotonSession.SuspiciousCommandPatterns).Count | Should -BeGreaterThan 0
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+
+            @($script:FotonSession.Findings |
+                Where-Object { $_.Title -eq 'Suspicious-command pattern matching did not run' }) |
+                Should -HaveCount 0
+        }
+    }
+
     It 'does not fire WDigest when UseLogonCredential is 0' {
         InModuleScope Foton {
             Initialize-FotonSession
