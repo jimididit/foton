@@ -128,6 +128,17 @@ Parse HTML is **not** findings. Analyze HTML is **not** a parsed artifact dump. 
 
 Pointing `analyze`, `parse`, or `compose` at a **ZIP** extracts it to a temp folder that is not preserved, so those commands write their reports next to the ZIP instead. The report's relative artifact links (`06_Security_Posture\...`) only resolve when you analyze an **extracted case folder** — the HTML says so in its limitations section.
 
+**Extract the ZIP before chaining these commands.** Each ZIP open extracts to a *new* temp folder, so `compose` writes `analysis\external\` into a directory that a later `analyze` never sees — the tool output is silently lost and cannot feed findings. Against a case folder the three steps accumulate correctly, in this order:
+
+```powershell
+Expand-Archive D:\Cases\Foton_HOSTNAME_...Z.zip -DestinationPath D:\Cases
+.\Foton.cmd parse   D:\Cases\Foton_HOSTNAME_...Z
+.\Foton.cmd compose D:\Cases\Foton_HOSTNAME_...Z
+.\Foton.cmd analyze D:\Cases\Foton_HOSTNAME_...Z
+```
+
+`analyze` must run **last**: it consumes what `parse` and `compose` wrote to disk.
+
 ---
 
 ## 3. Workstation: PowerShell commands
@@ -210,7 +221,9 @@ New-FotonReport
 
 Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are inventory rows (`NotOnPath`), not failures. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. Copy `Foton-Collect.ps1` does not parse Prefetch/EVTX/hives on the endpoint.
 
-Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard), because without it the tool waits for keyboard input and compose looks hung. Rules are loaded from the `rules\` folder beside the binary, so keep the release layout intact rather than copying a lone `hayabusa.exe` onto PATH. Findings are banded by Hayabusa's own level with the top rule titles named; note that a Foton collection can itself trigger hive-access and script-execution rules.
+Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard), because without it the tool waits for keyboard input and compose looks hung. Rules are loaded from the `rules\` folder beside the binary, so keep the release layout intact rather than copying a lone `hayabusa.exe` onto PATH — copy the whole extracted release folder and put *that* on PATH. Each tool is launched with its own install directory as the working directory, because Hayabusa resolves `config\` (output profiles, level colours) relative to the working directory and otherwise reports missing rules and config.
+
+**Collector footprint.** Script block logging records Foton's own PowerShell, so hunt rules for suspicious scripting and for registry or credential access fire on the collection itself. On a real package this was the single largest medium-level "detection". `Invoke-FotonAnalysis` attributes such rows to the collection — by timestamp inside the collection window read from `00_Collection\collection.log`, and by rows naming a Foton function outside it — excludes them from the severity bands, and reports the count as an Info methodology finding. That exclusion is inference, not process identity: genuine host activity during the collection window is excluded too, so filter the Hayabusa CSV to that window yourself if something could have coincided.
 
 Why this matters for `analyze`: **Collect already ran the heuristics on the endpoint**, so `analyze` on an untouched package reproduces `00_Collection\findings.csv` rather than adding detection, and it now says so. Parse, compose, `ioc`, and baseline compare are what add new findings — run them, then analyze again.
 

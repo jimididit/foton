@@ -721,6 +721,23 @@ function Invoke-FotonAnalysis {
             # fired, not just that something did.
             $counts = @{}
             $titles = @{}
+            # Script block logging records the collector's own code, so Sigma rules
+            # such as "Potentially Malicious PwSh" fire on Foton itself. Counted into
+            # the bands, that footprint is reported as host activity - on a real
+            # package it was the single largest medium-level "detection". Track those
+            # rows separately instead of dropping them: an examiner may want the
+            # collector's trace, but it is not evidence about the host.
+            # Text matching alone is far too weak: on a real package only 12 of 312
+            # "Potentially Malicious PwSh" rows named a Foton function, because most
+            # collector script blocks are ordinary PowerShell. 274 of them fell inside
+            # the collection window, so the window is the load-bearing signal and the
+            # token match only catches stragglers outside it (earlier Foton runs).
+            $selfCounts = @{}
+            $selfTitles = @{}
+            $selfTotal = 0
+            $selfByWindow = 0
+            $selfByName = 0
+            $window = Get-FotonCollectionWindow -CaseRoot $caseRoot
             $read = 0
             $capped = $false
             $maxLines = 2000000
@@ -732,10 +749,46 @@ function Invoke-FotonAnalysis {
                     while ($null -ne ($line = $reader.ReadLine())) {
                         $read++
                         if ($read -gt $maxLines) { $capped = $true; break }
-                        $m = [regex]::Match($line, '^"[^"]*","(?<t>[^"]*)","(?<l>[^"]*)"')
+                        $m = [regex]::Match($line, '^"(?<ts>[^"]*)","(?<t>[^"]*)","(?<l>[^"]*)"')
                         if (-not $m.Success) { continue }
                         $lvl = $m.Groups['l'].Value.ToLowerInvariant()
                         $ttl = $m.Groups['t'].Value
+
+                        # Two independent attribution signals, neither of which is
+                        # process identity - Hayabusa rows carry no collector PID.
+                        $isSelf = $false
+                        $byWindow = $false
+                        if ($window) {
+                            try {
+                                $ts = [datetimeoffset]::Parse($m.Groups['ts'].Value,
+                                    [Globalization.CultureInfo]::InvariantCulture)
+                                if ($ts -ge $window.StartUtc -and $ts -le $window.EndUtc) {
+                                    $isSelf = $true
+                                    $byWindow = $true
+                                }
+                            }
+                            catch { }
+                        }
+                        # The Details column carries the logged script block, so a row
+                        # naming a Foton function is the collector even outside the
+                        # window - typically an earlier run on the same host.
+                        if (-not $isSelf -and $line.IndexOf('Foton', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                            $isSelf = $true
+                        }
+
+                        if ($isSelf) {
+                            $selfTotal++
+                            if ($byWindow) { $selfByWindow++ } else { $selfByName++ }
+                            if (-not $selfCounts.ContainsKey($lvl)) {
+                                $selfCounts[$lvl] = 0
+                                $selfTitles[$lvl] = @{}
+                            }
+                            $selfCounts[$lvl] = $selfCounts[$lvl] + 1
+                            if (-not $selfTitles[$lvl].ContainsKey($ttl)) { $selfTitles[$lvl][$ttl] = 0 }
+                            $selfTitles[$lvl][$ttl] = $selfTitles[$lvl][$ttl] + 1
+                            continue
+                        }
+
                         if (-not $counts.ContainsKey($lvl)) {
                             $counts[$lvl] = 0
                             $titles[$lvl] = @{}
@@ -750,14 +803,18 @@ function Invoke-FotonAnalysis {
             }
 
             $describe = {
-                param($Level)
-                $t = $titles[$Level]
+                param($Map, $Level)
+                $t = $Map[$Level]
                 if (-not $t) { return '' }
                 $top = @($t.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 6)
                 return (($top | ForEach-Object { "{0} ({1})" -f $_.Key, $_.Value }) -join '; ')
             }
             $capNote = ''
             if ($capped) { $capNote = (" Row scan capped at {0} lines; counts are a floor, not a total." -f $maxLines) }
+            $selfNote = ''
+            if ($selfTotal -gt 0) {
+                $selfNote = (" Excludes {0} row(s) attributable to the Foton collector itself; see the collector-footprint finding." -f $selfTotal)
+            }
 
             # Hayabusa abbreviates levels in CSV output unless -b is passed, so a
             # timeline says "med" and "crit". Accept both spellings or whole bands
@@ -773,14 +830,14 @@ function Invoke-FotonAnalysis {
                 foreach ($l in $band.Levels) {
                     if ($counts.ContainsKey($l)) {
                         $total += $counts[$l]
-                        $d = & $describe $l
+                        $d = & $describe $titles $l
                         if ($d) { $samples += $d }
                     }
                 }
                 if ($total -le 0) { continue }
                 Add-FotonFinding -Severity $band.Severity -Category 'EventLogs' -Tier 2 `
                     -Title ("Hayabusa reported {0} rule hits on copied EVTX" -f $band.Label) `
-                    -Observation ("{0} {1} detection(s) in analysis/external/hayabusa. Top rules: {2}.{3}" -f $total, $band.Label, ($samples -join '; '), $capNote) `
+                    -Observation ("{0} {1} detection(s) in analysis/external/hayabusa. Top rules: {2}.{3}{4}" -f $total, $band.Label, ($samples -join '; '), $capNote, $selfNote) `
                     -WhyItMatters 'These are Hayabusa/Sigma rule hits, not a Foton engine and not a verdict. Sigma rules fire on legitimate administration, backup software, and management agents, and a Foton collection can itself trigger hive-access and script-execution rules. Judge each rule against what was expected on this host.' `
                     -Artifact 'analysis/external/hayabusa' `
                     -NextStep 'Filter the Hayabusa CSV to these RuleTitle values, note the RuleID and Timestamp, and corroborate against process, persistence, and account artifacts before drawing any conclusion.'
@@ -792,10 +849,32 @@ function Invoke-FotonAnalysis {
             }
             if ($lowVol -gt 0) {
                 Add-FotonFinding -Severity 'Info' -Category 'EventLogs' -Tier 1 -Title 'Hayabusa low and informational event volume' `
-                    -Observation ("{0} low/informational Hayabusa row(s) recorded. These are mostly normal telemetry (process execution, DNS queries, file creation) and are context for a timeline, not indicators.{1}" -f $lowVol, $capNote) `
+                    -Observation ("{0} low/informational Hayabusa row(s) recorded. These are mostly normal telemetry (process execution, DNS queries, file creation) and are context for a timeline, not indicators.{1}{2}" -f $lowVol, $capNote, $selfNote) `
                     -WhyItMatters 'Volume here reflects how much Sysmon/audit telemetry the host was producing. It is useful for timeline coverage and for spotting where telemetry stops.' `
                     -Artifact 'analysis/external/hayabusa' `
                     -NextStep 'Use these rows to bound the observable window rather than as suspicion.'
+            }
+
+            # Methodology disclosure, not a host observation. Reported so the operator
+            # can see what the collection itself put into the event log, and so the
+            # band counts above can be trusted as being about the host.
+            if ($selfTotal -gt 0) {
+                $selfSamples = @()
+                foreach ($l in @($selfCounts.Keys | Sort-Object)) {
+                    $d = & $describe $selfTitles $l
+                    if ($d) { $selfSamples += ("{0}: {1}" -f $l, $d) }
+                }
+                $winText = 'no collection window could be read from 00_Collection\collection.log'
+                if ($window) {
+                    $winText = ("collection window {0} to {1} UTC" -f
+                        $window.StartUtc.UtcDateTime.ToString('yyyy-MM-dd HH:mm:ss'),
+                        $window.EndUtc.UtcDateTime.ToString('yyyy-MM-dd HH:mm:ss'))
+                }
+                Add-FotonFinding -Severity 'Info' -Category 'Methodology' -Tier 2 -Title 'Hayabusa hits caused by the Foton collection itself' `
+                    -Observation ("{0} Hayabusa row(s) are attributed to the collection and excluded from the severity bands above: {1} fell inside the {2}, and {3} named a Foton function outside it. By level - {4}." -f $selfTotal, $selfByWindow, $winText, $selfByName, ($selfSamples -join ' | ')) `
+                    -WhyItMatters 'Script block logging records the collector''s own PowerShell, so Sigma rules for suspicious scripting and for registry or credential access fire on Foton. Left in the counts, that footprint is reported as host activity and can dominate a severity band. Attribution is inference, not process identity: rows are matched by time and by name, so genuine host activity that happened during the collection window is excluded here too, and an earlier Foton run on this host is included.' `
+                    -Artifact 'analysis/external/hayabusa' `
+                    -NextStep 'If a real event could have coincided with the collection, filter the Hayabusa CSV to that window and read the Details column directly rather than relying on this exclusion.'
             }
         }
     }

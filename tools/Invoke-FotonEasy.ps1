@@ -105,7 +105,8 @@ switch ($cmd) {
     }
     'compose' {
         if (-not $Target) { throw 'Usage: Foton.cmd compose <case-folder-or-zip>' }
-        Get-FotonPackage -Path $Target | Out-Null
+        # Invoke-FotonExternalParse opens the package itself; loading it here too
+        # just prints the "Loaded package" line twice.
         $rows = @(Invoke-FotonExternalParse -PackagePath $Target)
         $rows | Select-Object Tool, Status, DestRelative, Note |
             Format-Table -AutoSize -Wrap

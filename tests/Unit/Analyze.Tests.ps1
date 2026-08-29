@@ -52,6 +52,94 @@ Describe 'Get-FotonPackage and offline analysis' {
         }
     }
 
+    It 'excludes collector-caused Hayabusa rows from the severity bands' {
+        $tmp = Join-Path $env:TEMP ('foton-self-' + [guid]::NewGuid().ToString('N'))
+        $hay = Join-Path $tmp 'analysis\external\hayabusa'
+        New-Item -Path $hay -ItemType Directory -Force | Out-Null
+        try {
+            # Two medium rows: one is the collector's own script block, one is not.
+            $lines = @(
+                '"Timestamp","RuleTitle","Level","Computer","Channel","EventID","RecordID","Details","ExtraFieldInfo","RuleID"'
+                '"2026-01-01 00:00:00 +00:00","Potentially Malicious PwSh","med","H","Sec",4104,1,"ScriptBlock: Get-FotonRegValue -Path HKLM:\\x","x","id1"'
+                '"2026-01-01 00:00:01 +00:00","WMI Persistence","med","H","Sec",1,2,"genuine host activity","x","id2"'
+            )
+            Set-Content -LiteralPath (Join-Path $hay 'hayabusa.csv') -Value $lines -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+
+                $med = @($script:FotonSession.Findings | Where-Object { $_.Title -like '*medium-level*' })
+                $med | Should -HaveCount 1
+                # Only the non-collector row counts toward the band.
+                $med[0].Observation | Should -Match '^1 medium-level'
+                $med[0].Observation | Should -Match 'WMI Persistence'
+                $med[0].Observation | Should -Not -Match 'Potentially Malicious PwSh'
+                $med[0].Observation | Should -Match 'Excludes 1 row'
+
+                $self = @($script:FotonSession.Findings |
+                        Where-Object { $_.Title -eq 'Hayabusa hits caused by the Foton collection itself' })
+                $self | Should -HaveCount 1
+                $self[0].Severity | Should -Be 'Info'
+                $self[0].Category | Should -Be 'Methodology'
+                $self[0].Observation | Should -Match 'Potentially Malicious PwSh'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'attributes Hayabusa rows inside the collection window to the collector' {
+        $tmp = Join-Path $env:TEMP ('foton-win-' + [guid]::NewGuid().ToString('N'))
+        $hay = Join-Path $tmp 'analysis\external\hayabusa'
+        New-Item -Path $hay -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $tmp '00_Collection') -ItemType Directory -Force | Out-Null
+        try {
+            # collection.log bounds the run; Analyze reads the first and last stamp.
+            Set-Content -LiteralPath (Join-Path $tmp '00_Collection\collection.log') -Encoding UTF8 -Value @(
+                'Foton test collection log'
+                '2026-01-01 00:10:00 UTC  [Good] Case folder: X'
+                '2026-01-01 00:12:00 UTC  [Good] Hashed 1 artifacts'
+            )
+            # Row 1 is inside the window with no Foton token, row 2 is outside it.
+            $lines = @(
+                '"Timestamp","RuleTitle","Level","Computer","Channel","EventID","RecordID","Details","ExtraFieldInfo","RuleID"'
+                '"2026-01-01 00:11:00 +00:00","Potentially Malicious PwSh","med","H","Sec",4104,1,"ordinary powershell","x","id1"'
+                '"2026-01-01 09:00:00 +00:00","WMI Persistence","med","H","Sec",1,2,"genuine host activity","x","id2"'
+            )
+            Set-Content -LiteralPath (Join-Path $hay 'hayabusa.csv') -Value $lines -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+
+                $w = Get-FotonCollectionWindow -CaseRoot $Root
+                $w.StartUtc.UtcDateTime.ToString('HH:mm:ss') | Should -Be '00:10:00'
+                $w.EndUtc.UtcDateTime.ToString('HH:mm:ss') | Should -Be '00:12:00'
+
+                Invoke-FotonAnalysis
+
+                $med = @($script:FotonSession.Findings | Where-Object { $_.Title -like '*medium-level*' })
+                $med | Should -HaveCount 1
+                # The in-window row is excluded even though it never mentions Foton.
+                $med[0].Observation | Should -Match '^1 medium-level'
+                $med[0].Observation | Should -Match 'WMI Persistence'
+
+                $self = @($script:FotonSession.Findings |
+                        Where-Object { $_.Title -eq 'Hayabusa hits caused by the Foton collection itself' })
+                $self | Should -HaveCount 1
+                $self[0].Observation | Should -Match '1 fell inside the collection window'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'raises a visibility-gap finding when no suspicious-command patterns are loaded' {
         InModuleScope Foton {
             Initialize-FotonSession

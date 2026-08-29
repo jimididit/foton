@@ -131,8 +131,15 @@ function Invoke-FotonExternalParse {
         $arg = & $j.Args $exe $j.NeedDir $toolDir
         $log = Join-Path $toolDir 'tool_stderr.txt'
         $ok = $false
+        # Run in the tool's own install tree, not the output folder. Hayabusa resolves
+        # its config/ (profiles, level colours) relative to the working directory, so
+        # running it from analysis/external/hayabusa made it report missing rules and
+        # config even with -r and -c supplied. Every path passed in is absolute, so
+        # this is safe for the EZ Tools too.
+        $workDir = Split-Path -Parent $exe
+        if (-not $workDir -or -not (Test-Path -LiteralPath $workDir)) { $workDir = $toolDir }
         try {
-            $p = Start-Process -FilePath $exe -ArgumentList $arg -Wait -PassThru -NoNewWindow -RedirectStandardError $log -WorkingDirectory $toolDir
+            $p = Start-Process -FilePath $exe -ArgumentList $arg -Wait -PassThru -NoNewWindow -RedirectStandardError $log -WorkingDirectory $workDir
             if ($p.ExitCode -eq 0) { $ok = $true }
         }
         catch {
