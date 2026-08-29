@@ -119,6 +119,10 @@ if (Test-Path -LiteralPath $amsiCheck) {
         throw "Generated $OutputPath is blocked by antivirus at load time. It would fail on the endpoint."
     }
 }
+else {
+    # See Build-Standalone.ps1: skipping must be loud, not silent.
+    Write-Host "AMSI LOAD CHECK SKIPPED - $amsiCheck is missing. This build is UNVERIFIED against antivirus." -ForegroundColor Yellow
+}
 
 if ($aliasPath) {
     Copy-Item -LiteralPath $OutputPath -Destination $aliasPath -Force

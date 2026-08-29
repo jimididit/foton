@@ -168,6 +168,12 @@ if (Test-Path -LiteralPath $amsiCheck) {
         throw "Generated $OutputPath is blocked by antivirus at load time. It would fail on the endpoint."
     }
 }
+else {
+    # Tracked file, so absence means a partial checkout or a rename. Keep building,
+    # but never let the check disappear quietly: a verification step that looks like
+    # it ran and did not is what shipped the blocked collector in the first place.
+    Write-Host "AMSI LOAD CHECK SKIPPED - $amsiCheck is missing. This build is UNVERIFIED against antivirus." -ForegroundColor Yellow
+}
 
 if ($aliasPath) {
     Copy-Item -LiteralPath $OutputPath -Destination $aliasPath -Force
