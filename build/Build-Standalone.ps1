@@ -53,9 +53,23 @@ function ConvertTo-FotonQuotedArrayLiteral {
 
 $patternDir = Join-Path $srcRoot 'Private\Patterns'
 $writable = Get-FotonPatternLineArray (Join-Path $patternDir 'UserWritablePatterns.txt')
-$suspicious = Get-FotonPatternLineArray (Join-Path $patternDir 'SuspiciousCommandPatterns.txt')
 $rats = Get-FotonPatternLineArray (Join-Path $patternDir 'RemoteAccessToolNames.txt')
 $hardeningCsv = Get-Content -LiteralPath (Join-Path $patternDir 'HardeningRegistryChecks.csv') -Raw
+
+# SuspiciousCommandPatterns.txt is deliberately NOT embedded, so the emitted table
+# below is empty. Inlined as a literal array, that file is a contiguous list of
+# credential-theft and LOLBin substrings, and Defender AMSI blocks the whole flatten
+# as Trojan:PowerShell/PSAttackTool.A at script load. Verified by isolation: that one
+# array alone is blocked; the other three tables load clean.
+#
+# Matching those patterns is analysis, not acquisition, so it belongs on the
+# workstation (Invoke-FotonAnalysis reads the raw Command/Actions/CommandLine
+# columns). Do not "fix" this by encoding or splitting the strings: obfuscation is
+# itself an AV signal and a forensic tool must be readable by the examiner.
+#
+# Do not quote examples from that file here either. An earlier revision of this
+# comment listed a handful of them and AMSI then blocked THIS build script. The
+# contents belong in src/Private/Patterns/README.md, which no engine compiles.
 
 $skipNames = @('Get-FotonPackage.ps1', 'Get-FotonVersion.ps1')
 $files = @(
@@ -103,6 +117,7 @@ param(
     [switch]`$SkipHashing,
     [switch]`$LoadUserHives,
     [switch]`$IncludeFileTimeline,
+    [switch]`$IncludeUsnJournal,
     [switch]`$NoZip,
     [switch]`$RequireAdministrator
 )
@@ -114,7 +129,7 @@ param(
 `$script:FotonSession = @{ Version = '$version' }
 `$script:FotonEmbeddedPatterns = @{
     UserWritablePatterns      = $(ConvertTo-FotonQuotedArrayLiteral $writable)
-    SuspiciousCommandPatterns = $(ConvertTo-FotonQuotedArrayLiteral $suspicious)
+    SuspiciousCommandPatterns = @()
     RemoteAccessToolNames     = $(ConvertTo-FotonQuotedArrayLiteral $rats)
     HardeningCsv              = @'
 $hardeningCsv
@@ -142,6 +157,22 @@ $null = [System.Management.Automation.Language.Parser]::ParseFile($OutputPath, [
 if ($parseErrors -and $parseErrors.Count -gt 0) {
     $parseErrors | ForEach-Object { Write-Host "LINE $($_.Extent.StartLineNumber): $($_.Message)" -ForegroundColor Red }
     throw "Generated $OutputPath has parse errors."
+}
+
+# AMSI sees content that ParseFile never shows us. Check before the alias copy so a
+# blocked build does not get published under the stable name docs and RMM point at.
+$amsiCheck = Join-Path $PSScriptRoot 'Test-FotonAmsiLoad.ps1'
+if (Test-Path -LiteralPath $amsiCheck) {
+    & $amsiCheck -Path $OutputPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Generated $OutputPath is blocked by antivirus at load time. It would fail on the endpoint."
+    }
+}
+else {
+    # Tracked file, so absence means a partial checkout or a rename. Keep building,
+    # but never let the check disappear quietly: a verification step that looks like
+    # it ran and did not is what shipped the blocked collector in the first place.
+    Write-Host "AMSI LOAD CHECK SKIPPED - $amsiCheck is missing. This build is UNVERIFIED against antivirus." -ForegroundColor Yellow
 }
 
 if ($aliasPath) {

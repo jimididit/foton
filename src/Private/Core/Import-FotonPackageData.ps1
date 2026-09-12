@@ -11,6 +11,27 @@ function Resolve-FotonCaseRoot {
     throw "No 00_Collection folder under $SearchRoot. Point at an extracted WinFoton/Foton case."
 }
 
+function Get-FotonNestedDuplicateRoot {
+    <#
+        A well-formed package has exactly one 00_Collection. Some packages arrive
+        with the whole case tree copied inside itself, usually because the ZIP was
+        extracted into the case folder and re-zipped in transit. That is not a
+        second collection: the inner hashes.csv is byte-identical.
+
+        Returns the nested duplicate directory so callers can skip it. Left in
+        place, it makes recursive walks (parse, carve, hashing) count every
+        artifact twice, which inflates row counts without adding evidence.
+    #>
+    param([string]$CaseRoot)
+    if (-not $CaseRoot -or -not (Test-Path -LiteralPath $CaseRoot)) { return $null }
+    foreach ($d in @(Get-ChildItem -LiteralPath $CaseRoot -Directory -ErrorAction SilentlyContinue)) {
+        if (Test-Path -LiteralPath (Join-Path $d.FullName '00_Collection')) {
+            return $d.FullName
+        }
+    }
+    return $null
+}
+
 function Convert-FotonCsvBooleans {
     <# Import-Csv stores True/False as strings. Analysis compares -eq $true. #>
     param($Rows)

@@ -16,8 +16,10 @@ function Write-FotonArtifactHashes {
     Write-FotonStatus 'Hashing collected artifacts (SHA-256)' 'Step'
     $rows = @()
     $root = $script:FotonSession.CaseRoot
+    $nested = Get-FotonNestedDuplicateRoot -CaseRoot $root
     foreach ($f in (Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction SilentlyContinue)) {
         if ($f.Name -eq 'hashes.csv' -or $f.Name -eq 'hashes.txt') { continue }
+        if ($nested -and $f.FullName.StartsWith($nested, [StringComparison]::OrdinalIgnoreCase)) { continue }
         $hash = ''
         try { $hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256 -ErrorAction Stop).Hash } catch { $hash = 'HASH_ERROR' }
         $rel = $f.FullName.Substring($root.Length).TrimStart('\')
@@ -41,8 +43,23 @@ function Write-FotonArtifactHashes {
 function Compress-FotonCasePackage {
     Write-FotonStatus 'Compressing case package' 'Step'
     $zipPath = "$($script:FotonSession.CaseRoot).zip"
+
+    # Refuse to ship a package that contains a copy of itself. Hashing already ran,
+    # so hashes.csv describes one tree; zipping a nested copy would double the
+    # transfer and make every recursive count wrong downstream.
+    $nested = Get-FotonNestedDuplicateRoot -CaseRoot $script:FotonSession.CaseRoot
+    if ($nested) {
+        Write-FotonStatus ("Case folder contains a nested copy of itself at {0}. It is excluded from the ZIP; the collected tree is unaffected." -f (Split-Path -Leaf $nested)) 'Warn'
+    }
+
     try {
         if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
+        if ($nested) {
+            Compress-Archive -Path (@(Get-ChildItem -LiteralPath $script:FotonSession.CaseRoot -Force |
+                        Where-Object { $_.FullName -ne $nested } | ForEach-Object { $_.FullName })) `
+                -DestinationPath $zipPath -Force -ErrorAction Stop
+            return $zipPath
+        }
         Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
         [System.IO.Compression.ZipFile]::CreateFromDirectory($script:FotonSession.CaseRoot, $zipPath,
             [System.IO.Compression.CompressionLevel]::Optimal, $true)

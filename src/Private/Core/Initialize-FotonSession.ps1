@@ -12,7 +12,8 @@ function Initialize-FotonSession {
         [int]$EventLogDays = 14,
         [int]$MaxEventsPerLog = 3000,
         [switch]$SkipEvtxExport,
-        [switch]$IncludeFileTimeline
+        [switch]$IncludeFileTimeline,
+        [switch]$IncludeUsnJournal
     )
 
     $keepVersion = $null
@@ -38,6 +39,7 @@ function Initialize-FotonSession {
         MaxEventsPerLog           = $MaxEventsPerLog
         SkipEvtxExport            = [bool]$SkipEvtxExport
         IncludeFileTimeline       = [bool]$IncludeFileTimeline
+        IncludeUsnJournal         = [bool]$IncludeUsnJournal
         LoadUserHivesActive       = $false
         HiveMountPrefix           = 'Foton'
         Categories                = [ordered]@{

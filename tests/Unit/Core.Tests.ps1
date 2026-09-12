@@ -139,6 +139,43 @@ InModuleScope Foton {
         }
     }
 
+    Describe 'Resolve-FotonSuspiciousHits' {
+        BeforeEach { Initialize-FotonSession }
+
+        It 'computes hits from raw text when the collected column is empty' {
+            # Collect schema 1.10.0 onward: the endpoint writes the column empty
+            # because the pattern list cannot ship in the flatten.
+            $row = [PSCustomObject]@{ SuspiciousCmdHits = ''; CommandLine = 'powershell -encodedcommand ABC' }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousCmdHits' -TextProperty 'CommandLine' |
+                Should -Match 'encodedcommand'
+        }
+
+        It 'trusts hits already stored by an older endpoint collection' {
+            $row = [PSCustomObject]@{ SuspiciousHits = 'legacy-hit'; Command = 'notepad.exe' }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousHits' -TextProperty 'Command' |
+                Should -Be 'legacy-hit'
+        }
+
+        It 'returns empty for a benign row' {
+            $row = [PSCustomObject]@{ SuspiciousHits = ''; Command = 'notepad.exe C:\temp\notes.txt' }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousHits' -TextProperty 'Command' |
+                Should -BeNullOrEmpty
+        }
+
+        It 'returns empty when no pattern list is loaded, as inside the flatten' {
+            $script:FotonSession.SuspiciousCommandPatterns = @()
+            $row = [PSCustomObject]@{ SuspiciousCmdHits = ''; CommandLine = 'powershell -encodedcommand ABC' }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousCmdHits' -TextProperty 'CommandLine' |
+                Should -BeNullOrEmpty
+        }
+
+        It 'tolerates a row missing both properties' {
+            $row = [PSCustomObject]@{ Other = 1 }
+            Resolve-FotonSuspiciousHits -Row $row -StoredProperty 'SuspiciousHits' -TextProperty 'Command' |
+                Should -BeNullOrEmpty
+        }
+    }
+
     Describe 'Get-FotonArtifactPath' {
         BeforeEach { Initialize-FotonSession }
         It 'builds a relative package path' {
@@ -316,10 +353,13 @@ putty
                 [IO.File]::WriteAllBytes($old, [byte[]](1, 1))
                 Start-Sleep -Milliseconds 20
                 [IO.File]::WriteAllBytes($new, [byte[]](2, 2))
+                # Compare against FileInfo.FullName: $env:TEMP can be an 8.3 short
+                # path on CI runners (RUNNER~1) while Get-ChildItem returns the long form.
+                $newFull = (Get-Item -LiteralPath $new).FullName
                 $rows = @(Copy-FotonCappedHostFiles -SourceDirectory $srcDir -Filter '*.pf' -DestinationDirectory $dstDir -MaxFiles 1 -MaxTotalBytes 1000)
                 ($rows | Where-Object { $_.Status -eq 'Copied' }).Count | Should -Be 1
                 ($rows | Where-Object { $_.Status -eq 'CappedSkip' }).Count | Should -Be 1
-                ($rows | Where-Object { $_.Status -eq 'Copied' }).SourcePath | Should -Be $new
+                ($rows | Where-Object { $_.Status -eq 'Copied' }).SourcePath | Should -Be $newFull
             }
             finally {
                 Remove-Item -LiteralPath $srcDir, $dstDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -501,6 +541,68 @@ putty
                 Field      = 'DisplayVersion'
             }
             Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'Info'
+        }
+        It 'ranks WdacApplockerPolicy PolicyHash as High' {
+            $c = [PSCustomObject]@{
+                RecordType = 'WdacApplockerPolicy'
+                Identity   = 'Wdac|SiPolicy.p7b'
+                ChangeType = 'Modified'
+                Field      = 'PolicyHash'
+            }
+            Get-FotonBaselineChangeSeverity -Change $c | Should -Be 'High'
+        }
+    }
+
+    Describe 'Copy-FotonCappedHostFileList' {
+        It 'copies explicit DestRelative paths and caps byte budget' {
+            $srcDir = Join-Path $env:TEMP ('foton-list-src-' + [guid]::NewGuid().ToString('N'))
+            $dstDir = Join-Path $env:TEMP ('foton-list-dst-' + [guid]::NewGuid().ToString('N'))
+            New-Item -Path $srcDir -ItemType Directory | Out-Null
+            try {
+                $a = Join-Path $srcDir 'a.bin'
+                $b = Join-Path $srcDir 'b.bin'
+                [IO.File]::WriteAllBytes($a, [byte[]](1, 2, 3, 4))
+                Start-Sleep -Milliseconds 20
+                [IO.File]::WriteAllBytes($b, [byte[]](5, 6, 7, 8, 9, 10))
+                $items = @(
+                    [PSCustomObject]@{ SourcePath = $a; DestRelative = 'u1\a.bin' }
+                    [PSCustomObject]@{ SourcePath = $b; DestRelative = 'u2\b.bin' }
+                )
+                $rows = @(Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $dstDir -MaxFiles 10 -MaxTotalBytes 5)
+                ($rows | Where-Object { $_.Status -eq 'Copied' }).Count | Should -Be 1
+                ($rows | Where-Object { $_.Status -eq 'CappedSkip' }).Count | Should -Be 1
+                Test-Path -LiteralPath (Join-Path $dstDir 'u1\a.bin') | Should -Be $true
+            }
+            finally {
+                Remove-Item -LiteralPath $srcDir, $dstDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Describe 'Get-FotonNestedDuplicateRoot' {
+        It 'finds a case tree copied inside itself' {
+            $root = Join-Path $env:TEMP ('foton-nest-' + [guid]::NewGuid().ToString('N'))
+            $case = Join-Path $root 'Foton_HOST_20260101-000000Z'
+            $inner = Join-Path $case 'Foton_HOST_20260101-000000Z'
+            New-Item -Path (Join-Path $case '00_Collection') -ItemType Directory -Force | Out-Null
+            New-Item -Path (Join-Path $inner '00_Collection') -ItemType Directory -Force | Out-Null
+            # FullName avoids 8.3 vs long-path mismatch when $env:TEMP is short on CI.
+            $innerFull = (Get-Item -LiteralPath $inner).FullName
+            try {
+                Get-FotonNestedDuplicateRoot -CaseRoot $case | Should -Be $innerFull
+            }
+            finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+
+        It 'returns nothing for a well-formed single-tree package' {
+            $root = Join-Path $env:TEMP ('foton-nest-ok-' + [guid]::NewGuid().ToString('N'))
+            $case = Join-Path $root 'Foton_HOST_20260101-000000Z'
+            New-Item -Path (Join-Path $case '00_Collection') -ItemType Directory -Force | Out-Null
+            New-Item -Path (Join-Path $case '08_Filesystem') -ItemType Directory -Force | Out-Null
+            try {
+                Get-FotonNestedDuplicateRoot -CaseRoot $case | Should -BeNullOrEmpty
+            }
+            finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
         }
     }
 }

@@ -27,6 +27,7 @@ function Invoke-FotonTriage {
         [switch]$SkipHashing,
         [switch]$LoadUserHives,
         [switch]$IncludeFileTimeline,
+        [switch]$IncludeUsnJournal,
         [switch]$NoZip,
         [switch]$RequireAdministrator
     )
@@ -38,7 +39,7 @@ function Invoke-FotonTriage {
 
     Initialize-FotonSession -SkipHashing:$SkipHashing -EventLogDays $EventLogDays `
         -MaxEventsPerLog $MaxEventsPerLog -SkipEvtxExport:$SkipEvtxExport `
-        -IncludeFileTimeline:$IncludeFileTimeline
+        -IncludeFileTimeline:$IncludeFileTimeline -IncludeUsnJournal:$IncludeUsnJournal
 
     if (-not $script:FotonSession.Version) {
         $script:FotonSession.Version = '1.5.0'
@@ -113,7 +114,7 @@ function Invoke-FotonTriage {
 
     Write-FotonManifestFiles
     $reportPath = Join-Path $script:FotonSession.CaseRoot 'Foton_Report.html'
-    New-FotonReport -Path $reportPath
+    New-FotonReport -Path $reportPath | Out-Null
     $artifactCount = Write-FotonArtifactHashes
 
     $zipPath = $null

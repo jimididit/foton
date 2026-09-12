@@ -246,10 +246,13 @@ function Invoke-FotonAnalysis {
                 -Artifact (Get-FotonArtifactPath 'Processes' 'running_processes' 'csv') `
                 -NextStep 'Submit the SHA-256 values in the artifact to threat intelligence, and check parent process and creation time for each.'
         }
-        $suspCmd = @($procs | Where-Object { $_.SuspiciousCmdHits })
+        $suspCmd = @($procs | ForEach-Object {
+                $hits = Resolve-FotonSuspiciousHits -Row $_ -StoredProperty 'SuspiciousCmdHits' -TextProperty 'CommandLine'
+                if ($hits) { [PSCustomObject]@{ Name = $_.Name; Hits = $hits } }
+            })
         if ($suspCmd.Count -gt 0) {
             Add-FotonFinding -Severity 'High' -Category 'Processes' -Tier 2 -Title 'Running process command lines contain high-risk patterns' `
-                -Observation ("{0} process(es) matched: {1}." -f $suspCmd.Count, (ConvertTo-FotonSample ($suspCmd | ForEach-Object { "$($_.Name) [$($_.SuspiciousCmdHits)]" }))) `
+                -Observation ("{0} process(es) matched: {1}." -f $suspCmd.Count, (ConvertTo-FotonSample ($suspCmd | ForEach-Object { "$($_.Name) [$($_.Hits)]" }))) `
                 -WhyItMatters 'Patterns such as encoded commands, in-memory download-and-execute, and shadow copy deletion are heavily used in intrusions. They also appear in legitimate management tooling, so each match needs to be read in context.' `
                 -Artifact (Get-FotonArtifactPath 'Processes' 'running_processes' 'csv') `
                 -NextStep 'Decode any base64 command lines and review the full CommandLine column in the artifact before drawing conclusions.'
@@ -271,7 +274,9 @@ function Invoke-FotonAnalysis {
 
     $psHist = $script:FotonSession.Data['powershell_console_history']
     if ($psHist) {
-        $flagged = @($psHist | Where-Object { $_.SuspiciousHits })
+        $flagged = @($psHist | Where-Object {
+                Resolve-FotonSuspiciousHits -Row $_ -StoredProperty 'SuspiciousHits' -TextProperty 'Command'
+            })
         if ($flagged.Count -gt 0) {
             Add-FotonFinding -Severity 'High' -Category 'Processes' -Tier 2 -Title 'PowerShell console history contains high-risk commands' `
                 -Observation ("{0} matching line(s) across profiles. Sample: {1}." -f $flagged.Count, (ConvertTo-FotonSample ($flagged | ForEach-Object { "$($_.User): $($_.Command)" }) 4)) `
@@ -284,7 +289,10 @@ function Invoke-FotonAnalysis {
     # ---------- Persistence ----------
     $autoruns = $script:FotonSession.Data['autorun_registry_keys']
     if ($autoruns) {
-        $badRuns = @($autoruns | Where-Object { $_.SuspiciousHits -or $_.UserWritableTarget -eq $true })
+        $badRuns = @($autoruns | Where-Object {
+                $_.UserWritableTarget -eq $true -or
+                (Resolve-FotonSuspiciousHits -Row $_ -StoredProperty 'SuspiciousHits' -TextProperty 'Command')
+            })
         if ($badRuns.Count -gt 0) {
             Add-FotonFinding -Severity 'High' -Category 'Persistence' -Tier 2 -Title 'Autostart entries point to user-writable locations or contain risky patterns' `
                 -Observation ("{0} of {1} autostart entries flagged. Sample: {2}." -f $badRuns.Count, @($autoruns).Count, (ConvertTo-FotonSample ($badRuns | ForEach-Object { "$($_.ValueName) = $($_.Command)" }) 4)) `
@@ -296,7 +304,10 @@ function Invoke-FotonAnalysis {
 
     $tasks = $script:FotonSession.Data['scheduled_tasks']
     if ($tasks) {
-        $badTasks = @($tasks | Where-Object { $_.SuspiciousHits -or $_.UserWritableTarget -eq $true })
+        $badTasks = @($tasks | Where-Object {
+                $_.UserWritableTarget -eq $true -or
+                (Resolve-FotonSuspiciousHits -Row $_ -StoredProperty 'SuspiciousHits' -TextProperty 'Actions')
+            })
         if ($badTasks.Count -gt 0) {
             Add-FotonFinding -Severity 'High' -Category 'Persistence' -Tier 2 -Title 'Scheduled tasks reference user-writable paths or risky commands' `
                 -Observation ("{0} task(s) flagged. Sample: {1}." -f $badTasks.Count, (ConvertTo-FotonSample ($badTasks | ForEach-Object { "$($_.TaskPath)$($_.TaskName): $($_.Actions)" }) 4)) `
@@ -631,15 +642,292 @@ function Invoke-FotonAnalysis {
             -Artifact (Get-FotonArtifactPath 'Security' 'audit_policy' 'txt')
     }
 
+    # ---------- Parsed records + baseline diff (offline files; Import-FotonPackageData skips analysis/) ----------
+    $caseRoot = $script:FotonSession.CaseRoot
+    if ($caseRoot -and (Test-Path -LiteralPath $caseRoot)) {
+        $parsedPath = Join-Path $caseRoot 'analysis\parsed_records.csv'
+        if (-not (Test-Path -LiteralPath $parsedPath)) {
+            $parsedPath = Join-Path $caseRoot 'analysis\parsed_records.csv'
+        }
+        if (Test-Path -LiteralPath $parsedPath) {
+            try {
+                $parsed = @(Import-Csv -LiteralPath $parsedPath)
+                $hits = @()
+                foreach ($r in $parsed) {
+                    $p = [string]$r.LocalBasePath
+                    if (-not $p) { $p = [string]$r.Path }
+                    if (-not $p) { $p = [string]$r.LowerCaseLongPath }
+                    if (-not $p) { $p = [string]$r.Identity }
+                    if (-not $p) { continue }
+                    if (Test-FotonUserWritablePath -Path $p) {
+                        $hits += $p
+                    }
+                }
+                $hits = @($hits | Select-Object -Unique)
+                if ($hits.Count -gt 0) {
+                    $sample = ($hits | Select-Object -First 8) -join '; '
+                    Add-FotonFinding -Severity 'Medium' -Category 'Execution' -Tier 2 -Title 'Parsed artifacts reference user-writable paths' `
+                        -Observation ("analysis/parsed_records.csv contains {0} distinct path(s) under user-writable locations. Sample: {1}" -f $hits.Count, $sample) `
+                        -WhyItMatters 'Prefetch/LNK/Amcache rows are observations about files that were referenced. A user-writable path is a review item (updater, user binary, or unexpected drop). This is not a verdict of compromise.' `
+                        -Artifact 'analysis/parsed_records.csv' `
+                        -NextStep 'Open the parsed row, hash the file if it is still in the package, and compare to software inventory / baseline diffs.'
+                }
+            }
+            catch { }
+        }
+
+        $diffPath = Join-Path $caseRoot 'analysis\baseline_diff.csv'
+        if (Test-Path -LiteralPath $diffPath) {
+            try {
+                $diffs = @(Import-Csv -LiteralPath $diffPath)
+                $svc = @($diffs | Where-Object {
+                        $_.RecordType -eq 'Service' -and (
+                            ($_.ChangeType -eq 'Added') -or
+                            ($_.ChangeType -eq 'Modified' -and $_.Field -eq 'PathName')
+                        )
+                    })
+                if ($svc.Count -gt 0) {
+                    $ids = (@($svc | ForEach-Object { $_.Identity } | Select-Object -First 8) -join '; ')
+                    Add-FotonFinding -Severity 'High' -Category 'Persistence' -Tier 1 -Title 'Baseline diff: service ImagePath or new service' `
+                        -Observation ("Compare-FotonBaseline records show {0} service Added or PathName Modified. Identities: {1}" -f $svc.Count, $ids) `
+                        -WhyItMatters 'A new service or a changed ImagePath is a stable-config fact between two snapshots. Patching also replaces binaries. This does not establish who changed it or that the host is compromised.' `
+                        -Artifact 'analysis/baseline_diff.csv' `
+                        -NextStep 'Diff the PathName strings against the day0 baseline and the collected service CSV.'
+                }
+                $adm = @($diffs | Where-Object { $_.RecordType -eq 'LocalGroupMember' -and $_.ChangeType -eq 'Added' -and [string]$_.Identity -like 'Administrators|*' })
+                if ($adm.Count -gt 0) {
+                    Add-FotonFinding -Severity 'High' -Category 'Users' -Tier 1 -Title 'Baseline diff: Administrators membership added' `
+                        -Observation ("{0} Added LocalGroupMember row(s) for Administrators in analysis/baseline_diff.csv." -f $adm.Count) `
+                        -WhyItMatters 'Local admin membership is a high-attention trust change. Helpdesk, LAPS, and domain join also add members.' `
+                        -Artifact 'analysis/baseline_diff.csv'
+                }
+                $def = @($diffs | Where-Object { $_.RecordType -eq 'DefenderPreference' -and [string]$_.Identity -like '*DisableRealtimeMonitoring*' })
+                if ($def.Count -gt 0) {
+                    Add-FotonFinding -Severity 'High' -Category 'Security' -Tier 1 -Title 'Baseline diff: Defender real-time monitoring setting changed' `
+                        -Observation 'DefenderPreference DisableRealtimeMonitoring changed between baselines (see baseline_diff.csv).' `
+                        -WhyItMatters 'The change is a fact. Tampering, troubleshooting, and GPO/Intune all flip this switch.' `
+                        -Artifact 'analysis/baseline_diff.csv'
+                }
+            }
+            catch { }
+        }
+
+        $hay = Join-Path $caseRoot 'analysis\external\hayabusa'
+        if (Test-Path -LiteralPath $hay) {
+            # A Hayabusa timeline is routinely hundreds of MB, so stream it and pull
+            # only RuleTitle and Level (fields 2 and 3, ahead of the free-text
+            # Details column). A single "it found hits" row is useless at this volume:
+            # band the hits by the tool's own level so the operator sees which rules
+            # fired, not just that something did.
+            $counts = @{}
+            $titles = @{}
+            # Script block logging records the collector's own code, so Sigma rules
+            # such as "Potentially Malicious PwSh" fire on Foton itself. Counted into
+            # the bands, that footprint is reported as host activity - on a real
+            # package it was the single largest medium-level "detection". Track those
+            # rows separately instead of dropping them: an examiner may want the
+            # collector's trace, but it is not evidence about the host.
+            # Text matching alone is far too weak: on a real package only 12 of 312
+            # "Potentially Malicious PwSh" rows named a Foton function, because most
+            # collector script blocks are ordinary PowerShell. 274 of them fell inside
+            # the collection window, so the window is the load-bearing signal and the
+            # token match only catches stragglers outside it (earlier Foton runs).
+            $selfCounts = @{}
+            $selfTitles = @{}
+            $selfTotal = 0
+            $selfByWindow = 0
+            $selfByName = 0
+            $window = Get-FotonCollectionWindow -CaseRoot $caseRoot
+            $read = 0
+            $capped = $false
+            $maxLines = 2000000
+            foreach ($hf in @(Get-ChildItem -LiteralPath $hay -Filter '*.csv' -File -ErrorAction SilentlyContinue)) {
+                $reader = $null
+                try {
+                    $reader = [IO.StreamReader]::new($hf.FullName)
+                    $null = $reader.ReadLine()
+                    while ($null -ne ($line = $reader.ReadLine())) {
+                        $read++
+                        if ($read -gt $maxLines) { $capped = $true; break }
+                        $m = [regex]::Match($line, '^"(?<ts>[^"]*)","(?<t>[^"]*)","(?<l>[^"]*)"')
+                        if (-not $m.Success) { continue }
+                        $lvl = $m.Groups['l'].Value.ToLowerInvariant()
+                        $ttl = $m.Groups['t'].Value
+
+                        # Two independent attribution signals, neither of which is
+                        # process identity - Hayabusa rows carry no collector PID.
+                        $isSelf = $false
+                        $byWindow = $false
+                        if ($window) {
+                            try {
+                                $ts = [datetimeoffset]::Parse($m.Groups['ts'].Value,
+                                    [Globalization.CultureInfo]::InvariantCulture)
+                                if ($ts -ge $window.StartUtc -and $ts -le $window.EndUtc) {
+                                    $isSelf = $true
+                                    $byWindow = $true
+                                }
+                            }
+                            catch { }
+                        }
+                        # The Details column carries the logged script block, so a row
+                        # naming a Foton function is the collector even outside the
+                        # window - typically an earlier run on the same host.
+                        if (-not $isSelf -and $line.IndexOf('Foton', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                            $isSelf = $true
+                        }
+
+                        if ($isSelf) {
+                            $selfTotal++
+                            if ($byWindow) { $selfByWindow++ } else { $selfByName++ }
+                            if (-not $selfCounts.ContainsKey($lvl)) {
+                                $selfCounts[$lvl] = 0
+                                $selfTitles[$lvl] = @{}
+                            }
+                            $selfCounts[$lvl] = $selfCounts[$lvl] + 1
+                            if (-not $selfTitles[$lvl].ContainsKey($ttl)) { $selfTitles[$lvl][$ttl] = 0 }
+                            $selfTitles[$lvl][$ttl] = $selfTitles[$lvl][$ttl] + 1
+                            continue
+                        }
+
+                        if (-not $counts.ContainsKey($lvl)) {
+                            $counts[$lvl] = 0
+                            $titles[$lvl] = @{}
+                        }
+                        $counts[$lvl] = $counts[$lvl] + 1
+                        if (-not $titles[$lvl].ContainsKey($ttl)) { $titles[$lvl][$ttl] = 0 }
+                        $titles[$lvl][$ttl] = $titles[$lvl][$ttl] + 1
+                    }
+                }
+                catch { }
+                finally { if ($reader) { $reader.Dispose() } }
+            }
+
+            $describe = {
+                param($Map, $Level)
+                $t = $Map[$Level]
+                if (-not $t) { return '' }
+                $top = @($t.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 6)
+                return (($top | ForEach-Object { "{0} ({1})" -f $_.Key, $_.Value }) -join '; ')
+            }
+            $capNote = ''
+            if ($capped) { $capNote = (" Row scan capped at {0} lines; counts are a floor, not a total." -f $maxLines) }
+            $selfNote = ''
+            if ($selfTotal -gt 0) {
+                $selfNote = (" Excludes {0} row(s) attributable to the Foton collector itself; see the collector-footprint finding." -f $selfTotal)
+            }
+
+            # Hayabusa abbreviates levels in CSV output unless -b is passed, so a
+            # timeline says "med" and "crit". Accept both spellings or whole bands
+            # silently vanish from the findings.
+            $sevBand = @(
+                @{ Levels = @('emergency', 'emer', 'critical', 'crit'); Severity = 'High'; Label = 'critical-level' }
+                @{ Levels = @('high'); Severity = 'High'; Label = 'high-level' }
+                @{ Levels = @('medium', 'med'); Severity = 'Medium'; Label = 'medium-level' }
+            )
+            foreach ($band in $sevBand) {
+                $total = 0
+                $samples = @()
+                foreach ($l in $band.Levels) {
+                    if ($counts.ContainsKey($l)) {
+                        $total += $counts[$l]
+                        $d = & $describe $titles $l
+                        if ($d) { $samples += $d }
+                    }
+                }
+                if ($total -le 0) { continue }
+                Add-FotonFinding -Severity $band.Severity -Category 'EventLogs' -Tier 2 `
+                    -Title ("Hayabusa reported {0} rule hits on copied EVTX" -f $band.Label) `
+                    -Observation ("{0} {1} detection(s) in analysis/external/hayabusa. Top rules: {2}.{3}{4}" -f $total, $band.Label, ($samples -join '; '), $capNote, $selfNote) `
+                    -WhyItMatters 'These are Hayabusa/Sigma rule hits, not a Foton engine and not a verdict. Sigma rules fire on legitimate administration, backup software, and management agents, and a Foton collection can itself trigger hive-access and script-execution rules. Judge each rule against what was expected on this host.' `
+                    -Artifact 'analysis/external/hayabusa' `
+                    -NextStep 'Filter the Hayabusa CSV to these RuleTitle values, note the RuleID and Timestamp, and corroborate against process, persistence, and account artifacts before drawing any conclusion.'
+            }
+
+            $lowVol = 0
+            foreach ($l in @('low', 'info', 'informational')) {
+                if ($counts.ContainsKey($l)) { $lowVol += $counts[$l] }
+            }
+            if ($lowVol -gt 0) {
+                Add-FotonFinding -Severity 'Info' -Category 'EventLogs' -Tier 1 -Title 'Hayabusa low and informational event volume' `
+                    -Observation ("{0} low/informational Hayabusa row(s) recorded. These are mostly normal telemetry (process execution, DNS queries, file creation) and are context for a timeline, not indicators.{1}{2}" -f $lowVol, $capNote, $selfNote) `
+                    -WhyItMatters 'Volume here reflects how much Sysmon/audit telemetry the host was producing. It is useful for timeline coverage and for spotting where telemetry stops.' `
+                    -Artifact 'analysis/external/hayabusa' `
+                    -NextStep 'Use these rows to bound the observable window rather than as suspicion.'
+            }
+
+            # Methodology disclosure, not a host observation. Reported so the operator
+            # can see what the collection itself put into the event log, and so the
+            # band counts above can be trusted as being about the host.
+            if ($selfTotal -gt 0) {
+                $selfSamples = @()
+                foreach ($l in @($selfCounts.Keys | Sort-Object)) {
+                    $d = & $describe $selfTitles $l
+                    if ($d) { $selfSamples += ("{0}: {1}" -f $l, $d) }
+                }
+                $winText = 'no collection window could be read from 00_Collection\collection.log'
+                if ($window) {
+                    $winText = ("collection window {0} to {1} UTC" -f
+                        $window.StartUtc.UtcDateTime.ToString('yyyy-MM-dd HH:mm:ss'),
+                        $window.EndUtc.UtcDateTime.ToString('yyyy-MM-dd HH:mm:ss'))
+                }
+                Add-FotonFinding -Severity 'Info' -Category 'Methodology' -Tier 2 -Title 'Hayabusa hits caused by the Foton collection itself' `
+                    -Observation ("{0} Hayabusa row(s) are attributed to the collection and excluded from the severity bands above: {1} fell inside the {2}, and {3} named a Foton function outside it. By level - {4}." -f $selfTotal, $selfByWindow, $winText, $selfByName, ($selfSamples -join ' | ')) `
+                    -WhyItMatters 'Script block logging records the collector''s own PowerShell, so Sigma rules for suspicious scripting and for registry or credential access fire on Foton. Left in the counts, that footprint is reported as host activity and can dominate a severity band. Attribution is inference, not process identity: rows are matched by time and by name, so genuine host activity that happened during the collection window is excluded here too, and an earlier Foton run on this host is included.' `
+                    -Artifact 'analysis/external/hayabusa' `
+                    -NextStep 'If a real event could have coincided with the collection, filter the Hayabusa CSV to that window and read the Details column directly rather than relying on this exclusion.'
+            }
+        }
+    }
+
+    # Absence is not evidence. The endpoint flatten ships without the
+    # suspicious-command pattern list (Defender AMSI blocks the flatten when it is
+    # embedded - see build/Build-Standalone.ps1), so every rule that depends on it
+    # is silently inert there. Say so rather than letting a pattern-free run read as
+    # a clean result.
+    if (@($script:FotonSession.SuspiciousCommandPatterns).Count -eq 0) {
+        Add-FotonFinding -Severity 'Info' -Category 'Methodology' -Tier 1 -Title 'Suspicious-command pattern matching did not run' `
+            -Observation 'No suspicious-command pattern list was loaded in this session, so process command lines, PowerShell console history, autostart values, and scheduled task actions were not matched against high-risk patterns. Any other finding in this report is unaffected.' `
+            -WhyItMatters 'This is a visibility gap, not a negative result: the absence of pattern findings here says nothing about whether such commands ran. The endpoint collector intentionally ships without the pattern list because embedding it causes antivirus to block the collector at load.' `
+            -Artifact 'src/Private/Patterns/SuspiciousCommandPatterns.txt' `
+            -NextStep 'Re-run Invoke-FotonAnalysis against this package from the Foton module on an analyst workstation, where the pattern list loads and these rules evaluate.'
+    }
+
     Write-FotonStatus ("Findings generated: {0}" -f $script:FotonSession.Findings.Count) 'Good'
 
+    # Collect already ran these same rules on the endpoint before zipping, so a
+    # workstation re-run over an untouched package reproduces that report rather
+    # than adding detection. Say so instead of letting it look like new analysis.
     $caseRoot = $script:FotonSession.CaseRoot
+    if ($caseRoot -and (Test-Path -LiteralPath $caseRoot)) {
+        $endpointFindings = Join-Path $caseRoot '00_Collection\findings.csv'
+        $extraInputs = @(
+            (Join-Path $caseRoot 'analysis\parsed_records.csv')
+            (Join-Path $caseRoot 'analysis\baseline_diff.csv')
+            (Join-Path $caseRoot 'analysis\external')
+        )
+        $haveExtra = $false
+        foreach ($p in $extraInputs) {
+            if (Test-Path -LiteralPath $p) { $haveExtra = $true }
+        }
+        if ((Test-Path -LiteralPath $endpointFindings) -and -not $haveExtra) {
+            Write-FotonStatus 'These heuristics already ran on the endpoint during Collect (00_Collection\findings.csv), so this run reproduces that report rather than adding detection. New findings come from Invoke-FotonParse, Invoke-FotonExternalParse (compose), Invoke-FotonIocMatch, or Compare-FotonBaseline - then re-run analyze.' 'Warn'
+        }
+    }
+
     if ($caseRoot -and (Test-Path -LiteralPath $caseRoot)) {
         $analysisDir = Join-Path $caseRoot 'analysis'
         New-Item -Path $analysisDir -ItemType Directory -Force | Out-Null
         $findingsPath = Join-Path $analysisDir 'findings.csv'
         if ($script:FotonSession.Findings.Count -gt 0) {
             $script:FotonSession.Findings | Export-Csv -Path $findingsPath -NoTypeInformation -Encoding UTF8
+            # For a ZIP the case root is a temp extraction the operator never sees.
+            # Drop a second copy beside the ZIP so the findings survive cleanup.
+            $pkgMeta = $script:FotonSession.Package
+            if ($pkgMeta -and $pkgMeta.Kind -eq 'Zip' -and $pkgMeta.SourcePath) {
+                $stem = [IO.Path]::GetFileNameWithoutExtension($pkgMeta.SourcePath)
+                $beside = Join-Path (Split-Path -Parent $pkgMeta.SourcePath) ($stem + '_findings.csv')
+                $script:FotonSession.Findings | Export-Csv -Path $beside -NoTypeInformation -Encoding UTF8
+            }
         }
     }
 }

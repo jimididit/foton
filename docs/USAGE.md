@@ -9,7 +9,7 @@ Foton has **two machines**. Mixing them is what feels like too much PowerShell.
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-Current stamps (from `Foton.psd1`): module **1.24.0**, collect schema **1.8.0**, baseline schema **1.13.0**. `Get-FotonVersion` prints the same after import.
+Current stamps (from `Foton.psd1`): module **1.27.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
 
 ---
 
@@ -24,15 +24,34 @@ On a trusted box, rebuild after Collect/Baseline source changes:
 
 That writes a **versioned** leaf and an unversioned alias (same bytes):
 
-- `dist\Foton-Collect_v1.24.0_schema1.8.0.ps1` and `dist\Foton-Collect.ps1`
-- `dist\Foton-Baseline_v1.24.0_schema1.13.0.ps1` and `dist\Foton-Baseline.ps1`
+- `dist\Foton-Collect_v1.27.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
+- `dist\Foton-Baseline_v1.27.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
 
 Copy **one** file to the target (USB, RMM, email). Prefer the versioned leaf so the module and schema stay in the filename.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.24.0_schema1.8.0.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.24.0_schema1.13.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.27.0_schema1.10.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.27.0_schema1.14.0.ps1
 ```
+
+### If antivirus blocks the collector
+
+Endpoint security products scan PowerShell content at load through AMSI, and DFIR
+tooling reads like attack tooling. If the collector is blocked, you will see a
+scanner alert naming the script and PowerShell will refuse to run it with *"This
+script contains malicious content and has been blocked by your antivirus software."*
+
+Foton no longer embeds its suspicious-command pattern list in the flatten for exactly
+this reason (Defender flagged it as `Trojan:PowerShell/PSAttackTool.A`), so a current
+build should load cleanly. If your product still blocks it:
+
+- Verify locally before deployment: `.\build\Test-FotonAmsiLoad.ps1 -Path .\dist\Foton-Collect.ps1`. This compiles the script through AMSI without collecting anything.
+- Report it to your vendor as a false positive, and attach the package hash.
+- If your engagement authority permits it, add a **scoped, temporary** exclusion for the collector path on the target, and record it in the case notes - it changes the host's security posture during collection, which belongs in the methodology disclosure.
+- Do not modify the script to evade the scanner. An obfuscated collector is not defensible in a report, and the output would no longer match the published package hash.
+
+A block is also itself an observation worth recording: it tells you the host had an
+active scanner at collection time.
 
 Default `-OutputPath` is the current user’s **Desktop**. Open `Foton_Report.html` or `Foton_Baseline.html` **inside** the new folder. Send **ZIP + `*_PACKAGE_HASH.txt`** (or the whole folder). HTML alone is not the package.
 
@@ -51,6 +70,7 @@ Writes `Foton_<HOSTNAME>_<UTC>Z\`. Alters the host. Findings in the HTML are obs
 | `-SkipHashing` | Skip per-file SHA-256 (package still hashed) |
 | `-LoadUserHives` | Load NTUSER.DAT for users not logged on (unloaded in `finally`) |
 | `-IncludeFileTimeline` | Extra user-writable exe sweep (not a MACB timeline) |
+| `-IncludeUsnJournal` | Also copy `$J` when possible. Default is `fsutil usn queryjournal` text only. **`$MFT` is never copied** (KAPE/ORC). |
 | `-NoZip` | Folder only |
 | `-RequireAdministrator` | Exit if not elevated |
 
@@ -68,7 +88,7 @@ On a **workstation clone** of this repo (lab only), the same collect is `Invoke-
 
 Writes `FotonBaseline_<HOSTNAME>_<UTC>Z\` with `baseline.json`, hashes, optional ZIP, `Foton_Baseline.html`. Not a triage collect. Volatile fields (PIDs, live connections) are out of scope.
 
-A baseline taken after an incident is a picture of **that** state. Compare proves change between two observations, not when or who. Schema **1.13.0** will not compare against older baseline JSON.
+A baseline taken after an incident is a picture of **that** state. Compare proves change between two observations, not when or who. Schema **1.14.0** will not compare against older baseline JSON. Recapture day0 after this bump (WDAC/AppLocker policy hash).
 
 ```powershell
 .\Foton-Baseline.ps1 -OutputPath D:\Baselines -NoZip
@@ -99,11 +119,25 @@ Foton.cmd carve    D:\blob.bin
 | `baseline` | Capture on **this** workstation | Package folder, or JSON if the path ends in `.json` |
 | `compare` | Diff two baselines | Table + `Foton_BaselineCompare.html` beside the second JSON |
 | `parse` | Offline Prefetch / LNK / jumplist / EVTX / Amcache | `analysis\parsed_records.csv`, `analysis\Foton_Parse.html` |
-| `analyze` | Load package, run heuristics, write HTML | `Foton_Report.html`, `analysis\findings.csv` |
+| `compose` | If EZ Tools / Hayabusa / Chainsaw are on PATH, run them on copied files | `analysis\external\<tool>\` hashed CSV; inventory CSV. Native parse if missing |
+| `analyze` | Load package, run heuristics, write HTML | Case folder: `Foton_Report.html`, `analysis\findings.csv`. ZIP: `<zip-stem>_Report.html` + `<zip-stem>_findings.csv` **beside the ZIP** |
 | `ioc` | Match a text/CSV/JSON IOC list to the package | Match table (Tier 2 hits) |
 | `carve` | MZ/PE signature scan of a blob (capped) | Hit table. Not NTFS unallocated |
 
 Parse HTML is **not** findings. Analyze HTML is **not** a parsed artifact dump. Re-reporting does not rewrite collect `hashes.csv`.
+
+Pointing `analyze`, `parse`, or `compose` at a **ZIP** extracts it to a temp folder that is not preserved, so those commands write their reports next to the ZIP instead. The report's relative artifact links (`06_Security_Posture\...`) only resolve when you analyze an **extracted case folder** — the HTML says so in its limitations section.
+
+**Extract the ZIP before chaining these commands.** Each ZIP open extracts to a *new* temp folder, so `compose` writes `analysis\external\` into a directory that a later `analyze` never sees — the tool output is silently lost and cannot feed findings. Against a case folder the three steps accumulate correctly, in this order:
+
+```powershell
+Expand-Archive D:\Cases\Foton_HOSTNAME_...Z.zip -DestinationPath D:\Cases
+.\Foton.cmd parse   D:\Cases\Foton_HOSTNAME_...Z
+.\Foton.cmd compose D:\Cases\Foton_HOSTNAME_...Z
+.\Foton.cmd analyze D:\Cases\Foton_HOSTNAME_...Z
+```
+
+`analyze` must run **last**: it consumes what `parse` and `compose` wrote to disk.
 
 ---
 
@@ -172,6 +206,26 @@ ConvertFrom-FotonJumplist -Path D:\Cases\...\9b9cdc69de0e5dea.automaticDestinati
 ```
 
 SRUM ESE is **copied, not parsed**.
+
+### Compose (EZ Tools / Hayabusa, optional)
+
+Native `ConvertFrom-Foton*` is the air-gap fallback. If Eric Zimmerman tools or Hayabusa/Chainsaw are **already on PATH**, `Invoke-FotonExternalParse` runs them on **copied** package files only (no download, no live host).
+
+```powershell
+Get-FotonPackage -Path D:\Cases\Foton_HOSTNAME_...Z
+Invoke-FotonParse
+Invoke-FotonExternalParse
+Invoke-FotonAnalysis
+New-FotonReport
+```
+
+Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are inventory rows (`NotOnPath`), not failures. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. Copy `Foton-Collect.ps1` does not parse Prefetch/EVTX/hives on the endpoint.
+
+Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard), because without it the tool waits for keyboard input and compose looks hung. Rules are loaded from the `rules\` folder beside the binary, so keep the release layout intact rather than copying a lone `hayabusa.exe` onto PATH — copy the whole extracted release folder and put *that* on PATH. Each tool is launched with its own install directory as the working directory, because Hayabusa resolves `config\` (output profiles, level colours) relative to the working directory and otherwise reports missing rules and config.
+
+**Collector footprint.** Script block logging records Foton's own PowerShell, so hunt rules for suspicious scripting and for registry or credential access fire on the collection itself. On a real package this was the single largest medium-level "detection". `Invoke-FotonAnalysis` attributes such rows to the collection — by timestamp inside the collection window read from `00_Collection\collection.log`, and by rows naming a Foton function outside it — excludes them from the severity bands, and reports the count as an Info methodology finding. That exclusion is inference, not process identity: genuine host activity during the collection window is excluded too, so filter the Hayabusa CSV to that window yourself if something could have coincided.
+
+Why this matters for `analyze`: **Collect already ran the heuristics on the endpoint**, so `analyze` on an untouched package reproduces `00_Collection\findings.csv` rather than adding detection, and it now says so. Parse, compose, `ioc`, and baseline compare are what add new findings — run them, then analyze again.
 
 ### Analyze, IOC, report, carve
 

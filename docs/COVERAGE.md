@@ -11,6 +11,8 @@ Sources that shaped the gap list (industry practice, not a vendor checklist):
 
 Foton must not become Autoruns, Velociraptor, WinPmem, or a CIS benchmark scorer. It automates **enough Windows DFIR** that an examiner gets a hashed package and a honest diff, then goes deeper with specialist tools.
 
+How those specialists map to Foton (compose vs rebuild, PowerShell vs C#/Rust): **[LANDSCAPE.md](LANDSCAPE.md)**. Inventory of artifacts stays here; strategy stays there.
+
 ---
 
 ## Use cases (in scope)
@@ -59,8 +61,8 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | Network | Connections, listeners, IP/ARP/DNS/hosts, firewall, shares, proxy, Wi-Fi profiles |
 | Persistence | Machine **and** per-user Run keys, Startup folders, **StartupApproved**, tasks + task XML listing, services, WMI, Winlogon/LSA/IFEO/AppInit, **cmd_autorun**, **session_manager_boot**, **known_dlls**, **winsock_lsp**, **active_setup**, **silent_process_exit**, **netsh_helpers**, **time_providers**, **screensaver**, accessibility binaries, COM hijack *candidates*, BITS, Office add-ins |
 | Security | Defender status/prefs/detections, hardening CSV, auditpol (admin), SMB/WinRM, PS policy, non-MS roots, AppLocker/WDAC summary |
-| EventLogs | Capped queries + log configuration |
-| Filesystem | User-writable executables, recent System32 churn, Prefetch listing + **copied `.pf`** (capped), **Amcache.hve** (+ logs), **SRUM** (+ WAL/SHM), **BAM/DAM UserSettings**, **AppCompatCache.bin export**, **OneDrive/Teams local inventory**, ADS, Recycle Bin, USB, LNK/jumplist *inventory*, odd root items |
+| EventLogs | Capped selected-ID CSV queries + **raw `.evtx` export** (Security/System/Application, PowerShell, TaskScheduler, Defender, BITS, WMI, TerminalServices, Sysmon if present, Firewall channel) |
+| Filesystem | User-writable executables, recent System32 churn, Prefetch listing + **copied `.pf`** (capped), **Amcache.hve** (+ logs), **SRUM** (+ WAL/SHM), **machine + user registry hives** (+ `.LOG*`), **Recent LNK/jumplist files** (capped) plus inventory, **Tasks XML**, **browser History/Cookies/places.sqlite** (copy only), **setupapi/CBS/PS transcript**, optional **USN `$J`**, **BAM/DAM UserSettings**, **AppCompatCache.bin export**, **OneDrive/Teams local inventory**, ADS, Recycle Bin, USB |
 | Software | Uninstall keys, drivers, browser extensions, RAT name hits, AppX |
 
 **Collect gaps (priority).** Common in IR kits and still thin or missing as *package artifacts*:
@@ -74,17 +76,30 @@ Nine categories. Facts only. See `src/Public/Collect/*.ps1` task names.
 | done (1.6.0) | Entra / workplace join / MDM enrollment facts | Modern endpoints | Local registry only. No dsregcmd, Graph, or tenant lookup. Unloaded hives are a visibility gap |
 | done (1.7.0) | OneDrive/Teams local artifacts | Modern endpoints | Inventory only. No Graph, no cookie/IndexedDB copy, no cloud-tree walk |
 | done (1.8.0) | Screensaver, SilentProcessExit, netsh helpers, time providers | Lower-volume ASEPs | Screensaver Collect-only (user churn). Others also baseline 1.13.0 |
+| done (1.9.0) | Copy SYSTEM/SOFTWARE/SAM/SECURITY/DEFAULT + NTUSER/UsrClass (+ logs) | Bytes for RECmd / Registry Explorer | Admin; capped; not parsed on the endpoint |
+| done (1.9.0) | Copy Recent LNK, jumplists, Tasks XML | Native parse + LECmd/JLECmd | Caps; inventory CSV remains |
+| done (1.9.0) | Expand raw EVTX copy set | Hayabusa on the workstation | Still capped; selected-ID CSVs kept |
+| done (1.9.0) | Browser DB + setupapi/CBS/PS transcript copies | File facts for later parsers | No decrypt, no Graph; lock = coverage gap |
+| done (1.9.0) | Optional `-IncludeUsnJournal` | USN `$J` when the operator asks | Default is queryjournal text. `$MFT` is KAPE/ORC, not Foton |
+| done (1.10.0) | Stop interpreting command text during collection | The embedded pattern list made Defender block the whole collector at load | `SuspiciousHits` / `SuspiciousCmdHits` columns remain but ship empty; Analyze derives them from `Command` / `Actions` / `CommandLine` on the workstation |
 | P3 | Memory, pcap, full MFT | Wrong runtime | External tools |
 
 Standard-user Collect is **intentional**. Security log, Prefetch, other users’ hives stay skipped, not empty-success.
 
+Antivirus is a coverage factor, not just an annoyance: a collector the endpoint refuses
+to load captures nothing. Since collect 1.10.0 the suspicious-command pattern list is
+not embedded in the flatten (see [src/Private/Patterns/README.md](../src/Private/Patterns/README.md)),
+so the matching rules are inert during endpoint collection and Analyze raises an Info
+visibility-gap finding to say so. Run `Invoke-FotonAnalysis` from the module on a
+workstation to evaluate them.
+
 ---
 
-## Baseline today (schema 1.13.0)
+## Baseline today (schema 1.14.0)
 
 See `src/Public/Baseline/README.md` for identity keys.
 
-Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, **PrintMonitor**, **BitsJob**, **CmdAutoRun**, **SessionManager**, **KnownDll**, **ProxyConfig**, **WinsockLsp**, **ActiveSetup**, **SilentProcessExit**, **NetshHelper**, **TimeProvider**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
+Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutorun** (loaded hives), StartupFile, StartupApproved, **DefenderPreference**, **RemoteAccessConfig**, **LsaPackage**, **PrintMonitor**, **BitsJob**, **CmdAutoRun**, **SessionManager**, **KnownDll**, **ProxyConfig**, **WinsockLsp**, **ActiveSetup**, **SilentProcessExit**, **NetshHelper**, **TimeProvider**, **WdacApplockerPolicy**, LocalAccount, LocalGroupMember, HardeningRegistry, InstalledSoftware, FirewallRule, Certificate, Listener (TCP + non-ephemeral UDP), NetworkShare, SystemBinary, HostsEntry, MachineEnvironment, WmiPermanentEvent, ImageFileExecution, Winlogon, AppInitDll.
 
 **Baseline gaps (priority).** Prefer these over exotic ASEPs. Each needs a stable identity key and documented false positives.
 
@@ -103,6 +118,7 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 | done (1.13.0) | SilentProcessExit | ImageName | MonitorProcess ASEP. FP: procmon/debug dumps |
 | done (1.13.0) | NetshHelper | Key + Name | T1546.007. FP: VPN/EDR helpers |
 | done (1.13.0) | TimeProvider | Name | W32Time DLLs. FP: VMIC/GPO Enabled. Not NTP peers |
+| done (1.14.0) | WdacApplockerPolicy | Kind + Name | SiPolicy.p7b / `.cip` / effective AppLocker XML **hash**. FP: feature-update SIPolicy refresh. Not a compliance score |
 | Collect-only | Screensaver | - | `screensaver` CSV; Desktop/policy SCRNSAVE.EXE. User churn |
 | Collect-only | ComHijack | - | `com_hijack_candidates` CSV; too noisy for a stable baseline |
 | Collect-only | OfficeAddin | - | `office_addins_and_templates`; user churn |
@@ -118,8 +134,8 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 
 | Layer | Have | Next (useful DFIR, still offline) |
 |-------|------|-----------------------------------|
-| Parse | Prefetch (uncompressed SCCA), LNK, **EVTX (selected IDs, capped)**, **jumplists (DestList + custom LNK)**, **Amcache InventoryApplicationFile (named values)** | shellbags, SRUM *parser* (ESE), browser DB - **fixtures first**. Legacy Amcache `File\*` is unsupported (no guessed FILETIME). Collect copies SRUM; do not fake an ESE parse. |
-| Analyze | Triage heuristics + IOC file | Rules that consume *parsed* rows and baseline diffs; never live WMI |
+| Parse | Prefetch (uncompressed SCCA), LNK, **EVTX (selected IDs, capped)**, **jumplists (DestList + custom LNK)**, **Amcache InventoryApplicationFile (named values)**. Native fallback; **EZ Tools / Hayabusa if on PATH** (`Invoke-FotonExternalParse`) | shellbags, SRUM *parser* (ESE), browser DB *parse* - **fixtures first**. Collect copies SRUM and browser DBs; do not fake an ESE parse. |
+| Analyze | Triage heuristics + IOC file + **parsed_records.csv** user-writable paths + **baseline_diff.csv** (service PathName, Administrators, Defender RTP) | Still observations, not “compromised.” External-tool hits named to the tool |
 | Carve | MZ/PE signature scan of a blob | Not NTFS unallocated in PS |
 
 ---

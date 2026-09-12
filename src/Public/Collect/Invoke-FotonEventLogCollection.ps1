@@ -88,10 +88,12 @@ function Invoke-FotonEventLogCollection {
             'Microsoft-Windows-PowerShell/Operational',
             'Microsoft-Windows-TaskScheduler/Operational',
             'Microsoft-Windows-Windows Defender/Operational',
+            'Microsoft-Windows-Bits-Client/Operational',
+            'Microsoft-Windows-WMI-Activity/Operational',
             'Microsoft-Windows-TerminalServices-LocalSessionManager/Operational',
             'Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational',
-            'Microsoft-Windows-WMI-Activity/Operational',
-            'Microsoft-Windows-Sysmon/Operational')
+            'Microsoft-Windows-Sysmon/Operational',
+            'Microsoft-Windows-Windows Firewall With Advanced Security/Firewall')
         foreach ($log in $exportLogs) {
             if ((-not $script:FotonSession.IsElevated) -and ($log -eq 'Security')) {
                 Write-FotonStatus "EVTX export skipped for Security (not elevated)" 'Info'

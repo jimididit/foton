@@ -53,19 +53,25 @@ function Get-FotonPackage {
     }
 
     Import-FotonPackageData -CaseRoot $caseRoot
+    $nested = Get-FotonNestedDuplicateRoot -CaseRoot $caseRoot
     $script:FotonSession.Package = @{
-        SourcePath = $item.FullName
-        Kind       = $kind
-        CaseRoot   = $caseRoot
+        SourcePath      = $item.FullName
+        Kind            = $kind
+        CaseRoot        = $caseRoot
+        NestedDuplicate = $nested
     }
 
     Write-FotonStatus ("Loaded package {0} ({1} cached artifact keys)" -f $caseRoot, $script:FotonSession.Data.Count) 'Good'
+    if ($nested) {
+        Write-FotonStatus ("This package contains a full copy of itself at {0}. Recursive layers will skip it so artifacts are not counted twice. Verify 00_Collection\hashes.csv covers one tree only." -f (Split-Path -Leaf $nested)) 'Warn'
+    }
 
     [PSCustomObject]@{
-        CaseRoot     = $caseRoot
-        SourcePath   = $item.FullName
-        Kind         = $kind
-        ArtifactKeys = @($script:FotonSession.Data.Keys | Sort-Object)
-        ManifestRows = $script:FotonSession.Manifest.Count
+        CaseRoot        = $caseRoot
+        SourcePath      = $item.FullName
+        Kind            = $kind
+        ArtifactKeys    = @($script:FotonSession.Data.Keys | Sort-Object)
+        ManifestRows    = $script:FotonSession.Manifest.Count
+        NestedDuplicate = $nested
     }
 }
