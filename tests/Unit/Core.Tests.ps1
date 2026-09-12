@@ -353,10 +353,13 @@ putty
                 [IO.File]::WriteAllBytes($old, [byte[]](1, 1))
                 Start-Sleep -Milliseconds 20
                 [IO.File]::WriteAllBytes($new, [byte[]](2, 2))
+                # Compare against FileInfo.FullName: $env:TEMP can be an 8.3 short
+                # path on CI runners (RUNNER~1) while Get-ChildItem returns the long form.
+                $newFull = (Get-Item -LiteralPath $new).FullName
                 $rows = @(Copy-FotonCappedHostFiles -SourceDirectory $srcDir -Filter '*.pf' -DestinationDirectory $dstDir -MaxFiles 1 -MaxTotalBytes 1000)
                 ($rows | Where-Object { $_.Status -eq 'Copied' }).Count | Should -Be 1
                 ($rows | Where-Object { $_.Status -eq 'CappedSkip' }).Count | Should -Be 1
-                ($rows | Where-Object { $_.Status -eq 'Copied' }).SourcePath | Should -Be $new
+                ($rows | Where-Object { $_.Status -eq 'Copied' }).SourcePath | Should -Be $newFull
             }
             finally {
                 Remove-Item -LiteralPath $srcDir, $dstDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -583,8 +586,10 @@ putty
             $inner = Join-Path $case 'Foton_HOST_20260101-000000Z'
             New-Item -Path (Join-Path $case '00_Collection') -ItemType Directory -Force | Out-Null
             New-Item -Path (Join-Path $inner '00_Collection') -ItemType Directory -Force | Out-Null
+            # FullName avoids 8.3 vs long-path mismatch when $env:TEMP is short on CI.
+            $innerFull = (Get-Item -LiteralPath $inner).FullName
             try {
-                Get-FotonNestedDuplicateRoot -CaseRoot $case | Should -Be $inner
+                Get-FotonNestedDuplicateRoot -CaseRoot $case | Should -Be $innerFull
             }
             finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
         }

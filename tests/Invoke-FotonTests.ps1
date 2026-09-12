@@ -16,4 +16,6 @@ Import-Module Pester -MinimumVersion 5.0.0
 $config = New-PesterConfiguration
 $config.Run.Path = $Path
 $config.Output.Verbosity = 'Detailed'
+# Fail the process (and CI) when any test fails; Detailed still prints the table.
+$config.Run.Exit = $true
 Invoke-Pester -Configuration $config
