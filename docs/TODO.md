@@ -1,22 +1,27 @@
 # Backlog
 
-Use this file when you return to Foton after a break. Layers and artifact inventory: [COVERAGE.md](COVERAGE.md). How to run: [USAGE.md](USAGE.md).
+Use this file when you return to Foton after a break. Strategy and course check: [LANDSCAPE.md](LANDSCAPE.md). Layers and artifact inventory: [COVERAGE.md](COVERAGE.md). How to run: [USAGE.md](USAGE.md). Tool install design: [TOOLS.md](TOOLS.md).
 
-The v1 → module extract is **done** ([MIGRATION.md](MIGRATION.md)). Endpoint files are the flatten scripts, not a 3k-line collector.
+The v1 → module extract is **done** ([MIGRATION.md](MIGRATION.md)). Endpoint files are the flatten scripts, not a 3k-line collector. The landscape *compose* plan through **1.27.0** is largely landed (raw copies, Hayabusa compose + footprint exclusion, AMSI fix). Next work is **finish and convenience**, not a new architecture.
+
+**North star (from LANDSCAPE):** go-to Windows **audit / known-good baseline** tool; competitive IR via compose — not by absorbing KAPE/Hayabusa/Autoruns into PowerShell. Anti-monstrosity: every item below must strengthen baseline/audit, the package for specialists, or compose/analyze convenience.
 
 ---
 
 ## Will implement (next product work)
 
-Ordered. Prefer the next Collect P1 over exotic ASEPs.
+Ordered. Prefer finish and compose convenience over exotic ASEPs or new native parsers.
 
-1. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips.
-2. **External tool provisioning** - design agreed, not built: [TOOLS.md](TOOLS.md). Collect is one file for the target user; the workstation side still needs a manual tool download plus a correct `PATH`, and when that is missing compose quietly produces no findings. Scope for the first cut:
-   - `Install-FotonTool` + `Foton.cmd tools`, **Hayabusa only**. Separate setup command; compose stays offline and never prompts, it just names the command in its `NotOnPath` row.
-   - Foton-owned tool root (`%LOCALAPPDATA%\Foton\tools`) + `tools.json`. Resolution order in `Invoke-FotonExternalParse`: `-ToolPath`, then manifest, then `PATH`. **Do not modify `PATH`** - see TOOLS.md for why.
-   - Pinned version + expected SHA-256, refuse on mismatch; offline install from a local archive folder.
-   - Add tool **version** and rule-set version to the external parse inventory and the report's External Tool Passes section. Without it, external findings are not reproducible.
-   - Tests: faked catalog and a faked archive; no network in tests.
+1. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips. Trust beats novelty.
+2. **External tool provisioning** — design agreed, not built: [TOOLS.md](TOOLS.md). Without this, workstation compose is optional expertise and `NotOnPath` looks like a clean host. First cut:
+   - `Install-FotonTool` + `Foton.cmd tools`, **Hayabusa only**. Separate setup command; compose stays offline and never prompts; `NotOnPath` names this command.
+   - Foton-owned tool root (`%LOCALAPPDATA%\Foton\tools`) + `tools.json`. Resolution: `-ToolPath`, then manifest, then `PATH`. **Do not modify `PATH`.**
+   - Pinned version + expected SHA-256; offline install from a local archive folder.
+   - Tool **version** and rule-set version in external inventory + report External Tool Passes.
+   - Tests: faked catalog / archive; no network in tests.
+3. **Analyze consumes compose output** — PECmd / EvtxECmd (and later Chainsaw) CSV → observations that cite the tool. Today eight tools can run; only Hayabusa feeds findings. Prefer ingest over growing `ConvertFrom-Foton*`.
+4. **Baseline / audit operator path** — USAGE recipes for temporal (day0 → later) and fleet (host vs golden); thicken `baseline_diff` → findings only where identity + FP notes already exist. Do **not** add codecs/BHO/OptionalFeature providers for “completeness.”
+5. **Analyze-without-clone zip** + documented Authenticode / ExecutionPolicy story (release bar).
 
 **SRUM:** Collect copies the DB + WAL/SHM. A real ESE parser in PowerShell is unlikely to be correct; prefer “copied, not parsed” until a dedicated approach exists.
 
@@ -24,16 +29,17 @@ Ordered. Prefer the next Collect P1 over exotic ASEPs.
 
 ## Considering (not scheduled)
 
-Propose before building.
+Propose before building. Most of these are monstrosity risks if done early.
 
-- **In-report artifact browser** - navigable CSV/JSON inside `Foton_Report.html`. Offline only; cap rows; escape cells. Decide `file://` vs embed vs local HTTP first. Findings-first HTML already exists.
-- **TUI / GUI workstation shell** - wrap Collect/Baseline/open HTML. Does **not** replace one-file IR scripts. No risk score. Prefer TUI before a signed exe. Blocked on public-release bar being mostly green.
-- **MAM Prefetch inflate** - Win10+ `.pf` names stay empty until we inflate correctly.
-- **NTFS unallocated carve** - not in PowerShell; see [CARVE.md](CARVE.md).
-- **Authenticode** for flatten scripts / ExecutionPolicy story. Note that signing does **not** prevent AMSI content scanning: the 1.27.0 Defender block was on script content, not trust.
-- **Analyze zip** that does not require cloning the repo.
-- **OptionalFeature / Appx** as baseline - noisy on consumer SKUs.
-- **Codecs, gadgets, IE BHO** - low ROI.
+- **In-report artifact browser** — navigable CSV/JSON inside `Foton_Report.html`. Offline only; cap rows; escape cells. Decide `file://` vs embed vs local HTTP first. Findings-first HTML already exists.
+- **TUI / GUI workstation shell** — wrap Collect/Baseline/open HTML. Does **not** replace one-file IR scripts. No risk score. Prefer TUI before a signed exe. **Blocked** on public-release bar being mostly green.
+- **MAM Prefetch inflate in PowerShell** — wrong default; prefer PECmd via compose once tools install exists. Keep native “unsupported,” never guessed names.
+- **NTFS unallocated carve** — not in PowerShell; see [CARVE.md](CARVE.md).
+- **ZIP package session** — single extract reused across parse/compose/analyze so chaining a ZIP does not silently drop compose output (USAGE already says extract first; a code fix is optional later).
+- **OptionalFeature / Appx** as baseline — noisy on consumer SKUs.
+- **Codecs, gadgets, IE BHO** — low ROI; use Autoruns.
+- **Chainsaw** verify + ingest — after Hayabusa install path is solid.
+- **`$MFT` copy** — charter decision vs KAPE/ORC handoff; do not parse in PS.
 
 ---
 
@@ -69,6 +75,7 @@ Do not treat a GitHub release as ready for first-time DFIR users until most of t
 - Findings never say compromised / attributed
 - Methodology / limitations updated if collect footprint changes
 - Baseline provenance caveat in USAGE and HTML
+- External-tool hits name the engine; collector footprint is disclosed when excluded
 
 ---
 
@@ -78,10 +85,12 @@ Do not treat a GitHub release as ready for first-time DFIR users until most of t
 
 Operator copies one file, gets `FotonBaseline_<HOST>_<UTC>Z/` with `baseline.json`, hashes, `coverage.json`, `Foton_Baseline.html`. Analyst compares offline. Do not emit compare HTML on the endpoint. Do not mix baseline into a Collect case folder.
 
+This is the wedge for “go-to audit/baseline.” Next baseline work is operator recipes and diff→findings, not a second packaging format.
+
 ---
 
 ## In-report artifact browser (consideration)
 
 **Status:** Not started. HTML already has search/nav chrome. A full CSV browser is separate.
 
-Stay offline, cap rows, `ConvertTo-FotonSafeHtml`, no “compromised” charts. Propose `file://` vs embed before a large JS app.
+Stay offline, cap rows, `ConvertTo-FotonSafeHtml`, no “compromised” charts. Propose `file://` vs embed before a large JS app. Do not schedule ahead of the public-release bar.

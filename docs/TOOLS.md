@@ -1,6 +1,6 @@
 # External tool provisioning (design, not yet implemented)
 
-**Status: proposed.** Nothing in this file is built. Strategy for *why* Foton composes specialist tools instead of cloning them is [LANDSCAPE.md](LANDSCAPE.md); how to run compose today is [USAGE.md](USAGE.md). This file is the design for **getting the tools onto an analyst workstation** without breaking layer separation or reproducibility.
+**Status: proposed.** Nothing in this file is built. Strategy and course check: [LANDSCAPE.md](LANDSCAPE.md). Ordered backlog: [TODO.md](TODO.md). How to run compose today: [USAGE.md](USAGE.md). This file is the design for **getting the tools onto an analyst workstation** without breaking layer separation or reproducibility — the main remaining convenience gap after landscape compose work landed.
 
 ## Problem
 

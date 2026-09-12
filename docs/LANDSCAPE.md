@@ -1,27 +1,72 @@
 # Landscape, strengths, and development direction
 
-Contributor and agent guidance: **how Foton should grow relative to specialist Windows DFIR tools.** Artifact inventory stays in [COVERAGE.md](COVERAGE.md). The public-release checklist stays in [TODO.md](TODO.md). Getting the composed tools onto a workstation is designed in [TOOLS.md](TOOLS.md). This file is the **strategy**: what to keep, what to compose, what not to rebuild in PowerShell.
+Contributor and agent guidance: **how Foton should grow relative to specialist Windows DFIR tools.** Artifact inventory stays in [COVERAGE.md](COVERAGE.md). Ordered backlog and public-release bar stay in [TODO.md](TODO.md). Workstation tool install design stays in [TOOLS.md](TOOLS.md). This file is the **strategy**: what to keep, what to compose, what not to rebuild in PowerShell — including the post-landscape course check so we do not restart from a new plan every audit.
 
-Landscape snapshot: August 2026. Written against module **1.24.0**, collect schema **1.8.0**, baseline schema **1.13.0**; current is module **1.27.0**, collect schema **1.10.0**, baseline schema **1.14.0**. Tool capabilities change; the *composition* rule does not.
+Landscape snapshot: August 2026 (module **1.24.0** / collect **1.8.0** / baseline **1.13.0**). **Course check: September 2026** against module **1.27.0**, collect schema **1.10.0**, baseline schema **1.14.0**. Tool capabilities change; the *composition* rule and the anti-monstrosity rule do not.
 
-When you write a development plan from this document, treat the **Recommended build strategy** and **Planning constraints** sections as requirements, not suggestions.
+When you write a development plan from this document, treat the **Recommended build strategy**, **Product thesis**, and **Planning constraints** sections as requirements, not suggestions.
+
+---
+
+## Product thesis (north star)
+
+**Win as the go-to Windows audit / known-good baseline tool**, and stay a credible first-pass IR / triage toolkit by composing specialists — not by absorbing them.
+
+| Use case | Foton should be | Peer still owns deep work |
+|----------|-----------------|---------------------------|
+| **What changed since provision / golden?** | Best-in-class: identity keys, deterministic hash, field-level HTML compare, coverage honesty | — |
+| **Harden / audit snapshot** | Best-in-class for *this host vs last week / role image* (facts + drift), not a CIS pass/fail scorer | CIS-CAT / Intune for policy benchmarks |
+| **Live triage → hashed case** | Competitive: one `.ps1`, RMM-friendly, volatile + persistence + raw copies + HTML observations | KAPE/ORC for full disk targets; Velociraptor for fleet |
+| **Offline EVTX hunt / Prefetch depth** | Competitive **only via compose** (Hayabusa, EZ Tools) inside the case | Hayabusa, EZ Tools as engines |
+
+That is how to be a top-tier *solution for several use cases* without becoming a kitchen-sink. Competing on “more CSVs of the same live APIs” or “another Prefetch parser in PowerShell” is the path to a monstrosity. Competing on **hashed case + known-good config diff + honest first-pass report that specialists feed** is the path that was already working.
+
+**Anti-monstrosity rule:** every new feature must either (a) strengthen Baseline/audit, (b) make Collect or the package more useful to specialists, or (c) make compose/analyze *convenient and reproducible*. If it is “completeness for its own sake” (another ASEP tab, native Sigma, TUI before the release bar), it waits or dies in [TODO.md](TODO.md) Considering.
 
 ---
 
 ## Direct answer
 
-Foton is a coherent IR + configuration-drift toolkit with examiner-grade ethics (hashed package, coverage gaps disclosed, observations not verdicts). It is **not** overcomplicated for a five-layer product. It **is** below par if judged as KAPE + Hayabusa + Autoruns in one PowerShell binary.
+Foton is a coherent IR + configuration-drift toolkit with examiner-grade ethics (hashed package, coverage gaps disclosed, observations not verdicts). It is **not** overcomplicated for a five-layer product. It **is** still below par if judged as KAPE + Hayabusa + Autoruns in one PowerShell binary — and that judgment is the wrong target.
 
 The combination is uncommon:
 
 - One-file PowerShell 5.1 live triage (no install, RMM-friendly)
-- Deterministic field-level baseline **beyond** ASEP (Defender, RDP/WinRM, certs, firewall, listeners, LSA, BITS, hardening)
+- Deterministic field-level baseline **beyond** ASEP (Defender, RDP/WinRM, certs, firewall, listeners, LSA, BITS, hardening, WDAC policy hash)
 - Offline parse / analyze / report on a hashed package
 - Findings that refuse to say “compromised”
+- Compose path that attributes the collector’s own EVTX footprint instead of accusing the host
 
 Individual layers already have better specialists. **Improve by composing those tools, not cloning them.** A full Foton toolkit remains the right product idea: Foton owns the case, the known-good diff, and the report. Specialists own deep parse, Sigma EVTX hunting, exotic ASEP tabs, and raw-disk copies.
 
 **PowerShell is the right language for Collect and Baseline capture.** It is the wrong language for gold-standard Prefetch/Amcache/EVTX/ESE/NTFS work. Industry already splits this way: script or dropper collect, C#/Rust parse.
+
+---
+
+## Course check (did landscape work pull us off course?)
+
+**No. Direction is right; unfinished work is packaging and finish, not a strategy reset.**
+
+What the landscape plan said to do, and what landed through **1.27.0**:
+
+| Landscape bet | Status | Keep / stop |
+|---------------|--------|-------------|
+| Copy raw artifacts specialists need (hives, LNK, Tasks XML, browser DBs, wider EVTX, optional USN) | **Done** (collect 1.9.0) | Keep. Do not grow `$MFT` in PS unless charter changes. |
+| Compose Hayabusa on copied EVTX → findings | **Done and verified** on a real package; collector-footprint exclusion added | Keep. Chainsaw / EvtxECmd ingest still open — thin, not a rewrite. |
+| Analyze reads parsed rows + baseline diffs | **Started** — still thin | Keep prioritizing rules over new collectors. |
+| Do not rebuild Sigma / ESE / NTFS in PowerShell | **Held** | Keep holding. |
+| Operator packaging / release bar | **Partial** — AMSI fixed; lab ticks, analyze-without-clone, tool install still open | Finish these before novelty. |
+| Exotic ASEP “for completeness” | **Not scheduled** (codecs, BHO, …) | Correct. |
+
+**Wrong-direction traps to refuse now:**
+
+1. Growing native `ConvertFrom-Foton*` to chase EZ Tools quality.
+2. Adding baseline providers that Autoruns already covers better (codecs, gadgets, IE BHO).
+3. Putting network / interactive install prompts inside `compose` or `analyze` (see [TOOLS.md](TOOLS.md)).
+4. Building TUI/GUI or an in-report CSV browser before the public-release bar is mostly green.
+5. Becoming a CIS scorer, EDR, memory imager, or fleet agent — that abandons the uncommon niche.
+
+**Right-direction finish line for “top tier”:** Baseline/audit is already the strongest unique slice — polish trust and operator path (release bar, tool install, analyze zip). Triage becomes top-tier when compose is *one setup + one chain on a case folder*, and Analyze consumes what compose wrote — not when Foton reimplements Hayabusa.
 
 ---
 
@@ -37,6 +82,8 @@ Individual layers already have better specialists. **Improve by composing those 
 | Privilege-aware coverage | Standard-user collect is intentional; gaps are Info findings, not silent empty tables. |
 | Provider/collector files | One surface per file so the toolkit grows without a 3k-line script. |
 | Restraint already in COVERAGE.md | Not Autoruns, not Velociraptor, not WinPmem, not a CIS scorer. Memory/pcap/full MFT named as wrong runtime. |
+| Compose honesty | Hayabusa hits caused by the collection itself are attributed and excluded from severity bands (methodology finding), so the report does not accuse the host of the examiner’s script blocks. |
+| AMSI-aware flatten | Suspicious-command pattern list is not embedded in Collect; workstation Analyze derives hits; build fails if the flatten is blocked at load. |
 
 First-time PowerShell at this size usually looks like one giant script that prints “malware detected.” Foton does not. Keep that charter.
 
@@ -46,12 +93,13 @@ First-time PowerShell at this size usually looks like one giant script that prin
 
 | Worry | Assessment |
 |-------|------------|
-| Best practices | Strong: flatten deploy, SHA-256, UTC, fail-into-manifest, identity keys, schema versions, standard-user honesty. |
-| Missing collect | Live API/registry coverage is good. File-level forensic copies (full hives, USN, browser DBs) still thinner than KAPE / DFIR-ORC. |
-| Baseline details | Above typical Autoruns-CSV diffs (Defender, RDP/WinRM, certs, firewall, listeners, LSA, BITS). ASEP tabs still not exhaustive (by design). |
-| Automation / “is it compromised?” | Triage heuristics exist (Defender off, WDigest, IFEO, unsigned user-path processes, …). They must not decide compromise. **Unused potential:** rules that consume parsed Prefetch/Amcache/LNK and baseline diffs. |
+| Best practices | Strong: flatten deploy, SHA-256, UTC, fail-into-manifest, identity keys, schema versions, standard-user honesty, AMSI load check in build. |
+| Missing collect | Live API/registry coverage is good. Raw copies largely closed in 1.9.0; still thinner than KAPE/ORC on `$MFT` / full disk (by design for now). |
+| Baseline / audit | **Strongest product claim.** Above typical Autoruns-CSV diffs. ASEP tabs still not exhaustive (by design). Path to “go-to” is trust + docs + fleet/golden workflows, not more exotic providers. |
+| Automation / “is it compromised?” | Triage heuristics exist; they must not decide compromise. Hayabusa bands work. **Unused potential:** rules that consume EZ-tool CSV, thicker parsed-row / baseline-diff rules. |
 | PowerShell-only | Correct for RMM/no-install collect. Incorrect as the only parser runtime. |
-| Overcomplicated? | Charter is wide. File-per-provider is how you avoid a 3k-line script. Complexity matches intent. The trap is more parsers in PowerShell. |
+| Overcomplicated? | Charter is wide but the file-per-provider model prevents a 3k-line script. Complexity matches intent. The trap is more native parsers, UI shells, and “completeness” providers. |
+| Peer parity | Behind on workstation convenience (PATH, no tool install, ZIP staging) and on feeding compose output into findings. Ahead on baseline identity-key drift + honesty model. |
 
 ---
 
@@ -86,11 +134,12 @@ Deterministic baseline hash; field-level Added/Removed/Modified with documented 
 | Area | Gap | Why it matters | Direction |
 |------|-----|----------------|-----------|
 | Raw artifact copies | **Largely closed in collect 1.9.0**: machine + user hives with sidecars, LNK/jumplists, Tasks XML, browser DBs, host text logs, wider EVTX, optional USN `$J`. `$MFT` and `$LogFile` still not copied. | Parse/carve and EZ Tools need **bytes**, not CSV summaries. | Remaining: decide whether `$MFT` belongs here or stays a KAPE/ORC job. Do not parse any of it in PS 5.1 on the endpoint. |
-| Analyze automation | **Started in 1.25.0-1.27.0**: rules now read `analysis/parsed_records.csv`, `analysis/baseline_diff.csv`, and external engine output. Coverage is still thin - a handful of rules, and parsed-row rules are starved when native parsing yields no paths. | Highest ROI without new collect. COVERAGE.md already says this. | More rules over parsed rows and diffs, and rules that survive MAM-empty prefetch. Still observations, not verdicts. |
-| EVTX hunting | **Implemented in 1.25.0-1.27.0** via `Invoke-FotonExternalParse`: Hayabusa (v2/v3 `csv-timeline` and v4 `dfir-timeline`) runs on copied EVTX, output is hashed into `analysis/external/`, and hits become findings banded by the tool's own level with rule titles named. Verified end to end on a real package: 11 EVTX, 34k events, 10.5k detections. Hits caused by the collection itself are attributed and excluded from the bands - script block logging records Foton's own PowerShell, and on that package the collector was the single largest medium-level "detection" (350 medium hits fell to 60 once excluded). Chainsaw wiring is untested against a real binary. | Wrong to rebuild Hayabusa in PowerShell. **Composing a hunt engine means owning the collector's own footprint in its output**, or the report accuses the host of what the examiner did. | Verify the Chainsaw path; consider an EvtxECmd-driven timeline once EZ Tools are validated. Apply the same footprint exclusion to Chainsaw and EvtxECmd output. |
-| Parse correctness | MAM Prefetch, SRUM ESE, shellbags, Shimcache *entries*, legacy Amcache `File\*` | PowerShell is the wrong runtime. | Copy + EZ Tools (or documented “unsupported,” never guessed fields). |
-| Operator packaging | Authenticode, analyze-without-clone zip, public-release lab ticks. **AMSI blocking fixed in 1.27.0**: Defender quarantined the whole flatten as `Trojan:PowerShell/PSAttackTool.A` because the build inlined the suspicious-command pattern list; matching moved to workstation Analyze and `build/Test-FotonAmsiLoad.ps1` now guards it. | This is what makes the tool feel “not ready,” not missing another Winlogon value. A collector the endpoint refuses to load has zero coverage regardless of what it can capture. | Finish [TODO.md](TODO.md) public-release bar. Expect other engines to flag the collector; Authenticode signing helps trust but does not stop AMSI content scanning. |
+| Analyze automation | **Started in 1.25.0-1.27.0**: rules read collect CSVs, thin `parsed_records` / `baseline_diff` rules, and Hayabusa CSV. ~Eight compose tools are wired; **only Hayabusa feeds findings**. | Highest ROI without new collect. Compose that only writes inventory rows is aspirational wiring. | More rules over diffs and over compose CSV (cite the tool). Prefer ingesting PECmd/EvtxECmd over growing native parsers. Still observations, not verdicts. |
+| EVTX hunting | **Implemented and verified** via `Invoke-FotonExternalParse` + Hayabusa; collector-footprint attribution excludes self-hits from severity bands. Chainsaw wiring untested; EZ Tools often `NotOnPath`. | Wrong to rebuild Hayabusa in PowerShell. Composing a hunt engine means owning the collector’s footprint **and** making the tool findable. | [TOOLS.md](TOOLS.md) install (Hayabusa first); verify Chainsaw; same footprint model for other hunt engines. |
+| Parse correctness | MAM Prefetch, SRUM ESE, shellbags, Shimcache *entries*, legacy Amcache `File\*` | PowerShell is the wrong runtime. | Copy + EZ Tools (or documented “unsupported,” never guessed fields). Native ConvertFrom-* stays air-gap fallback. |
+| Operator packaging | Authenticode/ExecutionPolicy story, analyze-without-clone zip, lab ticks still open. **AMSI fixed in 1.27.0.** ZIP open stages a new temp dir each time — chaining `compose` then `analyze` on a ZIP loses tool output (documented: extract first). | This is what makes the tool feel “not ready,” not missing another Winlogon value. | Finish [TODO.md](TODO.md) public-release bar; build tool install; keep ZIP staging documented until a deliberate package-session fix exists. |
 | ASEP completeness | Codecs, gadgets, IE BHO marked low ROI; COM too noisy for baseline | Correct product call. | Use Autoruns when hunting those families. Do not add those providers “for completeness.” |
+| Baseline as go-to | Capture + compare + HTML exist and are strong. Fleet/golden framing, operator docs, and release trust are thinner than the engine. | “Go-to audit/baseline” is won on trust and workflow, not on the 35th provider. | Document golden-image / temporal recipes in USAGE; close lab ticks; resist exotic ASEP. |
 
 Collect P3 (memory, pcap, full MFT) and Carve-as-NTFS remain **wrong runtime** — point at WinPmem / KAPE / DFIR-ORC / a disk image. See [CARVE.md](CARVE.md).
 
@@ -98,24 +147,31 @@ Collect P3 (memory, pcap, full MFT) and Carve-as-NTFS remain **wrong runtime** �
 
 ## Recommended build strategy
 
-### Compose (default for Parse / hunt / exotic ASEP)
+Ordered for the north star. Detail and checkboxes live in [TODO.md](TODO.md).
+
+### 1. Finish (trust and convenience — product, not novelty)
+
+- Public-release lab ticks and Authenticode / ExecutionPolicy story.
+- Analyze zip that does not require cloning the repo.
+- `Install-FotonTool` (Hayabusa first) per [TOOLS.md](TOOLS.md); compose stays offline.
+
+### 2. Compose (default for Parse / hunt / exotic ASEP)
 
 Foton’s job on the **endpoint** is Collect + Baseline capture in PowerShell 5.1.
 
 Foton’s job on the **workstation** is: open the package, run what PowerShell can do *correctly*, and **orchestrate better languages/tools** for the rest:
 
-1. Hayabusa (or Chainsaw) on exported `.evtx` → timeline / Sigma hits → import as findings (cite the tool and rule).
-2. EZ Tools on copied `.pf`, LNK, jumplists, Amcache, hives → structured records in the package (`analysis/`). Existing `ConvertFrom-Foton*` output already lands in `analysis/parsed_records.csv`.
+1. Hayabusa (or Chainsaw) on exported `.evtx` → timeline / Sigma hits → import as findings (cite the tool and rule; exclude collector footprint).
+2. EZ Tools on copied `.pf`, LNK, jumplists, Amcache, hives → structured records in the package; **Analyze must read those outputs**, not only hash them.
 3. Optional `autorunsc` when the question is “every Autoruns tab,” not “did *this* identity-keyed surface change.”
-4. Optional KAPE/ORC *in addition to* Foton when the case needs MFT/USN/full hives Foton has not copied yet — until Collect grows those copies.
+4. Optional KAPE/ORC *in addition to* Foton when the case needs MFT — until Collect explicitly owns `$MFT`.
 
-Existing `ConvertFrom-Foton*` parsers stay useful as **no-dependency** fallbacks (lab, air-gap, “good enough”). They are not the quality ceiling. Prefer “copied, parsed by EZ Tools” over a new incomplete PowerShell parser. Prefer “copied, not parsed” over a wrong ESE/NTFS implementation (already the SRUM rule).
+Existing `ConvertFrom-Foton*` parsers stay useful as **no-dependency** fallbacks. They are not the quality ceiling.
 
-### Finish (product, not novelty)
+### 3. Deepen Baseline / audit (the uncommon wedge)
 
-- Public-release bar in [TODO.md](TODO.md): Authenticode / ExecutionPolicy story, analyze zip that does not require cloning the repo, remaining lab ticks.
-- Analyze rules that consume **parsed rows and baseline diffs**.
-- Collect: more **raw files** that specialists need (hives, USN, browser DBs), still hashed, still fail-into-manifest.
+- Prefer operator workflows (provision day0 → later compare; host vs golden) and more **diff → findings** rules over new record types.
+- Add a provider only when identity key + false positives are documented and COVERAGE.md gains a row — never “for completeness.”
 
 ### Stop (do not schedule)
 
@@ -123,12 +179,14 @@ Named in COVERAGE.md / TODO.md as low ROI or wrong runtime — keep that list:
 
 - Full ESE SRUM parser in PowerShell
 - NTFS unallocated carve in PowerShell
-- MAM Prefetch inflate until a correct non-PS approach exists
+- MAM Prefetch inflate in PowerShell (use PECmd compose instead)
 - In-process Sigma engine
 - CIS benchmark scorer / “risk score”
 - TUI/GUI before the public-release bar is mostly green
 - Codecs, gadgets, IE BHO baseline providers
 - Domain-wide hunting, live VirusTotal, remediation
+- Interactive install prompts inside compose/analyze
+- Mutating the user `PATH` from Foton
 
 That restraint is professional, not incomplete.
 
@@ -153,10 +211,11 @@ Any plan generated from this file should:
 
 1. **Keep** Collect/Baseline as PowerShell 5.1 flatten scripts. Do not require .NET 8, Python, or an agent on the endpoint.
 2. **Treat the workstation as a composition host.** New parse/hunt quality comes from invoking or documenting EZ Tools / Hayabusa (and storing their output in the package), not from larger `ConvertFrom-Foton*` surface area — unless the format is small, fixture-tested, and PowerShell can be *correct*.
-3. **Prioritize** (a) public-release bar, (b) analyze-on-parsed-and-diff, (c) more file copies for specialists, over exotic ASEP providers.
+3. **Prioritize** (a) public-release bar and tool install convenience, (b) Analyze consuming compose + baseline diffs, (c) Baseline/audit operator workflows — over exotic ASEP providers and new native parsers.
 4. **Update** [COVERAGE.md](COVERAGE.md) when collect targets or “parsed by external tool” rows change; update [USAGE.md](USAGE.md) when operators gain a documented workstation pipeline; bump schemas only when on-disk columns or baseline records change.
 5. **Stay honest.** Findings remain observations. External-tool hits are Tier 2 unless they are raw facts (hash match, Event ID present). Name the tool in Artifact / WhyItMatters.
 6. **Do not** expand charter into EDR, memory imaging, CIS scoring, or fleet C2.
+7. **Do not** start a parallel strategy doc. Course checks update *this* file and [TODO.md](TODO.md). Inventory stays in COVERAGE; tool install design stays in TOOLS.
 
 ---
 
@@ -164,4 +223,4 @@ Any plan generated from this file should:
 
 Specialists will beat each layer. The product job is to be the **hashed case** and the **known-good config diff** those specialists feed — and to automate first-pass observations without lying.
 
-Foton should remain a full toolkit. PowerShell collects. Better languages and existing tools analyze and parse. Follow their example instead of reinventing their engines.
+Foton should remain a full toolkit without becoming a monstrosity: PowerShell collects and baselines; better languages and existing tools parse and hunt; Foton owns the case, the drift story, and the report. Landscape work through 1.27.0 moved the right levers. Finish trust and compose convenience next — that is how Foton becomes the go-to audit/baseline tool and a competitive IR desk, not by cloning KAPE or Hayabusa into PowerShell.
