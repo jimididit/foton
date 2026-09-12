@@ -9,7 +9,7 @@ Foton has **two machines**. Mixing them is what feels like too much PowerShell.
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-Current stamps (from `Foton.psd1`): module **1.28.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+Current stamps (from `Foton.psd1`): module **1.29.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
 
 ---
 
@@ -24,14 +24,14 @@ On a trusted box, rebuild after Collect/Baseline source changes:
 
 That writes a **versioned** leaf and an unversioned alias (same bytes):
 
-- `dist\Foton-Collect_v1.28.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
-- `dist\Foton-Baseline_v1.28.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
+- `dist\Foton-Collect_v1.29.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
+- `dist\Foton-Baseline_v1.29.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
 
 Copy **one** file to the target (USB, RMM, email). Prefer the versioned leaf so the module and schema stay in the filename.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.28.0_schema1.10.0.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.28.0_schema1.14.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.29.0_schema1.10.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.29.0_schema1.14.0.ps1
 ```
 
 ### If antivirus blocks the collector
@@ -227,7 +227,7 @@ New-FotonReport
 
 Or: `Foton.cmd tools Hayabusa` then `Foton.cmd compose <case-folder>`.
 
-Outputs land under `analysis\external\<tool>\` and are hashed. Inventory rows include **Version** and **RulesVersion** when the tool came from the Foton manifest. Missing tools are inventory rows (`NotOnPath`), not failures — Hayabusa's note names `Install-FotonTool`. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding.
+Outputs land under `analysis\external\<tool>\` and are hashed. Inventory rows include **Version** and **RulesVersion** when the tool came from the Foton manifest. Missing tools are inventory rows (`NotOnPath`), not failures — Hayabusa's note names `Install-FotonTool`. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. **PECmd** and **EvtxECmd** CSVs also feed `Invoke-FotonAnalysis` (coverage, user-writable path references, and a short list of high-attention EventIds such as 1102/7045) — still observations that cite the tool, not a reimplementation of those parsers.
 
 **Collector footprint.** Script block logging records Foton's own PowerShell, so hunt rules for suspicious scripting and for registry or credential access fire on the collection itself. On a real package this was the single largest medium-level "detection". `Invoke-FotonAnalysis` attributes such rows to the collection — by timestamp inside the collection window read from `00_Collection\collection.log`, and by rows naming a Foton function outside it — excludes them from the severity bands, and reports the count as an Info methodology finding. That exclusion is inference, not process identity: genuine host activity during the collection window is excluded too, so filter the Hayabusa CSV to that window yourself if something could have coincided.
 
