@@ -12,7 +12,7 @@
 #
 @{
     RootModule        = 'Foton.psm1'
-    ModuleVersion     = '1.27.0'
+    ModuleVersion     = '1.28.0'
     GUID              = 'b7e4c1a2-8d3f-4a91-9c6e-2f0d5a8b1e73'
     Author            = 'JDI Consulting'
     CompanyName       = 'JDI Consulting'
@@ -49,6 +49,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
         'ConvertFrom-FotonAmcache'
         'Invoke-FotonParse'
         'Invoke-FotonExternalParse'
+        'Install-FotonTool'
         'New-FotonParseReport'
         'Invoke-FotonCarve'
     )
@@ -60,7 +61,7 @@ may require PowerShell 7; if they do, it will be stated on those commands.
             Tags         = @('DFIR', 'Forensics', 'Windows', 'Baseline', 'SecurityAudit', 'Triage')
             LicenseUri   = ''
             ProjectUri   = ''
-            ReleaseNotes = '1.27.0: External tools now run with their own install directory as the working directory, fixing Hayabusa reporting missing rules/config. Hayabusa hits caused by the Foton collection itself are attributed (collection window from collection.log, plus rows naming a Foton function) and excluded from the severity bands, with an Info methodology finding - on a real package this cut 350 medium-level hits to 60. Fix Defender AMSI blocking the Collect flatten as Trojan:PowerShell/PSAttackTool.A - the embedded suspicious-command pattern list is no longer inlined into dist. Collectors stop interpreting: SuspiciousHits/SuspiciousCmdHits are written empty and Analyze derives them from the raw Command/Actions/CommandLine columns, with an Info visibility-gap finding when no pattern list is loaded. New build/Test-FotonAmsiLoad.ps1 runs an AMSI load check in both flatten builds, since ParseFile never invokes AMSI. 1.26.0: ZIP analyze writes <zip-stem>_Report.html/_findings.csv beside the ZIP; New-FotonReport returns its path. Detect and skip packages that contain a copy of themselves. Analyze says when it is reproducing the endpoint Collect report. Hayabusa v4 (dfir-timeline, -w) supported and hits are banded by level with rule names instead of one generic row.'
+            ReleaseNotes = '1.28.0: Install-FotonTool + Foton.cmd tools provision pinned Hayabusa into %LOCALAPPDATA%\Foton\tools (tools.json); compose resolves -ToolPath then manifest then PATH and never mutates PATH; inventory/report carry tool Version and RulesVersion; NotOnPath points at Install-FotonTool. 1.27.0: External tools now run with their own install directory as the working directory, fixing Hayabusa reporting missing rules/config. Hayabusa hits caused by the Foton collection itself are attributed (collection window from collection.log, plus rows naming a Foton function) and excluded from the severity bands, with an Info methodology finding - on a real package this cut 350 medium-level hits to 60. Fix Defender AMSI blocking the Collect flatten as Trojan:PowerShell/PSAttackTool.A - the embedded suspicious-command pattern list is no longer inlined into dist. Collectors stop interpreting: SuspiciousHits/SuspiciousCmdHits are written empty and Analyze derives them from the raw Command/Actions/CommandLine columns, with an Info visibility-gap finding when no pattern list is loaded. New build/Test-FotonAmsiLoad.ps1 runs an AMSI load check in both flatten builds, since ParseFile never invokes AMSI. 1.26.0: ZIP analyze writes <zip-stem>_Report.html/_findings.csv beside the ZIP; New-FotonReport returns its path. Detect and skip packages that contain a copy of themselves. Analyze says when it is reproducing the endpoint Collect report. Hayabusa v4 (dfir-timeline, -w) supported and hits are banded by level with rule names instead of one generic row.'
         }
         Foton  = @{
             # Collect package layout / artifact columns. Bump when a collector changes the on-disk contract.

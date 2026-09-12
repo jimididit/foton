@@ -35,6 +35,8 @@ function Show-FotonEasyHelp {
     Write-Host '    Foton.cmd compare  C:\Baselines\day0.json C:\Baselines\day1.json'
     Write-Host '    Foton.cmd parse    C:\FotonCases\Foton_HOST_...Z'
     Write-Host '    Foton.cmd compose  C:\FotonCases\Foton_HOST_...Z'
+    Write-Host '    Foton.cmd tools    Hayabusa          (one-time workstation setup; does not change PATH)'
+    Write-Host '    Foton.cmd tools                      (list pinned tools)'
     Write-Host '    Foton.cmd ioc      C:\FotonCases\Foton_HOST_...Z C:\intel\iocs.txt'
     Write-Host '    Foton.cmd carve    C:\blob.bin'
     Write-Host '    Foton.cmd collect  C:\FotonCases     (runs dist\Foton-Collect.ps1 if built)'
@@ -108,9 +110,30 @@ switch ($cmd) {
         # Invoke-FotonExternalParse opens the package itself; loading it here too
         # just prints the "Loaded package" line twice.
         $rows = @(Invoke-FotonExternalParse -PackagePath $Target)
-        $rows | Select-Object Tool, Status, DestRelative, Note |
+        $rows | Select-Object Tool, Version, Status, DestRelative, Note |
             Format-Table -AutoSize -Wrap
         Write-Host '  Inventory: analysis\external\external_parse_inventory.csv. Native Invoke-FotonParse if tools are missing.' -ForegroundColor Green
+        Write-Host '  Missing Hayabusa: Foton.cmd tools Hayabusa' -ForegroundColor DarkGray
+    }
+    'tools' {
+        # One-time workstation setup. Never runs inside compose (offline invariant).
+        if (-not $Target -or $Target -in @('list', '-list', '/list')) {
+            Install-FotonTool -List | Out-Null
+            return
+        }
+        $archive = $null
+        if ($Rest -and $Rest.Count -ge 2 -and $Rest[0] -eq '-ArchivePath') {
+            $archive = $Rest[1]
+        }
+        elseif ($Rest -and $Rest.Count -ge 1 -and (Test-Path -LiteralPath $Rest[0])) {
+            $archive = $Rest[0]
+        }
+        if ($archive) {
+            Install-FotonTool -Name $Target -ArchivePath $archive -Force
+        }
+        else {
+            Install-FotonTool -Name $Target
+        }
     }
     'ioc' {
         $iocFile = $Rest | Select-Object -First 1

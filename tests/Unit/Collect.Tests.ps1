@@ -103,6 +103,7 @@ Describe 'Collect category functions (extracted)' {
                 'ConvertFrom-FotonPrefetch'
                 'Get-FotonPackage'
                 'Get-FotonVersion'
+                'Install-FotonTool'
                 'Invoke-FotonAnalysis'
                 'Invoke-FotonCarve'
                 'Invoke-FotonExternalParse'

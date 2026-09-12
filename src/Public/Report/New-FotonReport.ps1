@@ -333,7 +333,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
                 $ran = @($inv | Where-Object { $_.Status -eq 'Copied' })
                 $null = $sb.AppendLine('<h2 id="sec-external">External Tool Passes<small>who parsed what, and the hash of their output</small></h2>')
                 $null = $sb.AppendLine("<p class=""dim"">Third-party engines run on <b>copied</b> package files only. Their rule hits are that engine's inferences, named to the tool in the findings above - not a Foton verdict. Tools shown as NotOnPath are a coverage gap on this workstation, not a parse failure: $(ConvertTo-FotonSafeHtml ([string]$ran.Count)) of $(ConvertTo-FotonSafeHtml ([string]$inv.Count)) inventory row(s) produced output.</p>")
-                $null = $sb.AppendLine('<table><tr><th>Tool</th><th>Status</th><th>Output</th><th>SHA-256</th><th>Note</th></tr>')
+                $null = $sb.AppendLine('<table><tr><th>Tool</th><th>Version</th><th>Rules</th><th>Status</th><th>Output</th><th>SHA-256</th><th>Note</th></tr>')
                 foreach ($row in $inv) {
                     $cls = 'dim'
                     if ($row.Status -eq 'Copied') { $cls = 'ok' }
@@ -347,7 +347,13 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
                         $outCell = "<a href=""$(ConvertTo-FotonSafeHtml $link)"">$(ConvertTo-FotonSafeHtml $outCell)</a>"
                     }
                     else { $outCell = '<span class="dim">-</span>' }
-                    $null = $sb.AppendLine("<tr><td>$(ConvertTo-FotonSafeHtml $row.Tool)</td><td class=""$cls"">$(ConvertTo-FotonSafeHtml $row.Status)</td><td>$outCell</td><td class=""dim"">$(ConvertTo-FotonSafeHtml $shortHash)</td><td>$(ConvertTo-FotonSafeHtml $row.Note)</td></tr>")
+                    $ver = ''
+                    $rules = ''
+                    if ($row.PSObject.Properties['Version']) { $ver = [string]$row.Version }
+                    if ($row.PSObject.Properties['RulesVersion']) { $rules = [string]$row.RulesVersion }
+                    if (-not $ver) { $ver = '-' }
+                    if (-not $rules) { $rules = '-' }
+                    $null = $sb.AppendLine("<tr><td>$(ConvertTo-FotonSafeHtml $row.Tool)</td><td class=""dim"">$(ConvertTo-FotonSafeHtml $ver)</td><td class=""dim"">$(ConvertTo-FotonSafeHtml $rules)</td><td class=""$cls"">$(ConvertTo-FotonSafeHtml $row.Status)</td><td>$outCell</td><td class=""dim"">$(ConvertTo-FotonSafeHtml $shortHash)</td><td>$(ConvertTo-FotonSafeHtml $row.Note)</td></tr>")
                 }
                 $null = $sb.AppendLine('</table>')
             }

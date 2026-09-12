@@ -1,11 +1,14 @@
 function Invoke-FotonExternalParse {
     <#
     .SYNOPSIS
-        If EZ Tools / Hayabusa / Chainsaw are on PATH, run them on copied package files.
+        If EZ Tools / Hayabusa / Chainsaw are available, run them on copied package files.
 
     .DESCRIPTION
         Offline workstation compose. Does not download tools and does not read the live host.
         Native ConvertFrom-Foton* remains the no-dependency fallback (Invoke-FotonParse).
+
+        Resolution order per tool: -ToolPath override, then Foton tools.json (Install-FotonTool),
+        then PATH. Never mutates PATH.
 
         When a tool is present, stdout/CSV lands under analysis/external/<tool>/ and is hashed.
         Missing tools are recorded as Info coverage rows, not parse failures.
@@ -18,6 +21,12 @@ function Invoke-FotonExternalParse {
     .PARAMETER Path
         Same as PackagePath (Easy wrapper).
 
+    .PARAMETER ToolRoot
+        Foton tool install root (default %LOCALAPPDATA%\Foton\tools).
+
+    .PARAMETER ToolPath
+        Optional hashtable of ToolName -> executable path overrides.
+
     .EXAMPLE
         Get-FotonPackage -Path D:\Cases\Foton_HOSTNAME_20260823-011150Z
         Invoke-FotonExternalParse
@@ -25,12 +34,14 @@ function Invoke-FotonExternalParse {
         Runs PECmd/LECmd/JLECmd/EvtxECmd/AmcacheParser/RECmd/hayabusa/chainsaw if found.
 
     .OUTPUTS
-        Inventory rows (Tool, Status, DestRelative, SHA256, Note).
+        Inventory rows (Tool, Status, DestRelative, SHA256, Version, RulesVersion, Note).
     #>
     [CmdletBinding()]
     param(
         [string]$PackagePath,
-        [string]$Path
+        [string]$Path,
+        [string]$ToolRoot,
+        [hashtable]$ToolPath
     )
 
     if ($null -eq $script:FotonSession) { Initialize-FotonSession }
@@ -47,15 +58,7 @@ function Invoke-FotonExternalParse {
     $extRoot = Join-Path $root 'analysis\external'
     New-Item -Path $extRoot -ItemType Directory -Force | Out-Null
 
-    $resolve = {
-        param([string[]]$Names)
-        foreach ($n in $Names) {
-            $cmd = Get-Command $n -ErrorAction SilentlyContinue
-            if ($cmd -and $cmd.Source) { return [string]$cmd.Source }
-            if ($cmd -and $cmd.Path) { return [string]$cmd.Path }
-        }
-        return $null
-    }
+    if (-not $ToolPath) { $ToolPath = @{} }
 
     $prefetch = Join-Path $root (Join-Path $script:FotonSession.Categories['Filesystem'] 'prefetch')
     $lnk = Join-Path $root (Join-Path $script:FotonSession.Categories['Filesystem'] 'lnk_jumplist')
@@ -104,16 +107,35 @@ function Invoke-FotonExternalParse {
     $rows = New-Object System.Collections.ArrayList
     $anyTool = $false
     foreach ($j in $jobs) {
-        $exe = & $resolve $j.Names
+        $override = $null
+        if ($ToolPath.ContainsKey($j.Tool)) { $override = [string]$ToolPath[$j.Tool] }
+        $resolved = Resolve-FotonExternalTool -ToolName $j.Tool -ExecutableNames $j.Names `
+            -ToolPath $override -ToolRoot $ToolRoot
+        $exe = $null
+        $toolVer = ''
+        $rulesVer = ''
+        $resolveSrc = ''
+        if ($resolved) {
+            $exe = [string]$resolved.Path
+            $toolVer = [string]$resolved.Version
+            $rulesVer = [string]$resolved.RulesVersion
+            $resolveSrc = [string]$resolved.Source
+        }
         $toolDir = Join-Path $extRoot $j.Tool.ToLowerInvariant()
         New-Item -Path $toolDir -ItemType Directory -Force | Out-Null
         if (-not $exe) {
+            $hint = 'Native ConvertFrom-Foton* / Invoke-FotonParse is the fallback. This is a coverage gap, not a parse error.'
+            if ($j.Tool -eq 'Hayabusa') {
+                $hint = 'Run Install-FotonTool -Name Hayabusa (or Foton.cmd tools Hayabusa), then compose again. Native ConvertFrom-Foton* remains the air-gap fallback.'
+            }
             $null = $rows.Add([PSCustomObject]@{
                     Tool         = $j.Tool
                     Status       = 'NotOnPath'
                     DestRelative = ''
                     SHA256       = ''
-                    Note         = ("{0} is not on PATH. Native ConvertFrom-Foton* / Invoke-FotonParse is the fallback. This is a coverage gap, not a parse error." -f $j.Tool)
+                    Version      = ''
+                    RulesVersion = ''
+                    Note         = ("{0} was not found via -ToolPath, Foton tools.json, or PATH. {1}" -f $j.Tool, $hint)
                 })
             continue
         }
@@ -124,7 +146,9 @@ function Invoke-FotonExternalParse {
                     Status       = 'NoInput'
                     DestRelative = ''
                     SHA256       = ''
-                    Note         = ("Tool found but input folder is missing: {0}. Re-collect elevated if the copy task was skipped." -f $j.NeedDir)
+                    Version      = $toolVer
+                    RulesVersion = $rulesVer
+                    Note         = ("Tool found ({0}) but input folder is missing: {1}. Re-collect elevated if the copy task was skipped." -f $resolveSrc, $j.NeedDir)
                 })
             continue
         }
@@ -152,6 +176,8 @@ function Invoke-FotonExternalParse {
                     Status       = $(if ($ok) { 'NoOutput' } else { 'ToolError' })
                     DestRelative = (Join-Path 'analysis\external' $j.Tool.ToLowerInvariant())
                     SHA256       = ''
+                    Version      = $toolVer
+                    RulesVersion = $rulesVer
                     Note         = ("{0} ran but produced no output files. See tool_stderr.txt. Native parse remains valid." -f $j.Tool)
                 })
             continue
@@ -163,7 +189,9 @@ function Invoke-FotonExternalParse {
                     Status       = 'Copied'
                     DestRelative = $rel
                     SHA256       = (Get-FotonSafeHash -Path $f.FullName)
-                    Note         = ("Hashed output from {0}. Hits from this engine are observations named to the tool, not a Foton verdict." -f $j.Tool)
+                    Version      = $toolVer
+                    RulesVersion = $rulesVer
+                    Note         = ("Hashed output from {0} (resolved via {1}). Hits from this engine are observations named to the tool, not a Foton verdict." -f $j.Tool, $resolveSrc)
                 })
         }
     }
@@ -174,7 +202,9 @@ function Invoke-FotonExternalParse {
                 Status       = 'NotOnPath'
                 DestRelative = ''
                 SHA256       = ''
-                Note         = 'No EZ Tools / Hayabusa / Chainsaw binaries were on PATH. Use Invoke-FotonParse for native ConvertFrom-Foton* fallback.'
+                Version      = ''
+                RulesVersion = ''
+                Note         = 'No EZ Tools / Hayabusa / Chainsaw binaries were found. For Hayabusa: Install-FotonTool -Name Hayabusa. Use Invoke-FotonParse for native ConvertFrom-Foton* fallback.'
             })
     }
 
