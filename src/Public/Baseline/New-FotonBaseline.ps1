@@ -68,7 +68,7 @@ function New-FotonBaseline {
         $script:FotonSession.Version = [string]$man.ModuleVersion
     }
     elseif (-not $script:FotonSession.Version) {
-        $script:FotonSession.Version = '1.29.0'
+        $script:FotonSession.Version = '1.30.0'
     }
 
     $script:FotonSession.IsElevated = Test-FotonElevated

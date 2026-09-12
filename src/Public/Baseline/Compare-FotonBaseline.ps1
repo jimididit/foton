@@ -6,7 +6,9 @@ function Compare-FotonBaseline {
     .DESCRIPTION
         Refuses to diff if BaselineSchemaVersion does not match. Emits change
         records and Add-FotonFinding rows (Tier 1 for the fact of change).
+        Writes baseline_diff.csv beside the difference JSON (for Analyze ingest).
         Temporal (same hostname) vs fleet (host vs golden) only changes wording.
+        WhyItMatters includes the provider FalsePositives string when registered.
 
     .PARAMETER ReferencePath
         Older / golden baseline.
@@ -25,6 +27,9 @@ function Compare-FotonBaseline {
     .PARAMETER NoHtml
         Skip the HTML file (tests and New-FotonBaselineCompareReport re-entry).
 
+    .PARAMETER NoCsv
+        Skip writing baseline_diff.csv beside the difference JSON.
+
     .OUTPUTS
         Change records (RecordType, Identity, ChangeType, Field, OldValue, NewValue).
     #>
@@ -33,7 +38,8 @@ function Compare-FotonBaseline {
         [Parameter(Mandatory)][string]$ReferencePath,
         [Parameter(Mandatory)][string]$DifferencePath,
         [string]$OutputPath,
-        [switch]$NoHtml
+        [switch]$NoHtml,
+        [switch]$NoCsv
     )
 
     $ReferencePath = Get-FotonBaselineJsonPath -Path $ReferencePath
@@ -119,12 +125,40 @@ function Compare-FotonBaseline {
         if ($c.ChangeType -eq 'Modified') {
             $obs = "Identity '{0}' field {1}: '{2}' -> '{3}'." -f $c.Identity, $c.Field, $c.OldValue, $c.NewValue
         }
+        $fp = Get-FotonBaselineFalsePositives -RecordType $c.RecordType
+        $why = ("{0} mode ({1} vs {2}). A baseline diff records change between two snapshots. It does not establish when the change occurred, who made it, or that the host is compromised." -f `
+            $mode, $ref.Header.CapturedUtc, $dif.Header.CapturedUtc)
+        if ($fp) {
+            $why = $why + (' Common benign sources for {0}: {1}' -f $c.RecordType, $fp)
+        }
+        else {
+            $why = $why + ' Software version bumps and GPO are common benign sources.'
+        }
+        $next = 'Confirm against change control or the role golden image. Prefer a provisioning-time reference stored off-host.'
+        if ($mode -eq 'Temporal') {
+            $next = 'Confirm against change control for this host. Prefer a provisioning-time day0 stored off-host.'
+        }
+        elseif ($mode -eq 'Fleet') {
+            $next = 'Confirm against the role golden image and expected local variance (hostname, SID, joined domain).'
+        }
         Add-FotonFinding -Severity $sev -Category 'Baseline' -Tier 1 -Title $title `
             -Observation $obs `
-            -WhyItMatters ("{0} mode ({1} vs {2}). A baseline diff records change between two snapshots. It does not establish when the change occurred, who made it, or that the host is compromised. Software version bumps and GPO are common benign sources." -f `
-                $mode, $ref.Header.CapturedUtc, $dif.Header.CapturedUtc) `
+            -WhyItMatters $why `
             -Artifact (Split-Path $DifferencePath -Leaf) `
-            -NextStep 'Confirm against change control or the role golden image. Prefer a provisioning-time reference stored off-host.'
+            -NextStep $next
+    }
+
+    # Always persist the field-level change table beside the difference baseline so
+    # operators can copy it into a triage package as analysis/baseline_diff.csv
+    # for Invoke-FotonAnalysis (High-attention surfaces only there).
+    if (-not $NoCsv) {
+        $csvPath = Join-Path (Split-Path -Parent $DifferencePath) 'baseline_diff.csv'
+        try {
+            if ($changes.Count -gt 0) {
+                $changes | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+            }
+        }
+        catch { }
     }
 
     Write-FotonStatus ("Baseline diff ({0}): {1} change(s), {2} finding(s)" -f $mode, $changes.Count, $script:FotonSession.Findings.Count) 'Good'

@@ -679,34 +679,74 @@ function Invoke-FotonAnalysis {
         $diffPath = Join-Path $caseRoot 'analysis\baseline_diff.csv'
         if (Test-Path -LiteralPath $diffPath) {
             try {
-                $diffs = @(Import-Csv -LiteralPath $diffPath)
-                $svc = @($diffs | Where-Object {
-                        $_.RecordType -eq 'Service' -and (
-                            ($_.ChangeType -eq 'Added') -or
-                            ($_.ChangeType -eq 'Modified' -and $_.Field -eq 'PathName')
-                        )
-                    })
-                if ($svc.Count -gt 0) {
-                    $ids = (@($svc | ForEach-Object { $_.Identity } | Select-Object -First 8) -join '; ')
-                    Add-FotonFinding -Severity 'High' -Category 'Persistence' -Tier 1 -Title 'Baseline diff: service ImagePath or new service' `
-                        -Observation ("Compare-FotonBaseline records show {0} service Added or PathName Modified. Identities: {1}" -f $svc.Count, $ids) `
-                        -WhyItMatters 'A new service or a changed ImagePath is a stable-config fact between two snapshots. Patching also replaces binaries. This does not establish who changed it or that the host is compromised.' `
+                $diffs = @(Import-Csv -LiteralPath $diffPath | Where-Object { $_.RecordType })
+                # Lift High-attention surfaces only (Get-FotonBaselineChangeSeverity).
+                # Group so one finding covers many identities of the same kind. FP text
+                # comes from the registered provider - do not invent new RecordTypes here.
+                $highGroups = @{}
+                foreach ($d in $diffs) {
+                    $sev = Get-FotonBaselineChangeSeverity -Change $d
+                    if ($sev -ne 'High') { continue }
+                    # Stable group keys for the original Analyze titles (combined Service rows).
+                    $key = $null
+                    if ($d.RecordType -eq 'Service' -and ($d.ChangeType -eq 'Added' -or $d.Field -eq 'PathName')) {
+                        $key = 'Service|PathOrAdded'
+                    }
+                    elseif ($d.RecordType -eq 'LocalGroupMember' -and $d.ChangeType -eq 'Added' -and [string]$d.Identity -like 'Administrators|*') {
+                        $key = 'LocalGroupMember|AdministratorsAdded'
+                    }
+                    elseif ($d.RecordType -eq 'DefenderPreference' -and [string]$d.Identity -like '*DisableRealtimeMonitoring*') {
+                        $key = 'DefenderPreference|DisableRealtimeMonitoring'
+                    }
+                    else {
+                        $key = '{0}|{1}|{2}' -f $d.RecordType, $d.ChangeType, $d.Field
+                    }
+                    if (-not $highGroups.ContainsKey($key)) {
+                        $highGroups[$key] = New-Object System.Collections.ArrayList
+                    }
+                    $null = $highGroups[$key].Add($d)
+                }
+                foreach ($key in @($highGroups.Keys | Sort-Object)) {
+                    $rows = @($highGroups[$key])
+                    $rt = [string]$rows[0].RecordType
+                    $ct = [string]$rows[0].ChangeType
+                    $fld = [string]$rows[0].Field
+                    $ids = (@($rows | ForEach-Object { $_.Identity } | Select-Object -Unique | Select-Object -First 8) -join '; ')
+                    if ($key -eq 'Service|PathOrAdded') {
+                        $title = 'Baseline diff: service ImagePath or new service'
+                    }
+                    elseif ($key -eq 'LocalGroupMember|AdministratorsAdded') {
+                        $title = 'Baseline diff: Administrators membership added'
+                    }
+                    elseif ($key -eq 'DefenderPreference|DisableRealtimeMonitoring') {
+                        $title = 'Baseline diff: Defender real-time monitoring setting changed'
+                    }
+                    else {
+                        $title = 'Baseline diff: {0} {1}' -f $ct, $rt
+                        if ($fld) { $title = 'Baseline diff: {0} {1}.{2}' -f $ct, $rt, $fld }
+                    }
+                    $obs = ("Compare-FotonBaseline records show {0} High-attention {1} change(s) ({2}{3}). Identities: {4}" -f `
+                        $rows.Count, $rt, $ct, $(if ($fld) { '/' + $fld } else { '' }), $ids)
+                    $fp = Get-FotonBaselineFalsePositives -RecordType $rt
+                    $why = 'A baseline_diff.csv High-attention row is a stable-config fact between two snapshots. It does not establish who changed it or that the host is compromised.'
+                    if ($fp) {
+                        $why = $why + (' Common benign sources for {0}: {1}' -f $rt, $fp)
+                    }
+                    $cat = 'Baseline'
+                    if ($rt -in @('Service', 'Autorun', 'UserAutorun', 'ScheduledTask', 'Winlogon', 'AppInitDll', 'ImageFileExecution', 'StartupFile', 'StartupApproved', 'WmiPermanentEvent', 'BitsJob', 'CmdAutoRun', 'SessionManager', 'KnownDll', 'WinsockLsp', 'ActiveSetup', 'SilentProcessExit', 'NetshHelper', 'PrintMonitor', 'LsaPackage', 'Driver')) {
+                        $cat = 'Persistence'
+                    }
+                    elseif ($rt -in @('LocalGroupMember', 'LocalAccount', 'Certificate')) {
+                        $cat = 'Users'
+                    }
+                    elseif ($rt -in @('DefenderPreference', 'HardeningRegistry', 'RemoteAccessConfig', 'WdacApplockerPolicy', 'HostsEntry', 'NetworkShare', 'SystemBinary', 'MachineEnvironment')) {
+                        $cat = 'Security'
+                    }
+                    Add-FotonFinding -Severity 'High' -Category $cat -Tier 1 -Title $title `
+                        -Observation $obs `
+                        -WhyItMatters $why `
                         -Artifact 'analysis/baseline_diff.csv' `
-                        -NextStep 'Diff the PathName strings against the day0 baseline and the collected service CSV.'
-                }
-                $adm = @($diffs | Where-Object { $_.RecordType -eq 'LocalGroupMember' -and $_.ChangeType -eq 'Added' -and [string]$_.Identity -like 'Administrators|*' })
-                if ($adm.Count -gt 0) {
-                    Add-FotonFinding -Severity 'High' -Category 'Users' -Tier 1 -Title 'Baseline diff: Administrators membership added' `
-                        -Observation ("{0} Added LocalGroupMember row(s) for Administrators in analysis/baseline_diff.csv." -f $adm.Count) `
-                        -WhyItMatters 'Local admin membership is a high-attention trust change. Helpdesk, LAPS, and domain join also add members.' `
-                        -Artifact 'analysis/baseline_diff.csv'
-                }
-                $def = @($diffs | Where-Object { $_.RecordType -eq 'DefenderPreference' -and [string]$_.Identity -like '*DisableRealtimeMonitoring*' })
-                if ($def.Count -gt 0) {
-                    Add-FotonFinding -Severity 'High' -Category 'Security' -Tier 1 -Title 'Baseline diff: Defender real-time monitoring setting changed' `
-                        -Observation 'DefenderPreference DisableRealtimeMonitoring changed between baselines (see baseline_diff.csv).' `
-                        -WhyItMatters 'The change is a fact. Tampering, troubleshooting, and GPO/Intune all flip this switch.' `
-                        -Artifact 'analysis/baseline_diff.csv'
+                        -NextStep 'Open baseline_diff.csv for OldValue/NewValue, confirm against change control or the role golden image, and corroborate with Collect persistence CSVs when a triage package is available.'
                 }
             }
             catch { }
