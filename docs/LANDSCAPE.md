@@ -1,6 +1,6 @@
 # Landscape, strengths, and development direction
 
-Contributor and agent guidance: **how Foton should grow relative to specialist Windows DFIR tools.** Artifact inventory stays in [COVERAGE.md](COVERAGE.md). The public-release checklist stays in [TODO.md](TODO.md). This file is the **strategy**: what to keep, what to compose, what not to rebuild in PowerShell.
+Contributor and agent guidance: **how Foton should grow relative to specialist Windows DFIR tools.** Artifact inventory stays in [COVERAGE.md](COVERAGE.md). The public-release checklist stays in [TODO.md](TODO.md). Getting the composed tools onto a workstation is designed in [TOOLS.md](TOOLS.md). This file is the **strategy**: what to keep, what to compose, what not to rebuild in PowerShell.
 
 Landscape snapshot: August 2026. Written against module **1.24.0**, collect schema **1.8.0**, baseline schema **1.13.0**; current is module **1.27.0**, collect schema **1.10.0**, baseline schema **1.14.0**. Tool capabilities change; the *composition* rule does not.
 

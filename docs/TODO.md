@@ -11,6 +11,12 @@ The v1 → module extract is **done** ([MIGRATION.md](MIGRATION.md)). Endpoint f
 Ordered. Prefer the next Collect P1 over exotic ASEPs.
 
 1. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips.
+2. **External tool provisioning** - design agreed, not built: [TOOLS.md](TOOLS.md). Collect is one file for the target user; the workstation side still needs a manual tool download plus a correct `PATH`, and when that is missing compose quietly produces no findings. Scope for the first cut:
+   - `Install-FotonTool` + `Foton.cmd tools`, **Hayabusa only**. Separate setup command; compose stays offline and never prompts, it just names the command in its `NotOnPath` row.
+   - Foton-owned tool root (`%LOCALAPPDATA%\Foton\tools`) + `tools.json`. Resolution order in `Invoke-FotonExternalParse`: `-ToolPath`, then manifest, then `PATH`. **Do not modify `PATH`** - see TOOLS.md for why.
+   - Pinned version + expected SHA-256, refuse on mismatch; offline install from a local archive folder.
+   - Add tool **version** and rule-set version to the external parse inventory and the report's External Tool Passes section. Without it, external findings are not reproducible.
+   - Tests: faked catalog and a faked archive; no network in tests.
 
 **SRUM:** Collect copies the DB + WAL/SHM. A real ESE parser in PowerShell is unlikely to be correct; prefer “copied, not parsed” until a dedicated approach exists.
 
@@ -45,6 +51,7 @@ Do not treat a GitHub release as ready for first-time DFIR users until most of t
 - [x] Collector loads past AMSI on a Defender-protected host (1.27.0; guarded by `build/Test-FotonAmsiLoad.ps1`, operator guidance in USAGE.md)
 - [ ] Verify the collector loads under at least one non-Microsoft endpoint product before release
 - [ ] Installer or zip that analyzes a case without cloning the repo
+- [ ] Workstation tool setup that does not require a manual download plus a hand-edited `PATH` ([TOOLS.md](TOOLS.md))
 
 **Lab (admin + standard user)**
 
