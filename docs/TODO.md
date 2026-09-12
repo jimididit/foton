@@ -12,7 +12,7 @@ The v1 → module extract is **done** ([MIGRATION.md](MIGRATION.md)). Endpoint f
 
 Ordered. Prefer finish and compose convenience over exotic ASEPs or new native parsers.
 
-1. Close remaining **public-release lab ticks** (below) on a VM: v1 zip + Foton folder, parse copied `.pf`, IOC fixture, carve throw, locked files, standard-user skips. Trust beats novelty.
+1. ~~Close remaining **public-release lab ticks**~~ — automated in `tests/Unit/Lab.Tests.ps1` (package open, parse `.pf`/EVTX-in-package, IOC, carve, locked/missing, elevation skip). Live Collect → HTML + standard-user Security/Prefetch on a VM still operator smoke if you care before release.
 2. ~~**External tool provisioning**~~ — **done in 1.28.0** for Hayabusa: [TOOLS.md](TOOLS.md). Chainsaw / EZ Tools catalog entries still open when those paths are verified.
 3. **Analyze consumes compose output** — PECmd / EvtxECmd (and later Chainsaw) CSV → observations that cite the tool. Today eight tools can run; only Hayabusa feeds findings. Prefer ingest over growing `ConvertFrom-Foton*`.
 4. **Baseline / audit operator path** — USAGE recipes for temporal (day0 → later) and fleet (host vs golden); thicken `baseline_diff` → findings only where identity + FP notes already exist. Do **not** add codecs/BHO/OptionalFeature providers for “completeness.”
@@ -58,12 +58,12 @@ Do not treat a GitHub release as ready for first-time DFIR users until most of t
 
 - [x] Collect → open `Foton_Report.html` from the case folder (`file://`)
 - [x] Recapture baseline after schema bumps; Compare day0 vs day1 (schema **1.14.0** requires a new day0)
-- [ ] `Get-FotonPackage` on a historical `WinFoton_*` zip **and** a `Foton_*` flatten folder
-- [ ] Parse `.pf` / EVTX already in the package (not live Prefetch)
-- [ ] IOC txt + csv against `tests/Fixtures`
-- [ ] Carve tiny PE; missing-file throws
-- [ ] Locked/missing artifacts: manifest, no crash, Info gaps
-- [ ] Standard-user: Security / Prefetch skipped, not fatal
+- [x] `Get-FotonPackage` on a historical `WinFoton_*` zip **and** a `Foton_*` flatten folder (`tests/Unit/Lab.Tests.ps1`)
+- [x] Parse `.pf` / EVTX already in the package (not live Prefetch) (`Lab.Tests.ps1`; EVTX via wevtutil export into a temp case)
+- [x] IOC txt + csv against `tests/Fixtures` (`Lab.Tests.ps1`)
+- [x] Carve tiny PE; missing-file throws (`Lab.Tests.ps1`)
+- [x] Locked/missing artifacts: CopyError / Missing, no crash (`Lab.Tests.ps1`)
+- [x] Elevation skip path: `RequiresElevation` → `SkippedNotElevated` (`Lab.Tests.ps1`; live standard-user Security/Prefetch still optional VM smoke)
 
 **Honesty (keep true)**
 
