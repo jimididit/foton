@@ -60,7 +60,7 @@ function New-FotonBaselineCompareReport {
     $rows = @($Changes)
 
     if ($PSCmdlet.ParameterSetName -eq 'Paths') {
-        $rows = @(Compare-FotonBaseline -ReferencePath $ReferencePath -DifferencePath $DifferencePath -NoHtml)
+        $rows = @(Compare-FotonBaseline -ReferencePath $ReferencePath -DifferencePath $DifferencePath -NoHtml -NoCsv)
         $refJson = Get-FotonBaselineJsonPath -Path $ReferencePath
         $difJson = Get-FotonBaselineJsonPath -Path $DifferencePath
         $refHeader = (Get-Content -LiteralPath $refJson -Raw -Encoding UTF8 | ConvertFrom-Json).Header
