@@ -877,6 +877,166 @@ function Invoke-FotonAnalysis {
                     -NextStep 'If a real event could have coincided with the collection, filter the Hayabusa CSV to that window and read the Details column directly rather than relying on this exclusion.'
             }
         }
+
+        # PECmd / EvtxECmd compose CSV → observations that name the tool. Thin ingest
+        # only: coverage + path/EventId signals Foton already knows how to talk about.
+        # Do not reimplement Prefetch or EVTX parsers, and do not invent Sigma bands.
+        $pecmdDir = Join-Path $caseRoot 'analysis\external\PECmd'
+        if (Test-Path -LiteralPath $pecmdDir) {
+            $peRows = 0
+            $peNames = @{}
+            $peWritable = @{}
+            $peCapped = $false
+            $peMax = 200000
+            foreach ($pf in @(Get-ChildItem -LiteralPath $pecmdDir -Filter '*.csv' -File -ErrorAction SilentlyContinue)) {
+                # Timeline CSV is one row per run; main CSV carries FilesLoaded/Directories.
+                try {
+                    foreach ($row in @(Import-Csv -LiteralPath $pf.FullName -ErrorAction Stop)) {
+                        $peRows++
+                        if ($peRows -gt $peMax) { $peCapped = $true; break }
+                        $exe = [string]$row.ExecutableName
+                        if ($exe) {
+                            if (-not $peNames.ContainsKey($exe)) { $peNames[$exe] = 0 }
+                            $peNames[$exe] = $peNames[$exe] + 1
+                        }
+                        $blobs = @(
+                            [string]$row.FilesLoaded
+                            [string]$row.Directories
+                            [string]$row.SourceFilename
+                        )
+                        if ($exe -and $exe.IndexOf('\') -ge 0) { $blobs += $exe }
+                        foreach ($blob in $blobs) {
+                            if (-not $blob) { continue }
+                            foreach ($piece in @($blob -split '[,;\r\n]+')) {
+                                $p = $piece.Trim().Trim('"')
+                                if (-not $p -or $p.IndexOf('\') -lt 0) { continue }
+                                if (Test-FotonUserWritablePath -Path $p) {
+                                    if (-not $peWritable.ContainsKey($p)) { $peWritable[$p] = $true }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+                if ($peCapped) { break }
+            }
+            if ($peRows -gt 0) {
+                $top = @($peNames.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 8)
+                $sample = (($top | ForEach-Object { "{0} ({1})" -f $_.Key, $_.Value }) -join '; ')
+                $capNote = ''
+                if ($peCapped) { $capNote = (" Row scan capped at {0}; counts are a floor." -f $peMax) }
+                Add-FotonFinding -Severity 'Info' -Category 'Execution' -Tier 1 -Title 'PECmd Prefetch rows present in compose output' `
+                    -Observation ("PECmd wrote {0} Prefetch row(s) under analysis/external/PECmd. Top ExecutableName values: {1}.{2}" -f $peRows, $sample, $capNote) `
+                    -WhyItMatters 'These are Eric Zimmerman PECmd facts about Prefetch already copied into the package, not a Foton-native Prefetch parse and not a verdict. Prefetch is often disabled on servers and is incomplete for short-lived processes.' `
+                    -Artifact 'analysis/external/PECmd' `
+                    -NextStep 'Open pecmd.csv for RunCount/LastRun and corroborate interesting executables against process, persistence, and software inventory.'
+            }
+            if ($peWritable.Count -gt 0) {
+                $wSample = (@($peWritable.Keys | Select-Object -First 8) -join '; ')
+                Add-FotonFinding -Severity 'Medium' -Category 'Execution' -Tier 2 -Title 'PECmd Prefetch references user-writable paths' `
+                    -Observation ("PECmd FilesLoaded/Directories (and path-like ExecutableName) include {0} distinct user-writable path(s). Sample: {1}" -f $peWritable.Count, $wSample) `
+                    -WhyItMatters 'A Prefetch-referenced path under a user-writable location is a review item (updater, user binary, or unexpected drop). PECmd reported the reference; this finding does not establish that the file is malicious.' `
+                    -Artifact 'analysis/external/PECmd' `
+                    -NextStep 'Hash the path if the bytes are still in the package and compare to software inventory / baseline diffs.'
+            }
+        }
+
+        $evtxeDir = Join-Path $caseRoot 'analysis\external\EvtxECmd'
+        if (Test-Path -LiteralPath $evtxeDir) {
+            $evRows = 0
+            $evIds = @{}
+            $evWritable = @{}
+            $evSusp = @{}
+            $evCapped = $false
+            $evMax = 2000000
+            # High-attention IDs only — not a hunt engine. Counts cite EvtxECmd.
+            $attention = @{
+                '1102' = @{ Severity = 'High';   Label = 'Security audit log cleared' }
+                '104'  = @{ Severity = 'High';   Label = 'Event log cleared' }
+                '4697' = @{ Severity = 'Medium'; Label = 'Service installed (Security 4697)' }
+                '7045' = @{ Severity = 'Medium'; Label = 'Service installed (System 7045)' }
+                '4698' = @{ Severity = 'Medium'; Label = 'Scheduled task created' }
+            }
+            $attCounts = @{}
+            foreach ($ef in @(Get-ChildItem -LiteralPath $evtxeDir -Filter '*.csv' -File -ErrorAction SilentlyContinue)) {
+                try {
+                    foreach ($row in (Import-Csv -LiteralPath $ef.FullName -ErrorAction Stop)) {
+                        $evRows++
+                        if ($evRows -gt $evMax) { $evCapped = $true; break }
+                        $eid = [string]$row.EventId
+                        if (-not $eid) { $eid = [string]$row.EventID }
+                        if ($eid) {
+                            if (-not $evIds.ContainsKey($eid)) { $evIds[$eid] = 0 }
+                            $evIds[$eid] = $evIds[$eid] + 1
+                            if ($attention.ContainsKey($eid)) {
+                                if (-not $attCounts.ContainsKey($eid)) { $attCounts[$eid] = 0 }
+                                $attCounts[$eid] = $attCounts[$eid] + 1
+                            }
+                        }
+                        $execInfo = [string]$row.ExecutableInfo
+                        if ($execInfo) {
+                            if (Test-FotonUserWritablePath -Path $execInfo) {
+                                if (-not $evWritable.ContainsKey($execInfo)) { $evWritable[$execInfo] = $true }
+                            }
+                            else {
+                                # ExecutableInfo often embeds a path inside a longer string.
+                                foreach ($m in [regex]::Matches($execInfo, '(?i)[A-Za-z]:\\[^\s\|"]+')) {
+                                    $p = $m.Value
+                                    if (Test-FotonUserWritablePath -Path $p) {
+                                        if (-not $evWritable.ContainsKey($p)) { $evWritable[$p] = $true }
+                                    }
+                                }
+                            }
+                            $hit = Test-FotonSuspiciousCommand -Text $execInfo
+                            if ($hit) {
+                                if (-not $evSusp.ContainsKey($hit)) { $evSusp[$hit] = 0 }
+                                $evSusp[$hit] = $evSusp[$hit] + 1
+                            }
+                        }
+                    }
+                }
+                catch { }
+                if ($evCapped) { break }
+            }
+            if ($evRows -gt 0) {
+                $topIds = @($evIds.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 8)
+                $idSample = (($topIds | ForEach-Object { "EventId {0} ({1})" -f $_.Key, $_.Value }) -join '; ')
+                $capNote = ''
+                if ($evCapped) { $capNote = (" Row scan capped at {0}; counts are a floor." -f $evMax) }
+                Add-FotonFinding -Severity 'Info' -Category 'EventLogs' -Tier 1 -Title 'EvtxECmd event rows present in compose output' `
+                    -Observation ("EvtxECmd wrote {0} event row(s) under analysis/external/EvtxECmd. Top EventId values: {1}.{2}" -f $evRows, $idSample, $capNote) `
+                    -WhyItMatters 'These are Eric Zimmerman EvtxECmd facts about EVTX already copied into the package. Volume reflects which channels were collected and how noisy they were — not a compromise score.' `
+                    -Artifact 'analysis/external/EvtxECmd' `
+                    -NextStep 'Filter evtxecmd.csv by EventId and Channel for the investigation window; use Hayabusa/Chainsaw compose for Sigma-style hunts.'
+            }
+            foreach ($eid in @($attCounts.Keys | Sort-Object)) {
+                $meta = $attention[$eid]
+                $n = $attCounts[$eid]
+                Add-FotonFinding -Severity $meta.Severity -Category 'EventLogs' -Tier 1 `
+                    -Title ("EvtxECmd: {0}" -f $meta.Label) `
+                    -Observation ("EvtxECmd reported {0} EventId {1} row(s) in analysis/external/EvtxECmd." -f $n, $eid) `
+                    -WhyItMatters 'This EventId is a high-attention audit fact when present. Benign administrators, installers, and management agents also clear logs, install services, and create tasks. EvtxECmd reported the row; this is not attribution.' `
+                    -Artifact 'analysis/external/EvtxECmd' `
+                    -NextStep ("Open the EvtxECmd CSV filtered to EventId {0}, note TimeCreated/UserName/ExecutableInfo, and corroborate against persistence and account artifacts." -f $eid)
+            }
+            if ($evWritable.Count -gt 0) {
+                $wSample = (@($evWritable.Keys | Select-Object -First 8) -join '; ')
+                Add-FotonFinding -Severity 'Medium' -Category 'Execution' -Tier 2 -Title 'EvtxECmd ExecutableInfo references user-writable paths' `
+                    -Observation ("EvtxECmd ExecutableInfo fields include {0} distinct user-writable path(s). Sample: {1}" -f $evWritable.Count, $wSample) `
+                    -WhyItMatters 'Mapped ExecutableInfo often carries process paths, service ImagePath, or task actions. A user-writable location is a review item, not proof of compromise.' `
+                    -Artifact 'analysis/external/EvtxECmd' `
+                    -NextStep 'Corroborate the path against Prefetch/PECmd, persistence CSVs, and software inventory.'
+            }
+            if ($evSusp.Count -gt 0) {
+                $sSample = (($evSusp.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 6 |
+                        ForEach-Object { "{0} ({1})" -f $_.Key, $_.Value }) -join '; ')
+                Add-FotonFinding -Severity 'Medium' -Category 'Execution' -Tier 2 -Title 'EvtxECmd ExecutableInfo matched suspicious-command patterns' `
+                    -Observation ("EvtxECmd ExecutableInfo matched {0} distinct suspicious-command pattern(s). Sample: {1}" -f $evSusp.Count, $sSample) `
+                    -WhyItMatters 'These are the same workstation pattern matches used on collected process rows, applied to EvtxECmd-mapped command text. Admin scripts and installers often match. Not a verdict.' `
+                    -Artifact 'analysis/external/EvtxECmd' `
+                    -NextStep 'Read the matching EvtxECmd rows in full and corroborate against process creation and persistence artifacts.'
+            }
+        }
     }
 
     # Absence is not evidence. The endpoint flatten ships without the

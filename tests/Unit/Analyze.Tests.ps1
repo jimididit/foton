@@ -258,6 +258,129 @@ Describe 'Get-FotonPackage and offline analysis' {
         }
     }
 
+    It 'ingests PECmd compose CSV: coverage and user-writable FilesLoaded' {
+        $tmp = Join-Path $env:TEMP ('foton-pecmd-' + [guid]::NewGuid().ToString('N'))
+        $dir = Join-Path $tmp 'analysis\external\PECmd'
+        New-Item -Path $dir -ItemType Directory -Force | Out-Null
+        try {
+            @(
+                [PSCustomObject]@{
+                    ExecutableName = 'NOTEPAD.EXE'
+                    FilesLoaded    = 'C:\Windows\System32\notepad.exe, C:\Windows\System32\ntdll.dll'
+                    Directories    = '\VOLUME\WINDOWS\SYSTEM32'
+                    SourceFilename = 'C:\Windows\Prefetch\NOTEPAD.EXE-D8414F97.pf'
+                }
+                [PSCustomObject]@{
+                    ExecutableName = 'EVIL.EXE'
+                    FilesLoaded    = 'C:\Users\Public\evil.exe, C:\Windows\System32\ntdll.dll'
+                    Directories    = '\VOLUME\USERS\PUBLIC'
+                    SourceFilename = 'C:\Windows\Prefetch\EVIL.EXE-AAAAAAAA.pf'
+                }
+            ) | Export-Csv -Path (Join-Path $dir 'pecmd.csv') -NoTypeInformation -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+                $cov = @($script:FotonSession.Findings |
+                        Where-Object { $_.Title -eq 'PECmd Prefetch rows present in compose output' })
+                $cov | Should -HaveCount 1
+                $cov[0].Artifact | Should -Be 'analysis/external/PECmd'
+                $cov[0].Observation | Should -Match 'PECmd'
+                $w = @($script:FotonSession.Findings |
+                        Where-Object { $_.Title -eq 'PECmd Prefetch references user-writable paths' })
+                $w | Should -HaveCount 1
+                $w[0].Severity | Should -Be 'Medium'
+                $w[0].Observation | Should -Match 'Users\\Public\\evil.exe'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'does not raise PECmd path findings for System32-only FilesLoaded' {
+        $tmp = Join-Path $env:TEMP ('foton-pecmd-clean-' + [guid]::NewGuid().ToString('N'))
+        $dir = Join-Path $tmp 'analysis\external\PECmd'
+        New-Item -Path $dir -ItemType Directory -Force | Out-Null
+        try {
+            @(
+                [PSCustomObject]@{
+                    ExecutableName = 'NOTEPAD.EXE'
+                    FilesLoaded    = 'C:\Windows\System32\notepad.exe'
+                    Directories    = '\VOLUME\WINDOWS\SYSTEM32'
+                    SourceFilename = 'C:\Windows\Prefetch\NOTEPAD.EXE-D8414F97.pf'
+                }
+            ) | Export-Csv -Path (Join-Path $dir 'pecmd.csv') -NoTypeInformation -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+                @($script:FotonSession.Findings |
+                    Where-Object { $_.Title -eq 'PECmd Prefetch rows present in compose output' }) |
+                    Should -HaveCount 1
+                @($script:FotonSession.Findings |
+                    Where-Object { $_.Title -eq 'PECmd Prefetch references user-writable paths' }) |
+                    Should -HaveCount 0
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'ingests EvtxECmd compose CSV: coverage, EventId 1102, and ExecutableInfo paths' {
+        $tmp = Join-Path $env:TEMP ('foton-evtxe-' + [guid]::NewGuid().ToString('N'))
+        $dir = Join-Path $tmp 'analysis\external\EvtxECmd'
+        New-Item -Path $dir -ItemType Directory -Force | Out-Null
+        try {
+            @(
+                [PSCustomObject]@{
+                    EventId        = '4688'
+                    Channel        = 'Security'
+                    ExecutableInfo = 'C:\Windows\System32\cmd.exe'
+                }
+                [PSCustomObject]@{
+                    EventId        = '1102'
+                    Channel        = 'Security'
+                    ExecutableInfo = ''
+                }
+                [PSCustomObject]@{
+                    EventId        = '7045'
+                    Channel        = 'System'
+                    ExecutableInfo = 'C:\Users\Public\drop\svc.exe'
+                }
+            ) | Export-Csv -Path (Join-Path $dir 'evtxecmd.csv') -NoTypeInformation -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+                @($script:FotonSession.Findings |
+                    Where-Object { $_.Title -eq 'EvtxECmd event rows present in compose output' }) |
+                    Should -HaveCount 1
+                $cleared = @($script:FotonSession.Findings |
+                        Where-Object { $_.Title -eq 'EvtxECmd: Security audit log cleared' })
+                $cleared | Should -HaveCount 1
+                $cleared[0].Severity | Should -Be 'High'
+                $svc = @($script:FotonSession.Findings |
+                        Where-Object { $_.Title -eq 'EvtxECmd: Service installed (System 7045)' })
+                $svc | Should -HaveCount 1
+                $w = @($script:FotonSession.Findings |
+                        Where-Object { $_.Title -eq 'EvtxECmd ExecutableInfo references user-writable paths' })
+                $w | Should -HaveCount 1
+                $w[0].Observation | Should -Match 'Users\\Public\\drop\\svc.exe'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'fires on baseline_diff service PathName and not on DisplayVersion' {
         $tmp = Join-Path $env:TEMP ('foton-diff-' + [guid]::NewGuid().ToString('N'))
         New-Item -Path (Join-Path $tmp 'analysis') -ItemType Directory -Force | Out-Null

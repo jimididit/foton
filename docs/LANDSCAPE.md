@@ -52,10 +52,11 @@ What the landscape plan said to do, and what landed through **1.27.0**:
 | Landscape bet | Status | Keep / stop |
 |---------------|--------|-------------|
 | Copy raw artifacts specialists need (hives, LNK, Tasks XML, browser DBs, wider EVTX, optional USN) | **Done** (collect 1.9.0) | Keep. Do not grow `$MFT` in PS unless charter changes. |
-| Compose Hayabusa on copied EVTX → findings | **Done and verified** on a real package; collector-footprint exclusion added | Keep. Chainsaw / EvtxECmd ingest still open — thin, not a rewrite. |
+| Compose Hayabusa on copied EVTX → findings | **Done and verified** on a real package; collector-footprint exclusion added | Keep. Chainsaw ingest still open — thin, not a rewrite. |
+| Compose PECmd / EvtxECmd → findings | **Done in 1.29.0** (coverage, user-writable paths, high-attention EventIds) | Keep thin; do not grow native Prefetch/EVTX parsers for this. |
 | Analyze reads parsed rows + baseline diffs | **Started** — still thin | Keep prioritizing rules over new collectors. |
 | Do not rebuild Sigma / ESE / NTFS in PowerShell | **Held** | Keep holding. |
-| Operator packaging / release bar | **Partial** — AMSI fixed; lab ticks, analyze-without-clone, tool install still open | Finish these before novelty. |
+| Operator packaging / release bar | **Partial** — AMSI fixed; lab ticks automated; tool install (Hayabusa); analyze-without-clone + Authenticode still open | Finish release-bar before novelty. |
 | Exotic ASEP “for completeness” | **Not scheduled** (codecs, BHO, …) | Correct. |
 
 **Wrong-direction traps to refuse now:**
@@ -134,7 +135,7 @@ Deterministic baseline hash; field-level Added/Removed/Modified with documented 
 | Area | Gap | Why it matters | Direction |
 |------|-----|----------------|-----------|
 | Raw artifact copies | **Largely closed in collect 1.9.0**: machine + user hives with sidecars, LNK/jumplists, Tasks XML, browser DBs, host text logs, wider EVTX, optional USN `$J`. `$MFT` and `$LogFile` still not copied. | Parse/carve and EZ Tools need **bytes**, not CSV summaries. | Remaining: decide whether `$MFT` belongs here or stays a KAPE/ORC job. Do not parse any of it in PS 5.1 on the endpoint. |
-| Analyze automation | **Started in 1.25.0-1.27.0**: rules read collect CSVs, thin `parsed_records` / `baseline_diff` rules, and Hayabusa CSV. ~Eight compose tools are wired; **only Hayabusa feeds findings**. | Highest ROI without new collect. Compose that only writes inventory rows is aspirational wiring. | More rules over diffs and over compose CSV (cite the tool). Prefer ingesting PECmd/EvtxECmd over growing native parsers. Still observations, not verdicts. |
+| Analyze automation | **1.29.0**: rules read collect CSVs, thin `parsed_records` / `baseline_diff`, Hayabusa, **PECmd**, and **EvtxECmd** compose CSV. Chainsaw still inventory-only. | Highest ROI without new collect. | Chainsaw ingest next. Still observations, not verdicts. |
 | EVTX hunting | **Implemented and verified** via `Invoke-FotonExternalParse` + Hayabusa; collector-footprint attribution excludes self-hits from severity bands. Chainsaw wiring untested; EZ Tools often `NotOnPath`. | Wrong to rebuild Hayabusa in PowerShell. Composing a hunt engine means owning the collector’s footprint **and** making the tool findable. | [TOOLS.md](TOOLS.md) install (Hayabusa first); verify Chainsaw; same footprint model for other hunt engines. |
 | Parse correctness | MAM Prefetch, SRUM ESE, shellbags, Shimcache *entries*, legacy Amcache `File\*` | PowerShell is the wrong runtime. | Copy + EZ Tools (or documented “unsupported,” never guessed fields). Native ConvertFrom-* stays air-gap fallback. |
 | Operator packaging | Authenticode/ExecutionPolicy story, analyze-without-clone zip, lab ticks still open. **AMSI fixed in 1.27.0.** ZIP open stages a new temp dir each time — chaining `compose` then `analyze` on a ZIP loses tool output (documented: extract first). | This is what makes the tool feel “not ready,” not missing another Winlogon value. | Finish [TODO.md](TODO.md) public-release bar; build tool install; keep ZIP staging documented until a deliberate package-session fix exists. |
