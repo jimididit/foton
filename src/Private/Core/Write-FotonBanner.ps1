@@ -378,7 +378,7 @@ function Write-FotonBanner {
         [string]$Color = 'Auto'
     )
 
-    $ver = '1.29.0'
+    $ver = '1.30.0'
     if ($script:FotonSession -and $script:FotonSession.Version) {
         $ver = [string]$script:FotonSession.Version
     }

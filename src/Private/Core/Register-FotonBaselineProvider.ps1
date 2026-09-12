@@ -31,6 +31,18 @@ function Get-FotonBaselineIdentity {
     return ($parts -join '|')
 }
 
+function Get-FotonBaselineFalsePositives {
+    <#
+        Provider-documented false-positive notes for a RecordType, or empty.
+        Used by Compare and Analyze so findings cite the same FP text as the provider.
+    #>
+    param([Parameter(Mandatory)][string]$RecordType)
+    if ($null -eq $script:FotonBaselineProviders) { return '' }
+    $p = @($script:FotonBaselineProviders | Where-Object { $_.RecordType -eq $RecordType } | Select-Object -First 1)
+    if ($p.Count -eq 0) { return '' }
+    return [string]$p[0].FalsePositives
+}
+
 function Get-FotonBaselineSchemaVersion {
     if ($script:FotonEmbeddedBaselineSchema) {
         return [string]$script:FotonEmbeddedBaselineSchema

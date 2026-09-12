@@ -15,7 +15,7 @@ Ordered. Prefer finish and compose convenience over exotic ASEPs or new native p
 1. ~~Close remaining **public-release lab ticks**~~ — automated in `tests/Unit/Lab.Tests.ps1` (package open, parse `.pf`/EVTX-in-package, IOC, carve, locked/missing, elevation skip). Live Collect → HTML + standard-user Security/Prefetch on a VM still operator smoke if you care before release.
 2. ~~**External tool provisioning**~~ — **done in 1.28.0** for Hayabusa: [TOOLS.md](TOOLS.md). Chainsaw / EZ Tools catalog entries still open when those paths are verified.
 3. ~~**Analyze consumes compose output**~~ — **done in 1.29.0** for PECmd / EvtxECmd (coverage + user-writable paths + high-attention EventIds; findings cite the tool). Chainsaw ingest still open.
-4. **Baseline / audit operator path** — USAGE recipes for temporal (day0 → later) and fleet (host vs golden); thicken `baseline_diff` → findings only where identity + FP notes already exist. Do **not** add codecs/BHO/OptionalFeature providers for “completeness.”
+4. ~~**Baseline / audit operator path**~~ — **done in 1.30.0**: USAGE temporal + fleet recipes; `Compare-FotonBaseline` writes `baseline_diff.csv` and cites provider FalsePositives; Analyze lifts High-attention `baseline_diff` rows (not Info software bumps). No new ASEP providers.
 5. **Analyze-without-clone zip** + documented Authenticode / ExecutionPolicy story (release bar).
 
 **SRUM:** Collect copies the DB + WAL/SHM. A real ESE parser in PowerShell is unlikely to be correct; prefer “copied, not parsed” until a dedicated approach exists.

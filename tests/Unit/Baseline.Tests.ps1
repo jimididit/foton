@@ -257,7 +257,7 @@ Describe 'Baseline providers and diff' {
     }
 
     It 'diffs field-level changes and fires High on service PathName and new admin' {
-        $changes = Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif -NoHtml
+        $changes = Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif -NoHtml -NoCsv
         $path = @($changes | Where-Object { $_.RecordType -eq 'Service' -and $_.Field -eq 'PathName' })
         $path.Count | Should -Be 1
         $path[0].ChangeType | Should -Be 'Modified'
@@ -274,10 +274,37 @@ Describe 'Baseline providers and diff' {
     }
 
     It 'does not treat a software version bump as High' {
-        Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif -NoHtml | Out-Null
+        Compare-FotonBaseline -ReferencePath $script:Ref -DifferencePath $script:Dif -NoHtml -NoCsv | Out-Null
         InModuleScope Foton {
             @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Modified InstalledSoftware' -and $_.Severity -eq 'Info' }) |
                 Should -Not -BeNullOrEmpty
+        }
+    }
+
+    It 'writes baseline_diff.csv and cites provider false positives on High findings' {
+        $tmp = Join-Path $env:TEMP ('foton-cmp-csv-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path $tmp -ItemType Directory -Force | Out-Null
+        $ref = Join-Path $tmp 'ref.json'
+        $dif = Join-Path $tmp 'dif.json'
+        try {
+            Copy-Item -LiteralPath $script:Ref -Destination $ref -Force
+            Copy-Item -LiteralPath $script:Dif -Destination $dif -Force
+            Compare-FotonBaseline -ReferencePath $ref -DifferencePath $dif -NoHtml | Out-Null
+            $csv = Join-Path $tmp 'baseline_diff.csv'
+            Test-Path -LiteralPath $csv | Should -Be $true
+            $rows = @(Import-Csv -LiteralPath $csv)
+            $rows.Count | Should -BeGreaterThan 0
+            $rows[0].PSObject.Properties.Name | Should -Contain 'RecordType'
+            InModuleScope Foton {
+                $svc = @($script:FotonSession.Findings |
+                        Where-Object { $_.Title -eq 'Modified Service' -and $_.Severity -eq 'High' })
+                $svc | Should -Not -BeNullOrEmpty
+                $svc[0].WhyItMatters | Should -Match 'Patch Tuesday'
+                $svc[0].WhyItMatters | Should -Match 'Temporal|Fleet'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 
@@ -322,7 +349,7 @@ Describe 'New-FotonBaselineReport' {
         New-Item -Path $dir -ItemType Directory | Out-Null
         Copy-Item -LiteralPath $script:Ref -Destination (Join-Path $dir 'baseline.json')
         try {
-            Compare-FotonBaseline -ReferencePath $dir -DifferencePath $script:Dif -NoHtml | Out-Null
+            Compare-FotonBaseline -ReferencePath $dir -DifferencePath $script:Dif -NoHtml -NoCsv | Out-Null
         }
         finally {
             Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue

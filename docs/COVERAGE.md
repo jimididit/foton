@@ -135,7 +135,7 @@ Present: Service, Driver, ScheduledTask, Autorun (HKLM Run/RunOnce), **UserAutor
 | Layer | Have | Next (useful DFIR, still offline) |
 |-------|------|-----------------------------------|
 | Parse | Prefetch (uncompressed SCCA), LNK, **EVTX (selected IDs, capped)**, **jumplists (DestList + custom LNK)**, **Amcache InventoryApplicationFile (named values)**. Native fallback; **EZ Tools / Hayabusa if on PATH** (`Invoke-FotonExternalParse`) | shellbags, SRUM *parser* (ESE), browser DB *parse* - **fixtures first**. Collect copies SRUM and browser DBs; do not fake an ESE parse. |
-| Analyze | Triage heuristics + IOC file + **parsed_records.csv** user-writable paths + **baseline_diff.csv** (service PathName, Administrators, Defender RTP) | Still observations, not “compromised.” External-tool hits named to the tool |
+| Analyze | Triage heuristics + IOC file + **parsed_records.csv** user-writable paths + **baseline_diff.csv** (all High-attention RecordTypes via `Get-FotonBaselineChangeSeverity`, with provider FP notes) + Hayabusa/PECmd/EvtxECmd compose | Still observations, not “compromised.” External-tool hits named to the tool |
 | Carve | MZ/PE signature scan of a blob | Not NTFS unallocated in PS |
 
 ---

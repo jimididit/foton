@@ -394,8 +394,9 @@ Describe 'Get-FotonPackage and offline analysis' {
                 $script:FotonSession.CaseRoot = $Root
                 $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
                 Invoke-FotonAnalysis
-                @($script:FotonSession.Findings | Where-Object { $_.Title -like 'Baseline diff: service*' }) |
-                    Should -HaveCount 1
+                $hit = @($script:FotonSession.Findings | Where-Object { $_.Title -like 'Baseline diff: service*' })
+                $hit | Should -HaveCount 1
+                $hit[0].WhyItMatters | Should -Match 'Patch Tuesday'
             }
             @(
                 [PSCustomObject]@{ RecordType = 'InstalledSoftware'; Identity = 'App|Pub'; ChangeType = 'Modified'; Field = 'DisplayVersion' }
@@ -407,6 +408,37 @@ Describe 'Get-FotonPackage and offline analysis' {
                 $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
                 Invoke-FotonAnalysis
                 @($script:FotonSession.Findings | Where-Object { $_.Title -like 'Baseline diff:*' }) |
+                    Should -HaveCount 0
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'lifts High Winlogon and Root CA baseline_diff rows with provider FP notes' {
+        $tmp = Join-Path $env:TEMP ('foton-diff-hi-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path (Join-Path $tmp 'analysis') -ItemType Directory -Force | Out-Null
+        try {
+            @(
+                [PSCustomObject]@{ RecordType = 'Winlogon'; Identity = 'Userinit'; ChangeType = 'Modified'; Field = 'Value'; OldValue = 'userinit.exe'; NewValue = 'evil.exe' }
+                [PSCustomObject]@{ RecordType = 'Certificate'; Identity = 'Cert:\LocalMachine\Root|AABB'; ChangeType = 'Added'; Field = ''; OldValue = ''; NewValue = '' }
+                [PSCustomObject]@{ RecordType = 'InstalledSoftware'; Identity = 'App|Pub'; ChangeType = 'Modified'; Field = 'DisplayVersion'; OldValue = '1'; NewValue = '2' }
+            ) | Export-Csv -Path (Join-Path $tmp 'analysis\baseline_diff.csv') -NoTypeInformation -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+                $wl = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Baseline diff: Modified Winlogon.Value' })
+                $wl | Should -HaveCount 1
+                $wl[0].Severity | Should -Be 'High'
+                $wl[0].WhyItMatters | Should -Match 'EDR|MFA|Userinit'
+                $ca = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Baseline diff: Added Certificate' })
+                $ca | Should -HaveCount 1
+                $ca[0].WhyItMatters | Should -Match 'Root|Enterprise'
+                @($script:FotonSession.Findings | Where-Object { $_.Title -like 'Baseline diff:*InstalledSoftware*' }) |
                     Should -HaveCount 0
             }
         }

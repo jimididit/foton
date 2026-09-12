@@ -9,7 +9,7 @@ Foton has **two machines**. Mixing them is what feels like too much PowerShell.
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-Current stamps (from `Foton.psd1`): module **1.29.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+Current stamps (from `Foton.psd1`): module **1.30.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
 
 ---
 
@@ -24,14 +24,14 @@ On a trusted box, rebuild after Collect/Baseline source changes:
 
 That writes a **versioned** leaf and an unversioned alias (same bytes):
 
-- `dist\Foton-Collect_v1.29.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
-- `dist\Foton-Baseline_v1.29.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
+- `dist\Foton-Collect_v1.30.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
+- `dist\Foton-Baseline_v1.30.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
 
 Copy **one** file to the target (USB, RMM, email). Prefer the versioned leaf so the module and schema stay in the filename.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.29.0_schema1.10.0.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.29.0_schema1.14.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.30.0_schema1.10.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.30.0_schema1.14.0.ps1
 ```
 
 ### If antivirus blocks the collector
@@ -177,7 +177,7 @@ Invoke-FotonTriage -OutputPath D:\Cases -CaseNumber CASE-0001 -NoZip
 |---------|---------|-----|
 | `New-FotonBaseline` | Capture stable config (live host) | `-OutputPath D:\Baselines` package, or `-Path D:\Baselines\host.json` JSON only. `-NoZip`, `-NoHtml`, `-RequireAdministrator` |
 | `New-FotonBaselineReport` | HTML snapshot of **one** baseline | `-Path D:\Baselines\FotonBaseline_HOSTNAME_...Z` (or `baseline.json`) |
-| `Compare-FotonBaseline` | Field-level Added/Removed/Modified | `-ReferencePath day0.json -DifferencePath day1.json` (folders that contain `baseline.json` work). Refuses schema mismatch. Writes `Foton_BaselineCompare.html` unless `-NoHtml` |
+| `Compare-FotonBaseline` | Field-level Added/Removed/Modified | `-ReferencePath day0.json -DifferencePath day1.json` (folders that contain `baseline.json` work). Refuses schema mismatch. Writes `baseline_diff.csv` + `Foton_BaselineCompare.html` beside the difference JSON (HTML unless `-NoHtml`). Mode is **Temporal** when hostnames match, else **Fleet** |
 | `New-FotonBaselineCompareReport` | HTML for an existing diff (workstation) | Used when you already have change records; `Compare-FotonBaseline` writes HTML by default |
 
 ```powershell
@@ -185,6 +185,53 @@ New-FotonBaseline -OutputPath D:\Baselines -NoZip
 Compare-FotonBaseline -ReferencePath D:\Baselines\day0.json -DifferencePath D:\Baselines\day1.json
 New-FotonBaselineReport -Path D:\Baselines\FotonBaseline_HOSTNAME_20260822-120000Z
 ```
+
+#### Temporal recipe (same host, day0 → later)
+
+Capture at provisioning (or any known-good moment), store **off-host**, recapture later on that host, then compare. Hostnames must match for Temporal wording.
+
+```powershell
+# Day 0 (provisioning / known-good) - store off-host
+.\Foton-Baseline.ps1 -OutputPath D:\Baselines\day0 -NoZip
+
+# Day N on the same host
+.\Foton-Baseline.ps1 -OutputPath D:\Baselines\dayN -NoZip
+
+# Workstation
+Compare-FotonBaseline `
+  -ReferencePath D:\Baselines\day0\FotonBaseline_HOSTNAME_...Z `
+  -DifferencePath D:\Baselines\dayN\FotonBaseline_HOSTNAME_...Z
+# -> baseline_diff.csv + Foton_BaselineCompare.html beside dayN baseline.json
+```
+
+Optional: feed High-attention rows into a triage report:
+
+```powershell
+New-Item D:\Cases\Foton_HOSTNAME_...Z\analysis -ItemType Directory -Force | Out-Null
+Copy-Item D:\Baselines\dayN\...\baseline_diff.csv `
+  D:\Cases\Foton_HOSTNAME_...Z\analysis\baseline_diff.csv -Force
+.\Foton.cmd analyze D:\Cases\Foton_HOSTNAME_...Z
+```
+
+#### Fleet recipe (host vs golden / role image)
+
+Capture a **role** golden once (hostname will differ from candidates). Compare each host against that golden. Wording is Fleet — not a certificate that the host is clean.
+
+```powershell
+# Golden for role "web" (any representative build host)
+.\Foton-Baseline.ps1 -OutputPath D:\Baselines\golden-web -NoZip
+
+# Candidate host
+.\Foton-Baseline.ps1 -OutputPath D:\Baselines\hosts\WEB01 -NoZip
+
+Compare-FotonBaseline `
+  -ReferencePath D:\Baselines\golden-web\FotonBaseline_...Z `
+  -DifferencePath D:\Baselines\hosts\WEB01\FotonBaseline_WEB01_...Z
+```
+
+Expect noise: hostname, SIDs, domain join, local admin via LAPS, software version bumps (Info). High attention (service PathName, new Administrators member, Winlogon, IFEO, Root CA add, …) still cites provider false-positive notes — confirm against the role image, do not treat as compromise.
+
+Schema **1.14.0** refuses older JSON. Recapture golden and day0 after a schema bump.
 
 ### Parse (offline files)
 
