@@ -3,6 +3,7 @@
 .vscode/
 .specstory/
 .cursorindexingignore
+graphify-out/
 
 # OS files
 .DS_Store
