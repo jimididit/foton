@@ -206,3 +206,11 @@ leave the flatten readable.
 - When you add or change a public command, flatten switch, or `Foton.cmd` verb, update [docs/USAGE.md](docs/USAGE.md) in the same change (purpose + how). USAGE is the operator catalog; AGENTS.md is not.
 - Bump module and schema versions on behavior or format changes; keep docs in sync.
 - If a capability can't be done correctly in PowerShell, say so and propose the alternative (usually: copy the bytes, run EZ Tools / Hayabusa / KAPE). In forensics, a wrong answer is more expensive than a missing one. See [docs/LANDSCAPE.md](docs/LANDSCAPE.md).
+
+### Branch / PR workflow
+
+- Do **not** commit feature work directly to `main`.
+- Branch from up-to-date `main`, push, and open a **PR into `main`**.
+- Wait for **GitHub Actions CI** (Pester job) to pass; merge only when required checks are green.
+- Do not force-push `main` or bypass branch protection unless the user explicitly requests an emergency override.
+- Prefer focused PRs (one TODO/feature when practical). Long-lived `dev` is not the integration model; feature branches target `main`.
