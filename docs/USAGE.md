@@ -9,7 +9,7 @@ Foton has **two machines**. Mixing them is what feels like too much PowerShell.
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-Current stamps (from `Foton.psd1`): module **1.27.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+Current stamps (from `Foton.psd1`): module **1.28.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
 
 ---
 
@@ -24,14 +24,14 @@ On a trusted box, rebuild after Collect/Baseline source changes:
 
 That writes a **versioned** leaf and an unversioned alias (same bytes):
 
-- `dist\Foton-Collect_v1.27.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
-- `dist\Foton-Baseline_v1.27.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
+- `dist\Foton-Collect_v1.28.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
+- `dist\Foton-Baseline_v1.28.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
 
 Copy **one** file to the target (USB, RMM, email). Prefer the versioned leaf so the module and schema stay in the filename.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.27.0_schema1.10.0.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.27.0_schema1.14.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.28.0_schema1.10.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.28.0_schema1.14.0.ps1
 ```
 
 ### If antivirus blocks the collector
@@ -119,7 +119,8 @@ Foton.cmd carve    D:\blob.bin
 | `baseline` | Capture on **this** workstation | Package folder, or JSON if the path ends in `.json` |
 | `compare` | Diff two baselines | Table + `Foton_BaselineCompare.html` beside the second JSON |
 | `parse` | Offline Prefetch / LNK / jumplist / EVTX / Amcache | `analysis\parsed_records.csv`, `analysis\Foton_Parse.html` |
-| `compose` | If EZ Tools / Hayabusa / Chainsaw are on PATH, run them on copied files | `analysis\external\<tool>\` hashed CSV; inventory CSV. Native parse if missing |
+| `compose` | If EZ Tools / Hayabusa / Chainsaw are available (Install-FotonTool manifest or PATH), run them on copied files | `analysis\external\<tool>\` hashed CSV; inventory CSV with Version/RulesVersion. Native parse if missing |
+| `tools` | One-time workstation install of a **pinned** catalog tool (Hayabusa first) | `%LOCALAPPDATA%\Foton\tools` + `tools.json`. Does **not** change PATH |
 | `analyze` | Load package, run heuristics, write HTML | Case folder: `Foton_Report.html`, `analysis\findings.csv`. ZIP: `<zip-stem>_Report.html` + `<zip-stem>_findings.csv` **beside the ZIP** |
 | `ioc` | Match a text/CSV/JSON IOC list to the package | Match table (Tier 2 hits) |
 | `carve` | MZ/PE signature scan of a blob (capped) | Hit table. Not NTFS unallocated |
@@ -209,9 +210,14 @@ SRUM ESE is **copied, not parsed**.
 
 ### Compose (EZ Tools / Hayabusa, optional)
 
-Native `ConvertFrom-Foton*` is the air-gap fallback. If Eric Zimmerman tools or Hayabusa/Chainsaw are **already on PATH**, `Invoke-FotonExternalParse` runs them on **copied** package files only (no download, no live host).
+Native `ConvertFrom-Foton*` is the air-gap fallback. Prefer a one-time `Install-FotonTool` for Hayabusa (pinned version + SHA-256 into `%LOCALAPPDATA%\Foton\tools`). Compose then finds it via `tools.json` without touching PATH. EZ Tools / Chainsaw still resolve from PATH until they are catalogued.
 
 ```powershell
+Install-FotonTool -List
+Install-FotonTool -Name Hayabusa
+# Offline / air-gap:
+Install-FotonTool -Name Hayabusa -ArchivePath D:\Offline\hayabusa-4.0.0-win-x64.zip -Force
+
 Get-FotonPackage -Path D:\Cases\Foton_HOSTNAME_...Z
 Invoke-FotonParse
 Invoke-FotonExternalParse
@@ -219,11 +225,13 @@ Invoke-FotonAnalysis
 New-FotonReport
 ```
 
-Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are inventory rows (`NotOnPath`), not failures. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. Copy `Foton-Collect.ps1` does not parse Prefetch/EVTX/hives on the endpoint.
+Or: `Foton.cmd tools Hayabusa` then `Foton.cmd compose <case-folder>`.
 
-Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard), because without it the tool waits for keyboard input and compose looks hung. Rules are loaded from the `rules\` folder beside the binary, so keep the release layout intact rather than copying a lone `hayabusa.exe` onto PATH — copy the whole extracted release folder and put *that* on PATH. Each tool is launched with its own install directory as the working directory, because Hayabusa resolves `config\` (output profiles, level colours) relative to the working directory and otherwise reports missing rules and config.
+Outputs land under `analysis\external\<tool>\` and are hashed. Inventory rows include **Version** and **RulesVersion** when the tool came from the Foton manifest. Missing tools are inventory rows (`NotOnPath`), not failures — Hayabusa's note names `Install-FotonTool`. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding.
 
 **Collector footprint.** Script block logging records Foton's own PowerShell, so hunt rules for suspicious scripting and for registry or credential access fire on the collection itself. On a real package this was the single largest medium-level "detection". `Invoke-FotonAnalysis` attributes such rows to the collection — by timestamp inside the collection window read from `00_Collection\collection.log`, and by rows naming a Foton function outside it — excludes them from the severity bands, and reports the count as an Info methodology finding. That exclusion is inference, not process identity: genuine host activity during the collection window is excluded too, so filter the Hayabusa CSV to that window yourself if something could have coincided.
+
+Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard). Rules are loaded from the `rules\` folder beside the binary. Each tool is launched with its own install directory as the working directory. Catalog pin and refresh: [TOOLS.md](TOOLS.md).
 
 Why this matters for `analyze`: **Collect already ran the heuristics on the endpoint**, so `analyze` on an untouched package reproduces `00_Collection\findings.csv` rather than adding detection, and it now says so. Parse, compose, `ioc`, and baseline compare are what add new findings — run them, then analyze again.
 

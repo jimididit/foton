@@ -1,20 +1,24 @@
-# External tool provisioning (design, not yet implemented)
+# External tool provisioning
 
-**Status: proposed.** Nothing in this file is built. Strategy and course check: [LANDSCAPE.md](LANDSCAPE.md). Ordered backlog: [TODO.md](TODO.md). How to run compose today: [USAGE.md](USAGE.md). This file is the design for **getting the tools onto an analyst workstation** without breaking layer separation or reproducibility — the main remaining convenience gap after landscape compose work landed.
+**Status: implemented for Hayabusa in 1.28.0** (`Install-FotonTool` / `Foton.cmd tools`). Chainsaw and EZ Tools remain PATH-only until catalogued. Strategy: [LANDSCAPE.md](LANDSCAPE.md). Backlog: [TODO.md](TODO.md). Operator how-to: [USAGE.md](USAGE.md).
 
 ## Problem
 
-Collect is already as easy as it gets: the target user runs one `.ps1` and hands back a zip plus hashes. The workstation side is not. `Invoke-FotonExternalParse` resolves tools by `Get-Command` only, so it finds a tool only if the operator has already downloaded it, kept the release layout intact, and put it on `PATH` in the current shell. Every one of those is a place to fail, and the failure is quiet: compose prints `NotOnPath` coverage rows and produces no findings, which looks like "nothing to see" rather than "your toolbox is empty".
+Collect is already as easy as it gets: the target user runs one `.ps1` and hands back a zip plus hashes. The workstation side was not: compose resolved tools by `Get-Command` only, so a missing PATH looked like a clean host.
 
 Goal: after a one-time setup command, compose just works, and the operator never thinks about `PATH`.
 
-## Shape
-
-A **setup command**, separate from the analysis layers:
+## Shape (shipped)
 
 - `Install-FotonTool` (public), with a `Foton.cmd tools` wrapper.
-- Lists supported tools, states exactly what will be downloaded and from where, verifies it, unpacks to a Foton-owned tool root, records provenance.
-- `compose` stays fully offline and never prompts. Its `NotOnPath` row names this command.
+- Lists supported tools (`-List`), states source URL + expected SHA-256 + destination, confirms (or `-Force`), unpacks to a Foton-owned tool root, writes `tools.json`.
+- `compose` stays fully offline and never prompts. Hayabusa `NotOnPath` names `Install-FotonTool`.
+- Resolution order: `-ToolPath` → `tools.json` → PATH. **PATH is never mutated.**
+- Default tool root: `%LOCALAPPDATA%\Foton\tools` (`-ToolRoot` / `-ArchivePath` for offline).
+- Catalog pin: `src/Private/Tools/FotonToolCatalog.json` (Hayabusa 4.0.0 + SHA-256).
+- Inventory / report: `Version` and `RulesVersion` columns.
+
+Helpers live under `src/Private/Tools/` so they load with the workstation module but are **not** concatenated into the Collect flatten.
 
 ### Why the install is not inside compose
 
