@@ -129,7 +129,7 @@ function Install-FotonTool {
             }
         }
 
-        $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        $hash = (Get-FotonSha256Hex -LiteralPath $zipPath).ToUpperInvariant()
         $expect = ([string]$entry.ExpectedSha256).ToUpperInvariant()
         & $log ("Archive SHA-256 {0}" -f $hash)
         if ($hash -ne $expect) {

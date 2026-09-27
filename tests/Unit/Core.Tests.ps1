@@ -209,6 +209,32 @@ InModuleScope Foton {
         }
     }
 
+    Describe 'Get-FotonSha256Hex' {
+        It 'matches a .NET SHA-256 of the same bytes' {
+            InModuleScope Foton {
+                $tmp = Join-Path $env:TEMP ('foton-sha-' + [guid]::NewGuid().ToString('N') + '.bin')
+                try {
+                    [IO.File]::WriteAllBytes($tmp, [byte[]](9, 9, 9))
+                    $h = Get-FotonSha256Hex -LiteralPath $tmp
+                    $h | Should -Match '^[0-9A-Fa-f]{64}$'
+                    $sha = [Security.Cryptography.SHA256]::Create()
+                    $fs = [IO.File]::OpenRead($tmp)
+                    try {
+                        $expect = ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '')
+                    }
+                    finally {
+                        $fs.Dispose()
+                        $sha.Dispose()
+                    }
+                    $h.ToUpperInvariant() | Should -Be $expect.ToUpperInvariant()
+                }
+                finally {
+                    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+    }
+
     Describe 'Add-FotonFinding' {
         BeforeEach { Initialize-FotonSession }
         It 'appends a finding with tier and artifact' {

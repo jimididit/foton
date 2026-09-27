@@ -125,7 +125,7 @@ function Invoke-FotonTriage {
     $zipHash = ''
     $zipSizeMb = 0
     if ($zipPath -and (Test-Path -LiteralPath $zipPath)) {
-        try { $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash } catch { $zipHash = 'HASH_ERROR' }
+        try { $zipHash = Get-FotonSha256Hex -LiteralPath $zipPath } catch { $zipHash = 'HASH_ERROR' }
         $zipSizeMb = [math]::Round((Get-Item -LiteralPath $zipPath).Length / 1MB, 2)
         $stamp = @()
         $stamp += 'Foton package integrity record'

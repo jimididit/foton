@@ -31,7 +31,7 @@ function ConvertFrom-FotonJumplist {
     }
     $item = Get-Item -LiteralPath $Path
     $bytes = [IO.File]::ReadAllBytes($item.FullName)
-    $sha = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
+    $sha = Get-FotonSha256Hex -LiteralPath $item.FullName
     $base = {
         param($Kind, $Supported, $Identity, $Note, $StreamName, $LastAccessUtc, $PinStatus, $Hostname, $LocalBasePath)
         [PSCustomObject]@{

@@ -21,7 +21,7 @@ function Write-FotonArtifactHashes {
         if ($f.Name -eq 'hashes.csv' -or $f.Name -eq 'hashes.txt') { continue }
         if ($nested -and $f.FullName.StartsWith($nested, [StringComparison]::OrdinalIgnoreCase)) { continue }
         $hash = ''
-        try { $hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256 -ErrorAction Stop).Hash } catch { $hash = 'HASH_ERROR' }
+        try { $hash = Get-FotonSha256Hex -LiteralPath $f.FullName } catch { $hash = 'HASH_ERROR' }
         $rel = $f.FullName.Substring($root.Length).TrimStart('\')
         $rows += [PSCustomObject]@{
             RelativePath = $rel

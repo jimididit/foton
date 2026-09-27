@@ -21,8 +21,8 @@ Describe 'Install-FotonTool and resolve' {
         $catalogPath = Join-Path $tmp 'catalog.json'
         New-Item -Path $payload -ItemType Directory -Force | Out-Null
         try {
-            # Tiny fake "release" tree: exe + rules folder.
-            Set-Content -LiteralPath (Join-Path $payload 'hayabusa.exe') -Value 'fake-hayabusa' -Encoding Ascii
+            # Tiny fake "release" tree: versioned exe name (real Hayabusa 4.x layout) + rules.
+            Set-Content -LiteralPath (Join-Path $payload 'hayabusa-9.9.9-test-win-x64.exe') -Value 'fake-hayabusa' -Encoding Ascii
             New-Item -Path (Join-Path $payload 'rules') -ItemType Directory -Force | Out-Null
             Set-Content -LiteralPath (Join-Path $payload 'rules\dummy.yml') -Value 'title: test' -Encoding Ascii
             $zip = Join-Path $tmp 'hayabusa-fake.zip'
@@ -39,7 +39,7 @@ Describe 'Install-FotonTool and resolve' {
                         ExpectedSha256   = $hash
                         License          = 'AGPL-3.0'
                         ProjectUrl       = 'https://example.invalid'
-                        ExecutableNames  = @('hayabusa.exe')
+                        ExecutableNames  = @('hayabusa.exe', 'hayabusa-*.exe')
                         RulesRelativePath = 'rules'
                         Notes            = 'test pin'
                     }

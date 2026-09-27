@@ -187,7 +187,7 @@ function New-FotonBaseline {
             $zipPath = Compress-FotonCasePackage
             if ($zipPath -and (Test-Path -LiteralPath $zipPath)) {
                 try {
-                    $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash
+                    $zipHash = Get-FotonSha256Hex -LiteralPath $zipPath
                     $stampLines = @(
                         "Foton baseline package integrity record"
                         "Folder   : $packageRoot"
