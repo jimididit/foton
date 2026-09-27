@@ -31,7 +31,7 @@ function ConvertFrom-FotonEvtx {
         throw "EVTX file not found: $Path"
     }
     $item = Get-Item -LiteralPath $Path
-    $sha = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
+    $sha = Get-FotonSha256Hex -LiteralPath $item.FullName
     $len = $item.Length
     $base = [PSCustomObject]@{
         SourcePath     = $item.FullName

@@ -14,6 +14,11 @@
 Set-StrictMode -Version 1
 $ErrorActionPreference = 'Continue'
 
+# Foton.cmd uses Windows PowerShell 5.1 -NoProfile. Module-scope calls do not
+# always auto-load Microsoft.PowerShell.Utility, so Get-FileHash is missing.
+# Prefetch Utility here; Get-FotonSha256Hex also falls back to .NET.
+Import-Module Microsoft.PowerShell.Utility -ErrorAction SilentlyContinue | Out-Null
+
 $script:FotonModuleRoot = $PSScriptRoot
 $script:FotonSrcRoot    = Join-Path $PSScriptRoot 'src'
 $script:FotonSession    = $null

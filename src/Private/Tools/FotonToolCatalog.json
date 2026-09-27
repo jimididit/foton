@@ -8,7 +8,7 @@
       "ExpectedSha256": "6E173C9FD1FA8EE4D95931EA1E1997723330C4779F4F83A96DCD3F1B00D31FF5",
       "License": "AGPL-3.0",
       "ProjectUrl": "https://github.com/Yamato-Security/hayabusa",
-      "ExecutableNames": [ "hayabusa.exe", "hayabusa" ],
+      "ExecutableNames": [ "hayabusa.exe", "hayabusa", "hayabusa-*.exe" ],
       "RulesRelativePath": "rules",
       "Notes": "Rules ship inside the release zip. Do not run hayabusa update-rules mid-case; that changes detections without a new Foton pin."
     }
