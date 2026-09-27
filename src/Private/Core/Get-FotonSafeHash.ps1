@@ -1,21 +1,14 @@
 function Get-FotonSha256Hex {
     <#
-        SHA-256 hex of a readable file. Prefer Get-FileHash when the Utility
-        module is visible; otherwise hash with .NET.
+        SHA-256 hex of a readable file via .NET.
 
         Foton.cmd launches Windows PowerShell 5.1 -NoProfile. Calls from inside
         this module's scope often do not auto-load Microsoft.PowerShell.Utility,
         so bare Get-FileHash becomes CommandNotFound (seen on Install-FotonTool
-        and ConvertFrom-FotonPrefetch). .NET avoids that.
+        and ConvertFrom-FotonPrefetch). Flatten scripts must not load modules
+        either. .NET hashing avoids both problems.
     #>
     param([Parameter(Mandatory)][string]$LiteralPath)
-    try {
-        Import-Module Microsoft.PowerShell.Utility -ErrorAction SilentlyContinue | Out-Null
-        if (Get-Command Get-FileHash -ErrorAction SilentlyContinue) {
-            return (Get-FileHash -LiteralPath $LiteralPath -Algorithm SHA256 -ErrorAction Stop).Hash
-        }
-    }
-    catch { }
 
     $sha = [System.Security.Cryptography.SHA256]::Create()
     $fs = $null
