@@ -82,9 +82,28 @@ function Invoke-FotonAnalysis {
 
     $pref = $script:FotonSession.Data['defender_preferences_and_exclusions']
     if ($pref) {
-        $exPaths = @($pref.ExclusionPath) | Where-Object { $_ }
-        $exProcs = @($pref.ExclusionProcess) | Where-Object { $_ }
-        if ($exPaths.Count -gt 0 -or $exProcs.Count -gt 0) {
+        # Tamper Protection / policy can make Get-MpPreference return placeholder
+        # strings like "N/A: Administrators are not allowed to view exclusions"
+        # instead of real paths. Those are a visibility gap, not configured exclusions.
+        $isReadableExclusion = {
+            param($v)
+            if ([string]::IsNullOrWhiteSpace([string]$v)) { return $false }
+            if ([string]$v -match '^N/A\s*:') { return $false }
+            return $true
+        }
+        $rawPaths = @($pref.ExclusionPath) | Where-Object { $_ }
+        $rawProcs = @($pref.ExclusionProcess) | Where-Object { $_ }
+        $exPaths = @($rawPaths | Where-Object { & $isReadableExclusion $_ })
+        $exProcs = @($rawProcs | Where-Object { & $isReadableExclusion $_ })
+        $unreadable = ($rawPaths.Count + $rawProcs.Count) -gt 0 -and ($exPaths.Count + $exProcs.Count) -eq 0
+        if ($unreadable) {
+            Add-FotonFinding -Severity 'Info' -Category 'Security' -Tier 1 -Title 'Defender exclusion lists could not be read' `
+                -Observation 'Get-MpPreference returned an unreadable placeholder for exclusion paths/processes (often Tamper Protection or MDM policy).' `
+                -WhyItMatters 'Absence of readable exclusions is a visibility gap, not evidence that no exclusions are configured. Attackers and admins both use exclusions; without the list this surface cannot be audited from the package alone.' `
+                -Artifact (Get-FotonArtifactPath 'Security' 'defender_preferences_and_exclusions' 'json') `
+                -NextStep 'Re-check exclusions from an account/policy context that can read them, or inspect the Defender CSP / GPO that owns them.'
+        }
+        elseif ($exPaths.Count -gt 0 -or $exProcs.Count -gt 0) {
             $risky = @()
             foreach ($p in $exPaths) {
                 if ((Test-FotonUserWritablePath -Path $p) -or $p -match '^[A-Za-z]:\\?$' -or $p -match '^[A-Za-z]:\\Users\\?$' -or $p -match '^[A-Za-z]:\\Windows\\?$') { $risky += $p }
@@ -177,7 +196,7 @@ function Invoke-FotonAnalysis {
     # ---------- Firewall / RDP ----------
     $fw = $script:FotonSession.Data['firewall_profiles']
     if ($fw) {
-        $off = @($fw | Where-Object { $_.Enabled -eq $false -or $_.Enabled -eq 'False' })
+        $off = @($fw | Where-Object { Test-FotonIsFalse $_.Enabled })
         if ($off.Count -gt 0) {
             Add-FotonFinding -Severity 'Medium' -Category 'Network' -Tier 1 -Title 'One or more firewall profiles are disabled' `
                 -Observation ("Disabled profile(s): {0}." -f (ConvertTo-FotonSample ($off | ForEach-Object { $_.Name }))) `
@@ -304,8 +323,11 @@ function Invoke-FotonAnalysis {
 
     $tasks = $script:FotonSession.Data['scheduled_tasks']
     if ($tasks) {
+        # Also probe Actions text so older packages (Execute-only UserWritableTarget)
+        # still flag powershell -File C:\Temp\... style tasks on re-analyze.
         $badTasks = @($tasks | Where-Object {
                 $_.UserWritableTarget -eq $true -or
+                (Test-FotonUserWritablePath -Path $_.Actions) -or
                 (Resolve-FotonSuspiciousHits -Row $_ -StoredProperty 'SuspiciousHits' -TextProperty 'Actions')
             })
         if ($badTasks.Count -gt 0) {
@@ -504,10 +526,24 @@ function Invoke-FotonAnalysis {
     }
     $psEvents = $script:FotonSession.Data['powershell_operational']
     if ($psEvents) {
-        $flagged = @($psEvents | Where-Object { Test-FotonSuspiciousCommand -Text $_.Message })
+        $psWindow = Get-FotonCollectionWindow -CaseRoot $script:FotonSession.CaseRoot
+        $flagged = [System.Collections.Generic.List[object]]::new()
+        $psSelf = 0
+        foreach ($ev in @($psEvents)) {
+            if (-not (Test-FotonSuspiciousCommand -Text $ev.Message)) { continue }
+            if (Test-FotonCollectorAttributedEvent -TimeCreatedUtc $ev.TimeCreatedUtc -Message $ev.Message -Window $psWindow) {
+                $psSelf++
+                continue
+            }
+            $flagged.Add($ev)
+        }
         if ($flagged.Count -gt 0) {
+            $selfNote = ''
+            if ($psSelf -gt 0) {
+                $selfNote = (" Excludes {0} event(s) attributable to the Foton collector itself." -f $psSelf)
+            }
             Add-FotonFinding -Severity 'High' -Category 'EventLogs' -Tier 2 -Title 'PowerShell script block logs contain high-risk content' `
-                -Observation ("{0} event(s) matched risk patterns. Most recent: {1} UTC." -f $flagged.Count, (@($flagged)[0].TimeCreatedUtc)) `
+                -Observation ("{0} event(s) matched risk patterns. Most recent: {1} UTC.{2}" -f $flagged.Count, (@($flagged)[0].TimeCreatedUtc), $selfNote) `
                 -WhyItMatters 'Script block logging captures deobfuscated script content at execution time, which makes it some of the highest-value evidence available on a Windows endpoint.' `
                 -Artifact (Get-FotonArtifactPath 'EventLogs' 'powershell_operational' 'csv') `
                 -NextStep 'Read the full Message column for each matched event and reconstruct the script from multi-part 4104 records.'
@@ -626,7 +662,12 @@ function Invoke-FotonAnalysis {
     # ---------- Visibility gaps ----------
     $logCfg = $script:FotonSession.Data['event_log_configuration']
     if ($logCfg) {
-        $sysmon = @($logCfg | Where-Object { $_.LogName -like '*Sysmon*' -and $_.IsEnabled -eq 'NotPresent' })
+        # IsEnabled is the string 'NotPresent' when ListLog threw. Do not compare with
+        # -eq 'NotPresent' against a coerced [bool]: [bool]'NotPresent' is $true, so
+        # an enabled Sysmon log falsely fired "Sysmon is not installed".
+        $sysmon = @($logCfg | Where-Object {
+                $_.LogName -like '*Sysmon*' -and ([string]$_.IsEnabled) -eq 'NotPresent'
+            })
         if ($sysmon.Count -gt 0) {
             Add-FotonFinding -Severity 'Info' -Category 'EventLogs' -Tier 1 -Title 'Sysmon is not installed on this host' `
                 -Observation 'The Microsoft-Windows-Sysmon/Operational log is not present.' `

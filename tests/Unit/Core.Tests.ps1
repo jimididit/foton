@@ -134,8 +134,31 @@ InModuleScope Foton {
             $r = Test-FotonSuspiciousCommand 'powershell -encodedcommand ABC'
             $r | Should -Match 'encodedcommand'
         }
+        It 'hits -enc as a real flag' {
+            $r = Test-FotonSuspiciousCommand 'powershell -enc ZQBjAGgAbwA='
+            $r | Should -Match '-enc'
+        }
+        It 'does not treat Transfer-Encode as -enc' {
+            Test-FotonSuspiciousCommand '... | Transfer-Encode against C:\ProgramData\jOVAL\' |
+                Should -BeNullOrEmpty
+        }
         It 'returns null for a benign line' {
-            Test-FotonSuspiciousCommand 'notepad.exe C:\temp\notes.txt' | Should -BeNullOrEmpty
+            Test-FotonSuspiciousCommand 'notepad.exe C:\Windows\notes.txt' | Should -BeNullOrEmpty
+        }
+    }
+
+    Describe 'Test-FotonIsFalse' {
+        It 'treats bool false as false' {
+            Test-FotonIsFalse $false | Should -Be $true
+            Test-FotonIsFalse $true | Should -Be $false
+        }
+        It 'does not treat bool true as the string False' {
+            # Regression: $true -eq 'False' was true because [bool]'False' is $true
+            Test-FotonIsFalse $true | Should -Be $false
+        }
+        It 'accepts string False' {
+            Test-FotonIsFalse 'False' | Should -Be $true
+            Test-FotonIsFalse 'True' | Should -Be $false
         }
     }
 

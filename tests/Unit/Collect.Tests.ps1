@@ -28,6 +28,18 @@ Describe 'Collect category functions (extracted)' {
         }
     }
 
+    It 'records local group membership enum failures instead of pretending empty' {
+        $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonUserCollection.ps1') -Raw
+        $src | Should -Match '\(error:'
+        $src | Should -Match 'enumError'
+    }
+
+    It 'probes scheduled-task Arguments for user-writable targets' {
+        $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonPersistenceCollection.ps1') -Raw
+        $src | Should -Match 'writableProbe'
+        $src | Should -Match 'WorkingDirectory'
+    }
+
     It 'keeps the suspicious-command pattern list out of the generated flatten' {
         $build = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\build\Build-Standalone.ps1') -Raw
         $build | Should -Match 'SuspiciousCommandPatterns\s*=\s*@\(\)'

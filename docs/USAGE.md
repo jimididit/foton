@@ -9,7 +9,7 @@ Foton has **two machines**. Mixing them is what feels like too much PowerShell.
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-Current stamps (from `Foton.psd1`): module **1.30.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+Current stamps (from `Foton.psd1`): module **1.31.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
 
 ---
 
@@ -24,14 +24,14 @@ On a trusted box, rebuild after Collect/Baseline source changes:
 
 That writes a **versioned** leaf and an unversioned alias (same bytes):
 
-- `dist\Foton-Collect_v1.30.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
-- `dist\Foton-Baseline_v1.30.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
+- `dist\Foton-Collect_v1.31.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
+- `dist\Foton-Baseline_v1.31.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
 
 Copy **one** file to the target (USB, RMM, email). Prefer the versioned leaf so the module and schema stay in the filename.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.30.0_schema1.10.0.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.30.0_schema1.14.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.31.0_schema1.10.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.31.0_schema1.14.0.ps1
 ```
 
 ### If antivirus blocks the collector
