@@ -1,6 +1,5 @@
-# Lab.Tests.ps1 - public-release lab bar as automated checks.
-# Maps to docs/TODO.md Lab ticks. Live elevated/standard-user collect on a VM
-# remains operator verification; these tests prove the offline/package contracts.
+# Lab.Tests.ps1 - offline/package contracts for the public-release lab bar.
+# Live elevated/standard-user collect on a VM remains operator verification.
 
 BeforeAll {
     $script:FotonPsd1 = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\Foton.psd1'))

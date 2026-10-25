@@ -1,28 +1,28 @@
 # Operator usage
 
-Foton has **two machines**. Mixing them is what feels like too much PowerShell.
+Foton has **two machines**. Mixing them is what usually causes confusion.
 
 | Where | What you run | What you get |
 |-------|----------------|--------------|
-| **Endpoint** | One flatten script from `dist\` | Hashed case folder or baseline folder |
-| **Workstation** (this repo) | `Foton.cmd` or `Import-Module .\Foton.psd1` | Parse, compare, analyze, reports |
+| **Endpoint** | One Collect or Baseline flatten script | Hashed case folder or baseline folder |
+| **Workstation** (this repo) | `Foton.cmd` or `Import-Module .\Foton.psd1` | Parse, compose, analyze, compare, reports |
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-Current stamps (from `Foton.psd1`): module **1.31.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+**Versions** (from `Foton.psd1`): module **1.31.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
 
 ---
 
 ## 1. Endpoint: Collect and Baseline capture
 
-On a trusted box, rebuild after Collect/Baseline source changes:
+Obtain a flatten script from a [GitHub Release](https://github.com/jimididit/foton/releases) when available, or build on a trusted workstation:
 
 ```powershell
 .\build\Build-Standalone.ps1
 .\build\Build-BaselineStandalone.ps1
 ```
 
-That writes a **versioned** leaf and an unversioned alias (same bytes):
+That writes a **versioned** leaf and an unversioned alias (same bytes) under `dist\` (generated locally; not committed):
 
 - `dist\Foton-Collect_v1.31.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
 - `dist\Foton-Baseline_v1.31.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
@@ -278,7 +278,7 @@ Outputs land under `analysis\external\<tool>\` and are hashed. Inventory rows in
 
 **Collector footprint.** Script block logging records Foton's own PowerShell, so hunt rules for suspicious scripting and for registry or credential access fire on the collection itself. On a real package this was the single largest medium-level "detection". `Invoke-FotonAnalysis` attributes such rows to the collection — by timestamp inside the collection window read from `00_Collection\collection.log`, and by rows naming a Foton function outside it — excludes them from the severity bands, and reports the count as an Info methodology finding. That exclusion is inference, not process identity: genuine host activity during the collection window is excluded too, so filter the Hayabusa CSV to that window yourself if something could have coincided.
 
-Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard). Rules are loaded from the `rules\` folder beside the binary. Each tool is launched with its own install directory as the working directory. Catalog pin and refresh: [TOOLS.md](TOOLS.md).
+Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard). Rules are loaded from the `rules\` folder beside the binary. Each tool is launched with its own install directory as the working directory. Catalog pin and refresh: `Install-FotonTool -List` (manifest under `src/Private/Tools/`).
 
 Why this matters for `analyze`: **Collect already ran the heuristics on the endpoint**, so `analyze` on an untouched package reproduces `00_Collection\findings.csv` rather than adding detection, and it now says so. Parse, compose, `ioc`, and baseline compare are what add new findings — run them, then analyze again.
 
@@ -307,7 +307,6 @@ Invoke-FotonCarve -Path D:\evidence\unalloc-sample.bin
 - Live collect **changes the host**. Capture memory/disk first if that is the case plan.
 - Findings are **observations**, not “infected.”
 - Empty findings is not a clean host.
-- A post-incident baseline is a picture of the compromised (or unknown) state.
-- Until the public-release bar in [TODO.md](TODO.md) is mostly green, treat Foton as a lab/internal tool.
+- A post-incident baseline is a picture of that observed state—not proof of when or who.
 
-Coverage (in vs missing artifacts): [COVERAGE.md](COVERAGE.md). Carve limits: [CARVE.md](CARVE.md).
+Carve limits: [CARVE.md](CARVE.md). Vulnerability reporting: [SECURITY.md](../SECURITY.md).

@@ -1,8 +1,4 @@
 # Core helper tests. These functions are module-private; InModuleScope is required.
-# Behavior must match WinFoton.ps1 helpers (sentinels, escape rules, skip status).
-
-# Core helper tests. These functions are module-private; InModuleScope is required.
-# Behavior must match WinFoton.ps1 helpers (sentinels, escape rules, skip status).
 
 $moduleManifest = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\Foton.psd1'))
 Import-Module $moduleManifest -Force
@@ -332,7 +328,7 @@ InModuleScope Foton {
             $script:FotonSession.UserWritablePatterns.Count | Should -BeGreaterThan 0
             $script:FotonSession.SuspiciousCommandPatterns | Should -Contain '-encodedcommand'
         }
-        It 'loads the same hardening check count as WinFoton.ps1' {
+        It 'loads the expected hardening check count' {
             $script:FotonSession.HardeningRegistryChecks.Count | Should -Be 29
             $lua = $script:FotonSession.HardeningRegistryChecks | Where-Object { $_.Name -eq 'EnableLUA' } | Select-Object -First 1
             $lua.Expected | Should -Be '1'
