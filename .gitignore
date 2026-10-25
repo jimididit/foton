@@ -11,11 +11,21 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Generated / local
-dist/Foton-Collect*.ps1
-dist/Foton-Baseline*.ps1
+# Generated flatten scripts (build locally or download from GitHub Releases)
+dist/
 *.zip
 
-# LLM files (AGENTS.md is tracked - shared invariants)
+# Agent / internal development docs (keep local; do not publish)
+AGENTS.md
 CLAUDE.md
 RULES.md
+WinFoton.ps1
+WinFoton-sample-report.html
+docs/TODO.md
+docs/LANDSCAPE.md
+docs/TOOLS.md
+docs/LAB.md
+docs/COVERAGE.md
+docs/MIGRATION.md
+docs/ARCHITECTURE.md
+docs/REVIEW.md

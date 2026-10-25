@@ -1,65 +1,102 @@
 # Contributing to Foton
 
-This project is designed so someone new can add a **collector**, **baseline provider**, **parser**, or **analysis rule** without rewriting the core.
+Thank you for contributing. Foton is structured so you can add a **collector**, **baseline provider**, **parser**, or **analysis rule** without rewriting the core.
 
-## Before you write code
+## Ground rules
 
-1. Read [AGENTS.md](../AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [USAGE.md](USAGE.md), [LAB.md](LAB.md), **[COVERAGE.md](COVERAGE.md)** (in vs missing artifacts), and **[LANDSCAPE.md](LANDSCAPE.md)** (compose specialists; do not rebuild KAPE/Hayabusa/EZ Tools in PowerShell).
-2. Live Collect/Baseline on an endpoint is the flatten script (`Foton-Collect_v*_schema*.ps1` / `Foton-Baseline_v*_schema*.ps1`, plus unversioned aliases). Do not add features by editing a frozen v1 script if one remains in git.
-3. If the change is a large new capability (especially Carve/NTFS), propose it first.
-4. Prefer filling a **P0/P1** row in COVERAGE.md over a novel ASEP. Map the operator UI to the real artifact before coding.
+1. Read [USAGE.md](USAGE.md) so operator-facing behavior stays consistent.
+2. Prefer **composing** specialist tools (EZ Tools, Hayabusa, KAPE/ORC) over reimplementing them in PowerShell. Native parsers only when PowerShell can emit *correct* fields.
+3. Propose large new capabilities (especially NTFS carve) before building.
+4. Update [USAGE.md](USAGE.md) in the same change when you add or change a public command, flatten switch, or `Foton.cmd` verb.
 
-## Naming and files
+## Development setup
 
-- One public function per file; file name = function name (`New-FotonBaseline.ps1`).
-- Add the function to `FunctionsToExport` in `Foton.psd1`.
-- Comment-based help with `.SYNOPSIS`, `.DESCRIPTION`, and at least one `.EXAMPLE` that looks like a real engagement.
-- Update **[USAGE.md](USAGE.md)** in the same change: command, purpose, and a copy-paste example (`CASE-0001`, `D:\Cases`, `HOSTNAME`). Update the `Foton.cmd` table if the wrapper grows. Point README at USAGE; do not leave a cmdlet only in AGENTS.md.
-- Comments: forensic *why* (why this artifact, why this identity key) and extension *how* (where the next provider goes). Avoid narrating `foreach` line-by-line.
+```powershell
+git clone https://github.com/jimididit/foton.git
+Set-Location foton
+Set-ExecutionPolicy -Scope Process Bypass -Force
+Import-Module .\Foton.psd1 -Force
+Get-FotonVersion
+.\tests\Invoke-FotonTests.ps1
+```
 
-## Add a live collection task (after Collect exists)
+Rebuild endpoint scripts after Collect/Baseline source changes:
 
-1. Prefer a new `Invoke-Collection` / `Invoke-FotonCollection` call inside the right category file.
+```powershell
+.\build\Build-Standalone.ps1
+.\build\Build-BaselineStandalone.ps1
+```
+
+Use a throwaway Windows VM for live Collect/Baseline. Collection changes the host.
+
+## Naming and layout
+
+| Rule | Detail |
+|------|--------|
+| One public function per file | Filename = function name (`New-FotonBaseline.ps1`) |
+| Export allow-list | Add the name to `FunctionsToExport` in `Foton.psd1` |
+| Comment-based help | `.SYNOPSIS`, `.DESCRIPTION`, and at least one realistic `.EXAMPLE` |
+| Placeholders in docs | `CASE-0001`, `D:\Cases`, `HOSTNAME` — no personal host names |
+| Layer split | Collect/Baseline may touch a live host. Parse, Carve, and Analyze stay offline |
+
+## Add a live collection task
+
+1. Prefer a new `Invoke-FotonCollection` call in the right category under `src/Public/Collect/`.
 2. Emit facts (paths, hashes, registry values). Do not assign severity in Collect.
-3. Fail into the manifest; never throw out of the orchestrator. If the task is admin-only, use `RequiresElevation` so unelevated runs skip it as a visibility gap.
-4. PS 5.1 only in this layer.
+3. Fail into the manifest; never throw out of the orchestrator. Admin-only work uses `RequiresElevation`.
+4. PowerShell **5.1** only in Collect/Baseline (no ternaries, `??`, `-Parallel`, or runtime internet).
+
+Do not embed long LOLBin / credential-theft string lists in Core or the Collect flatten — AMSI will block the script. Keep raw command text in the package; derive hits in Analyze on the workstation.
 
 ## Add a baseline provider
 
-Declare: record type, identity key, collect scriptblock, compared fields vs ignored fields (e.g. ignore service `State` and `ProcessId`; compare `PathName`, `StartMode`, `StartName`, binary hash). Put the file in `src/Private/Baseline/Providers/`. Bump `BaselineSchemaVersion`. Update `docs/COVERAGE.md`.
+Place a provider under `src/Private/Baseline/Providers/`. Document:
 
-State likely false positives in the PR (e.g. software `DisplayName` churn from patch Tuesday; Settings startup toggles are `StartupApproved`, not `StartupFile`).
+- Record type and **stable identity key**
+- Compared fields vs ignored (volatile) fields
+- Likely false positives
+
+Bump `BaselineSchemaVersion` in `Foton.psd1` when identity keys or compared fields change. Recapture golden/day0 baselines after a schema bump.
 
 ## Add an analysis rule
 
-- Input: package data (or a mock in tests), never live WMI.
-- Output: `Add-FotonFinding` with Tier, Artifact path, WhyItMatters (benign reading), optional NextStep.
-- Tests: one record that must fire, one that must not.
+- Input: package data (or a test mock)—never live WMI or the network
+- Output: `Add-FotonFinding` with Tier, Artifact, WhyItMatters (include a benign reading), optional NextStep
+- Tests: one record that must fire, one that must not
+- Never assert compromise, attribution, intent, or causation
 
 ## Add a parser
 
-If EZ Tools (or Hayabusa for EVTX) already parse the format correctly, prefer **copy the artifact into the package** and document or invoke that tool on the workstation. See [LANDSCAPE.md](LANDSCAPE.md).
+If EZ Tools or Hayabusa already parse the format correctly, prefer copying the artifact into the package and composing that tool on the workstation.
 
-A native `ConvertFrom-Foton*` is appropriate only when PowerShell can emit *correct* fields. Pure function over a path or byte array. Commit a small fixture under `tests/Fixtures/`. No client data. Unsupported formats get an explicit record, not guessed columns.
+A native `ConvertFrom-Foton*` is appropriate only when PowerShell can be correct. Pure function over a path or bytes. Commit a small fixture under `tests/Fixtures/` (no client data). Unsupported formats get an explicit record—not guessed columns.
 
 ## Verification
 
 ```powershell
-# Parse
-$e=$null;$t=$null
-[System.Management.Automation.Language.Parser]::ParseFile('.\src\Public\Get-FotonVersion.ps1',[ref]$t,[ref]$e) | Out-Null
+# Parse check a changed file
+$e = $null; $t = $null
+[System.Management.Automation.Language.Parser]::ParseFile('.\src\Public\Get-FotonVersion.ps1', [ref]$t, [ref]$e) | Out-Null
+if ($e) { $e } else { 'PARSE OK' }
 
-# Tests
+# Pester 5+
 .\tests\Invoke-FotonTests.ps1
+
+# After Collect/Baseline changes: rebuild + AMSI load check
+.\build\Build-Standalone.ps1
+.\build\Test-FotonAmsiLoad.ps1 -Path .\dist\Foton-Collect.ps1
 ```
 
-ScriptAnalyzer: see AGENTS.md accepted rule exceptions (`PSAvoidUsingWriteHost`, empty catch on best-effort collect, etc.).
-
-HTML reports: include the shared search/nav chrome (`Get-FotonReportNavCss` and friends). No CDN.
+Accepted ScriptAnalyzer exceptions in this repo include `PSAvoidUsingWriteHost`, empty catch on best-effort collect paths, and a few naming rules. HTML reports must include the offline search/nav chrome (`Get-FotonReportNavCss` and friends)—no CDN.
 
 ## What we will not accept
 
-- Remediation, process kill, quarantine, or “repair” switches.
-- Analyze/Parse code that reads the live registry or network.
-- Findings that assert compromise, attribution, or intent.
-- Expanding LOLBin/RAT lists without noting false-positive sources.
+- Remediation, process kill, quarantine, or “repair” switches
+- Analyze/Parse/Carve that reads the live registry, filesystem state outside the package, or the network
+- Findings that assert compromise, attribution, or intent
+- Expanding LOLBin/RAT lists without noting false-positive sources
+- Obfuscating the Collect flatten to evade antivirus
+
+## License
+
+By contributing, you agree that your contributions are licensed under the [MIT License](../LICENSE).
