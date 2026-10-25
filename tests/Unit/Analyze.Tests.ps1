@@ -92,6 +92,33 @@ Describe 'Get-FotonPackage and offline analysis' {
         }
     }
 
+    It 'does not treat a bare Foton case-path substring as collector Hayabusa noise' {
+        $tmp = Join-Path $env:TEMP ('foton-path-' + [guid]::NewGuid().ToString('N'))
+        $hay = Join-Path $tmp 'analysis\external\hayabusa'
+        New-Item -Path $hay -ItemType Directory -Force | Out-Null
+        try {
+            $lines = @(
+                '"Timestamp","RuleTitle","Level","Computer","Channel","EventID","RecordID","Details","ExtraFieldInfo","RuleID"'
+                '"2026-01-01 00:00:00 +00:00","EncodedCommand","high","H","Sec",4104,1,"powershell -enc ABC path C:\Cases\Foton_HOST_Z\x","x","id1"'
+            )
+            Set-Content -LiteralPath (Join-Path $hay 'hayabusa.csv') -Value $lines -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+                $hi = @($script:FotonSession.Findings | Where-Object { $_.Title -like '*high-level*' })
+                $hi | Should -HaveCount 1
+                $hi[0].Observation | Should -Match 'EncodedCommand'
+                $hi[0].Observation | Should -Not -Match 'Excludes'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'attributes Hayabusa rows inside the collection window to the collector' {
         $tmp = Join-Path $env:TEMP ('foton-win-' + [guid]::NewGuid().ToString('N'))
         $hay = Join-Path $tmp 'analysis\external\hayabusa'

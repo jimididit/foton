@@ -25,10 +25,12 @@ function Test-FotonSuspiciousCommand {
         if ($useBoundary) {
             $escaped = [regex]::Escape($token)
             if ($token.StartsWith('-')) {
+                # -enc must not hit Transfer-Encode; still matches -enc / -encodedcommand
                 $re = '(?<![\w-])' + $escaped + '\b'
             }
             else {
-                $re = '(?<![\w])' + $escaped + '(?![\w])'
+                # Bare tokens: block prefix (xpsexec) but allow suffix (psexec64)
+                $re = '(?<![\w])' + $escaped
             }
             if ([regex]::IsMatch($lower, $re)) { $matched = $true }
         }

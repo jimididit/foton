@@ -142,8 +142,23 @@ InModuleScope Foton {
             Test-FotonSuspiciousCommand '... | Transfer-Encode against C:\ProgramData\jOVAL\' |
                 Should -BeNullOrEmpty
         }
+        It 'still hits suffixed short tokens such as psexec64' {
+            $r = Test-FotonSuspiciousCommand 'C:\Tools\psexec64.exe -s cmd.exe'
+            $r | Should -Match 'psexec'
+        }
         It 'returns null for a benign line' {
             Test-FotonSuspiciousCommand 'notepad.exe C:\Windows\notes.txt' | Should -BeNullOrEmpty
+        }
+    }
+
+    Describe 'Test-FotonMessageNamesCollector' {
+        It 'matches Verb-FotonNoun cmdlets' {
+            Test-FotonMessageNamesCollector 'ScriptBlock: Get-FotonRegValue -Path HKLM:\x' | Should -Be $true
+            Test-FotonMessageNamesCollector 'Invoke-FotonAnalysis ran' | Should -Be $true
+        }
+        It 'does not treat a bare Foton substring or case path as collector' {
+            Test-FotonMessageNamesCollector 'C:\Cases\Foton_HOST_20260101Z\analysis\x.csv' | Should -Be $false
+            Test-FotonMessageNamesCollector 'comment: Foton was here' | Should -Be $false
         }
     }
 

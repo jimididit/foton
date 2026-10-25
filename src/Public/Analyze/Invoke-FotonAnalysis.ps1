@@ -853,7 +853,7 @@ function Invoke-FotonAnalysis {
                         # The Details column carries the logged script block, so a row
                         # naming a Foton function is the collector even outside the
                         # window - typically an earlier run on the same host.
-                        if (-not $isSelf -and $line.IndexOf('Foton', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                        if (-not $isSelf -and (Test-FotonMessageNamesCollector -Text $line)) {
                             $isSelf = $true
                         }
 
