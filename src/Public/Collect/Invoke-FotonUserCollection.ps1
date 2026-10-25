@@ -29,8 +29,22 @@ function Invoke-FotonUserCollection {
         try {
             foreach ($g in (Get-LocalGroup -ErrorAction Stop)) {
                 $members = @()
-                try { $members = Get-LocalGroupMember -Group $g.Name -ErrorAction Stop } catch { }
-                if ($members.Count -eq 0) {
+                $enumError = $null
+                # Empty catch used to write Member='(none)' when Get-LocalGroupMember threw
+                # (common on domain-joined hosts with domain principals / orphaned SIDs),
+                # which hid real membership - including Administrators - behind Status Success.
+                try { $members = @(Get-LocalGroupMember -Group $g.Name -ErrorAction Stop) }
+                catch { $enumError = $_.Exception.Message }
+                if ($enumError) {
+                    $rows += [PSCustomObject]@{
+                        Group           = $g.Name
+                        Member          = ('(error: {0})' -f $enumError)
+                        ObjectClass     = ''
+                        PrincipalSource = ''
+                        SID             = ''
+                    }
+                }
+                elseif ($members.Count -eq 0) {
                     $rows += [PSCustomObject]@{ Group = $g.Name; Member = '(none)'; ObjectClass = ''; PrincipalSource = ''; SID = '' }
                 }
                 foreach ($m in $members) {

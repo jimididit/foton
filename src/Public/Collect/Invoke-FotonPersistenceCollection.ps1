@@ -97,6 +97,17 @@ function Invoke-FotonPersistenceCollection {
                 if ($t.Actions -and $t.Actions[0].Execute) {
                     $exePath = [Environment]::ExpandEnvironmentVariables($t.Actions[0].Execute.Trim('"'))
                 }
+                # Probe Execute + Arguments + WorkingDirectory. Interpreter-only checks
+                # miss powershell.exe -File C:\Temp\... (user-writable payload).
+                $writableProbe = @($exePath, $actionText)
+                foreach ($a in @($t.Actions)) {
+                    if ($a.Arguments) { $writableProbe += [string]$a.Arguments }
+                    if ($a.WorkingDirectory) { $writableProbe += [string]$a.WorkingDirectory }
+                }
+                $userWritable = $false
+                foreach ($probe in $writableProbe) {
+                    if (Test-FotonUserWritablePath -Path $probe) { $userWritable = $true; break }
+                }
                 $triggers = @()
                 foreach ($tr in $t.Triggers) { $triggers += $tr.CimClass.CimClassName }
                 $rows += [PSCustomObject]@{
@@ -113,7 +124,7 @@ function Invoke-FotonPersistenceCollection {
                     NextRunTime    = if ($info) { [string]$info.NextRunTime } else { '' }
                     Description    = $t.Description
                     SuspiciousHits = ''
-                    UserWritableTarget = (Test-FotonUserWritablePath -Path $exePath)
+                    UserWritableTarget = $userWritable
                     SHA256         = (Get-FotonSafeHash -Path $exePath)
                 }
             }

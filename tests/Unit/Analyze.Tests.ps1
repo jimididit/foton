@@ -92,6 +92,33 @@ Describe 'Get-FotonPackage and offline analysis' {
         }
     }
 
+    It 'does not treat a bare Foton case-path substring as collector Hayabusa noise' {
+        $tmp = Join-Path $env:TEMP ('foton-path-' + [guid]::NewGuid().ToString('N'))
+        $hay = Join-Path $tmp 'analysis\external\hayabusa'
+        New-Item -Path $hay -ItemType Directory -Force | Out-Null
+        try {
+            $lines = @(
+                '"Timestamp","RuleTitle","Level","Computer","Channel","EventID","RecordID","Details","ExtraFieldInfo","RuleID"'
+                '"2026-01-01 00:00:00 +00:00","EncodedCommand","high","H","Sec",4104,1,"powershell -enc ABC path C:\Cases\Foton_HOST_Z\x","x","id1"'
+            )
+            Set-Content -LiteralPath (Join-Path $hay 'hayabusa.csv') -Value $lines -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+                $hi = @($script:FotonSession.Findings | Where-Object { $_.Title -like '*high-level*' })
+                $hi | Should -HaveCount 1
+                $hi[0].Observation | Should -Match 'EncodedCommand'
+                $hi[0].Observation | Should -Not -Match 'Excludes'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'attributes Hayabusa rows inside the collection window to the collector' {
         $tmp = Join-Path $env:TEMP ('foton-win-' + [guid]::NewGuid().ToString('N'))
         $hay = Join-Path $tmp 'analysis\external\hayabusa'
@@ -440,6 +467,131 @@ Describe 'Get-FotonPackage and offline analysis' {
                 $ca[0].WhyItMatters | Should -Match 'Root|Enterprise'
                 @($script:FotonSession.Findings | Where-Object { $_.Title -like 'Baseline diff:*InstalledSoftware*' }) |
                     Should -HaveCount 0
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'does not claim enabled firewall profiles are disabled' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['firewall_profiles'] = @(
+                [PSCustomObject]@{ Name = 'Domain'; Enabled = $true }
+                [PSCustomObject]@{ Name = 'Private'; Enabled = $true }
+                [PSCustomObject]@{ Name = 'Public'; Enabled = $true }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'One or more firewall profiles are disabled' }) |
+                Should -HaveCount 0
+        }
+    }
+
+    It 'flags a disabled firewall profile' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['firewall_profiles'] = @(
+                [PSCustomObject]@{ Name = 'Public'; Enabled = $false }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'One or more firewall profiles are disabled' }) |
+                Should -HaveCount 1
+        }
+    }
+
+    It 'does not claim Sysmon is missing when the log is present and enabled' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['event_log_configuration'] = @(
+                [PSCustomObject]@{ LogName = 'Microsoft-Windows-Sysmon/Operational'; IsEnabled = $true; RecordCount = 100 }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Sysmon is not installed on this host' }) |
+                Should -HaveCount 0
+        }
+    }
+
+    It 'reports Sysmon missing only for NotPresent rows' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['event_log_configuration'] = @(
+                [PSCustomObject]@{ LogName = 'Microsoft-Windows-Sysmon/Operational'; IsEnabled = 'NotPresent'; RecordCount = 0 }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Sysmon is not installed on this host' }) |
+                Should -HaveCount 1
+        }
+    }
+
+    It 'treats unreadable Defender exclusion placeholders as a visibility gap' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['defender_preferences_and_exclusions'] = [PSCustomObject]@{
+                ExclusionPath    = @('N/A: Administrators are not allowed to view exclusions')
+                ExclusionProcess = @('N/A: Administrators are not allowed to view exclusions')
+            }
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Defender exclusions are configured' }) |
+                Should -HaveCount 0
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Defender exclusion lists could not be read' }) |
+                Should -HaveCount 1
+        }
+    }
+
+    It 'flags scheduled tasks whose Actions point at user-writable paths even when UserWritableTarget is false' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['scheduled_tasks'] = @(
+                [PSCustomObject]@{
+                    TaskPath = '\'; TaskName = 'LocalAdmin-Creation-CDW'
+                    RunAsUser = 'NT AUTHORITY\System'; Actions = 'powershell.exe -File C:\Temp\Invoke-LocalAdmin-Creation-cdw\LocalAdmin-Creation-cdw.ps1'
+                    UserWritableTarget = $false; SuspiciousHits = ''
+                }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            $hit = @($script:FotonSession.Findings |
+                    Where-Object { $_.Title -eq 'Scheduled tasks reference user-writable paths or risky commands' })
+            $hit | Should -HaveCount 1
+            $hit[0].Observation | Should -Match 'LocalAdmin-Creation-CDW'
+        }
+    }
+
+    It 'excludes collector-window PowerShell operational events from high-risk script block findings' {
+        $tmp = Join-Path $env:TEMP ('foton-pswin-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path (Join-Path $tmp '00_Collection') -ItemType Directory -Force | Out-Null
+        try {
+            @(
+                '2026-01-15 12:00:00 UTC  start'
+                '2026-01-15 12:05:00 UTC  end'
+            ) | Set-Content -LiteralPath (Join-Path $tmp '00_Collection\collection.log') -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['powershell_operational'] = @(
+                    [PSCustomObject]@{
+                        TimeCreatedUtc = '2026-01-15 12:02:00'
+                        Message        = 'powershell -encodedcommand ABC'
+                    }
+                    [PSCustomObject]@{
+                        TimeCreatedUtc = '2026-01-14 10:00:00'
+                        Message        = 'powershell -encodedcommand DEF'
+                    }
+                )
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+                $hit = @($script:FotonSession.Findings |
+                        Where-Object { $_.Title -eq 'PowerShell script block logs contain high-risk content' })
+                $hit | Should -HaveCount 1
+                $hit[0].Observation | Should -Match '^1 event'
+                $hit[0].Observation | Should -Match 'Excludes 1'
             }
         }
         finally {
