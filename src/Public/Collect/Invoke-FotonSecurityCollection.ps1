@@ -190,4 +190,43 @@ function Invoke-FotonSecurityCollection {
         $out += (& gpresult.exe /r 2>&1 | Out-String)
         $out
     } | Out-Null
+
+    # Deep only: full gpresult HTML (elevated). Complements the /r text above.
+    if ($script:FotonSession.Deep) {
+        Invoke-FotonCollection -Category 'Security' -Name 'gpresult_html' -Format 'Csv' -Description 'Deep: gpresult /h HTML report into the package (requires elevation).' -RequiresElevation -Script {
+            $dest = Join-Path $script:FotonSession.Dirs['Security'] 'gpresult.html'
+            $rel = Join-Path $script:FotonSession.Categories['Security'] 'gpresult.html'
+            $row = [PSCustomObject]@{
+                SourcePath   = 'gpresult.exe /h'
+                DestRelative = $rel
+                SizeBytes    = 0
+                SHA256       = ''
+                Status       = 'CopyError'
+                Note         = ''
+            }
+            try {
+                $destDir = Split-Path -Parent $dest
+                if ($destDir -and -not (Test-Path -LiteralPath $destDir)) {
+                    New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+                }
+                $null = & gpresult.exe /h $dest /f 2>&1
+                if (Test-Path -LiteralPath $dest -PathType Leaf) {
+                    $item = Get-Item -LiteralPath $dest -Force
+                    $row.SizeBytes = $item.Length
+                    $row.SHA256 = Get-FotonSafeHash -Path $dest
+                    $row.Status = 'Copied'
+                    $row.Note = 'gpresult /h written into package. Applied GPO HTML, not Intune MDM report.'
+                }
+                else {
+                    $row.Status = 'Missing'
+                    $row.Note = 'gpresult produced no HTML. Visibility gap (policy, elevation, or gpresult failure).'
+                }
+            }
+            catch {
+                $row.Status = 'CopyError'
+                $row.Note = $_.Exception.Message
+            }
+            @($row)
+        } | Out-Null
+    }
 }

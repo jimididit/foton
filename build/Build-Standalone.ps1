@@ -118,6 +118,7 @@ param(
     [switch]`$LoadUserHives,
     [switch]`$IncludeFileTimeline,
     [switch]`$IncludeUsnJournal,
+    [switch]`$Deep,
     [switch]`$NoZip,
     [switch]`$RequireAdministrator
 )

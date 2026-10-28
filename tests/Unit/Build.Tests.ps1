@@ -15,6 +15,9 @@ Describe 'Build-Standalone' {
             $raw = Get-Content -LiteralPath $out -Raw
             $raw | Should -Match 'function Invoke-FotonTriage'
             $raw | Should -Match 'function Invoke-FotonSystemCollection'
+            # Script-level switches must land in the flatten param() or operators get NamedParameterNotFound.
+            $raw | Should -Match '(?m)^\s*\[switch\]\$Deep\s*,?\s*$'
+            $raw | Should -Match '(?m)^\s*\[switch\]\$IncludeUsnJournal\s*,?\s*$'
             $raw | Should -Not -Match '(?m)^\s*Import-Module\b'
             # Benign pattern tables still embed; the endpoint needs them offline.
             $raw | Should -Match 'UserWritablePatterns'

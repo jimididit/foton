@@ -28,6 +28,7 @@ function Invoke-FotonTriage {
         [switch]$LoadUserHives,
         [switch]$IncludeFileTimeline,
         [switch]$IncludeUsnJournal,
+        [switch]$Deep,
         [switch]$NoZip,
         [switch]$RequireAdministrator
     )
@@ -37,9 +38,16 @@ function Invoke-FotonTriage {
         return
     }
 
+    # -Deep forces the existing depth switches; they still work alone without -Deep.
+    if ($Deep) {
+        $IncludeFileTimeline = $true
+        $IncludeUsnJournal = $true
+    }
+
     Initialize-FotonSession -SkipHashing:$SkipHashing -EventLogDays $EventLogDays `
         -MaxEventsPerLog $MaxEventsPerLog -SkipEvtxExport:$SkipEvtxExport `
-        -IncludeFileTimeline:$IncludeFileTimeline -IncludeUsnJournal:$IncludeUsnJournal
+        -IncludeFileTimeline:$IncludeFileTimeline -IncludeUsnJournal:$IncludeUsnJournal `
+        -Deep:$Deep
 
     if (-not $script:FotonSession.Version) {
         $script:FotonSession.Version = '1.5.0'
