@@ -47,6 +47,8 @@ function Write-FotonChainOfCustody {
     $lines += "  SkipHashing         = $($script:FotonSession.SkipHashing)"
     $lines += "  LoadUserHives       = $LoadUserHives"
     $lines += "  IncludeFileTimeline = $($script:FotonSession.IncludeFileTimeline)"
+    $lines += "  IncludeUsnJournal   = $($script:FotonSession.IncludeUsnJournal)"
+    $lines += "  Deep                = $($script:FotonSession.Deep)"
     $lines += "  NoZip               = $NoZip"
     $lines += "  RequireAdministrator = $RequireAdministrator"
     $lines += ''

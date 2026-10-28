@@ -71,6 +71,7 @@ Writes `Foton_<HOSTNAME>_<UTC>Z\`. Alters the host. Findings in the HTML are obs
 | `-LoadUserHives` | Load NTUSER.DAT for users not logged on (unloaded in `finally`) |
 | `-IncludeFileTimeline` | Extra user-writable exe sweep (not a MACB timeline) |
 | `-IncludeUsnJournal` | Also copy `$J` when possible. Default is `fsutil usn queryjournal` text only. **`$MFT` is never copied** (KAPE/ORC). |
+| `-Deep` | Opt-in extended Collect. Forces `-IncludeFileTimeline` and `-IncludeUsnJournal`, and adds task-referenced script copies, PnP inventory, DriverStore FileRepository inventory (hashes for `.sys`/`.inf`/`.cat` only — not a full binary tree), and elevated `gpresult /h` HTML. Larger/slower package. Task-script copies use raised caps (10k files / 1 GiB) and skip if the output volume has under 2 GiB free. Default Collect stays unchanged without this switch. |
 | `-NoZip` | Folder only |
 | `-RequireAdministrator` | Exit if not elevated |
 
@@ -79,6 +80,8 @@ Unelevated runs skip Security log, Prefetch/Amcache/SRUM copies, VSS, auditpol/s
 ```powershell
 .\Foton-Collect.ps1 -CaseNumber "CASE-0001" -Examiner "A. Examiner" `
     -OutputPath D:\Cases -EventLogDays 30 -LoadUserHives
+.\Foton-Collect.ps1 -CaseNumber "CASE-0001" -Examiner "A. Examiner" `
+    -OutputPath D:\Cases -Deep
 .\Foton-Collect.ps1 -CaseNumber "SELF-AUDIT"
 ```
 

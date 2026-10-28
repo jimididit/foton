@@ -665,4 +665,34 @@ putty
             finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
         }
     }
+
+    Describe 'Get-FotonTaskActionScriptPath' {
+        It 'takes Execute when it is a rooted script path' {
+            $paths = @(Get-FotonTaskActionScriptPath -Execute 'C:\Temp\payload.ps1' -Arguments '')
+            $paths | Should -Contain 'C:\Temp\payload.ps1'
+        }
+
+        It 'pulls quoted and bare script paths from Arguments' {
+            $args = '-File "C:\Windows\Temp\run.ps1" /c D:\Scripts\fix.bat'
+            $paths = @(Get-FotonTaskActionScriptPath -Execute 'powershell.exe' -Arguments $args)
+            $paths | Should -Contain 'C:\Windows\Temp\run.ps1'
+            $paths | Should -Contain 'D:\Scripts\fix.bat'
+        }
+
+        It 'ignores non-script Execute and relative paths' {
+            $paths = @(Get-FotonTaskActionScriptPath -Execute 'C:\Windows\System32\notepad.exe' -Arguments 'relative.ps1')
+            $paths.Count | Should -Be 0
+        }
+    }
+
+    Describe 'Test-FotonDeepDiskBudget' {
+        It 'returns true when CaseRoot is unset (fail-open)' {
+            $prev = $script:FotonSession
+            $script:FotonSession = @{ CaseRoot = $null }
+            try {
+                Test-FotonDeepDiskBudget | Should -Be $true
+            }
+            finally { $script:FotonSession = $prev }
+        }
+    }
 }

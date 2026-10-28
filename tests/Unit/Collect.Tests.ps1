@@ -104,6 +104,43 @@ Describe 'Collect category functions (extracted)' {
         $src | Should -Match "Name 'named_pipes'"
     }
 
+    It 'wires -Deep through triage, session, flatten, and custody' {
+        $triage = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Invoke-FotonTriage.ps1') -Raw
+        $triage | Should -Match '\[switch\]\$Deep'
+        $triage | Should -Match '-Deep:\$Deep'
+        $triage | Should -Match 'IncludeFileTimeline = \$true'
+        $triage | Should -Match 'IncludeUsnJournal = \$true'
+
+        $session = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Private\Core\Initialize-FotonSession.ps1') -Raw
+        $session | Should -Match '\[switch\]\$Deep'
+        $session | Should -Match 'Deep\s+=\s+\[bool\]\$Deep'
+
+        $build = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\build\Build-Standalone.ps1') -Raw
+        $build | Should -Match '\[switch\]\`\$Deep'
+
+        $custody = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Private\Core\Write-FotonChainOfCustody.ps1') -Raw
+        $custody | Should -Match 'IncludeUsnJournal'
+        $custody | Should -Match 'Deep\s+='
+    }
+
+    It 'gates Deep collectors behind FotonSession.Deep' {
+        $fs = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonFilesystemCollection.ps1') -Raw
+        $fs | Should -Match "Name 'task_action_scripts'"
+        $fs | Should -Match 'FotonSession\.Deep'
+        $fs | Should -Match 'Test-FotonDeepDiskBudget'
+        $fs | Should -Match 'Get-FotonTaskActionScriptPath'
+
+        $sw = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonSoftwareCollection.ps1') -Raw
+        $sw | Should -Match "Name 'pnp_devices'"
+        $sw | Should -Match "Name 'driverstore_inventory'"
+        $sw | Should -Match 'Win32_PnPEntity'
+        $sw | Should -Match 'DriverStore\\FileRepository'
+
+        $sec = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonSecurityCollection.ps1') -Raw
+        $sec | Should -Match "Name 'gpresult_html'"
+        $sec | Should -Match 'gpresult\.exe /h'
+    }
+
     It 'does not export Collect commands on the public module surface yet' {
         Get-Command -Module Foton | Select-Object -ExpandProperty Name | Sort-Object |
             Should -Be @(

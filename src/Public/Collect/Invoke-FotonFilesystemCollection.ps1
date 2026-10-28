@@ -430,6 +430,46 @@ function Invoke-FotonFilesystemCollection {
         Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxFiles 500 -MaxTotalBytes 52428800
     } | Out-Null
 
+    # Deep only: copy script bodies referenced by scheduled-task Actions (Accanto-shaped gap).
+    if ($script:FotonSession.Deep) {
+        Invoke-FotonCollection -Category 'Filesystem' -Name 'task_action_scripts' -Format 'Csv' -Description 'Deep: copied script files referenced by scheduled-task Execute/Arguments (raised caps; skipped if output volume has under 2 GiB free).' -Script {
+            $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'task_scripts'
+            $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'task_scripts'
+            if (-not (Test-FotonDeepDiskBudget)) {
+                return @([PSCustomObject]@{
+                        SourcePath   = ''
+                        DestRelative = ''
+                        SizeBytes    = 0
+                        SHA256       = ''
+                        Status       = 'SkippedLowDisk'
+                        Note         = 'Deep task-script copy skipped: output volume has under 2 GiB free. Visibility gap, not proof scripts were absent.'
+                    })
+            }
+            $items = @()
+            $seen = @{}
+            try {
+                foreach ($t in (Get-ScheduledTask -ErrorAction Stop)) {
+                    foreach ($a in @($t.Actions)) {
+                        $exe = ''
+                        $args = ''
+                        if ($a.Execute) { $exe = [string]$a.Execute }
+                        if ($a.Arguments) { $args = [string]$a.Arguments }
+                        foreach ($p in (Get-FotonTaskActionScriptPath -Execute $exe -Arguments $args)) {
+                            $key = $p.ToLowerInvariant()
+                            if ($seen.ContainsKey($key)) { continue }
+                            $seen[$key] = $true
+                            # Preserve drive+path under dest so colliding leaf names do not overwrite.
+                            $rel = ($p -replace '^[A-Za-z]:\\', '' -replace '^\\\\', 'UNC\') -replace ':', '_'
+                            $items += [PSCustomObject]@{ SourcePath = $p; DestRelative = $rel }
+                        }
+                    }
+                }
+            }
+            catch { }
+            Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxFiles 10000 -MaxTotalBytes 1073741824
+        } | Out-Null
+    }
+
     Invoke-FotonCollection -Category 'Filesystem' -Name 'browser_databases' -Format 'Csv' -Description 'Copied browser History/Cookies/places.sqlite (capped). No cookie decryption, no Graph. Locked files are coverage gaps.' -RequiresElevation -Script {
         $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'browser_db'
         $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'browser_db'

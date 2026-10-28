@@ -187,4 +187,57 @@ function Invoke-FotonSoftwareCollection {
                 Select-Object Name, PackageFullName, Publisher, Version, InstallLocation, SignatureKind, Status
         }
     } | Out-Null
+
+    # Deep only: PnP device inventory + DriverStore FileRepository listing (not full binary tree copy).
+    if ($script:FotonSession.Deep) {
+        Invoke-FotonCollection -Category 'Software' -Name 'pnp_devices' -Format 'Csv' -Description 'Deep: Win32_PnPEntity inventory (Name, DeviceID, class, service). No binary copy.' -Script {
+            $rows = @()
+            foreach ($d in (Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue)) {
+                $rows += [PSCustomObject]@{
+                    Name         = $d.Name
+                    DeviceID     = $d.DeviceID
+                    Manufacturer = $d.Manufacturer
+                    Status       = $d.Status
+                    PNPClass     = $d.PNPClass
+                    Service      = $d.Service
+                }
+            }
+            $rows | Sort-Object DeviceID
+        } | Out-Null
+
+        Invoke-FotonCollection -Category 'Software' -Name 'driverstore_inventory' -Format 'Csv' -Description 'Deep: DriverStore\FileRepository inventory. SHA-256 for .sys/.inf/.cat only. No full tree copy into the package.' -Script {
+            $repo = Join-Path $env:SystemRoot 'System32\DriverStore\FileRepository'
+            $rows = @()
+            if (-not (Test-Path -LiteralPath $repo)) {
+                return @([PSCustomObject]@{
+                        Path         = $repo
+                        SizeBytes    = 0
+                        Extension    = ''
+                        ModifiedUtc  = ''
+                        SHA256       = ''
+                        Note         = 'DriverStore FileRepository not found. Visibility gap.'
+                    })
+            }
+            $hashExt = @('.sys', '.inf', '.cat')
+            Get-ChildItem -LiteralPath $repo -Recurse -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                $ext = $_.Extension
+                $hash = ''
+                foreach ($h in $hashExt) {
+                    if ($ext.Equals($h, [StringComparison]::OrdinalIgnoreCase)) {
+                        $hash = Get-FotonSafeHash -Path $_.FullName
+                        break
+                    }
+                }
+                $rows += [PSCustomObject]@{
+                    Path        = $_.FullName
+                    SizeBytes   = $_.Length
+                    Extension   = $ext
+                    ModifiedUtc = $_.LastWriteTimeUtc.ToString('yyyy-MM-dd HH:mm:ss')
+                    SHA256      = $hash
+                    Note        = ''
+                }
+            }
+            $rows | Sort-Object Path
+        } | Out-Null
+    }
 }

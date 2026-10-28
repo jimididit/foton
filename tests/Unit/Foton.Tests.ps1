@@ -19,8 +19,8 @@ Describe 'Foton module scaffold' {
         Import-Module $script:FotonPsd1 -Force
         $v = Get-FotonVersion
         $v.ProductName | Should -Be 'Foton'
-        $v.ModuleVersion | Should -Be '1.31.0'
-        $v.CollectSchemaVersion | Should -Be '1.10.0'
+        $v.ModuleVersion | Should -Be '1.32.0'
+        $v.CollectSchemaVersion | Should -Be '1.11.0'
         $v.BaselineSchemaVersion | Should -Be '1.14.0'
         $v.FindingsSchemaVersion | Should -Be '1.0.0'
     }
