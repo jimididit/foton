@@ -28,7 +28,11 @@ function Copy-FotonCappedHostFileList {
 
     $sorted = @($list | Sort-Object {
             $p = [string]$_.SourcePath
-            if ($p -and (Test-Path -LiteralPath $p -PathType Leaf)) {
+            # Do not Test-Path UNC during sort (would auth to remote).
+            if ($p -and ($p.StartsWith('\\') -or $p.StartsWith('//'))) {
+                [datetime]::MinValue
+            }
+            elseif ($p -and (Test-Path -LiteralPath $p -PathType Leaf)) {
                 try { (Get-Item -LiteralPath $p -Force).LastWriteTimeUtc } catch { [datetime]::MinValue }
             }
             else { [datetime]::MinValue }
@@ -36,11 +40,41 @@ function Copy-FotonCappedHostFileList {
 
     $copied = 0
     $used = [int64]0
+    $destRootFull = $null
+    try { $destRootFull = [IO.Path]::GetFullPath($DestinationDirectory) } catch { $destRootFull = $DestinationDirectory }
+
     foreach ($it in $sorted) {
         $src = [string]$it.SourcePath
         $relLeaf = [string]$it.DestRelative
         if (-not $relLeaf) { $relLeaf = [string]$it.DestRelative }
         if (-not $relLeaf) { $relLeaf = [IO.Path]::GetFileName($src) }
+
+        # Never probe UNC: Test-Path / open would auth to remote shares (NTLM leak).
+        if ($src -and ($src.StartsWith('\\') -or $src.StartsWith('//'))) {
+            $null = $rows.Add([PSCustomObject]@{
+                    SourcePath   = $src
+                    DestRelative = $relLeaf
+                    SizeBytes    = 0
+                    SHA256       = ''
+                    Status       = 'SkippedUnc'
+                    Note         = 'UNC source refused. Deep Collect does not follow remote paths (NTLM / network footprint).'
+                })
+            continue
+        }
+
+        # DestRelative must stay under DestinationDirectory (no .. escape).
+        if ($relLeaf -match '(^|[\\/])\.\.([\\/]|$)') {
+            $null = $rows.Add([PSCustomObject]@{
+                    SourcePath   = $src
+                    DestRelative = $relLeaf
+                    SizeBytes    = 0
+                    SHA256       = ''
+                    Status       = 'CopyError'
+                    Note         = 'DestRelative contained .. segments; refused to prevent package-directory escape.'
+                })
+            continue
+        }
+
         if (-not $src -or -not (Test-Path -LiteralPath $src -PathType Leaf)) {
             $null = $rows.Add([PSCustomObject]@{
                     SourcePath   = $src
@@ -74,6 +108,23 @@ function Copy-FotonCappedHostFileList {
         }
 
         $dest = Join-Path $DestinationDirectory $relLeaf
+        $destFull = $null
+        try { $destFull = [IO.Path]::GetFullPath($dest) } catch { $destFull = $dest }
+        $rootPrefix = $destRootFull.TrimEnd('\') + '\'
+        if ($destRootFull -and $destFull -and
+            -not ($destFull.Equals($destRootFull, [StringComparison]::OrdinalIgnoreCase)) -and
+            -not $destFull.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            $null = $rows.Add([PSCustomObject]@{
+                    SourcePath   = $src
+                    DestRelative = $relLeaf
+                    SizeBytes    = $len
+                    SHA256       = ''
+                    Status       = 'CopyError'
+                    Note         = 'Resolved destination left DestinationDirectory; copy refused.'
+                })
+            continue
+        }
+
         $copy = Copy-FotonHostFile -SourcePath $src -DestinationPath $dest
         $rel = $relLeaf
         if ($PackageRelativeDirectory) {

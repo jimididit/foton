@@ -129,6 +129,9 @@ Describe 'Collect category functions (extracted)' {
         $fs | Should -Match 'FotonSession\.Deep'
         $fs | Should -Match 'Test-FotonDeepDiskBudget'
         $fs | Should -Match 'Get-FotonTaskActionScriptPath'
+        $fs | Should -Match 'SkippedUnc'
+        $fs | Should -Match 'GetFullPath'
+        $fs | Should -Match 'Substring\(0, 1\)'
 
         $sw = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonSoftwareCollection.ps1') -Raw
         $sw | Should -Match "Name 'pnp_devices'"

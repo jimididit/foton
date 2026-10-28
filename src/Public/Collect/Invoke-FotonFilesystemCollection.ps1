@@ -432,7 +432,7 @@ function Invoke-FotonFilesystemCollection {
 
     # Deep only: copy script bodies referenced by scheduled-task Actions (Accanto-shaped gap).
     if ($script:FotonSession.Deep) {
-        Invoke-FotonCollection -Category 'Filesystem' -Name 'task_action_scripts' -Format 'Csv' -Description 'Deep: copied script files referenced by scheduled-task Execute/Arguments (raised caps; skipped if output volume has under 2 GiB free).' -Script {
+        Invoke-FotonCollection -Category 'Filesystem' -Name 'task_action_scripts' -Format 'Csv' -Description 'Deep: copied local script files referenced by scheduled-task Execute/Arguments (raised caps; UNC skipped; under 2 GiB free skips copy).' -Script {
             $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'task_scripts'
             $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'task_scripts'
             if (-not (Test-FotonDeepDiskBudget)) {
@@ -446,6 +446,7 @@ function Invoke-FotonFilesystemCollection {
                     })
             }
             $items = @()
+            $preRows = New-Object System.Collections.ArrayList
             $seen = @{}
             try {
                 foreach ($t in (Get-ScheduledTask -ErrorAction Stop)) {
@@ -458,15 +459,39 @@ function Invoke-FotonFilesystemCollection {
                             $key = $p.ToLowerInvariant()
                             if ($seen.ContainsKey($key)) { continue }
                             $seen[$key] = $true
-                            # Preserve drive+path under dest so colliding leaf names do not overwrite.
-                            $rel = ($p -replace '^[A-Za-z]:\\', '' -replace '^\\\\', 'UNC\') -replace ':', '_'
-                            $items += [PSCustomObject]@{ SourcePath = $p; DestRelative = $rel }
+
+                            # UNC: record and do not open (NTLM / remote auth).
+                            if ($p.StartsWith('\\') -or $p.StartsWith('//')) {
+                                $null = $preRows.Add([PSCustomObject]@{
+                                        SourcePath   = $p
+                                        DestRelative = ''
+                                        SizeBytes    = 0
+                                        SHA256       = ''
+                                        Status       = 'SkippedUnc'
+                                        Note         = 'UNC task-script path refused. Deep Collect does not follow remote paths (NTLM / network footprint).'
+                                    })
+                                continue
+                            }
+
+                            # Resolve .. and env-expanded quirks to a local full path.
+                            $full = $null
+                            try { $full = [IO.Path]::GetFullPath($p) } catch { continue }
+                            if (-not $full -or $full -notmatch '^[A-Za-z]:\\') { continue }
+
+                            # Keep drive letter in DestRelative so C:\a.ps1 and D:\a.ps1 do not collide.
+                            # C:\Temp\x.ps1 -> C\Temp\x.ps1 (no colon; no ..).
+                            $rel = $full.Substring(0, 1) + $full.Substring(2)
+                            $rel = $rel -replace ':', '_'
+                            if ($rel -match '(^|[\\/])\.\.([\\/]|$)') { continue }
+
+                            $items += [PSCustomObject]@{ SourcePath = $full; DestRelative = $rel }
                         }
                     }
                 }
             }
             catch { }
-            Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxFiles 10000 -MaxTotalBytes 1073741824
+            $copyRows = @(Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxFiles 10000 -MaxTotalBytes 1073741824)
+            @($preRows) + @($copyRows)
         } | Out-Null
     }
 

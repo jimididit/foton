@@ -637,6 +637,43 @@ putty
                 Remove-Item -LiteralPath $srcDir, $dstDir -Recurse -Force -ErrorAction SilentlyContinue
             }
         }
+
+        It 'refuses UNC sources without probing the network' {
+            $dstDir = Join-Path $env:TEMP ('foton-list-unc-' + [guid]::NewGuid().ToString('N'))
+            New-Item -Path $dstDir -ItemType Directory | Out-Null
+            try {
+                $items = @(
+                    [PSCustomObject]@{ SourcePath = '\\evil.example\share\x.ps1'; DestRelative = 'x.ps1' }
+                )
+                $rows = @(Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $dstDir)
+                $rows.Count | Should -Be 1
+                $rows[0].Status | Should -Be 'SkippedUnc'
+            }
+            finally {
+                Remove-Item -LiteralPath $dstDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        It 'refuses DestRelative that would escape the destination root' {
+            $srcDir = Join-Path $env:TEMP ('foton-list-esc-src-' + [guid]::NewGuid().ToString('N'))
+            $dstDir = Join-Path $env:TEMP ('foton-list-esc-dst-' + [guid]::NewGuid().ToString('N'))
+            New-Item -Path $srcDir -ItemType Directory | Out-Null
+            New-Item -Path $dstDir -ItemType Directory | Out-Null
+            try {
+                $a = Join-Path $srcDir 'a.bin'
+                [IO.File]::WriteAllBytes($a, [byte[]](1, 2, 3))
+                $items = @(
+                    [PSCustomObject]@{ SourcePath = $a; DestRelative = '..\escape.bin' }
+                )
+                $rows = @(Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $dstDir)
+                $rows[0].Status | Should -Be 'CopyError'
+                $rows[0].Note | Should -Match '\.\.'
+                Test-Path -LiteralPath (Join-Path (Split-Path $dstDir -Parent) 'escape.bin') | Should -Be $false
+            }
+            finally {
+                Remove-Item -LiteralPath $srcDir, $dstDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
 
     Describe 'Get-FotonNestedDuplicateRoot' {
@@ -682,6 +719,18 @@ putty
         It 'ignores non-script Execute and relative paths' {
             $paths = @(Get-FotonTaskActionScriptPath -Execute 'C:\Windows\System32\notepad.exe' -Arguments 'relative.ps1')
             $paths.Count | Should -Be 0
+        }
+
+        It 'returns UNC paths without resolving them (caller must not open)' {
+            $paths = @(Get-FotonTaskActionScriptPath -Execute '\\evil.example\share\pay.ps1' -Arguments '')
+            $paths | Should -Contain '\\evil.example\share\pay.ps1'
+        }
+
+        It 'normalizes local .. segments via GetFullPath' {
+            $paths = @(Get-FotonTaskActionScriptPath -Execute 'C:\Windows\Temp\..\Temp\payload.ps1' -Arguments '')
+            $paths.Count | Should -Be 1
+            $paths[0] | Should -Not -Match '\\\.\.\\'
+            $paths[0] | Should -Match '^[A-Za-z]:\\'
         }
     }
 

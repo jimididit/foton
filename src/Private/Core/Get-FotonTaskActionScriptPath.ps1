@@ -45,6 +45,17 @@ function Get-FotonTaskActionScriptPath {
         }
         if (-not $ok) { continue }
         if (-not [IO.Path]::IsPathRooted($p)) { continue }
+        # Keep UNC in the result list so callers can emit SkippedUnc without opening them.
+        # Do not GetFullPath UNC here (would touch the network).
+        if ($p.StartsWith('\\') -or $p.StartsWith('//')) {
+            $null = $found.Add($p)
+            continue
+        }
+        try {
+            $p = [IO.Path]::GetFullPath($p)
+        }
+        catch { continue }
+        if ($p -notmatch '^[A-Za-z]:\\') { continue }
         $null = $found.Add($p)
     }
 
