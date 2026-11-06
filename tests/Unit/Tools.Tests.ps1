@@ -14,6 +14,15 @@ Describe 'Install-FotonTool and resolve' {
         }
     }
 
+    It 'returns the catalog once from -List, shown as one four-column table' {
+        $rows = @(Install-FotonTool -List)
+        $rows | Should -HaveCount 1
+        $rows[0].ExpectedSha256.Length | Should -Be 64
+        @($rows[0].PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames) | Should -Be @('Name', 'Version', 'License', 'DownloadUrl')
+        $text = (Install-FotonTool -List | Out-String)
+        ([regex]::Matches($text, 'hayabusa-4\.0\.0-win-x64')).Count | Should -Be 1
+    }
+
     It 'installs from a local archive when the hash matches, and refuses a mismatch' {
         $tmp = Join-Path $env:TEMP ('foton-tooltest-' + [guid]::NewGuid().ToString('N'))
         $toolRoot = Join-Path $tmp 'tools'

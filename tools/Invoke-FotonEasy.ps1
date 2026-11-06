@@ -122,8 +122,7 @@ switch ($cmd) {
     'tools' {
         # One-time workstation setup. Never runs inside compose (offline invariant).
         if (-not $Target -or $Target -in @('list', '-list', '/list')) {
-            # Table goes to host; Out-Null only drops the returned catalog objects.
-            Install-FotonTool -List | Out-Null
+            Install-FotonTool -List | Format-Table -AutoSize -Wrap | Out-Host
             return
         }
         $archive = $null

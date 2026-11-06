@@ -89,9 +89,13 @@ function Install-FotonTool {
 
     $catalog = @(Get-FotonToolCatalog -CatalogPath $CatalogPath)
     if ($List -or -not $Name) {
-        # Out-Host so wrappers can Out-Null the returned objects without killing the table.
-        $catalog | Select-Object Name, Version, License, DownloadUrl, ExpectedSha256, Notes |
-            Format-Table -AutoSize -Wrap | Out-Host
+        # Return objects only, with a default view, so the console shows one table and
+        # callers still get every field (Format-List * shows SHA-256 and Notes).
+        $view = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet', [string[]]@('Name', 'Version', 'License', 'DownloadUrl'))
+        $members = [System.Management.Automation.PSMemberInfo[]]@($view)
+        foreach ($entry in $catalog) {
+            $entry | Add-Member -MemberType MemberSet -Name PSStandardMembers -Value $members -Force
+        }
         if (-not $List -and -not $Name) {
             Write-Host "  Usage: Install-FotonTool -Name Hayabusa   (or -List)" -ForegroundColor Cyan
         }
