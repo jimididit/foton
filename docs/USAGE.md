@@ -262,7 +262,7 @@ SRUM ESE is **copied, not parsed**.
 
 Native `ConvertFrom-Foton*` is the air-gap fallback. Prefer a one-time `Install-FotonTool` for Hayabusa (pinned version + SHA-256 into `%LOCALAPPDATA%\Foton\tools`). Compose then finds it via `tools.json` without touching PATH.
 
-EZ Tools and Chainsaw are not downloaded by Foton. If you already have them, register the folder once. EZ Tools unpacks several tools into subfolders (`EvtxeCmd\`, `RECmd\`, `AmcacheParser\`) that a single PATH entry does not cover; registration records each executable's full path. The SHA-256 written to `tools.json` is what Foton observed on disk, not a verification against upstream.
+EZ Tools and Chainsaw are not downloaded by Foton. If you already have them, register the folder once. EZ Tools unpacks several tools into subfolders (`EvtxeCmd\`, `RECmd\`, `AmcacheParser\`) that a single PATH entry does not cover; registration records each executable's full path. The SHA-256 written to `tools.json` is what Foton observed on disk, not a verification against upstream. Versions come from each executable's file version; Chainsaw has none, so registration runs `chainsaw --version` once (5-second timeout) to record it.
 
 ```powershell
 Install-FotonTool -Name EZTools -Path C:\Tools\EZTools

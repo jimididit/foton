@@ -44,6 +44,28 @@ Describe 'Install-FotonTool and resolve' {
         }
     }
 
+    It 'reads a version from the tool itself when the binary has no version resource' {
+        $tmp = Join-Path $env:TEMP ('foton-cliver-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmp | Out-Null
+        try {
+            $ok = Join-Path $tmp 'chainsaw-ok.cmd'
+            Set-Content -LiteralPath $ok -Value "@echo chainsaw 2.17.1`r`n" -Encoding Ascii -NoNewline
+            $hang = Join-Path $tmp 'chainsaw-hang.cmd'
+            Set-Content -LiteralPath $hang -Value "@ping -n 6 127.0.0.1 >nul`r`n@echo chainsaw 9.9.9`r`n" -Encoding Ascii -NoNewline
+            InModuleScope Foton -Parameters @{ Ok = $ok; Hang = $hang } {
+                param($Ok, $Hang)
+                Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $Ok | Should -Be '2.17.1'
+                Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $Hang -TimeoutMs 500 | Should -Be ''
+                # Tools without a known version flag are never executed.
+                Get-FotonToolCliVersion -Name PECmd -ExecutablePath $Ok | Should -Be ''
+            }
+        }
+        finally {
+            Start-Sleep -Milliseconds 200
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'installs from a local archive when the hash matches, and refuses a mismatch' {
         $tmp = Join-Path $env:TEMP ('foton-tooltest-' + [guid]::NewGuid().ToString('N'))
         $toolRoot = Join-Path $tmp 'tools'
