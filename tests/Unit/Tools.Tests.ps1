@@ -282,6 +282,43 @@ Describe 'Install-FotonTool and resolve' {
         }
     }
 
+    It 'quotes arguments so paths with spaces survive the command line' {
+        InModuleScope Foton {
+            ConvertTo-FotonCommandLine -Arguments @('-d', 'D:\My Cases\x', '-U') | Should -Be '-d "D:\My Cases\x" -U'
+            ConvertTo-FotonCommandLine -Arguments @('C:\a b\', '') | Should -Be '"C:\a b\\" ""'
+            ConvertTo-FotonCommandLine -Arguments @('say "hi"') | Should -Be '"say \"hi\""'
+            ConvertTo-FotonCommandLine -Arguments @('C:\plain\path.csv') | Should -Be 'C:\plain\path.csv'
+        }
+    }
+
+    It 'keeps the earlier output when a rerun fails, and quotes a spaced case path' {
+        $tmp = Join-Path $env:TEMP ('foton-stage-' + [guid]::NewGuid().ToString('N'))
+        $pkg = Join-Path $tmp 'My Cases\Foton_HOST_20260101-000000Z'
+        New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pkg '07_Event_Logs\evtx') -ItemType Directory -Force | Out-Null
+        $old = Join-Path $pkg 'analysis\external\hayabusa'
+        New-Item -Path $old -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $old 'hayabusa.csv') -Value 'old'
+        $bin = Join-Path $tmp 'bin'
+        New-Item -Path $bin -ItemType Directory -Force | Out-Null
+        $fake = "@echo %* > `"%~dp0args_%~n0.txt`"`r`n@exit /b 1`r`n"
+        Set-Content -LiteralPath (Join-Path $bin 'hayabusa.cmd') -Value $fake -Encoding Ascii -NoNewline
+        try {
+            $rows = @(Invoke-FotonExternalParse -PackagePath $pkg -ToolRoot (Join-Path $tmp 'empty') -ToolPath @{
+                    Hayabusa = (Join-Path $bin 'hayabusa.cmd')
+                })
+            $hb = @($rows | Where-Object Tool -eq 'Hayabusa')
+            ($hb | Where-Object Status -eq 'ToolError') | Should -Not -BeNullOrEmpty
+            @($hb | Where-Object Status -eq 'Retained')[0].DestRelative | Should -Match 'hayabusa\\hayabusa\.csv$'
+            (Get-Content -LiteralPath (Join-Path $old 'hayabusa.csv') -Raw).Trim() | Should -Be 'old'
+            Test-Path -LiteralPath (Join-Path $pkg 'analysis\external\.hayabusa.staging') | Should -Be $false
+            (Get-Content -LiteralPath (Join-Path $bin 'args_hayabusa.txt') -Raw) | Should -Match '"[^"]*My Cases[^"]*"'
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'tells compose to use Install-FotonTool when Hayabusa is missing' {
         $pkg = Join-Path $env:TEMP ('foton-compose-miss-' + [guid]::NewGuid().ToString('N'))
         New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null

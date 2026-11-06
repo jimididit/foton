@@ -216,12 +216,14 @@ function Invoke-FotonExternalParse {
                 continue
             }
         }
-        # The tool runs now: replace its earlier output so this inventory is one run.
-        Get-ChildItem -LiteralPath $toolDir -Force -ErrorAction SilentlyContinue |
-            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-        $arg = & $j.Args $exe $j.NeedDir $toolDir
-        $log = Join-Path $toolDir 'tool_stderr.txt'
-        $stdout = Join-Path $toolDir 'tool_stdout.txt'
+        # Run into a staging folder; earlier output is replaced only when this run
+        # actually produces files, so a failed rerun cannot destroy the last good one.
+        $stage = Join-Path $extRoot ('.{0}.staging' -f $j.Tool.ToLowerInvariant())
+        if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
+        New-Item -Path $stage -ItemType Directory -Force | Out-Null
+        $arg = & $j.Args $exe $j.NeedDir $stage
+        $log = Join-Path $stage 'tool_stderr.txt'
+        $stdout = Join-Path $stage 'tool_stdout.txt'
         $ok = $false
         # Run in the tool's own install tree, not the output folder. Hayabusa resolves
         # its config/ (profiles, level colours) relative to the working directory, so
@@ -231,16 +233,35 @@ function Invoke-FotonExternalParse {
         $workDir = Split-Path -Parent $exe
         if (-not $workDir -or -not (Test-Path -LiteralPath $workDir)) { $workDir = $toolDir }
         try {
-            $p = Start-Process -FilePath $exe -ArgumentList $arg -Wait -PassThru -NoNewWindow -RedirectStandardError $log -RedirectStandardOutput $stdout -WorkingDirectory $workDir
+            # Start-Process joins an array with bare spaces, which splits any path that
+            # contains a space (D:\My Cases\...). Pass one correctly quoted string.
+            $argLine = ConvertTo-FotonCommandLine -Arguments @($arg)
+            $p = Start-Process -FilePath $exe -ArgumentList $argLine -Wait -PassThru -NoNewWindow -RedirectStandardError $log -RedirectStandardOutput $stdout -WorkingDirectory $workDir
             if ($p.ExitCode -eq 0) { $ok = $true }
         }
         catch {
             Set-Content -LiteralPath $log -Value $_.Exception.Message -Encoding UTF8
         }
-        $outs = @(Get-ChildItem -LiteralPath $toolDir -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @('tool_stderr.txt', 'tool_stdout.txt') })
+        $newOuts = @(Get-ChildItem -LiteralPath $stage -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @('tool_stderr.txt', 'tool_stdout.txt') })
+        if ($newOuts.Count -gt 0) {
+            Get-ChildItem -LiteralPath $toolDir -Force -ErrorAction SilentlyContinue |
+                Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            Get-ChildItem -LiteralPath $stage -Force -ErrorAction SilentlyContinue |
+                Move-Item -Destination $toolDir -Force
+        }
+        else {
+            # Nothing new: keep earlier output, but replace the logs so they describe this run.
+            foreach ($leaf in @('tool_stderr.txt', 'tool_stdout.txt')) {
+                $src = Join-Path $stage $leaf
+                if (Test-Path -LiteralPath $src) { Move-Item -LiteralPath $src -Destination (Join-Path $toolDir $leaf) -Force }
+            }
+        }
+        Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+        $log = Join-Path $toolDir 'tool_stderr.txt'
+        $stdout = Join-Path $toolDir 'tool_stdout.txt'
         # .NET 10 builds (AmcacheParser has no other) print this and exit when the
         # runtime is absent; without it the row read as a generic tool error.
-        if (-not $ok -and (Test-FotonToolMissingRuntime -Paths @($log, $stdout))) {
+        if ($newOuts.Count -eq 0 -and -not $ok -and (Test-FotonToolMissingRuntime -Paths @($log, $stdout))) {
             $null = $rows.Add([PSCustomObject]@{
                     Tool         = $j.Tool
                     Status       = 'MissingRuntime'
@@ -250,20 +271,24 @@ function Invoke-FotonExternalParse {
                     RulesVersion = $rulesVer
                     Note         = ("{0} needs a .NET runtime that is not installed on this workstation (see tool_stdout.txt / tool_stderr.txt). Install the runtime it names, then compose again." -f $j.Tool)
                 })
+            & $addRetained 'MissingRuntime'
             continue
         }
-        if ($outs.Count -eq 0) {
+        if ($newOuts.Count -eq 0) {
+            $failStatus = $(if ($ok) { 'NoOutput' } else { 'ToolError' })
             $null = $rows.Add([PSCustomObject]@{
                     Tool         = $j.Tool
-                    Status       = $(if ($ok) { 'NoOutput' } else { 'ToolError' })
+                    Status       = $failStatus
                     DestRelative = (Join-Path 'analysis\external' $j.Tool.ToLowerInvariant())
                     SHA256       = ''
                     Version      = $toolVer
                     RulesVersion = $rulesVer
                     Note         = ("{0} ran but produced no output files. See tool_stderr.txt. Native parse remains valid." -f $j.Tool)
                 })
+            & $addRetained $failStatus
             continue
         }
+        $outs = @(Get-ChildItem -LiteralPath $toolDir -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @('tool_stderr.txt', 'tool_stdout.txt') })
         foreach ($f in $outs) {
             $rel = $f.FullName.Substring($root.Length).TrimStart('\')
             $null = $rows.Add([PSCustomObject]@{
