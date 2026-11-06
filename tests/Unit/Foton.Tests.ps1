@@ -19,7 +19,7 @@ Describe 'Foton module scaffold' {
         Import-Module $script:FotonPsd1 -Force
         $v = Get-FotonVersion
         $v.ProductName | Should -Be 'Foton'
-        $v.ModuleVersion | Should -Be '1.38.0'
+        $v.ModuleVersion | Should -Be '1.38.1'
         $v.CollectSchemaVersion | Should -Be '1.13.0'
         $v.BaselineSchemaVersion | Should -Be '1.14.0'
         $v.FindingsSchemaVersion | Should -Be '1.0.0'
@@ -84,6 +84,9 @@ Describe 'Foton module scaffold' {
         }
         $banner = Get-Content -LiteralPath (Join-Path $root 'src\Private\Core\Write-FotonBanner.ps1') -Raw
         $banner | Should -Not -Match "Updated\s+\d"
+        # The Gallery shows the manifest Author; the banner must name the same author.
+        $banner | Should -Match ("Author\s+{0}'" -f [regex]::Escape([string]$man.Author))
+        (Get-Content -LiteralPath (Join-Path $root 'LICENSE') -Raw) | Should -Match ([regex]::Escape([string]$man.Author))
     }
 
     It 'exports package, analysis, and report commands (Collect stays unexported)' {
