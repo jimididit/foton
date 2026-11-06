@@ -5,6 +5,9 @@
 .cursorindexingignore
 graphify-out/
 
+# Engagement-only scratch (custom follow-up collectors; do not ship)
+.scratchpad/
+
 # OS files
 .DS_Store
 Thumbs.db

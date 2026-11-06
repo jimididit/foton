@@ -702,6 +702,49 @@ Describe 'Get-FotonPackage and offline analysis' {
         }
     }
 
+    It 'counts a per-user service event when the collected ServiceDll is suspect' {
+        InModuleScope Foton {
+            $row = [PSCustomObject]@{ PayloadData1 = 'Name: OneSyncSvc_1701f8'; ExecutableInfo = 'C:\Windows\system32\svchost.exe -k UnistackSvcGroup' }
+            $ok = @{ 'OneSyncSvc_1701f8' = [PSCustomObject]@{ ServiceDll = 'C:\Windows\System32\APHostService.dll'; ServiceDllSource = 'Template:OneSyncSvc'; ServiceDllUserWritablePath = 'False'; ServiceDllSignatureStatus = 'Valid' } }
+            Test-FotonPerUserServiceEvent -Row $row -ServiceIndex $ok | Should -Be $true
+            Test-FotonPerUserServiceEvent -Row $row -ServiceIndex @{} | Should -Be $true
+            # A genuine instance never has its own ServiceDll; one that does was registered directly.
+            $own = @{ 'OneSyncSvc_1701f8' = [PSCustomObject]@{ ServiceDll = 'C:\Windows\System32\APHostService.dll'; ServiceDllSource = 'Parameters'; ServiceDllUserWritablePath = 'False'; ServiceDllSignatureStatus = 'Valid' } }
+            Test-FotonPerUserServiceEvent -Row $row -ServiceIndex $own | Should -Be $false
+            $elsewhere = @{ 'OneSyncSvc_1701f8' = [PSCustomObject]@{ ServiceDll = 'C:\ProgramData\sync.dll'; ServiceDllUserWritablePath = 'True'; ServiceDllSignatureStatus = 'NotSigned' } }
+            Test-FotonPerUserServiceEvent -Row $row -ServiceIndex $elsewhere | Should -Be $false
+            $unsigned = @{ 'OneSyncSvc_1701f8' = [PSCustomObject]@{ ServiceDll = 'C:\Windows\System32\sync.dll'; ServiceDllUserWritablePath = 'False'; ServiceDllSignatureStatus = 'NotSigned' } }
+            Test-FotonPerUserServiceEvent -Row $row -ServiceIndex $unsigned | Should -Be $false
+        }
+    }
+
+    It 'flags user-writable and unsigned ServiceDll, and stays quiet for older packages' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['services'] = @(
+                [PSCustomObject]@{ Name = 'GoodSvc'; State = 'Running'; StartMode = 'Auto'; PathName = 'C:\Windows\system32\svchost.exe -k netsvcs'; ResolvedExe = 'C:\Windows\system32\svchost.exe'; UserWritablePath = 'False'; UnquotedPath = 'False'; SignatureStatus = 'Valid'; ServiceDll = 'C:\Windows\System32\good.dll'; ServiceDllUserWritablePath = 'False'; ServiceDllSignatureStatus = 'Valid' }
+                [PSCustomObject]@{ Name = 'HijackSvc'; State = 'Running'; StartMode = 'Auto'; PathName = 'C:\Windows\system32\svchost.exe -k netsvcs'; ResolvedExe = 'C:\Windows\system32\svchost.exe'; UserWritablePath = 'False'; UnquotedPath = 'False'; SignatureStatus = 'Valid'; ServiceDll = 'C:\Users\Public\h.dll'; ServiceDllUserWritablePath = 'True'; ServiceDllSignatureStatus = 'NotSigned' }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            $w = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Services execute binaries from user-writable paths' })
+            $w | Should -HaveCount 1
+            $w[0].Observation | Should -Match 'HijackSvc -> ServiceDll C:\\Users\\Public\\h\.dll'
+            $u = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'svchost services load an unsigned or tampered ServiceDll' })
+            $u | Should -HaveCount 1
+            $u[0].Observation | Should -Match 'HijackSvc'
+            $u[0].Observation | Should -Not -Match 'GoodSvc'
+
+            Initialize-FotonSession
+            $script:FotonSession.Data['services'] = @(
+                [PSCustomObject]@{ Name = 'OldSvc'; State = 'Running'; StartMode = 'Auto'; PathName = 'C:\Windows\system32\svchost.exe -k netsvcs'; ResolvedExe = 'C:\Windows\system32\svchost.exe'; UserWritablePath = 'False'; UnquotedPath = 'False'; SignatureStatus = 'Valid' }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -in @('Services execute binaries from user-writable paths', 'svchost services load an unsigned or tampered ServiceDll') }) | Should -HaveCount 0
+        }
+    }
+
     It 'reads account and group names that contain spaces' {
         InModuleScope Foton {
             $rows = @(

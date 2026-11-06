@@ -65,6 +65,15 @@ Describe 'Collect category functions (extracted)' {
         $src | Should -Match "Name 'screensaver'"
     }
 
+    It 'records ServiceDll for svchost-hosted services' {
+        $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonPersistenceCollection.ps1') -Raw
+        $src | Should -Match "\\Parameters'\) -Name 'ServiceDll'"
+        $src | Should -Match "'Template:' \+ \`$base"
+        foreach ($col in @('ServiceDll', 'ServiceDllSource', 'ServiceDllUserWritablePath', 'ServiceDllSignatureStatus', 'ServiceDllSigner', 'ServiceDllSHA256')) {
+            $src | Should -Match ("\b{0}\s+=" -f $col)
+        }
+    }
+
     It 'adds copy-into-package tasks for Prefetch, Amcache, and SRUM' {
         $src = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\Public\Collect\Invoke-FotonFilesystemCollection.ps1') -Raw
         $src | Should -Match "Name 'prefetch_files'"
