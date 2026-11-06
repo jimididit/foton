@@ -283,7 +283,8 @@ EvtxECmd noise rules (apply to every package):
 
 - Suspicious-command patterns are matched only on events that carry command text (4688, Sysmon 1, 4104, 4697, 7045, 4698, 4702). On 4673/4674 the `ExecutableInfo` is the calling image (often `lsass.exe`), not a command.
 - Rows inside the collection window (from `collection.log`) are excluded from the path and pattern counts and reported as an Info methodology finding. Attribution is by time only.
-- Service installs exclude per-user service instances (`OneSyncSvc_1701f8` and similar), which Windows creates at every logon. Only instances of known Microsoft per-user templates are excluded; any other `Name_<hex>` service is still counted. The finding names the remaining services.
+- Service installs exclude per-user service instances (`OneSyncSvc_1701f8` and similar), which Windows creates at every logon. Only instances of known Microsoft per-user templates whose image is System32 `svchost.exe` are excluded; any other `Name_<hex>` service, a template name pointing at another binary, or a row without a readable image is still counted. The finding names the remaining services.
+- Profile scans skip earlier Foton package folders on the host. Each skipped folder is listed in `collection_coverage.json` (`ExcludedEarlierPackages`) and in an Info finding, because the name and marker files that identify a package can be forged.
 
 Account findings: a 4720 followed by a 4726 for the same SID within 60 seconds is reported separately (Low, "created and deleted within a minute") - typical of provisioning or local-admin rotation scripts. Persistent accounts and additions to privileged groups stay Medium; a new account joining its default primary group (RID 513) is not a privilege change.
 

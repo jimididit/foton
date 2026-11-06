@@ -486,7 +486,7 @@ function Invoke-FotonAnalysis {
     }
     $svcEvents = $script:FotonSession.Data['system_service_and_driver']
     if ($svcEvents) {
-        $installs = @($svcEvents | Where-Object { [string]$_.EventId -eq '7045' -and -not (Test-FotonPerUserServiceName -Name (Get-FotonServiceNameFromEvent -Row $_)) })
+        $installs = @($svcEvents | Where-Object { [string]$_.EventId -eq '7045' -and -not (Test-FotonPerUserServiceEvent -Row $_) })
         if ($installs.Count -gt 0) {
             $names = @($installs | ForEach-Object { Get-FotonServiceNameFromEvent -Row $_ } | Where-Object { $_ } | Sort-Object -Unique)
             $nameText = ''
@@ -718,6 +718,17 @@ function Invoke-FotonAnalysis {
             -WhyItMatters 'A missing hive, Prefetch file, or log copy is a visibility gap in this package, not evidence the artifact was empty on the host. Parsers and compose tools cannot see what was not copied.' `
             -Artifact (Get-FotonArtifactPath 'Collection' 'collection_errors' 'csv') `
             -NextStep 'Read the Note column for each failed row. Locked files usually need an elevated re-collect, a shadow copy, or an imaging tool.'
+    }
+    # Profile scans skip earlier Foton packages so the toolkit's own output is not
+    # re-collected; the folder name and marker files that identify one can be forged.
+    $excludedPkgs = @()
+    if ($cov -and $cov.PSObject.Properties['ExcludedEarlierPackages']) { $excludedPkgs = @($cov.ExcludedEarlierPackages | Where-Object { $_ }) }
+    if ($excludedPkgs.Count -gt 0) {
+        Add-FotonFinding -Severity 'Info' -Category 'Collection' -Tier 1 -Title 'Earlier Foton package folders were skipped by profile scans' `
+            -Observation ("{0} folder(s) identified as earlier Foton packages were not scanned for executables, shortcuts, or alternate data streams: {1}." -f $excludedPkgs.Count, ((@($excludedPkgs | Select-Object -First 10)) -join '; ')) `
+            -WhyItMatters 'Earlier collections on the same host are expected and re-collecting them only adds noise. A folder is recognised by its name pattern plus a collection.log or baseline.json marker, and both can be created by anyone, so a folder listed here was not inspected.' `
+            -Artifact (Get-FotonArtifactPath 'Collection' 'collection_coverage' 'json') `
+            -NextStep 'Confirm each listed folder is a collection the operator or host owner ran. Inspect any unfamiliar one directly.'
     }
     $procCreate = $script:FotonSession.Data['security_process_creation']
     if (-not $procCreate -or @($procCreate).Count -eq 0) {
@@ -1120,7 +1131,7 @@ function Invoke-FotonAnalysis {
                                 $svcName = ''
                                 if ($eid -in @('4697', '7045')) {
                                     $svcName = Get-FotonServiceNameFromEvent -Row $row
-                                    if (Test-FotonPerUserServiceName -Name $svcName) { $perUserSkipped++; $eid = $null }
+                                    if (Test-FotonPerUserServiceEvent -Row $row) { $perUserSkipped++; $eid = $null }
                                 }
                                 if ($eid) {
                                     if (-not $attCounts.ContainsKey($eid)) { $attCounts[$eid] = 0; $attNames[$eid] = @{} }

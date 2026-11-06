@@ -47,6 +47,35 @@ function Get-FotonServiceNameFromEvent {
     return ''
 }
 
+function Get-FotonServiceImageFromEvent {
+    <#
+        Service binary from a 7045/4697 row: EvtxECmd 7045 ExecutableInfo (ImagePath),
+        EvtxECmd 4697 PayloadData2 ("ServiceFileName: X"), or native Message text
+        ("Service File Name:  X"). Empty when the row does not carry it.
+    #>
+    param([object]$Row)
+    $exe = [string]$Row.ExecutableInfo
+    if ($exe.Trim()) { return $exe.Trim() }
+    foreach ($field in @('PayloadData2', 'Message')) {
+        $m = [regex]::Match([string]$Row.$field, '(?i)Service\s?File\s?Name:\s+(?<p>.+?)(?=\s{2,}|\s+Service Type:|\r|\n|$)')
+        if ($m.Success) { return $m.Groups['p'].Value.Trim() }
+    }
+    return ''
+}
+
+function Test-FotonPerUserServiceEvent {
+    <#
+        True only when the service name is a known per-user template instance AND the
+        image is the System32 svchost.exe that hosts every per-user service. A copied
+        template name pointing at another binary is counted, and so is a row whose
+        image cannot be read: unknown is not proof of benign.
+    #>
+    param([object]$Row)
+    if (-not (Test-FotonPerUserServiceName -Name (Get-FotonServiceNameFromEvent -Row $Row))) { return $false }
+    $img = Get-FotonServiceImageFromEvent -Row $Row
+    return ($img -match '(?i)^"?(?:%SystemRoot%|%windir%|\\SystemRoot|[A-Z]:\\Windows)\\System32\\svchost\.exe"?(?:\s|$)')
+}
+
 function Get-FotonAccountEventFacts {
     <#
         Normalise account lifecycle events (4720 create, 4726 delete, 4728/4732/4756
@@ -73,17 +102,17 @@ function Get-FotonAccountEventFacts {
         $msg = [string]$r.Message
         if ($msg) {
             # Rendered messages show "Security ID:" as a SID when it cannot be
-            # resolved and as DOMAIN\Name when it can (BUILTIN\Administrators), so the
-            # identifier is any non-space token, and group names are checked too.
+            # resolved and as DOMAIN\Name when it can (BUILTIN\Remote Desktop Users).
+            # Names may contain spaces, so each value runs to the next field label.
             if ($eid -in @('4720', '4726')) {
-                $m = [regex]::Match($msg, '(?:New Account|Target Account):\s+Security ID:\s+(?<sid>\S+)\s+Account Name:\s+(?<n>\S+)')
-                if ($m.Success) { $fact.AccountSid = $m.Groups['sid'].Value; $fact.AccountName = $m.Groups['n'].Value }
+                $m = [regex]::Match($msg, '(?:New Account|Target Account):\s+Security ID:\s+(?<sid>.+?)\s+Account Name:\s+(?<n>.+?)\s+Account Domain:')
+                if ($m.Success) { $fact.AccountSid = $m.Groups['sid'].Value.Trim(); $fact.AccountName = $m.Groups['n'].Value.Trim() }
             }
             else {
-                $m = [regex]::Match($msg, 'Member:\s+Security ID:\s+(?<sid>\S+)')
-                if ($m.Success) { $fact.AccountSid = $m.Groups['sid'].Value }
-                $g = [regex]::Match($msg, 'Group:\s+Security ID:\s+(?<sid>\S+)\s+Group Name:\s+(?<n>.+?)\s+Group Domain:')
-                if ($g.Success) { $fact.GroupSid = $g.Groups['sid'].Value; $fact.GroupName = $g.Groups['n'].Value.Trim() }
+                $m = [regex]::Match($msg, 'Member:\s+Security ID:\s+(?<sid>.+?)\s+Account Name:')
+                if ($m.Success) { $fact.AccountSid = $m.Groups['sid'].Value.Trim() }
+                $g = [regex]::Match($msg, 'Group:\s+Security ID:\s+(?<sid>.+?)\s+Group Name:\s+(?<n>.+?)\s+Group Domain:')
+                if ($g.Success) { $fact.GroupSid = $g.Groups['sid'].Value.Trim(); $fact.GroupName = $g.Groups['n'].Value.Trim() }
             }
         }
         else {

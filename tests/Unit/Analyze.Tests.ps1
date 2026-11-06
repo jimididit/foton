@@ -611,12 +611,13 @@ Describe 'Get-FotonPackage and offline analysis' {
         ) | Set-Content -LiteralPath (Join-Path $tmp '00_Collection\collection.log')
         try {
             @(
-                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:00:00.0000000'; PayloadData1 = 'ServiceName: OneSyncSvc_1701f8'; ExecutableInfo = '' }
-                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:00:01.0000000'; PayloadData1 = 'ServiceName: CDPUserSvc_2a8824'; ExecutableInfo = '' }
-                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:04:16.0000000'; PayloadData1 = 'ServiceName: VendorUpdateSvc'; ExecutableInfo = '' }
-                [PSCustomObject]@{ EventId = '4673'; TimeCreated = '2026-10-28 18:00:00.0000000'; PayloadData1 = ''; ExecutableInfo = 'C:\Windows\System32\lsass.exe (PID: 0x654)' }
-                [PSCustomObject]@{ EventId = '4688'; TimeCreated = '2026-10-28 18:00:01.0000000'; PayloadData1 = ''; ExecutableInfo = 'C:\Windows\System32\rundll32.exe comsvcs.dll MiniDump 654 C:\Users\Public\l.dmp full lsass' }
-                [PSCustomObject]@{ EventId = '4688'; TimeCreated = '2026-10-29 15:12:00.0000000'; PayloadData1 = ''; ExecutableInfo = 'C:\Users\u\Desktop\Foton_HOST_20261029-151029Z\x.exe' }
+                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:00:00.0000000'; PayloadData1 = 'ServiceName: OneSyncSvc_1701f8'; PayloadData2 = 'ServiceFileName: C:\Windows\system32\svchost.exe -k UnistackSvcGroup'; ExecutableInfo = '' }
+                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:00:01.0000000'; PayloadData1 = 'ServiceName: CDPUserSvc_2a8824'; PayloadData2 = 'ServiceFileName: %SystemRoot%\system32\svchost.exe -k UnistackSvcGroup'; ExecutableInfo = '' }
+                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:00:02.0000000'; PayloadData1 = 'ServiceName: CDPUserSvc_99aa11'; PayloadData2 = 'ServiceFileName: C:\ProgramData\cdp.exe'; ExecutableInfo = '' }
+                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:04:16.0000000'; PayloadData1 = 'ServiceName: VendorUpdateSvc'; PayloadData2 = 'ServiceFileName: C:\Program Files\Vendor\upd.exe'; ExecutableInfo = '' }
+                [PSCustomObject]@{ EventId = '4673'; TimeCreated = '2026-10-28 18:00:00.0000000'; PayloadData1 = ''; PayloadData2 = ''; ExecutableInfo = 'C:\Windows\System32\lsass.exe (PID: 0x654)' }
+                [PSCustomObject]@{ EventId = '4688'; TimeCreated = '2026-10-28 18:00:01.0000000'; PayloadData1 = ''; PayloadData2 = ''; ExecutableInfo = 'C:\Windows\System32\rundll32.exe comsvcs.dll MiniDump 654 C:\Users\Public\l.dmp full lsass' }
+                [PSCustomObject]@{ EventId = '4688'; TimeCreated = '2026-10-29 15:12:00.0000000'; PayloadData1 = ''; PayloadData2 = ''; ExecutableInfo = 'C:\Users\u\Desktop\Foton_HOST_20261029-151029Z\x.exe' }
             ) | Export-Csv -Path (Join-Path $dir 'evtxecmd.csv') -NoTypeInformation -Encoding UTF8
             InModuleScope Foton -Parameters @{ Root = $tmp } {
                 param($Root)
@@ -631,8 +632,10 @@ Describe 'Get-FotonPackage and offline analysis' {
                 $susp[0].Observation | Should -Not -Match '\(2\)'
                 $svc = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'EvtxECmd: Service installed (Security 4697)' })
                 $svc | Should -HaveCount 1
-                $svc[0].Observation | Should -Match 'reported 1 EventId 4697'
+                $svc[0].Observation | Should -Match 'reported 2 EventId 4697'
                 $svc[0].Observation | Should -Match 'VendorUpdateSvc'
+                # Template name, but not hosted by svchost.exe: counted, not filtered.
+                $svc[0].Observation | Should -Match 'CDPUserSvc_99aa11'
                 $svc[0].Observation | Should -Match 'Excludes 2 per-user service instance\(s\) of known Windows templates'
                 $self = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'EvtxECmd rows inside the collection window were excluded' })
                 $self | Should -HaveCount 1
@@ -685,6 +688,51 @@ Describe 'Get-FotonPackage and offline analysis' {
             Test-FotonPerUserServiceName -Name 'webthreatdefusersvc_2a8824' | Should -Be $true
             Test-FotonPerUserServiceName -Name 'Updater_1a2b3c' | Should -Be $false
             Test-FotonPerUserServiceName -Name 'OneSyncSvc' | Should -Be $false
+        }
+    }
+
+    It 'filters a per-user service event only when svchost.exe hosts it' {
+        InModuleScope Foton {
+            $native = 'A service was installed in the system. Service Name:  WpnUserService_1701f8 Service File Name:  C:\WINDOWS\system32\svchost.exe -k UnistackSvcGroup Service Type:  user mode service'
+            Test-FotonPerUserServiceEvent -Row ([PSCustomObject]@{ Message = $native }) | Should -Be $true
+            Test-FotonPerUserServiceEvent -Row ([PSCustomObject]@{ PayloadData1 = 'Name: OneSyncSvc_1701f8'; ExecutableInfo = 'C:\Windows\system32\svchost.exe -k UnistackSvcGroup' }) | Should -Be $true
+            Test-FotonPerUserServiceEvent -Row ([PSCustomObject]@{ Message = 'Service Name:  WpnUserService_1701f8 Service File Name:  C:\Users\Public\svchost.exe' }) | Should -Be $false
+            Test-FotonPerUserServiceEvent -Row ([PSCustomObject]@{ PayloadData1 = 'Name: OneSyncSvc_1701f8' }) | Should -Be $false
+            Test-FotonPerUserServiceEvent -Row ([PSCustomObject]@{ PayloadData1 = 'Name: Updater_1a2b3c'; ExecutableInfo = 'C:\Windows\system32\svchost.exe -k netsvcs' }) | Should -Be $false
+        }
+    }
+
+    It 'reads account and group names that contain spaces' {
+        InModuleScope Foton {
+            $rows = @(
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 21:00:00'; EventId = 4720; Message = "A user account was created.`r`nNew Account:`r`n`tSecurity ID:`t`tCORP\John Smith`r`n`tAccount Name:`t`tJohn Smith`r`n`tAccount Domain:`t`tCORP" }
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 21:00:01'; EventId = 4732; Message = "Member:`r`n`tSecurity ID:`t`tCORP\John Smith`r`n`tAccount Name:`t`t-`r`nGroup:`r`n`tSecurity ID:`t`tBUILTIN\Remote Desktop Users`r`n`tGroup Name:`t`tRemote Desktop Users`r`n`tGroup Domain:`t`tBuiltin" }
+            )
+            $facts = @(Get-FotonAccountEventFacts -Rows $rows)
+            $facts[0].AccountSid | Should -Be 'CORP\John Smith'
+            $facts[0].AccountName | Should -Be 'John Smith'
+            $facts[1].AccountSid | Should -Be 'CORP\John Smith'
+            $facts[1].GroupSid | Should -Be 'BUILTIN\Remote Desktop Users'
+            $facts[1].GroupName | Should -Be 'Remote Desktop Users'
+            Test-FotonPrivilegedGroupSid -Sid $facts[1].GroupSid -Name $facts[1].GroupName | Should -Be $true
+        }
+    }
+
+    It 'discloses earlier Foton packages that profile scans skipped' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['collection_coverage'] = [PSCustomObject]@{ Elevated = $true; ExcludedEarlierPackages = @('C:\Users\u\Desktop\Foton_HOST_20260101-000000Z') }
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            $f = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Earlier Foton package folders were skipped by profile scans' })
+            $f | Should -HaveCount 1
+            $f[0].Observation | Should -Match 'Foton_HOST_20260101-000000Z'
+
+            Initialize-FotonSession
+            $script:FotonSession.Data['collection_coverage'] = [PSCustomObject]@{ Elevated = $true; ExcludedEarlierPackages = @() }
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Earlier Foton package folders were skipped by profile scans' }) | Should -HaveCount 0
         }
     }
 
