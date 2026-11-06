@@ -308,6 +308,8 @@ Invoke-FotonCarve -Path D:\evidence\unalloc-sample.bin
 ## What we will not hide
 
 - Live collect **changes the host**. Capture memory/disk first if that is the case plan.
+- Elevated collect exports loaded registry hives (SYSTEM, SOFTWARE, DEFAULT, signed-in users' NTUSER/UsrClass) with `reg save` into the case folder. **SAM and SECURITY are not collected** (credential material); the manifest records them as `NotCollectedByDesign`. Use a full image or KAPE when a case needs them.
+- A copy task whose files could not be captured shows **Partial** or **Failed** in the manifest, `collection_errors.csv`, and `collection_coverage.json` - not Good.
 - Findings are **observations**, not “infected.”
 - Empty findings is not a clean host.
 - A post-incident baseline is a picture of that observed state—not proof of when or who.
