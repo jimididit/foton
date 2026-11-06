@@ -633,7 +633,7 @@ Describe 'Get-FotonPackage and offline analysis' {
                 $svc | Should -HaveCount 1
                 $svc[0].Observation | Should -Match 'reported 1 EventId 4697'
                 $svc[0].Observation | Should -Match 'VendorUpdateSvc'
-                $svc[0].Observation | Should -Match 'Excludes 2 per-user'
+                $svc[0].Observation | Should -Match 'Excludes 2 per-user service instance\(s\) of known Windows templates'
                 $self = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'EvtxECmd rows inside the collection window were excluded' })
                 $self | Should -HaveCount 1
                 $self[0].Observation | Should -Match '^1 EvtxECmd row'
@@ -676,6 +676,39 @@ Describe 'Get-FotonPackage and offline analysis' {
             $p[0].Observation | Should -Match 'support'
             $p[0].Observation | Should -Match 'Administrators'
             @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Accounts created and deleted within a minute' }) | Should -HaveCount 0
+        }
+    }
+
+    It 'filters only known per-user service templates, not any Name_<hex> service' {
+        InModuleScope Foton {
+            Test-FotonPerUserServiceName -Name 'OneSyncSvc_1701f8' | Should -Be $true
+            Test-FotonPerUserServiceName -Name 'webthreatdefusersvc_2a8824' | Should -Be $true
+            Test-FotonPerUserServiceName -Name 'Updater_1a2b3c' | Should -Be $false
+            Test-FotonPerUserServiceName -Name 'OneSyncSvc' | Should -Be $false
+        }
+    }
+
+    It 'reads the service name, not the subject account, from a native 4697 message' {
+        InModuleScope Foton {
+            $row = [PSCustomObject]@{ EventId = 4697; Message = 'A service was installed in the system. Subject: Security ID: S-1-5-18 Account Name: HOST$ Account Domain: CORP Logon ID: 0x3E7 Service Information: Service Name: Contoso Agent Service File Name: C:\Program Files\Contoso\agent.exe Service Type: 0x10' }
+            Get-FotonServiceNameFromEvent -Row $row | Should -Be 'Contoso Agent'
+            Get-FotonServiceNameFromEvent -Row ([PSCustomObject]@{ PayloadData1 = 'Name: TmKmSnsr' }) | Should -Be 'TmKmSnsr'
+            Get-FotonServiceNameFromEvent -Row ([PSCustomObject]@{ PayloadData1 = 'ServiceName: OneSyncSvc_1701f8' }) | Should -Be 'OneSyncSvc_1701f8'
+        }
+    }
+
+    It 'treats an Administrators add as privileged when the message shows a resolved name' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['security_account_management'] = @(
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 21:00:01'; EventId = 4732; Message = 'A member was added to a security-enabled local group. Member: Security ID: CORP\jdoe Account Name: - Group: Security ID: BUILTIN\Administrators Group Name: Administrators Group Domain: Builtin' }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            $p = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Accounts created or privileged groups changed in the exported logs' })
+            $p | Should -HaveCount 1
+            $p[0].Observation | Should -Match '1 addition\(s\) to privileged groups'
+            $p[0].Observation | Should -Match 'Administrators'
         }
     }
 

@@ -1177,7 +1177,7 @@ function Invoke-FotonAnalysis {
                 $svcNames = @($attNames[$eid].Keys | Sort-Object)
                 if ($svcNames.Count -gt 0) { $extra = (' Services: {0}.' -f ((@($svcNames | Select-Object -First 12)) -join '; ')) }
                 if ($eid -in @('4697', '7045') -and $perUserSkipped -gt 0) {
-                    $extra += (' Excludes {0} per-user service instance(s) (Name_<hex>) that Windows creates at every logon.' -f $perUserSkipped)
+                    $extra += (' Excludes {0} per-user service instance(s) of known Windows templates (OneSyncSvc_<hex> and similar) that Windows creates at every logon.' -f $perUserSkipped)
                 }
                 Add-FotonFinding -Severity $meta.Severity -Category 'EventLogs' -Tier 1 `
                     -Title ("EvtxECmd: {0}" -f $meta.Label) `
