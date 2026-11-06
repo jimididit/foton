@@ -96,6 +96,16 @@ Accepted ScriptAnalyzer exceptions in this repo include `PSAvoidUsingWriteHost`,
 - The Pester CI check must pass before merge; `main` is protected. Merged branches are deleted automatically.
 - Keep a PR to one change when practical. Bump `ModuleVersion`, `ReleaseDate`, and the schema version you changed in `Foton.psd1` for behavior or format changes, and add a `ReleaseNotes` entry.
 
+## Releases
+
+Maintainers release from `main` after the version PR merges:
+
+1. `Foton.psd1` has the new `ModuleVersion`, `ReleaseDate`, and a `ReleaseNotes` entry at the front (the release page shows that entry).
+2. `git tag v<ModuleVersion>` on the merge commit and push the tag. `.github/workflows/release.yml` refuses a tag that does not match `ModuleVersion`, runs the tests, builds the assets (`build/Build-Release.ps1`), attests provenance, creates the GitHub release, and publishes to the PowerShell Gallery when the `PSGALLERY_API_KEY` repository secret is set.
+3. Run the workflow manually (Actions, Release, Run workflow) for a dry run: same build and tests, assets uploaded as a workflow artifact, nothing published.
+
+`build/Build-Release.ps1` produces the same assets locally in `dist\release`. The workstation zip and Gallery module ship an allow-list (module, `src`, `Foton.cmd` + wrapper, flattens, operator docs); `tests/Unit/Release.Tests.ps1` fails if anything else gets in.
+
 ## What we will not accept
 
 - Remediation, process kill, quarantine, or “repair” switches
