@@ -599,6 +599,143 @@ Describe 'Get-FotonPackage and offline analysis' {
         }
     }
 
+    It 'excludes per-user service instances and non-command events from EvtxECmd counts' {
+        $tmp = Join-Path $env:TEMP ('foton-evtxe2-' + [guid]::NewGuid().ToString('N'))
+        $dir = Join-Path $tmp 'analysis\external\EvtxECmd'
+        New-Item -Path $dir -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $tmp '00_Collection') -ItemType Directory -Force | Out-Null
+        @(
+            'Foton 1.35.0 collection log'
+            '2026-10-29 15:10:29 UTC  [Good] Case folder: X'
+            '2026-10-29 15:27:45 UTC  [Step] Compressing case package'
+        ) | Set-Content -LiteralPath (Join-Path $tmp '00_Collection\collection.log')
+        try {
+            @(
+                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:00:00.0000000'; PayloadData1 = 'ServiceName: OneSyncSvc_1701f8'; ExecutableInfo = '' }
+                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:00:01.0000000'; PayloadData1 = 'ServiceName: CDPUserSvc_2a8824'; ExecutableInfo = '' }
+                [PSCustomObject]@{ EventId = '4697'; TimeCreated = '2026-10-28 17:04:16.0000000'; PayloadData1 = 'ServiceName: VendorUpdateSvc'; ExecutableInfo = '' }
+                [PSCustomObject]@{ EventId = '4673'; TimeCreated = '2026-10-28 18:00:00.0000000'; PayloadData1 = ''; ExecutableInfo = 'C:\Windows\System32\lsass.exe (PID: 0x654)' }
+                [PSCustomObject]@{ EventId = '4688'; TimeCreated = '2026-10-28 18:00:01.0000000'; PayloadData1 = ''; ExecutableInfo = 'C:\Windows\System32\rundll32.exe comsvcs.dll MiniDump 654 C:\Users\Public\l.dmp full lsass' }
+                [PSCustomObject]@{ EventId = '4688'; TimeCreated = '2026-10-29 15:12:00.0000000'; PayloadData1 = ''; ExecutableInfo = 'C:\Users\u\Desktop\Foton_HOST_20261029-151029Z\x.exe' }
+            ) | Export-Csv -Path (Join-Path $dir 'evtxecmd.csv') -NoTypeInformation -Encoding UTF8
+            InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                Initialize-FotonSession
+                $script:FotonSession.CaseRoot = $Root
+                $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+                Invoke-FotonAnalysis
+                $susp = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'EvtxECmd ExecutableInfo matched suspicious-command patterns' })
+                $susp | Should -HaveCount 1
+                # Only the 4688 row counts; the 4673 row whose image is lsass.exe does not.
+                $susp[0].Observation | Should -Match 'matched 1 distinct'
+                $susp[0].Observation | Should -Not -Match '\(2\)'
+                $svc = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'EvtxECmd: Service installed (Security 4697)' })
+                $svc | Should -HaveCount 1
+                $svc[0].Observation | Should -Match 'reported 1 EventId 4697'
+                $svc[0].Observation | Should -Match 'VendorUpdateSvc'
+                $svc[0].Observation | Should -Match 'Excludes 2 per-user'
+                $self = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'EvtxECmd rows inside the collection window were excluded' })
+                $self | Should -HaveCount 1
+                $self[0].Observation | Should -Match '^1 EvtxECmd row'
+                $w = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'EvtxECmd ExecutableInfo references user-writable paths' })
+                $w | Should -HaveCount 1
+                $w[0].Observation | Should -Not -Match 'Foton_HOST'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'separates transient create/delete accounts from persistent ones and ignores default-group adds' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $sidT = 'S-1-5-21-1-2-3-1014'
+            $sidP = 'S-1-5-21-1-2-3-1020'
+            $script:FotonSession.Data['security_account_management'] = @(
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 20:34:54'; EventId = 4720; Message = "A user account was created. Subject: Security ID: S-1-5-18 New Account: Security ID: $sidT Account Name: tempadmin Account Domain: HOST" }
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 20:34:54'; EventId = 4728; Message = "A member was added to a security-enabled global group. Member: Security ID: $sidT Account Name: - Group: Security ID: S-1-5-21-1-2-3-513 Group Name: None Group Domain: HOST" }
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 20:34:55'; EventId = 4726; Message = "A user account was deleted. Target Account: Security ID: $sidT Account Name: tempadmin Account Domain: HOST" }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Accounts created or privileged groups changed in the exported logs' }) | Should -HaveCount 0
+            $t = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Accounts created and deleted within a minute' })
+            $t | Should -HaveCount 1
+            $t[0].Observation | Should -Match 'tempadmin'
+
+            Initialize-FotonSession
+            $script:FotonSession.Data['security_account_management'] = @(
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 21:00:00'; EventId = 4720; Message = "A user account was created. New Account: Security ID: $sidP Account Name: support Account Domain: HOST" }
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 21:00:01'; EventId = 4732; Message = "A member was added to a security-enabled local group. Member: Security ID: $sidP Account Name: - Group: Security ID: S-1-5-32-544 Group Name: Administrators Group Domain: Builtin" }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            $p = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Accounts created or privileged groups changed in the exported logs' })
+            $p | Should -HaveCount 1
+            $p[0].Observation | Should -Match 'support'
+            $p[0].Observation | Should -Match 'Administrators'
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Accounts created and deleted within a minute' }) | Should -HaveCount 0
+        }
+    }
+
+    It 'names native 7045 services and skips per-user instances' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['system_service_and_driver'] = @(
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 17:27:20'; EventId = 7045; Message = 'A service was installed in the system. Service Name:  Contoso Agent Service File Name:  C:\Program Files\Contoso\agent.exe' }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            $f = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Service install events in the exported logs' })
+            $f | Should -HaveCount 1
+            $f[0].Observation | Should -Match 'Contoso Agent'
+
+            Initialize-FotonSession
+            $script:FotonSession.Data['system_service_and_driver'] = @(
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 17:27:20'; EventId = 7045; Message = 'A service was installed in the system. Service Name:  WpnUserService_1701f8 Service File Name:  C:\Windows\system32\svchost.exe' }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Service install events in the exported logs' }) | Should -HaveCount 0
+        }
+    }
+
+    It 'flags an automatic Sysmon service that is stopped, not one that is running' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $script:FotonSession.Data['services'] = @([PSCustomObject]@{ Name = 'Sysmon64'; State = 'Stopped'; StartMode = 'Auto' })
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Sysmon is installed but not running' }) | Should -HaveCount 1
+
+            Initialize-FotonSession
+            $script:FotonSession.Data['services'] = @([PSCustomObject]@{ Name = 'Sysmon64'; State = 'Running'; StartMode = 'Auto' })
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Sysmon is installed but not running' }) | Should -HaveCount 0
+        }
+    }
+
+    It 'reports Partial/Failed collection tasks and stays quiet when all succeeded' {
+        InModuleScope Foton {
+            Initialize-FotonSession
+            $null = $script:FotonSession.Manifest.Add([PSCustomObject]@{ Task = 'registry_hives_machine'; Status = 'Failed' })
+            $null = $script:FotonSession.Manifest.Add([PSCustomObject]@{ Task = 'prefetch_files'; Status = 'Success' })
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            $f = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Some collection tasks captured only part of their files' })
+            $f | Should -HaveCount 1
+            $f[0].Observation | Should -Match 'registry_hives_machine \(Failed\)'
+
+            Initialize-FotonSession
+            $null = $script:FotonSession.Manifest.Add([PSCustomObject]@{ Task = 'prefetch_files'; Status = 'Success' })
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Some collection tasks captured only part of their files' }) | Should -HaveCount 0
+        }
+    }
+
     It 'writes HTML using package hostname not the analyst workstation' {
         Get-FotonPackage -Path $script:Fixture | Out-Null
         Invoke-FotonAnalysis

@@ -279,6 +279,14 @@ Or: `Foton.cmd tools Hayabusa` then `Foton.cmd compose <case-folder>`.
 
 Outputs land under `analysis\external\<tool>\` and are hashed. Inventory rows include **Version** and **RulesVersion** when the tool came from the Foton manifest. Missing tools are inventory rows (`NotOnPath`), not failures — Hayabusa's note names `Install-FotonTool`. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. **PECmd** and **EvtxECmd** CSVs also feed `Invoke-FotonAnalysis` (coverage, user-writable path references, and a short list of high-attention EventIds such as 1102/7045) — still observations that cite the tool, not a reimplementation of those parsers.
 
+EvtxECmd noise rules (apply to every package):
+
+- Suspicious-command patterns are matched only on events that carry command text (4688, Sysmon 1, 4104, 4697, 7045, 4698, 4702). On 4673/4674 the `ExecutableInfo` is the calling image (often `lsass.exe`), not a command.
+- Rows inside the collection window (from `collection.log`) are excluded from the path and pattern counts and reported as an Info methodology finding. Attribution is by time only.
+- Service installs exclude per-user service instances (`OneSyncSvc_1701f8` and similar), which Windows creates at every logon. The finding names the remaining services.
+
+Account findings: a 4720 followed by a 4726 for the same SID within 60 seconds is reported separately (Low, "created and deleted within a minute") - typical of provisioning or local-admin rotation scripts. Persistent accounts and additions to privileged groups stay Medium; a new account joining its default primary group (RID 513) is not a privilege change.
+
 **Collector footprint.** Script block logging records Foton's own PowerShell, so hunt rules for suspicious scripting and for registry or credential access fire on the collection itself. On a real package this was the single largest medium-level "detection". `Invoke-FotonAnalysis` attributes such rows to the collection — by timestamp inside the collection window read from `00_Collection\collection.log`, and by rows naming a Foton function outside it — excludes them from the severity bands, and reports the count as an Info methodology finding. That exclusion is inference, not process identity: genuine host activity during the collection window is excluded too, so filter the Hayabusa CSV to that window yourself if something could have coincided.
 
 Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard). Rules are loaded from the `rules\` folder beside the binary. Each tool is launched with its own install directory as the working directory. Catalog pin and refresh: `Install-FotonTool -List` (manifest under `src/Private/Tools/`).
