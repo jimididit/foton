@@ -1103,7 +1103,7 @@ function Invoke-FotonAnalysis {
             $evWritable = @{}
             $evSusp = @{}
             $evMax = 2000000
-            # High-attention IDs only — not a hunt engine. Counts cite EvtxECmd.
+            # High-attention IDs only - not a hunt engine. Counts cite EvtxECmd.
             $attention = @{
                 '1102' = @{ Severity = 'High';   Label = 'Security audit log cleared' }
                 '104'  = @{ Severity = 'High';   Label = 'Event log cleared' }
@@ -1196,7 +1196,7 @@ function Invoke-FotonAnalysis {
                 if ($evState.Capped) { $capNote = (" Row scan capped at {0}; counts are a floor." -f $evMax) }
                 Add-FotonFinding -Severity 'Info' -Category 'EventLogs' -Tier 1 -Title 'EvtxECmd event rows present in compose output' `
                     -Observation ("EvtxECmd wrote {0} event row(s) under analysis/external/EvtxECmd. Top EventId values: {1}.{2}" -f $evRows, $idSample, $capNote) `
-                    -WhyItMatters 'These are Eric Zimmerman EvtxECmd facts about EVTX already copied into the package. Volume reflects which channels were collected and how noisy they were — not a compromise score.' `
+                    -WhyItMatters 'These are Eric Zimmerman EvtxECmd facts about EVTX already copied into the package. Volume reflects which channels were collected and how noisy they were - not a compromise score.' `
                     -Artifact 'analysis/external/EvtxECmd' `
                     -NextStep 'Filter evtxecmd.csv by EventId and Channel for the investigation window; use Hayabusa/Chainsaw compose for Sigma-style hunts.'
             }

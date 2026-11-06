@@ -36,7 +36,7 @@ Use a throwaway Windows VM for live Collect/Baseline. Collection changes the hos
 | One public function per file | Filename = function name (`New-FotonBaseline.ps1`) |
 | Export allow-list | Add the name to `FunctionsToExport` in `Foton.psd1` |
 | Comment-based help | `.SYNOPSIS`, `.DESCRIPTION`, and at least one realistic `.EXAMPLE` |
-| Placeholders in docs | `CASE-0001`, `D:\Cases`, `HOSTNAME` — no personal host names |
+| Placeholders in docs | `CASE-0001`, `D:\Cases`, `HOSTNAME` - no personal host names |
 | Layer split | Collect/Baseline may touch a live host. Parse, Carve, and Analyze stay offline |
 
 ## Add a live collection task
@@ -46,7 +46,7 @@ Use a throwaway Windows VM for live Collect/Baseline. Collection changes the hos
 3. Fail into the manifest; never throw out of the orchestrator. Admin-only work uses `RequiresElevation`.
 4. PowerShell **5.1** only in Collect/Baseline (no ternaries, `??`, `-Parallel`, or runtime internet).
 
-Do not embed long LOLBin / credential-theft string lists in Core or the Collect flatten — AMSI will block the script. Keep raw command text in the package; derive hits in Analyze on the workstation.
+Do not embed long LOLBin / credential-theft string lists in Core or the Collect flatten - AMSI will block the script. Keep raw command text in the package; derive hits in Analyze on the workstation.
 
 ## Add a baseline provider
 
@@ -60,7 +60,7 @@ Bump `BaselineSchemaVersion` in `Foton.psd1` when identity keys or compared fiel
 
 ## Add an analysis rule
 
-- Input: package data (or a test mock)—never live WMI or the network
+- Input: package data (or a test mock)-never live WMI or the network
 - Output: `Add-FotonFinding` with Tier, Artifact, WhyItMatters (include a benign reading), optional NextStep
 - Tests: one record that must fire, one that must not
 - Never assert compromise, attribution, intent, or causation
@@ -70,7 +70,7 @@ Bump `BaselineSchemaVersion` in `Foton.psd1` when identity keys or compared fiel
 
 If EZ Tools or Hayabusa already parse the format correctly, prefer copying the artifact into the package and composing that tool on the workstation.
 
-A native `ConvertFrom-Foton*` is appropriate only when PowerShell can be correct. Pure function over a path or bytes. Commit a small fixture under `tests/Fixtures/` (no client data). Unsupported formats get an explicit record—not guessed columns.
+A native `ConvertFrom-Foton*` is appropriate only when PowerShell can be correct. Pure function over a path or bytes. Commit a small fixture under `tests/Fixtures/` (no client data). Unsupported formats get an explicit record-not guessed columns.
 
 ## Verification
 
@@ -88,7 +88,7 @@ if ($e) { $e } else { 'PARSE OK' }
 .\build\Test-FotonAmsiLoad.ps1 -Path .\dist\Foton-Collect.ps1
 ```
 
-Accepted ScriptAnalyzer exceptions in this repo include `PSAvoidUsingWriteHost`, empty catch on best-effort collect paths, and a few naming rules. HTML reports must include the offline search/nav chrome (`Get-FotonReportNavCss` and friends)—no CDN.
+Accepted ScriptAnalyzer exceptions in this repo include `PSAvoidUsingWriteHost`, empty catch on best-effort collect paths, and a few naming rules. HTML reports must include the offline search/nav chrome (`Get-FotonReportNavCss` and friends)-no CDN.
 
 ## Branches and pull requests
 

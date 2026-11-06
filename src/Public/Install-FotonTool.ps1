@@ -141,7 +141,7 @@ function Install-FotonTool {
     $destVer = Join-Path $dest ([string]$entry.Version)
 
     Write-Host ''
-    Write-Host '  Foton tool install (workstation setup — not part of a case package)' -ForegroundColor Cyan
+    Write-Host '  Foton tool install (workstation setup - not part of a case package)' -ForegroundColor Cyan
     Write-Host ("  Tool:     {0} {1}" -f $entry.Name, $entry.Version)
     Write-Host ("  License:  {0}  {1}" -f $entry.License, $entry.ProjectUrl)
     Write-Host ("  Source:   {0}" -f $(if ($ArchivePath) { $ArchivePath } else { $entry.DownloadUrl }))

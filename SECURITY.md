@@ -28,7 +28,7 @@ You should receive an acknowledgement within a few business days.
 - Antivirus / AMSI false positives on Collect flatten scripts (common for DFIR tooling; see [docs/USAGE.md](docs/USAGE.md))
 - Findings that match legitimate admin tools (pattern lists are intentionally broad)
 - Missing coverage of a Windows artifact (feature request)
-- Expected live-collection side effects (Prefetch, event logs, `reg save` hive exports into the case folder, optional `-LoadUserHives` load/unload)—disclosed in operator docs
+- Expected live-collection side effects (Prefetch, event logs, `reg save` hive exports into the case folder, optional `-LoadUserHives` load/unload)-disclosed in operator docs
 
 ## Signing and ExecutionPolicy
 
