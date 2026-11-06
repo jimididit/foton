@@ -38,8 +38,21 @@ function Test-FotonCaseOutputPath {
         $isPackage = $true
     }
     $cache[$root] = $isPackage
-    if ($isPackage -and (Get-Command Write-FotonStatus -ErrorAction SilentlyContinue)) {
-        Write-FotonStatus ("Skipping {0} in profile scan: {1}" -f $label, $root) 'Info'
+    if ($isPackage) {
+        if (Get-Command Write-FotonStatus -ErrorAction SilentlyContinue) {
+            Write-FotonStatus ("Skipping {0} in profile scan: {1}" -f $label, $root) 'Info'
+        }
+        # Any marker can be forged by whoever controls the host, so a skip is never
+        # silent: earlier packages are listed in collection_coverage.json and Analyze
+        # reports them. The current run's own folder is not listed.
+        if ($script:FotonSession -and $label -ne 'this collection''s own case folder') {
+            if (-not $script:FotonSession.ContainsKey('ExcludedEarlierPackages')) {
+                $script:FotonSession['ExcludedEarlierPackages'] = New-Object System.Collections.ArrayList
+            }
+            if (-not $script:FotonSession['ExcludedEarlierPackages'].Contains($root)) {
+                $null = $script:FotonSession['ExcludedEarlierPackages'].Add($root)
+            }
+        }
     }
     return $isPackage
 }
