@@ -33,7 +33,9 @@ Describe 'Install-FotonTool and resolve' {
             $pe = @($rows | Where-Object Name -eq 'PECmd')
             $pe | Should -HaveCount 1
             $pe[0].Source | Should -Be 'Registered'
-            $pe[0].Location | Should -Be (Join-Path $bin 'PECmd.exe')
+            # CI temp paths can be 8.3 short names; compare the file, not the spelling.
+            $pe[0].Location | Should -Match '\\ez\\PECmd\.exe$'
+            Test-Path -LiteralPath $pe[0].Location | Should -Be $true
             $pe[0].Verified | Should -Be $false
             ($rows | Where-Object Name -eq 'Hayabusa').Source | Should -Be 'Catalog'
         }
