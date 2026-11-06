@@ -65,9 +65,9 @@ if (Test-Path -LiteralPath $manifestPath) {
     catch {
         try {
             $raw = [IO.File]::ReadAllText($manifestPath)
-            $m = [regex]::Match($raw, "ModuleVersion\s*=\s*'([^']+)'")
+            $m = [regex]::Match($raw, "(?m)^\s*ModuleVersion\s*=\s*'([^']+)'")
             if ($m.Success) { $ver = $m.Groups[1].Value }
-            $m = [regex]::Match($raw, "ReleaseDate\s*=\s*'([^']+)'")
+            $m = [regex]::Match($raw, "(?m)^\s*ReleaseDate\s*=\s*'([^']+)'")
             if ($m.Success) { $released = $m.Groups[1].Value }
         }
         catch { }

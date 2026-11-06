@@ -26,6 +26,44 @@ Describe 'Foton module scaffold' {
         $v.ReleaseDate | Should -Match '^\d{4}-\d{2}-\d{2}$'
     }
 
+    It 'reads the banner version and release date from top-level manifest keys only' {
+        Import-Module $script:FotonPsd1 -Force
+        $tmp = Join-Path $env:TEMP ('foton-banner-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmp | Out-Null
+        try {
+            @(
+                '@{'
+                "    RequiredModules = @(@{ ModuleName = 'Other'; ModuleVersion = '9.9.9' })"
+                "    ModuleVersion     = '1.2.3'"
+                '    PrivateData = @{'
+                '        Foton = @{'
+                "            ReleaseDate = '2026-01-02'"
+                '        }'
+                '    }'
+                '}'
+            ) | Set-Content -LiteralPath (Join-Path $tmp 'Foton.psd1')
+            $out = InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                $savedRoot = $script:FotonModuleRoot
+                $savedSession = $script:FotonSession
+                try {
+                    $script:FotonModuleRoot = $Root
+                    $script:FotonSession = $null
+                    Write-FotonBanner -Kind Analyze -Color None 6>&1 | Out-String
+                }
+                finally {
+                    $script:FotonModuleRoot = $savedRoot
+                    $script:FotonSession = $savedSession
+                }
+            }
+            $out | Should -Match 'Version\s+1\.2\.3'
+            $out | Should -Match 'Updated\s+2026-01-02'
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'keeps public docs and the banner on the current version' {
         $man = Import-PowerShellDataFile -LiteralPath $script:FotonPsd1
         $ver = [string]$man.ModuleVersion

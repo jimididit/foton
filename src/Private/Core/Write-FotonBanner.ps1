@@ -391,9 +391,9 @@ function Write-FotonBanner {
             # PowerShell 7 prompt inherits its module path and that cmdlet fails to load.
             try {
                 $raw = [IO.File]::ReadAllText($psd1)
-                $m = [regex]::Match($raw, "ModuleVersion\s*=\s*'([^']+)'")
+                $m = [regex]::Match($raw, "(?m)^\s*ModuleVersion\s*=\s*'([^']+)'")
                 if ($m.Success) { $ver = $m.Groups[1].Value }
-                $m = [regex]::Match($raw, "ReleaseDate\s*=\s*'([^']+)'")
+                $m = [regex]::Match($raw, "(?m)^\s*ReleaseDate\s*=\s*'([^']+)'")
                 if ($m.Success) { $released = $m.Groups[1].Value }
             }
             catch { }
