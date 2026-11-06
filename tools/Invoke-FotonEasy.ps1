@@ -36,6 +36,7 @@ function Show-FotonEasyHelp {
     Write-Host '    Foton.cmd parse    C:\FotonCases\Foton_HOST_...Z'
     Write-Host '    Foton.cmd compose  C:\FotonCases\Foton_HOST_...Z'
     Write-Host '    Foton.cmd tools    Hayabusa          (one-time workstation setup; does not change PATH)'
+    Write-Host '    Foton.cmd tools    EZTools C:\Tools\EZTools   (register an existing install; also Chainsaw <dir>)'
     Write-Host '    Foton.cmd tools                      (list pinned tools)'
     Write-Host '    Foton.cmd ioc      C:\FotonCases\Foton_HOST_...Z C:\intel\iocs.txt'
     Write-Host '    Foton.cmd carve    C:\blob.bin'
@@ -48,6 +49,9 @@ function Show-FotonEasyHelp {
 
 $cmd = $Command.ToLower()
 if ($cmd -notin @('collect', 'baseline', 'compare') -and (Test-Path -LiteralPath $banner)) {
+    # The banner reads the version from Foton.psd1 under FotonModuleRoot; without it,
+    # dot-sourcing outside the module fell back to a stale hard-coded version.
+    $script:FotonModuleRoot = $repoRoot
     . $banner
     Write-FotonBanner -Kind 'Easy'
 }
@@ -113,7 +117,7 @@ switch ($cmd) {
         $rows | Select-Object Tool, Version, Status, DestRelative, Note |
             Format-Table -AutoSize -Wrap
         Write-Host '  Inventory: analysis\external\external_parse_inventory.csv. Native Invoke-FotonParse if tools are missing.' -ForegroundColor Green
-        Write-Host '  Missing Hayabusa: Foton.cmd tools Hayabusa' -ForegroundColor DarkGray
+        Write-Host '  Missing Hayabusa: Foton.cmd tools Hayabusa. Existing EZ Tools / Chainsaw folder: Foton.cmd tools EZTools <dir>' -ForegroundColor DarkGray
     }
     'tools' {
         # One-time workstation setup. Never runs inside compose (offline invariant).
@@ -122,13 +126,18 @@ switch ($cmd) {
             return
         }
         $archive = $null
+        $existing = $null
         if ($Rest -and $Rest.Count -ge 2 -and $Rest[0] -eq '-ArchivePath') {
             $archive = $Rest[1]
         }
         elseif ($Rest -and $Rest.Count -ge 1 -and (Test-Path -LiteralPath $Rest[0])) {
-            $archive = $Rest[0]
+            # A .zip is a release archive to install; a folder or .exe is an existing install to register.
+            if ([IO.Path]::GetExtension($Rest[0]) -eq '.zip') { $archive = $Rest[0] } else { $existing = $Rest[0] }
         }
-        if ($archive) {
+        if ($existing) {
+            Install-FotonTool -Name $Target -Path $existing | Out-Null
+        }
+        elseif ($archive) {
             Install-FotonTool -Name $Target -ArchivePath $archive -Force
         }
         else {

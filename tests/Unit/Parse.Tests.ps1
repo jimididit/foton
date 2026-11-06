@@ -331,17 +331,21 @@ Describe 'Invoke-FotonExternalParse' {
     It 'records NotOnPath when EZ tools are absent' {
         $tmp = Join-Path $env:TEMP ('foton-ext-' + [guid]::NewGuid().ToString('N'))
         New-Item -Path $tmp -ItemType Directory | Out-Null
+        # Isolate from a workstation that really has the tools on PATH or in tools.json.
+        $savedPath = $env:Path
+        $env:Path = Join-Path $env:SystemRoot 'System32'
         try {
             InModuleScope Foton -Parameters @{ Root = $tmp } {
                 param($Root)
                 Initialize-FotonSession
                 $script:FotonSession.CaseRoot = $Root
-                $rows = @(Invoke-FotonExternalParse)
+                $rows = @(Invoke-FotonExternalParse -ToolRoot (Join-Path $Root 'no-tools'))
                 @($rows | Where-Object { $_.Status -eq 'NotOnPath' }).Count | Should -BeGreaterThan 0
             }
             Test-Path -LiteralPath (Join-Path $tmp 'analysis\external\external_parse_inventory.csv') | Should -Be $true
         }
         finally {
+            $env:Path = $savedPath
             Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
         }
     }

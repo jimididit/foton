@@ -50,7 +50,13 @@ function Invoke-FotonTriage {
         -Deep:$Deep
 
     if (-not $script:FotonSession.Version) {
-        $script:FotonSession.Version = '1.5.0'
+        $ver = 'unknown'
+        $psd1 = $null
+        if ($script:FotonModuleRoot) { $psd1 = Join-Path $script:FotonModuleRoot 'Foton.psd1' }
+        if ($psd1 -and (Test-Path -LiteralPath $psd1)) {
+            try { $ver = [string](Import-PowerShellDataFile -LiteralPath $psd1).ModuleVersion } catch { }
+        }
+        $script:FotonSession.Version = $ver
     }
     $script:FotonSession.StartTimeUtc = (Get-Date).ToUniversalTime()
     $script:FotonSession.IsElevated = Test-FotonElevated

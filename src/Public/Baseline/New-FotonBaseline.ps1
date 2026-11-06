@@ -68,7 +68,8 @@ function New-FotonBaseline {
         $script:FotonSession.Version = [string]$man.ModuleVersion
     }
     elseif (-not $script:FotonSession.Version) {
-        $script:FotonSession.Version = '1.31.0'
+        # Flatten builds stamp the version; a literal here went stale and was reported as fact.
+        $script:FotonSession.Version = 'unknown'
     }
 
     $script:FotonSession.IsElevated = Test-FotonElevated
