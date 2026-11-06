@@ -347,13 +347,27 @@ function Invoke-FotonAnalysis {
     }
 
     $svcs = $script:FotonSession.Data['services']
+    $svcIndex = Get-FotonServiceIndex -Services @($svcs)
+    $hostSys32 = ''
+    if ($osInfo -and $osInfo.PSObject.Properties['SystemDirectory']) { $hostSys32 = [string]$osInfo.SystemDirectory }
     if ($svcs) {
         $svcUserPath = @($svcs | Where-Object { $_.UserWritablePath -eq $true -and $_.ResolvedExe })
-        if ($svcUserPath.Count -gt 0) {
+        # ServiceDll columns exist from collect schema 1.13.0; older packages lack them.
+        $svcUserDll = @($svcs | Where-Object { $_.PSObject.Properties['ServiceDllUserWritablePath'] -and $_.ServiceDllUserWritablePath -eq $true -and $_.ServiceDll })
+        if ($svcUserPath.Count -gt 0 -or $svcUserDll.Count -gt 0) {
+            $svcUserItems = @($svcUserPath | ForEach-Object { "$($_.Name) -> $($_.PathName)" }) + @($svcUserDll | ForEach-Object { "$($_.Name) -> ServiceDll $($_.ServiceDll)" })
             Add-FotonFinding -Severity 'High' -Category 'Persistence' -Tier 2 -Title 'Services execute binaries from user-writable paths' `
-                -Observation ("{0} service(s): {1}." -f $svcUserPath.Count, (ConvertTo-FotonSample ($svcUserPath | ForEach-Object { "$($_.Name) -> $($_.PathName)" }) 4)) `
-                -WhyItMatters 'A service binary in a user-writable directory can be replaced by a non-administrative user, and is also a common location for attacker-installed services.' `
+                -Observation ("{0} service(s): {1}." -f $svcUserItems.Count, (ConvertTo-FotonSample $svcUserItems 4)) `
+                -WhyItMatters 'A service binary or svchost ServiceDll in a user-writable directory can be replaced by a non-administrative user, and is also a common location for attacker-installed services.' `
                 -Artifact (Get-FotonArtifactPath 'Persistence' 'services' 'csv')
+        }
+        $svcBadDll = @($svcs | Where-Object { $_.PSObject.Properties['ServiceDllSignatureStatus'] -and $_.ServiceDll -and ([string]$_.ServiceDllSignatureStatus) -in @('NotSigned', 'HashMismatch') })
+        if ($svcBadDll.Count -gt 0) {
+            Add-FotonFinding -Severity 'Medium' -Category 'Persistence' -Tier 2 -Title 'svchost services load an unsigned or tampered ServiceDll' `
+                -Observation ("{0} service(s): {1}." -f $svcBadDll.Count, (ConvertTo-FotonSample ($svcBadDll | ForEach-Object { "$($_.Name) -> $($_.ServiceDll) [$($_.ServiceDllSignatureStatus)]" }) 4)) `
+                -WhyItMatters 'svchost.exe is always a signed Windows binary, so the ServiceDll is the code that actually runs. Windows service DLLs are signed; an unsigned one is usually third-party or in-house software, and HashMismatch means the file changed after signing. ServiceDll hijacking is a known way to hide persistence behind a normal-looking svchost process.' `
+                -Artifact (Get-FotonArtifactPath 'Persistence' 'services' 'csv') `
+                -NextStep 'Check the DLL''s publisher, install date, and the ServiceDllSHA256 against known-good copies of the software that owns the service.'
         }
         $svcUnquoted = @($svcs | Where-Object { $_.UnquotedPath -eq $true })
         if ($svcUnquoted.Count -gt 0) {
@@ -487,14 +501,14 @@ function Invoke-FotonAnalysis {
     $svcEvents = $script:FotonSession.Data['system_service_and_driver']
     if ($svcEvents) {
         $all7045 = @($svcEvents | Where-Object { [string]$_.EventId -eq '7045' })
-        $installs = @($all7045 | Where-Object { -not (Test-FotonPerUserServiceEvent -Row $_) })
+        $installs = @($all7045 | Where-Object { -not (Test-FotonPerUserServiceEvent -Row $_ -ServiceIndex $svcIndex -SystemDirectory $hostSys32) })
         if ($installs.Count -gt 0) {
             $names = @($installs | ForEach-Object { Get-FotonServiceNameFromEvent -Row $_ } | Where-Object { $_ } | Sort-Object -Unique)
             $nameText = ''
             if ($names.Count -gt 0) { $nameText = (' Services: {0}.' -f ((@($names | Select-Object -First 12)) -join '; ')) }
             $perUserNative = $all7045.Count - $installs.Count
             if ($perUserNative -gt 0) {
-                $nameText += (' Excludes {0} per-user service instance(s) of known Windows templates hosted by System32 svchost.exe; the event does not record ServiceDll, so check Services\<name>\Parameters\ServiceDll in the SYSTEM hive if a template name is in doubt.' -f $perUserNative)
+                $nameText += (' Excludes {0} per-user service instance(s) of known Windows templates hosted by System32 svchost.exe. The event does not record ServiceDll; it was checked in services.csv for instances that still existed at collection time, and instances removed at logoff could not be checked.' -f $perUserNative)
             }
             # The event export covers the configured lookback (EventLogDays), not the
             # minutes the collector ran - "during the collection window" overstated it.
@@ -1136,7 +1150,7 @@ function Invoke-FotonAnalysis {
                                 $svcName = ''
                                 if ($eid -in @('4697', '7045')) {
                                     $svcName = Get-FotonServiceNameFromEvent -Row $row
-                                    if (Test-FotonPerUserServiceEvent -Row $row) { $perUserSkipped++; $eid = $null }
+                                    if (Test-FotonPerUserServiceEvent -Row $row -ServiceIndex $svcIndex -SystemDirectory $hostSys32) { $perUserSkipped++; $eid = $null }
                                 }
                                 if ($eid) {
                                     if (-not $attCounts.ContainsKey($eid)) { $attCounts[$eid] = 0; $attNames[$eid] = @{} }
@@ -1193,7 +1207,7 @@ function Invoke-FotonAnalysis {
                 $svcNames = @($attNames[$eid].Keys | Sort-Object)
                 if ($svcNames.Count -gt 0) { $extra = (' Services: {0}.' -f ((@($svcNames | Select-Object -First 12)) -join '; ')) }
                 if ($eid -in @('4697', '7045') -and $perUserSkipped -gt 0) {
-                    $extra += (' Excludes {0} per-user service instance(s) of known Windows templates (OneSyncSvc_<hex> and similar) hosted by System32 svchost.exe, which Windows creates at every logon. The event does not record the ServiceDll, so a copied template name loading another DLL through svchost would also be excluded; check Services\<name>\Parameters\ServiceDll in the SYSTEM hive if that matters here.' -f $perUserSkipped)
+                    $extra += (' Excludes {0} per-user service instance(s) of known Windows templates (OneSyncSvc_<hex> and similar) hosted by System32 svchost.exe, which Windows creates at every logon. The event does not record ServiceDll; it was checked in services.csv for instances that still existed at collection time, and instances removed at logoff could not be checked.' -f $perUserSkipped)
                 }
                 Add-FotonFinding -Severity $meta.Severity -Category 'EventLogs' -Tier 1 `
                     -Title ("EvtxECmd: {0}" -f $meta.Label) `

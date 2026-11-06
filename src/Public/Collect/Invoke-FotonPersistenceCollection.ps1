@@ -146,7 +146,7 @@ function Invoke-FotonPersistenceCollection {
             Sort-Object ModifiedUtc -Descending
     } | Out-Null
 
-    Invoke-FotonCollection -Category 'Persistence' -Name 'services' -Format 'Csv' -Description 'All services with binary path, signature, hash, unquoted-path flag' -Script {
+    Invoke-FotonCollection -Category 'Persistence' -Name 'services' -Format 'Csv' -Description 'All services with binary path, signature, hash, unquoted-path flag, and ServiceDll for svchost-hosted services' -Script {
         $rows = @()
         foreach ($s in (Get-CimInstance Win32_Service -ErrorAction SilentlyContinue)) {
             $pathName = $s.PathName
@@ -162,6 +162,35 @@ function Invoke-FotonPersistenceCollection {
             $unquoted = $false
             if ($pathName -and -not $pathName.StartsWith('"') -and $pathName -match ' ' -and $exe -match ' ') { $unquoted = $true }
             $sig = Get-FotonSignatureInfo -Path $exe
+            # svchost-hosted services all share one image; the code that runs is the
+            # ServiceDll under Parameters (older services set it on the service key).
+            # Per-user instances (Name_<hex>) carry no ServiceDll of their own; svchost
+            # loads the template service's, and templates are not listed by Win32_Service.
+            $dll = ''
+            $dllSource = ''
+            $dllSig = [PSCustomObject]@{ Status = ''; Signer = '' }
+            $dllHash = ''
+            if ($exe -match '(?i)\\svchost\.exe$') {
+                $svcRoot = 'HKLM:\SYSTEM\CurrentControlSet\Services\'
+                $dll = [string](Get-FotonRegValue -Path ($svcRoot + $s.Name + '\Parameters') -Name 'ServiceDll')
+                if ($dll) { $dllSource = 'Parameters' }
+                else {
+                    $dll = [string](Get-FotonRegValue -Path ($svcRoot + $s.Name) -Name 'ServiceDll')
+                    if ($dll) { $dllSource = 'ServiceKey' }
+                }
+                $inst = [regex]::Match([string]$s.Name, '^(?<base>.+)_[0-9a-fA-F]{4,8}$')
+                if (-not $dll -and $inst.Success) {
+                    $base = $inst.Groups['base'].Value
+                    $dll = [string](Get-FotonRegValue -Path ($svcRoot + $base + '\Parameters') -Name 'ServiceDll')
+                    if (-not $dll) { $dll = [string](Get-FotonRegValue -Path ($svcRoot + $base) -Name 'ServiceDll') }
+                    if ($dll) { $dllSource = 'Template:' + $base }
+                }
+                if ($dll) {
+                    $dll = [Environment]::ExpandEnvironmentVariables($dll)
+                    $dllSig = Get-FotonSignatureInfo -Path $dll
+                    $dllHash = Get-FotonSafeHash -Path $dll
+                }
+            }
             $rows += [PSCustomObject]@{
                 Name            = $s.Name
                 DisplayName     = $s.DisplayName
@@ -177,6 +206,12 @@ function Invoke-FotonPersistenceCollection {
                 SignatureStatus = $sig.Status
                 Signer          = $sig.Signer
                 SHA256          = (Get-FotonSafeHash -Path $exe)
+                ServiceDll      = $dll
+                ServiceDllSource = $dllSource
+                ServiceDllUserWritablePath = $(if ($dll) { Test-FotonUserWritablePath -Path $dll } else { $false })
+                ServiceDllSignatureStatus  = $dllSig.Status
+                ServiceDllSigner           = $dllSig.Signer
+                ServiceDllSHA256           = $dllHash
                 Description     = $s.Description
             }
         }
