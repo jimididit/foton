@@ -3,7 +3,7 @@
 [![CI](https://github.com/jimididit/foton/actions/workflows/ci.yml/badge.svg)](https://github.com/jimididit/foton/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
-[![Module](https://img.shields.io/badge/module-1.38.0-informational)](Foton.psd1)
+[![Module](https://img.shields.io/badge/module-1.38.1-informational)](Foton.psd1)
 
 Windows DFIR, baseline, and security-audit toolkit. Capture host state into a hashed **package**, then parse, compare, and analyze **offline**. Findings are observations-not a compromise verdict.
 
@@ -49,7 +49,7 @@ Build flattens after Collect/Baseline source changes (`dist\` is generated, not 
 .\build\Build-BaselineStandalone.ps1
 ```
 
-Prefer the versioned leaf (`Foton-Collect_v1.38.0_schema1.13.0.ps1`) so module and schema stay in the filename. Release assets (when published) are the same bytes.
+Prefer the versioned leaf (`Foton-Collect_v1.38.1_schema1.13.0.ps1`) so module and schema stay in the filename. Release assets (when published) are the same bytes.
 
 ## Requirements
 
@@ -84,4 +84,4 @@ PRs welcome. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Run `.\tests\Invo
 
 ## License
 
-[MIT](LICENSE) © JDI Consulting
+[MIT](LICENSE) © jimididit
