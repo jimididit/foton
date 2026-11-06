@@ -9,13 +9,53 @@ Foton has **two machines**. Mixing them is what usually causes confusion.
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-**Versions** (from `Foton.psd1`): module **1.37.1**, collect schema **1.13.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+**Versions** (from `Foton.psd1`): module **1.38.0**, collect schema **1.13.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+
+---
+
+## 0. Getting Foton
+
+Each [GitHub Release](https://github.com/jimididit/foton/releases) carries:
+
+| Asset | For |
+|-------|-----|
+| `Foton-Collect_v<module>_schema<collect>.ps1` | Endpoint live triage (one file) |
+| `Foton-Baseline_v<module>_schema<baseline>.ps1` | Endpoint baseline capture (one file) |
+| `Foton-Workstation_v<module>.zip` | Analyst workstation: parse, compose, analyze, compare, without cloning the repo |
+| `SHA256SUMS.txt` | Hashes of the three files above |
+
+The workstation module is also on the PowerShell Gallery:
+
+```powershell
+Install-Module Foton -Scope CurrentUser          # or: Install-Module Foton -RequiredVersion 1.38.0
+Import-Module Foton
+Get-FotonVersion
+# Foton.cmd ships inside the module folder:
+& (Join-Path (Get-Module Foton).ModuleBase 'Foton.cmd') help
+```
+
+**Verify before use.** The scripts are not Authenticode-signed yet, so trust comes from the hash and the build provenance, not a publisher certificate:
+
+```powershell
+Get-FileHash .\Foton-Collect_v1.38.0_schema1.13.0.ps1 -Algorithm SHA256   # must match SHA256SUMS.txt
+gh attestation verify .\Foton-Collect_v1.38.0_schema1.13.0.ps1 --repo jimididit/foton
+```
+
+`gh attestation verify` proves the file was built by this repository's release workflow from a specific commit. Record the hash in the case notes so the report names the exact collector build that ran.
+
+**ExecutionPolicy.** Run the endpoint scripts with `powershell -ExecutionPolicy Bypass -File ...`: it applies to that one process and changes nothing on the target. Do not change the machine policy on an engagement host. On the workstation:
+
+- A zip downloaded from the internet carries Mark-of-the-Web, so under `RemoteSigned` its scripts refuse to load. After verifying the hash, unblock the extracted folder: `Get-ChildItem .\Foton-1.38.0 -Recurse | Unblock-File`.
+- A module installed from the Gallery is not marked, so `RemoteSigned` loads it as-is.
+- Windows client defaults to `Restricted`, which blocks every script. `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` on the analyst account is enough for both.
+
+Building from source instead (`build\Build-Release.ps1` writes the same assets to `dist\release`) is covered below.
 
 ---
 
 ## 1. Endpoint: Collect and Baseline capture
 
-Obtain a flatten script from a [GitHub Release](https://github.com/jimididit/foton/releases) when available, or build on a trusted workstation:
+Obtain a flatten script from a [GitHub Release](https://github.com/jimididit/foton/releases) (section 0), or build on a trusted workstation:
 
 ```powershell
 .\build\Build-Standalone.ps1
@@ -24,14 +64,14 @@ Obtain a flatten script from a [GitHub Release](https://github.com/jimididit/fot
 
 That writes a **versioned** leaf and an unversioned alias (same bytes) under `dist\` (generated locally; not committed):
 
-- `dist\Foton-Collect_v1.37.1_schema1.13.0.ps1` and `dist\Foton-Collect.ps1`
-- `dist\Foton-Baseline_v1.37.1_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
+- `dist\Foton-Collect_v1.38.0_schema1.13.0.ps1` and `dist\Foton-Collect.ps1`
+- `dist\Foton-Baseline_v1.38.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
 
 Copy **one** file to the target (USB, RMM, email). Prefer the versioned leaf so the module and schema stay in the filename.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.37.1_schema1.13.0.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.37.1_schema1.14.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.38.0_schema1.13.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.38.0_schema1.14.0.ps1
 ```
 
 ### If antivirus blocks the collector

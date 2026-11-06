@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-There are no tagged releases yet. Fixes land on `main`; build the Collect and Baseline flattens from the current `main`. Once releases are tagged, fixes go to `main` and the latest release, and older tags are not backported unless a release advisory says otherwise.
+Fixes land on `main` and ship in the next tagged [release](https://github.com/jimididit/foton/releases) (also published to the PowerShell Gallery as `Foton`). Older releases are not backported unless a release advisory says otherwise.
 
 ## Reporting a vulnerability
 
@@ -32,10 +32,15 @@ You should receive an acknowledgement within a few business days.
 
 ## Signing and ExecutionPolicy
 
-Endpoint scripts are **unsigned** in current public builds. Operators typically run:
+Release scripts are **not Authenticode-signed** yet. Trust comes from two checks that need no certificate:
+
+- `SHA256SUMS.txt` on each release lists the SHA-256 of every asset.
+- Each asset carries a GitHub build provenance attestation: `gh attestation verify <file> --repo jimididit/foton` proves it was built by this repository's release workflow from a specific commit.
+
+Endpoint scripts run with a process-scoped bypass that changes nothing on the target:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v<module>_schema<collect>.ps1
 ```
 
-Verify SHA-256 of release assets before use. Authenticode-signed releases are planned; this document will be updated when they ship.
+Workstation ExecutionPolicy and Mark-of-the-Web handling are in [docs/USAGE.md](docs/USAGE.md) ("Getting Foton"). Authenticode signing is planned; this document will be updated when it ships.
