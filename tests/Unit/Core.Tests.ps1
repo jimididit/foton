@@ -320,6 +320,112 @@ InModuleScope Foton {
             $script:FotonSession.Manifest[0].Status | Should -Be 'Error'
             $script:FotonSession.Errors[0].Task | Should -Be 'boom'
         }
+        It 'records Failed when every copy row is CopyError' {
+            Invoke-FotonCollection -Category 'System' -Name 'copy_all_fail' -Format 'Csv' -Script {
+                @(
+                    [PSCustomObject]@{ SourcePath = 'C:\a'; Status = 'CopyError'; Note = 'in use' }
+                    [PSCustomObject]@{ SourcePath = 'C:\b'; Status = 'CopyError'; Note = 'in use' }
+                )
+            } | Out-Null
+            $script:FotonSession.Manifest[0].Status | Should -Be 'Failed'
+            $script:FotonSession.Manifest[0].Error | Should -Match '2 of 2'
+            $script:FotonSession.Errors[0].Task | Should -Be 'copy_all_fail'
+        }
+        It 'records Partial when some copy rows succeed' {
+            Invoke-FotonCollection -Category 'System' -Name 'copy_some_fail' -Format 'Csv' -Script {
+                @(
+                    [PSCustomObject]@{ SourcePath = 'C:\a'; Status = 'Saved'; Note = '' }
+                    [PSCustomObject]@{ SourcePath = 'C:\b'; Status = 'CopyError'; Note = 'in use' }
+                )
+            } | Out-Null
+            $script:FotonSession.Manifest[0].Status | Should -Be 'Partial'
+        }
+        It 'keeps Success for caps, by-design gaps, and non-copy Status columns' {
+            Invoke-FotonCollection -Category 'System' -Name 'copy_ok' -Format 'Csv' -Script {
+                @(
+                    [PSCustomObject]@{ SourcePath = 'C:\a'; Status = 'Copied'; Note = '' }
+                    [PSCustomObject]@{ SourcePath = 'C:\b'; Status = 'CappedSkip'; Note = '' }
+                    [PSCustomObject]@{ SourcePath = 'HKLM\SAM'; Status = 'NotCollectedByDesign'; Note = '' }
+                    [PSCustomObject]@{ SourcePath = 'C:\c.LOG1'; Status = 'SupersededBySave'; Note = '' }
+                )
+            } | Out-Null
+            Invoke-FotonCollection -Category 'System' -Name 'pnp_like' -Format 'Csv' -Script {
+                @([PSCustomObject]@{ Name = 'Firmware'; Status = 'Error' })
+            } | Out-Null
+            $script:FotonSession.Manifest[0].Status | Should -Be 'Success'
+            $script:FotonSession.Manifest[1].Status | Should -Be 'Success'
+        }
+    }
+
+    Describe 'Get-FotonCopyTaskStatus' {
+        It 'returns Success for rows without a Status column' {
+            (Get-FotonCopyTaskStatus -Rows @([PSCustomObject]@{ Name = 'x' })).Status | Should -Be 'Success'
+        }
+        It 'treats SaveError as a failure' {
+            (Get-FotonCopyTaskStatus -Rows @([PSCustomObject]@{ SourcePath = 'HKLM\SYSTEM'; Status = 'SaveError'; Note = 'denied' })).Status | Should -Be 'Failed'
+        }
+    }
+
+    Describe 'Test-FotonCaseOutputPath' {
+        It 'matches an earlier collect package on the Desktop' {
+            Test-FotonCaseOutputPath -Path 'C:\Users\u\Desktop\Foton_HOST_20261028-180601Z\08_Filesystem\lnk_jumplist\a.lnk' | Should -Be $true
+        }
+        It 'matches baseline and historical WinFoton folders' {
+            Test-FotonCaseOutputPath -Path 'C:\Users\u\Desktop\FotonBaseline_HOST_20261023-121245Z' | Should -Be $true
+            Test-FotonCaseOutputPath -Path 'D:\Cases\WinFoton_HOST_20250101-010101Z\x.csv' | Should -Be $true
+        }
+        It 'does not match the collector script or unrelated folders' {
+            Test-FotonCaseOutputPath -Path 'C:\Users\u\Downloads\Foton-Collect.ps1' | Should -Be $false
+            Test-FotonCaseOutputPath -Path 'C:\Users\u\Desktop\Foton notes\a.lnk' | Should -Be $false
+        }
+    }
+
+    Describe 'Save-FotonRegistryHive' {
+        It 'returns a Saved row with hash when reg save succeeds' {
+            $dst = Join-Path $env:TEMP ('foton-hive-' + [guid]::NewGuid().ToString('N'))
+            try {
+                Mock reg.exe {
+                    [IO.File]::WriteAllBytes($args[2], [byte[]](0x72, 0x65, 0x67, 0x66))
+                    $global:LASTEXITCODE = 0
+                    'The operation completed successfully.'
+                }
+                $row = Save-FotonRegistryHive -RegistryPath 'HKLM\SYSTEM' -DestinationPath (Join-Path $dst 'SYSTEM') -PackageRelativePath '08_Filesystem\hives\machine\SYSTEM'
+                $row.Status | Should -Be 'Saved'
+                $row.SizeBytes | Should -Be 4
+                $row.SHA256 | Should -Not -BeNullOrEmpty
+                $row.DestRelative | Should -Be '08_Filesystem\hives\machine\SYSTEM'
+            }
+            finally {
+                Remove-Item -LiteralPath $dst -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+        It 'returns SaveError with the reg output when reg save fails' {
+            $dst = Join-Path $env:TEMP ('foton-hive-' + [guid]::NewGuid().ToString('N'))
+            try {
+                Mock reg.exe {
+                    $global:LASTEXITCODE = 1
+                    'ERROR: A required privilege is not held by the client.'
+                }
+                $row = Save-FotonRegistryHive -RegistryPath 'HKLM\SYSTEM' -DestinationPath (Join-Path $dst 'SYSTEM')
+                $row.Status | Should -Be 'SaveError'
+                $row.Note | Should -Match 'privilege'
+                $row.DestRelative | Should -Be ''
+            }
+            finally {
+                Remove-Item -LiteralPath $dst -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Describe 'Get-FotonLocalGroupMemberAdsi' {
+        It 'enumerates the local Administrators group with SIDs' {
+            $rows = @(Get-FotonLocalGroupMemberAdsi -GroupName 'Administrators')
+            $rows.Count | Should -BeGreaterThan 0
+            ($rows | Where-Object { $_.SID -match '^S-1-5-' }).Count | Should -BeGreaterThan 0
+        }
+        It 'throws for a group that does not exist' {
+            { Get-FotonLocalGroupMemberAdsi -GroupName 'Foton-No-Such-Group-9f3c' } | Should -Throw
+        }
     }
 
     Describe 'Pattern data files' {
@@ -424,6 +530,11 @@ putty
             finally {
                 Remove-Item -LiteralPath $srcDir, $dstDir -Recurse -Force -ErrorAction SilentlyContinue
             }
+        }
+        It 'defaults MaxFiles to the 1024 Prefetch ceiling' {
+            $ast = (Get-Command Copy-FotonCappedHostFiles).ScriptBlock.Ast
+            $p = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.ParameterAst] -and $n.Name.VariablePath.UserPath -eq 'MaxFiles' }, $true) | Select-Object -First 1
+            $p.DefaultValue.Value | Should -Be 1024
         }
         It 'records Missing when the source directory is absent' {
             $dstDir = Join-Path $env:TEMP ('foton-pf-miss-' + [guid]::NewGuid().ToString('N'))

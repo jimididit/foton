@@ -64,6 +64,13 @@ function Write-FotonChainOfCustody {
     $lines += 'were produced. If either is required, capture them before or'
     $lines += 'independently of this collection.'
     $lines += ''
+    if ($elevated) {
+        $lines += 'Loaded registry hives (SYSTEM, SOFTWARE, DEFAULT, and signed-in users'
+        $lines += 'NTUSER.DAT/UsrClass.dat) were exported with reg save. The export files'
+        $lines += 'in the output path are the only writes; no key was modified. SAM and'
+        $lines += 'SECURITY were not collected by design (credential material).'
+        $lines += ''
+    }
     if ($LoadUserHives -and $elevated) {
         $lines += 'The -LoadUserHives option was used: NTUSER.DAT hives for users not'
         $lines += 'logged on were mounted into HKEY_USERS and unloaded at the end'

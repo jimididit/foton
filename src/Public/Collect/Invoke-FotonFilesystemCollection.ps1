@@ -22,7 +22,7 @@ function Invoke-FotonFilesystemCollection {
             if (-not (Test-FotonPathAccessible -Path $r)) { continue }
             try {
                 $files = Get-ChildItem -LiteralPath $r -Recurse -File -Force -Depth $depth -ErrorAction SilentlyContinue |
-                    Where-Object { $exts -contains $_.Extension.ToLower() }
+                    Where-Object { $exts -contains $_.Extension.ToLower() -and -not (Test-FotonCaseOutputPath -Path $_.FullName) }
                 foreach ($f in $files) {
                     $sig = Get-FotonSignatureInfo -Path $f.FullName
                     $rows += [PSCustomObject]@{
@@ -99,25 +99,35 @@ function Invoke-FotonFilesystemCollection {
         Copy-FotonHostFileFamily -SourcePath $src -DestinationDirectory $dest -PackageRelativeDirectory $rel -MaxTotalBytes 104857600
     } | Out-Null
 
-    Invoke-FotonCollection -Category 'Filesystem' -Name 'registry_hives_machine' -Format 'Csv' -Description 'Copied SYSTEM/SOFTWARE/SAM/SECURITY/DEFAULT hives plus .LOG* sidecars (locked-file copy; not parsed on the endpoint). For RECmd / Registry Explorer.' -RequiresElevation -Script {
-        $config = Join-Path $env:SystemRoot 'System32\config'
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'registry_hives_machine' -Format 'Csv' -Description 'SYSTEM/SOFTWARE/DEFAULT hives exported with reg save (loaded hives cannot be file-copied; not parsed on the endpoint). SAM and SECURITY are not collected by design. For RECmd / Registry Explorer.' -RequiresElevation -Script {
         $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'hives\machine'
         $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'hives\machine'
         $rows = @()
-        $budget = [int64]419430400
-        foreach ($name in @('SYSTEM', 'SOFTWARE', 'SAM', 'SECURITY', 'DEFAULT')) {
-            $src = Join-Path $config $name
-            $fam = @(Copy-FotonHostFileFamily -SourcePath $src -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxTotalBytes $budget)
-            $rows += $fam
-            foreach ($r in $fam) {
-                if ($r.Status -eq 'Copied') { $budget = $budget - [int64]$r.SizeBytes }
+        foreach ($h in @(
+                @{ Key = 'HKLM\SYSTEM'; File = 'SYSTEM' },
+                @{ Key = 'HKLM\SOFTWARE'; File = 'SOFTWARE' },
+                @{ Key = 'HKU\.DEFAULT'; File = 'DEFAULT' })) {
+            $rows += Save-FotonRegistryHive -RegistryPath $h.Key -DestinationPath (Join-Path $destRoot $h.File) `
+                -PackageRelativePath (Join-Path $relRoot $h.File)
+        }
+        # SAM and SECURITY hold credential material (local password hashes, LSA
+        # secrets). Exporting them is the textbook credential-theft step, so EDR and
+        # AMSI treat it as such; the account and policy facts Foton needs come from
+        # live queries instead. Recorded as a disclosed gap, not silently omitted.
+        foreach ($name in @('SAM', 'SECURITY')) {
+            $rows += [PSCustomObject]@{
+                SourcePath   = "HKLM\$name"
+                DestRelative = ''
+                SizeBytes    = 0
+                SHA256       = ''
+                Status       = 'NotCollectedByDesign'
+                Note         = 'Credential hive. Not exported: it holds password hashes / LSA secrets and exporting it matches credential-theft detections. Use a full image or KAPE if the case needs it.'
             }
-            if ($budget -le 0) { break }
         }
         $rows
     } | Out-Null
 
-    Invoke-FotonCollection -Category 'Filesystem' -Name 'registry_hives_user' -Format 'Csv' -Description 'Copied NTUSER.DAT and UsrClass.dat plus hive logs per profile (capped; not parsed on the endpoint).' -RequiresElevation -Script {
+    Invoke-FotonCollection -Category 'Filesystem' -Name 'registry_hives_user' -Format 'Csv' -Description 'NTUSER.DAT and UsrClass.dat per profile: file copy for unloaded hives, reg save for loaded ones (capped; not parsed on the endpoint).' -RequiresElevation -Script {
         $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'hives\users'
         $relRoot = Join-Path $script:FotonSession.Categories['Filesystem'] 'hives\users'
         $rows = @()
@@ -127,14 +137,36 @@ function Invoke-FotonFilesystemCollection {
             $seg = Get-FotonSafePathSegment -Name $userProfile.UserName
             $userDest = Join-Path $destRoot $seg
             $userRel = Join-Path $relRoot $seg
-            $nt = Join-Path $userProfile.ProfilePath 'NTUSER.DAT'
-            $uc = Join-Path $userProfile.ProfilePath 'AppData\Local\Microsoft\Windows\UsrClass.dat'
-            foreach ($src in @($nt, $uc)) {
+            $hives = @(
+                @{ Src = (Join-Path $userProfile.ProfilePath 'NTUSER.DAT'); Key = ('HKU\{0}' -f $userProfile.SID); File = 'NTUSER.DAT' },
+                @{ Src = (Join-Path $userProfile.ProfilePath 'AppData\Local\Microsoft\Windows\UsrClass.dat'); Key = ('HKU\{0}_Classes' -f $userProfile.SID); File = 'UsrClass.dat' }
+            )
+            foreach ($h in $hives) {
                 if ($budget -le 0) { break }
-                $fam = @(Copy-FotonHostFileFamily -SourcePath $src -DestinationDirectory $userDest -PackageRelativeDirectory $userRel -MaxTotalBytes $budget)
+                $fam = @(Copy-FotonHostFileFamily -SourcePath $h.Src -DestinationDirectory $userDest -PackageRelativeDirectory $userRel -MaxTotalBytes $budget)
+                $primary = $fam | Where-Object { [IO.Path]::GetFileName([string]$_.SourcePath) -eq $h.File } | Select-Object -First 1
+                # A signed-in user's hive is loaded and locked exactly like the machine
+                # hives. Fall back to reg save of the loaded key; the copied sidecars
+                # (.LOG*, .regtrans-ms) stay in the package as context.
+                if ($primary -and $primary.Status -eq 'CopyError' -and $userProfile.HiveLoaded -and
+                    (Test-FotonPathAccessible -Path ('Registry::HKEY_USERS\{0}' -f ($h.Key -replace '^HKU\\', '')))) {
+                    $saved = Save-FotonRegistryHive -RegistryPath $h.Key -DestinationPath (Join-Path $userDest $h.File) `
+                        -PackageRelativePath (Join-Path $userRel $h.File)
+                    $rest = @($fam | Where-Object { $_ -ne $primary })
+                    if ($saved.Status -eq 'Saved') {
+                        # Locked .LOG sidecars are moot once the hive is exported whole.
+                        foreach ($r in $rest) {
+                            if ($r.Status -eq 'CopyError') {
+                                $r.Status = 'SupersededBySave'
+                                $r.Note = 'Locked transaction log of a loaded hive; the reg save export already includes its changes.'
+                            }
+                        }
+                    }
+                    $fam = $rest + @($saved)
+                }
                 $rows += $fam
                 foreach ($r in $fam) {
-                    if ($r.Status -eq 'Copied') { $budget = $budget - [int64]$r.SizeBytes }
+                    if ($r.Status -in @('Copied', 'Saved')) { $budget = $budget - [int64]$r.SizeBytes }
                 }
             }
         }
@@ -297,6 +329,7 @@ function Invoke-FotonFilesystemCollection {
             if (-not (Test-FotonPathAccessible -Path $r)) { continue }
             try {
                 foreach ($f in (Get-ChildItem -LiteralPath $r -Recurse -File -Force -Depth 3 -ErrorAction SilentlyContinue)) {
+                    if (Test-FotonCaseOutputPath -Path $f.FullName) { continue }
                     try {
                         foreach ($s in (Get-Item -LiteralPath $f.FullName -Stream * -ErrorAction Stop)) {
                             if ($s.Stream -eq ':$DATA') { continue }
