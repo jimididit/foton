@@ -134,8 +134,12 @@ function Invoke-FotonSecurityCollection {
         }
         $out += '--- WinRM service ---'
         $out += (Get-Service WinRM -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType | Out-String)
-        $out += '--- PSRemoting trusted hosts ---'
-        try { $out += (Get-Item WSMan:\localhost\Client\TrustedHosts -ErrorAction Stop | Select-Object Name, Value | Out-String) } catch { }
+        $out += '--- PSRemoting trusted hosts (registry) ---'
+        # Read the registry value, not the WSMan: drive. With WinRM stopped, the WSMan
+        # provider prompts to START the service: the collector blocks on input and a
+        # "Y" changes the host it is supposed to observe read-only.
+        $th = Get-FotonRegValue 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WSMAN\Client' 'trusted_hosts'
+        if ($null -eq $th -or [string]$th -eq '') { $out += 'trusted_hosts: (not set)' } else { $out += ('trusted_hosts: {0}' -f $th) }
         $out
     } | Out-Null
 

@@ -29,6 +29,11 @@ function Invoke-FotonSystemCollection {
             Model              = if ($cs) { $cs.Model } else { '' }
             TotalPhysicalMemGB = if ($cs) { [math]::Round($cs.TotalPhysicalMemory / 1GB, 2) } else { $null }
             BiosVersion        = if ($bios) { ($bios.BIOSVersion -join ' ') } else { '' }
+            SmbiosBiosVersion  = if ($bios) { [string]$bios.SMBIOSBIOSVersion } else { '' }
+            BiosReleaseDateUtc = if ($bios -and $bios.ReleaseDate) { $bios.ReleaseDate.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            # SMBIOS uses 255 (0xFF) for "no embedded controller version"; emitting
+            # "255.255" would read as a real version.
+            EmbeddedControllerVersion = if (-not $bios -or $null -eq $bios.EmbeddedControllerMajorVersion) { '' } elseif ([int]$bios.EmbeddedControllerMajorVersion -eq 255) { 'NotReported' } else { '{0}.{1}' -f $bios.EmbeddedControllerMajorVersion, $bios.EmbeddedControllerMinorVersion }
             BiosSerial         = if ($bios) { $bios.SerialNumber } else { '' }
             TimeZone           = [System.TimeZoneInfo]::Local.Id
             UtcOffset          = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).ToString()
@@ -56,15 +61,38 @@ function Invoke-FotonSystemCollection {
             Sort-Object InstalledOn -Descending
     } | Out-Null
 
-    Invoke-FotonCollection -Category 'System' -Name 'boot_and_firmware' -Description 'Secure Boot, TPM, BitLocker, boot configuration' -Script {
+    Invoke-FotonCollection -Category 'System' -Name 'boot_and_firmware' -Description 'Secure Boot, TPM, BitLocker, Firmware-class devices (staged UEFI updates), boot configuration' -Script {
         $secureBoot = 'Unknown'
         try { $secureBoot = [string](Confirm-SecureBootUEFI -ErrorAction Stop) } catch { $secureBoot = 'NotSupportedOrLegacyBIOS' }
         $tpm = $null
         try { $tpm = Get-CimInstance -Namespace 'root\cimv2\security\microsofttpm' -ClassName Win32_Tpm -ErrorAction Stop } catch { }
         $bde = @()
         try {
-            $bde = Get-CimInstance -Namespace 'root\cimv2\security\microsoftvolumeencryption' -ClassName Win32_EncryptableVolume -ErrorAction Stop |
-                Select-Object DriveLetter, ProtectionStatus, ConversionStatus, EncryptionMethod
+            $bde = @(Get-CimInstance -Namespace 'root\cimv2\security\microsoftvolumeencryption' -ClassName Win32_EncryptableVolume -ErrorAction Stop |
+                    Select-Object DriveLetter, ProtectionStatus, ConversionStatus, EncryptionMethod)
+        }
+        catch { }
+        # Windows Update ships UEFI capsules as Firmware-class devices. A device whose
+        # name carries a newer version than SMBIOS, in an error state, is a staged
+        # update waiting for the next reboot - that is how a BIOS change shows up
+        # before it applies.
+        $fw = @()
+        try {
+            $drivers = @{}
+            foreach ($d in @(Get-CimInstance Win32_PnPSignedDriver -Filter "DeviceClass='FIRMWARE'" -ErrorAction Stop)) {
+                if ($d.DeviceID) { $drivers[[string]$d.DeviceID] = $d }
+            }
+            foreach ($p in @(Get-CimInstance Win32_PnPEntity -Filter "PNPClass='Firmware'" -ErrorAction Stop)) {
+                $drv = $drivers[[string]$p.DeviceID]
+                $fw += [PSCustomObject]@{
+                    Name          = [string]$p.Name
+                    DeviceID      = [string]$p.DeviceID
+                    Status        = [string]$p.Status
+                    ProblemCode   = $p.ConfigManagerErrorCode
+                    DriverVersion = if ($drv) { [string]$drv.DriverVersion } else { '' }
+                    InfName       = if ($drv) { [string]$drv.InfName } else { '' }
+                }
+            }
         }
         catch { }
         [PSCustomObject]@{
@@ -74,6 +102,7 @@ function Invoke-FotonSystemCollection {
             TpmActivated      = if ($tpm) { $tpm.IsActivated_InitialValue } else { $null }
             TpmVersion        = if ($tpm) { $tpm.SpecVersion } else { '' }
             BitLockerVolumes  = $bde
+            FirmwareDevices   = $fw
             BcdOutput         = (& bcdedit.exe /enum 2>&1 | Out-String)
         }
     } | Out-Null

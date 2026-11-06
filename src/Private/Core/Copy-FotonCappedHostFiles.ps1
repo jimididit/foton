@@ -9,7 +9,9 @@ function Copy-FotonCappedHostFiles {
         [Parameter(Mandatory)][string]$Filter,
         [Parameter(Mandatory)][string]$DestinationDirectory,
         [string]$PackageRelativeDirectory,
-        [int]$MaxFiles = 200,
+        # 1024 is the Windows 10/11 Prefetch ceiling. A lower count cap dropped the
+        # very executions under review once later activity rewrote 200+ .pf files.
+        [int]$MaxFiles = 1024,
         [long]$MaxTotalBytes = 83886080
     )
 

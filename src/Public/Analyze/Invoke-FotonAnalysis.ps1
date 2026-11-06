@@ -34,7 +34,7 @@ function Invoke-FotonAnalysis {
     $osInfo = $script:FotonSession.Data['os_info']
     if ($osInfo) {
         Add-FotonFinding -Severity 'Info' -Category 'System' -Tier 1 -Title 'Host and collection baseline' `
-            -Observation ("{0} running {1} (build {2}), uptime {3} days, time zone {4} (offset {5})." -f `
+            -Observation ("{0} running {1} (build {2}), {3} days since last boot (includes sleep and hibernation, so not necessarily time powered on), time zone {4} (offset {5})." -f `
                 $osInfo.Hostname, $osInfo.Caption, $osInfo.BuildNumber, $osInfo.UptimeDays, $osInfo.TimeZone, $osInfo.UtcOffset) `
             -WhyItMatters 'All timestamps in this package are recorded in UTC. Confirm the host clock was accurate before building any timeline (see time_sync.txt).' `
             -Artifact (Get-FotonArtifactPath 'System' 'os_info' 'json')
@@ -486,24 +486,47 @@ function Invoke-FotonAnalysis {
     }
     $svcEvents = $script:FotonSession.Data['system_service_and_driver']
     if ($svcEvents) {
-        $installs = @($svcEvents | Where-Object { $_.EventId -eq 7045 })
+        $all7045 = @($svcEvents | Where-Object { [string]$_.EventId -eq '7045' })
+        $installs = @($all7045 | Where-Object { -not (Test-FotonPerUserServiceEvent -Row $_) })
         if ($installs.Count -gt 0) {
-            Add-FotonFinding -Severity 'Medium' -Category 'EventLogs' -Tier 1 -Title 'Services were installed during the collection window' `
-                -Observation ("{0} service install event(s) (ID 7045). Most recent: {1} UTC." -f $installs.Count, (@($installs)[0].TimeCreatedUtc)) `
-                -WhyItMatters 'Remote execution tooling (PsExec and similar) and many malware families install a service. Compare each install against expected software deployment activity.' `
+            $names = @($installs | ForEach-Object { Get-FotonServiceNameFromEvent -Row $_ } | Where-Object { $_ } | Sort-Object -Unique)
+            $nameText = ''
+            if ($names.Count -gt 0) { $nameText = (' Services: {0}.' -f ((@($names | Select-Object -First 12)) -join '; ')) }
+            $perUserNative = $all7045.Count - $installs.Count
+            if ($perUserNative -gt 0) {
+                $nameText += (' Excludes {0} per-user service instance(s) of known Windows templates hosted by System32 svchost.exe; the event does not record ServiceDll, so check Services\<name>\Parameters\ServiceDll in the SYSTEM hive if a template name is in doubt.' -f $perUserNative)
+            }
+            # The event export covers the configured lookback (EventLogDays), not the
+            # minutes the collector ran - "during the collection window" overstated it.
+            Add-FotonFinding -Severity 'Medium' -Category 'EventLogs' -Tier 1 -Title 'Service install events in the exported logs' `
+                -Observation ("{0} service install event(s) (ID 7045) in the exported System log. Most recent: {1} UTC.{2}" -f $installs.Count, (@($installs)[0].TimeCreatedUtc), $nameText) `
+                -WhyItMatters 'Remote execution tooling (PsExec and similar) and many malware families install a service. So do software updates, drivers, and management agents. Compare each install against expected software deployment activity.' `
                 -Artifact (Get-FotonArtifactPath 'EventLogs' 'system_service_and_driver' 'csv')
         }
     }
     $acctEvents = $script:FotonSession.Data['security_account_management']
     if ($acctEvents) {
-        $created = @($acctEvents | Where-Object { $_.EventId -eq 4720 })
-        $adminAdd = @($acctEvents | Where-Object { $_.EventId -in @(4732, 4728, 4756) })
-        if ($created.Count -gt 0 -or $adminAdd.Count -gt 0) {
-            Add-FotonFinding -Severity 'Medium' -Category 'EventLogs' -Tier 1 -Title 'Account creation or privileged group changes occurred in the window' `
-                -Observation ("{0} account creation event(s) (4720) and {1} group addition event(s) (4728/4732/4756)." -f $created.Count, $adminAdd.Count) `
-                -WhyItMatters 'New accounts and group additions are both routine IT activity and a standard persistence/privilege step. The distinguishing factor is whether they map to an approved change.' `
-                -Artifact (Get-FotonArtifactPath 'EventLogs' 'security_account_management' 'csv') `
+        $acct = Get-FotonAccountChangeSummary -Facts @(Get-FotonAccountEventFacts -Rows @($acctEvents))
+        $acctArtifact = Get-FotonArtifactPath 'EventLogs' 'security_account_management' 'csv'
+        if ($acct.Persistent.Count -gt 0 -or $acct.PrivilegedAdds.Count -gt 0) {
+            $who = @($acct.Persistent | ForEach-Object { $_.AccountName } | Where-Object { $_ } | Sort-Object -Unique)
+            $grp = @($acct.PrivilegedAdds | ForEach-Object { $_.GroupName } | Where-Object { $_ } | Sort-Object -Unique)
+            Add-FotonFinding -Severity 'Medium' -Category 'EventLogs' -Tier 1 -Title 'Accounts created or privileged groups changed in the exported logs' `
+                -Observation ("{0} account creation(s) not followed by a quick deletion (4720){1}, and {2} addition(s) to privileged groups (4728/4732/4756){3}." -f `
+                    $acct.Persistent.Count, $(if ($who.Count) { ': ' + ($who -join ', ') } else { '' }),
+                    $acct.PrivilegedAdds.Count, $(if ($grp.Count) { ': ' + ($grp -join ', ') } else { '' })) `
+                -WhyItMatters 'New accounts and privileged group additions are both routine IT activity and a standard persistence/privilege step. The distinguishing factor is whether they map to an approved change.' `
+                -Artifact $acctArtifact `
                 -NextStep 'Match each event to a change ticket or known onboarding. Note the account that performed the change, not just the account affected.'
+        }
+        if ($acct.Transient.Count -gt 0) {
+            $tn = @($acct.Transient | ForEach-Object { $_.AccountName } | Where-Object { $_ } | Sort-Object -Unique)
+            Add-FotonFinding -Severity 'Low' -Category 'EventLogs' -Tier 1 -Title 'Accounts created and deleted within a minute' `
+                -Observation ("{0} account(s) were created (4720) and deleted (4726) with the same SID within 60 seconds{1}. Each pair used a new SID." -f `
+                    $acct.Transient.Count, $(if ($tn.Count) { ': ' + ($tn -join ', ') } else { '' })) `
+                -WhyItMatters 'Provisioning scripts, local-admin rotation tools, and some installers create and remove an account in the same run, often at every boot. Repeating create/delete with no privileged group membership is usually automation; it is still worth naming the script or task responsible.' `
+                -Artifact $acctArtifact `
+                -NextStep 'Find the scheduled task or deployment job that runs at the same times (boot, logon) and confirm it is expected.'
         }
     }
     $logons = $script:FotonSession.Data['security_logon_events']
@@ -674,6 +697,43 @@ function Invoke-FotonAnalysis {
                 -WhyItMatters 'Without Sysmon, process creation with hashes, network connection attribution, and image load telemetry are largely unavailable. This limits what can be reconstructed and should be stated as a limitation in any report.' `
                 -Artifact (Get-FotonArtifactPath 'EventLogs' 'event_log_configuration' 'csv')
         }
+    }
+    # Installed but not running is a different gap from not installed: the log
+    # exists and may hold older events, but nothing new is being recorded.
+    $svcList = $script:FotonSession.Data['services']
+    if ($svcList) {
+        $sysmonSvc = @($svcList | Where-Object {
+                ([string]$_.Name) -match '^Sysmon(64)?$' -and ([string]$_.StartMode) -match '^Auto' -and ([string]$_.State) -ne 'Running'
+            })
+        if ($sysmonSvc.Count -gt 0) {
+            $s = $sysmonSvc[0]
+            Add-FotonFinding -Severity 'Low' -Category 'EventLogs' -Tier 1 -Title 'Sysmon is installed but not running' `
+                -Observation ("Service {0} is set to {1} start but was {2} at collection time." -f $s.Name, $s.StartMode, $s.State) `
+                -WhyItMatters 'An automatic-start Sysmon that is stopped records nothing new: process, network, and image-load telemetry stop at the moment it stopped. Crashes, failed updates, and managing agents (EDR/MDR products often own Sysmon) cause this as well as tampering.' `
+                -Artifact (Get-FotonArtifactPath 'Persistence' 'services' 'csv') `
+                -NextStep 'Find when it stopped (System 7034/7036 for the service, last Sysmon/Operational event) and ask whoever manages Sysmon on this host whether that is expected.'
+        }
+    }
+    # Copy tasks that captured nothing (or only part) are gaps in the package itself.
+    $incomplete = @($script:FotonSession.Manifest | Where-Object { [string]$_.Status -in @('Partial', 'Failed') })
+    if ($incomplete.Count -gt 0) {
+        $list = (@($incomplete | Select-Object -First 10 | ForEach-Object { '{0} ({1})' -f $_.Task, $_.Status }) -join '; ')
+        Add-FotonFinding -Severity 'Info' -Category 'Collection' -Tier 1 -Title 'Some collection tasks captured only part of their files' `
+            -Observation ("{0} task(s) did not capture every file they targeted: {1}. Details are in collection_errors.csv and the task CSVs (Status column)." -f $incomplete.Count, $list) `
+            -WhyItMatters 'A missing hive, Prefetch file, or log copy is a visibility gap in this package, not evidence the artifact was empty on the host. Parsers and compose tools cannot see what was not copied.' `
+            -Artifact (Get-FotonArtifactPath 'Collection' 'collection_errors' 'csv') `
+            -NextStep 'Read the Note column for each failed row. Locked files usually need an elevated re-collect, a shadow copy, or an imaging tool.'
+    }
+    # Profile scans skip earlier Foton packages so the toolkit's own output is not
+    # re-collected; the folder name and marker files that identify one can be forged.
+    $excludedPkgs = @()
+    if ($cov -and $cov.PSObject.Properties['ExcludedEarlierPackages']) { $excludedPkgs = @($cov.ExcludedEarlierPackages | Where-Object { $_ }) }
+    if ($excludedPkgs.Count -gt 0) {
+        Add-FotonFinding -Severity 'Info' -Category 'Collection' -Tier 1 -Title 'Earlier Foton package folders were skipped by profile scans' `
+            -Observation ("{0} folder(s) identified as earlier Foton packages were not scanned for executables, shortcuts, or alternate data streams: {1}." -f $excludedPkgs.Count, ((@($excludedPkgs | Select-Object -First 10)) -join '; ')) `
+            -WhyItMatters 'Earlier collections on the same host are expected and re-collecting them only adds noise. A folder is recognised by its name pattern plus a collection.log or baseline.json marker, and both can be created by anyone, so a folder listed here was not inspected.' `
+            -Artifact (Get-FotonArtifactPath 'Collection' 'collection_coverage' 'json') `
+            -NextStep 'Confirm each listed folder is a collection the operator or host owner ran. Inspect any unfamiliar one directly.'
     }
     $procCreate = $script:FotonSession.Data['security_process_creation']
     if (-not $procCreate -or @($procCreate).Count -eq 0) {
@@ -1028,7 +1088,6 @@ function Invoke-FotonAnalysis {
             $evIds = @{}
             $evWritable = @{}
             $evSusp = @{}
-            $evCapped = $false
             $evMax = 2000000
             # High-attention IDs only — not a hunt engine. Counts cite EvtxECmd.
             $attention = @{
@@ -1039,35 +1098,73 @@ function Invoke-FotonAnalysis {
                 '4698' = @{ Severity = 'Medium'; Label = 'Scheduled task created' }
             }
             $attCounts = @{}
+            $attNames = @{}
+            $perUserSkipped = 0
+            # Command text only means something on events that carry a command line or
+            # script. On 4673/4674 (privileged service calls) ExecutableInfo is the
+            # calling image, e.g. lsass.exe, which matched the "lsass" pattern ~1,200
+            # times on one ordinary laptop.
+            $commandEventIds = @('4688', '1', '4104', '4697', '7045', '4698', '4702')
+            # The collector's own process creation and script blocks land in these logs
+            # too. Rows inside the collection window are excluded from the path and
+            # pattern counts and reported separately (same rule as Hayabusa).
+            $evWindow = Get-FotonCollectionWindow -CaseRoot $caseRoot
+            $winStart = $null
+            $winEnd = $null
+            if ($evWindow) {
+                $winStart = $evWindow.StartUtc.UtcDateTime.ToString('yyyy-MM-dd HH:mm:ss')
+                $winEnd = $evWindow.EndUtc.UtcDateTime.ToString('yyyy-MM-dd HH:mm:ss')
+            }
+            $evSelf = 0
+            # Hashtable, not a scalar: the flag is set inside the ForEach-Object block.
+            $evState = @{ Capped = $false }
             foreach ($ef in @(Get-ChildItem -LiteralPath $evtxeDir -Filter '*.csv' -File -ErrorAction SilentlyContinue)) {
+                if ($evState.Capped) { break }
+                $remaining = $evMax - $evRows
                 try {
-                    foreach ($row in (Import-Csv -LiteralPath $ef.FullName -ErrorAction Stop)) {
+                    # Stream: an EvtxECmd CSV for a single laptop reached 248 MB.
+                    Import-Csv -LiteralPath $ef.FullName -ErrorAction Stop | Select-Object -First ($remaining + 1) | ForEach-Object {
+                        $row = $_
                         $evRows++
-                        if ($evRows -gt $evMax) { $evCapped = $true; break }
+                        if ($evRows -gt $evMax) { $evState.Capped = $true; $evRows = $evMax; return }
                         $eid = [string]$row.EventId
                         if (-not $eid) { $eid = [string]$row.EventID }
                         if ($eid) {
                             if (-not $evIds.ContainsKey($eid)) { $evIds[$eid] = 0 }
                             $evIds[$eid] = $evIds[$eid] + 1
                             if ($attention.ContainsKey($eid)) {
-                                if (-not $attCounts.ContainsKey($eid)) { $attCounts[$eid] = 0 }
-                                $attCounts[$eid] = $attCounts[$eid] + 1
+                                $svcName = ''
+                                if ($eid -in @('4697', '7045')) {
+                                    $svcName = Get-FotonServiceNameFromEvent -Row $row
+                                    if (Test-FotonPerUserServiceEvent -Row $row) { $perUserSkipped++; $eid = $null }
+                                }
+                                if ($eid) {
+                                    if (-not $attCounts.ContainsKey($eid)) { $attCounts[$eid] = 0; $attNames[$eid] = @{} }
+                                    $attCounts[$eid] = $attCounts[$eid] + 1
+                                    if ($svcName) { $attNames[$eid][$svcName] = $true }
+                                }
                             }
                         }
                         $execInfo = [string]$row.ExecutableInfo
-                        if ($execInfo) {
-                            if (Test-FotonUserWritablePath -Path $execInfo) {
-                                if (-not $evWritable.ContainsKey($execInfo)) { $evWritable[$execInfo] = $true }
-                            }
-                            else {
-                                # ExecutableInfo often embeds a path inside a longer string.
-                                foreach ($m in [regex]::Matches($execInfo, '(?i)[A-Za-z]:\\[^\s\|"]+')) {
-                                    $p = $m.Value
-                                    if (Test-FotonUserWritablePath -Path $p) {
-                                        if (-not $evWritable.ContainsKey($p)) { $evWritable[$p] = $true }
-                                    }
+                        if (-not $execInfo) { return }
+                        $ts = [string]$row.TimeCreated
+                        if ($winStart -and $ts.Length -ge 19) {
+                            $t19 = $ts.Substring(0, 19)
+                            if ($t19 -ge $winStart -and $t19 -le $winEnd) { $evSelf++; return }
+                        }
+                        if (Test-FotonUserWritablePath -Path $execInfo) {
+                            if (-not $evWritable.ContainsKey($execInfo)) { $evWritable[$execInfo] = $true }
+                        }
+                        else {
+                            # ExecutableInfo often embeds a path inside a longer string.
+                            foreach ($m in [regex]::Matches($execInfo, '(?i)[A-Za-z]:\\[^\s\|"]+')) {
+                                $p = $m.Value
+                                if (Test-FotonUserWritablePath -Path $p) {
+                                    if (-not $evWritable.ContainsKey($p)) { $evWritable[$p] = $true }
                                 }
                             }
+                        }
+                        if ([string]$row.EventId -in $commandEventIds) {
                             $hit = Test-FotonSuspiciousCommand -Text $execInfo
                             if ($hit) {
                                 if (-not $evSusp.ContainsKey($hit)) { $evSusp[$hit] = 0 }
@@ -1077,13 +1174,12 @@ function Invoke-FotonAnalysis {
                     }
                 }
                 catch { }
-                if ($evCapped) { break }
             }
             if ($evRows -gt 0) {
                 $topIds = @($evIds.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 8)
                 $idSample = (($topIds | ForEach-Object { "EventId {0} ({1})" -f $_.Key, $_.Value }) -join '; ')
                 $capNote = ''
-                if ($evCapped) { $capNote = (" Row scan capped at {0}; counts are a floor." -f $evMax) }
+                if ($evState.Capped) { $capNote = (" Row scan capped at {0}; counts are a floor." -f $evMax) }
                 Add-FotonFinding -Severity 'Info' -Category 'EventLogs' -Tier 1 -Title 'EvtxECmd event rows present in compose output' `
                     -Observation ("EvtxECmd wrote {0} event row(s) under analysis/external/EvtxECmd. Top EventId values: {1}.{2}" -f $evRows, $idSample, $capNote) `
                     -WhyItMatters 'These are Eric Zimmerman EvtxECmd facts about EVTX already copied into the package. Volume reflects which channels were collected and how noisy they were — not a compromise score.' `
@@ -1093,9 +1189,15 @@ function Invoke-FotonAnalysis {
             foreach ($eid in @($attCounts.Keys | Sort-Object)) {
                 $meta = $attention[$eid]
                 $n = $attCounts[$eid]
+                $extra = ''
+                $svcNames = @($attNames[$eid].Keys | Sort-Object)
+                if ($svcNames.Count -gt 0) { $extra = (' Services: {0}.' -f ((@($svcNames | Select-Object -First 12)) -join '; ')) }
+                if ($eid -in @('4697', '7045') -and $perUserSkipped -gt 0) {
+                    $extra += (' Excludes {0} per-user service instance(s) of known Windows templates (OneSyncSvc_<hex> and similar) hosted by System32 svchost.exe, which Windows creates at every logon. The event does not record the ServiceDll, so a copied template name loading another DLL through svchost would also be excluded; check Services\<name>\Parameters\ServiceDll in the SYSTEM hive if that matters here.' -f $perUserSkipped)
+                }
                 Add-FotonFinding -Severity $meta.Severity -Category 'EventLogs' -Tier 1 `
                     -Title ("EvtxECmd: {0}" -f $meta.Label) `
-                    -Observation ("EvtxECmd reported {0} EventId {1} row(s) in analysis/external/EvtxECmd." -f $n, $eid) `
+                    -Observation ("EvtxECmd reported {0} EventId {1} row(s) in analysis/external/EvtxECmd.{2}" -f $n, $eid, $extra) `
                     -WhyItMatters 'This EventId is a high-attention audit fact when present. Benign administrators, installers, and management agents also clear logs, install services, and create tasks. EvtxECmd reported the row; this is not attribution.' `
                     -Artifact 'analysis/external/EvtxECmd' `
                     -NextStep ("Open the EvtxECmd CSV filtered to EventId {0}, note TimeCreated/UserName/ExecutableInfo, and corroborate against persistence and account artifacts." -f $eid)
@@ -1112,10 +1214,17 @@ function Invoke-FotonAnalysis {
                 $sSample = (($evSusp.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 6 |
                         ForEach-Object { "{0} ({1})" -f $_.Key, $_.Value }) -join '; ')
                 Add-FotonFinding -Severity 'Medium' -Category 'Execution' -Tier 2 -Title 'EvtxECmd ExecutableInfo matched suspicious-command patterns' `
-                    -Observation ("EvtxECmd ExecutableInfo matched {0} distinct suspicious-command pattern(s). Sample: {1}" -f $evSusp.Count, $sSample) `
+                    -Observation ("EvtxECmd command text (process creation, script block, service, and task events) matched {0} distinct suspicious-command pattern(s). Sample: {1}" -f $evSusp.Count, $sSample) `
                     -WhyItMatters 'These are the same workstation pattern matches used on collected process rows, applied to EvtxECmd-mapped command text. Admin scripts and installers often match. Not a verdict.' `
                     -Artifact 'analysis/external/EvtxECmd' `
                     -NextStep 'Read the matching EvtxECmd rows in full and corroborate against process creation and persistence artifacts.'
+            }
+            if ($evSelf -gt 0) {
+                Add-FotonFinding -Severity 'Info' -Category 'Methodology' -Tier 2 -Title 'EvtxECmd rows inside the collection window were excluded' `
+                    -Observation ("{0} EvtxECmd row(s) with ExecutableInfo fell inside the collection window ({1} to {2} UTC) and were excluded from the user-writable path and suspicious-command counts above." -f $evSelf, $winStart, $winEnd) `
+                    -WhyItMatters 'The collector''s own processes and script blocks are logged like any other activity, and its output folder is usually user-writable. Attribution is by time only, so genuine host activity during the collection minutes is excluded too.' `
+                    -Artifact 'analysis/external/EvtxECmd' `
+                    -NextStep 'If something could have coincided with the collection, filter evtxecmd.csv to that window and read the rows directly.'
             }
         }
     }

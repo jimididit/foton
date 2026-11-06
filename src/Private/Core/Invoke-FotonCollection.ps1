@@ -83,6 +83,18 @@ function Invoke-FotonCollection {
 
     $sw.Stop()
 
+    # Copy-style tasks return one row per file with their own Status. Rows prove the
+    # task ran, not that it captured anything: on a real host every hive copy failed
+    # with "in use" and the task was still logged Good.
+    if ($status -eq 'Success') {
+        $copyStatus = Get-FotonCopyTaskStatus -Rows $data
+        if ($copyStatus.Status -ne 'Success') {
+            $status = $copyStatus.Status
+            $errMsg = $copyStatus.Message
+            $null = $script:FotonSession.Errors.Add([PSCustomObject]@{ Task = $Name; Error = ("{0}: {1}" -f $status, $errMsg) })
+        }
+    }
+
     $null = $script:FotonSession.Manifest.Add([PSCustomObject]@{
             Category    = $Category
             Task        = $Name
@@ -99,6 +111,8 @@ function Invoke-FotonCollection {
     switch ($status) {
         'Success' { Write-FotonStatus "$Name ($count records, $([int]$sw.ElapsedMilliseconds) ms)" 'Good' }
         'NoData' { Write-FotonStatus "$Name - no data returned" 'Info' }
+        'Partial' { Write-FotonStatus "$Name ($count records) - Partial : $errMsg" 'Warn' }
+        'Failed' { Write-FotonStatus "$Name ($count records) - Failed : $errMsg" 'Warn' }
         default { Write-FotonStatus "$Name - $status : $errMsg" 'Warn' }
     }
 

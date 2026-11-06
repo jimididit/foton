@@ -33,8 +33,22 @@ function Invoke-FotonUserCollection {
                 # Empty catch used to write Member='(none)' when Get-LocalGroupMember threw
                 # (common on domain-joined hosts with domain principals / orphaned SIDs),
                 # which hid real membership - including Administrators - behind Status Success.
+                $source = 'Cmdlet'
                 try { $members = @(Get-LocalGroupMember -Group $g.Name -ErrorAction Stop) }
                 catch { $enumError = $_.Exception.Message }
+                if ($enumError) {
+                    try {
+                        $adsi = @(Get-FotonLocalGroupMemberAdsi -GroupName $g.Name)
+                        $members = @($adsi | ForEach-Object {
+                                [PSCustomObject]@{ Name = $_.Member; ObjectClass = $_.ObjectClass; PrincipalSource = 'ADSI'; SID = $_.SID }
+                            })
+                        $source = 'ADSI'
+                        $enumError = $null
+                    }
+                    catch {
+                        $enumError = ('{0}; ADSI fallback: {1}' -f $enumError, $_.Exception.Message)
+                    }
+                }
                 if ($enumError) {
                     $rows += [PSCustomObject]@{
                         Group           = $g.Name
@@ -45,7 +59,7 @@ function Invoke-FotonUserCollection {
                     }
                 }
                 elseif ($members.Count -eq 0) {
-                    $rows += [PSCustomObject]@{ Group = $g.Name; Member = '(none)'; ObjectClass = ''; PrincipalSource = ''; SID = '' }
+                    $rows += [PSCustomObject]@{ Group = $g.Name; Member = '(none)'; ObjectClass = ''; PrincipalSource = $source; SID = '' }
                 }
                 foreach ($m in $members) {
                     $rows += [PSCustomObject]@{
@@ -108,7 +122,10 @@ function Invoke-FotonUserCollection {
 
     Invoke-FotonCollection -Category 'Users' -Name 'rdp_configuration' -Description 'Remote Desktop enablement and NLA state' -Script {
         $rdpUsers = 'unavailable'
-        try { $rdpUsers = ((Get-LocalGroupMember -Group 'Remote Desktop Users' -ErrorAction Stop | Select-Object -ExpandProperty Name) -join '; ') } catch { }
+        try { $rdpUsers = ((Get-LocalGroupMember -Group 'Remote Desktop Users' -ErrorAction Stop | Select-Object -ExpandProperty Name) -join '; ') }
+        catch {
+            try { $rdpUsers = ((Get-FotonLocalGroupMemberAdsi -GroupName 'Remote Desktop Users' | Select-Object -ExpandProperty Member) -join '; ') } catch { }
+        }
         $ts = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
         $rdpTcp = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
         [PSCustomObject]@{

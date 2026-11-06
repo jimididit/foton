@@ -75,6 +75,8 @@ $skipNames = @('Get-FotonPackage.ps1', 'Get-FotonVersion.ps1')
 $files = @(
     Get-ChildItem -LiteralPath (Join-Path $srcRoot 'Private\Core') -Filter '*.ps1' -File
     Get-ChildItem -LiteralPath (Join-Path $srcRoot 'Public\Collect') -Filter '*.ps1' -File
+    # Invoke-FotonAnalysis runs at the end of Collect, so its private helpers ship too.
+    Get-ChildItem -LiteralPath (Join-Path $srcRoot 'Private\Analyze') -Filter '*.ps1' -File -ErrorAction SilentlyContinue
     Get-Item -LiteralPath (Join-Path $srcRoot 'Public\Analyze\Invoke-FotonAnalysis.ps1')
     Get-Item -LiteralPath (Join-Path $srcRoot 'Public\Report\New-FotonReport.ps1')
     Get-Item -LiteralPath (Join-Path $srcRoot 'Public\Invoke-FotonTriage.ps1')
