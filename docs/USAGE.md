@@ -123,7 +123,7 @@ Foton.cmd carve    D:\blob.bin
 | `compare` | Diff two baselines | Table + `Foton_BaselineCompare.html` beside the second JSON |
 | `parse` | Offline Prefetch / LNK / jumplist / EVTX / Amcache | `analysis\parsed_records.csv`, `analysis\Foton_Parse.html` |
 | `compose` | If EZ Tools / Hayabusa / Chainsaw are available (`-ToolPath`, `tools.json` from `tools`, or PATH), run them on copied files | `analysis\external\<tool>\` hashed CSV; inventory CSV with Version/RulesVersion. Native parse if missing |
-| `tools` | One-time workstation setup: install a **pinned** catalog tool (`tools Hayabusa`), or register an existing install (`tools EZTools <folder>`, `tools Chainsaw <folder>`) | `%LOCALAPPDATA%\Foton\tools` + `tools.json`. Does **not** change PATH |
+| `tools` | One-time workstation setup: install a **pinned** catalog tool (`tools Hayabusa`), or register an existing install (`tools EZTools <folder>`, `tools Chainsaw <folder>`). `tools` alone lists every known tool: Source `Installed` / `Catalog` (pinned download) / `Registered` (existing folder), and the Location compose will run | `%LOCALAPPDATA%\Foton\tools` + `tools.json`. Does **not** change PATH |
 | `analyze` | Load package, run heuristics, write HTML | Case folder: `Foton_Report.html`, `analysis\findings.csv`. ZIP: `<zip-stem>_Report.html` + `<zip-stem>_findings.csv` **beside the ZIP** |
 | `ioc` | Match a text/CSV/JSON IOC list to the package | Match table (Tier 2 hits) |
 | `carve` | MZ/PE signature scan of a blob (capped) | Hit table. Not NTFS unallocated |

@@ -38,7 +38,7 @@ function Show-FotonEasyHelp {
     Write-Host '    Foton.cmd compare  D:\Baselines\day0.json D:\Baselines\day1.json'
     Write-Host '    Foton.cmd tools    Hayabusa          (one-time workstation setup; does not change PATH)'
     Write-Host '    Foton.cmd tools    EZTools C:\Tools\EZTools   (register an existing install; also Chainsaw <dir>)'
-    Write-Host '    Foton.cmd tools                      (list pinned tools)'
+    Write-Host '    Foton.cmd tools                      (list pinned and registered tools)'
     Write-Host '    Foton.cmd carve    D:\blob.bin'
     Write-Host '    Foton.cmd collect  D:\Cases          (runs dist\Foton-Collect.ps1 if built)'
     Write-Host ''

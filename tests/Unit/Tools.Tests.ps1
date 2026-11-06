@@ -14,13 +14,32 @@ Describe 'Install-FotonTool and resolve' {
         }
     }
 
-    It 'returns the catalog once from -List, shown as one four-column table' {
-        $rows = @(Install-FotonTool -List)
-        $rows | Should -HaveCount 1
-        $rows[0].ExpectedSha256.Length | Should -Be 64
-        @($rows[0].PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames) | Should -Be @('Name', 'Version', 'License', 'DownloadUrl')
-        $text = (Install-FotonTool -List | Out-String)
-        ([regex]::Matches($text, 'hayabusa-4\.0\.0-win-x64')).Count | Should -Be 1
+    It 'lists catalog and registered tools once each, with source and location' {
+        $root = Join-Path $env:TEMP ('foton-list-' + [guid]::NewGuid().ToString('N'))
+        try {
+            $rows = @(Install-FotonTool -List -ToolRoot $root)
+            $rows | Should -HaveCount 1
+            $rows[0].Source | Should -Be 'Catalog'
+            $rows[0].Location | Should -Match 'hayabusa-4\.0\.0-win-x64\.zip$'
+            $rows[0].ExpectedSha256.Length | Should -Be 64
+            @($rows[0].PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames) | Should -Be @('Name', 'Version', 'Source', 'Location')
+            ([regex]::Matches((Install-FotonTool -List -ToolRoot $root | Out-String), 'hayabusa-4\.0\.0-win-x64')).Count | Should -Be 1
+
+            $bin = Join-Path $root 'ez'
+            New-Item -ItemType Directory -Path $bin -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $bin 'PECmd.exe') -Value 'x'
+            Install-FotonTool -Name PECmd -Path (Join-Path $bin 'PECmd.exe') -ToolRoot $root -Force | Out-Null
+            $rows = @(Install-FotonTool -List -ToolRoot $root)
+            $pe = @($rows | Where-Object Name -eq 'PECmd')
+            $pe | Should -HaveCount 1
+            $pe[0].Source | Should -Be 'Registered'
+            $pe[0].Location | Should -Be (Join-Path $bin 'PECmd.exe')
+            $pe[0].Verified | Should -Be $false
+            ($rows | Where-Object Name -eq 'Hayabusa').Source | Should -Be 'Catalog'
+        }
+        finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 
     It 'installs from a local archive when the hash matches, and refuses a mismatch' {
