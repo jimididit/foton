@@ -311,8 +311,36 @@ Describe 'Install-FotonTool and resolve' {
             ($hb | Where-Object Status -eq 'ToolError') | Should -Not -BeNullOrEmpty
             @($hb | Where-Object Status -eq 'Retained')[0].DestRelative | Should -Match 'hayabusa\\hayabusa\.csv$'
             (Get-Content -LiteralPath (Join-Path $old 'hayabusa.csv') -Raw).Trim() | Should -Be 'old'
-            Test-Path -LiteralPath (Join-Path $pkg 'analysis\external\.hayabusa.staging') | Should -Be $false
+            @(Get-ChildItem -LiteralPath (Join-Path $pkg 'analysis\external') -Force -Filter '.hayabusa.*') | Should -HaveCount 0
             (Get-Content -LiteralPath (Join-Path $bin 'args_hayabusa.txt') -Raw) | Should -Match '"[^"]*My Cases[^"]*"'
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'replaces earlier output only after a successful run, leaving no staging folders' {
+        $tmp = Join-Path $env:TEMP ('foton-swap-' + [guid]::NewGuid().ToString('N'))
+        $pkg = Join-Path $tmp 'Foton_HOST_20260101-000000Z'
+        New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pkg '07_Event_Logs\evtx') -ItemType Directory -Force | Out-Null
+        $old = Join-Path $pkg 'analysis\external\hayabusa'
+        New-Item -Path $old -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $old 'stale.csv') -Value 'old'
+        $bin = Join-Path $tmp 'bin'
+        New-Item -Path $bin -ItemType Directory -Force | Out-Null
+        # Writes a file into the folder that follows -o (its parent is the staging folder).
+        $fake = "@echo off`r`n:loop`r`nif `"%~1`"==`"`" exit /b 0`r`nif /i `"%~1`"==`"-o`" echo new> `"%~dp2fresh.csv`"`r`nshift`r`ngoto loop`r`n"
+        Set-Content -LiteralPath (Join-Path $bin 'hayabusa.cmd') -Value $fake -Encoding Ascii -NoNewline
+        try {
+            $rows = @(Invoke-FotonExternalParse -PackagePath $pkg -ToolRoot (Join-Path $tmp 'empty') -ToolPath @{
+                    Hayabusa = (Join-Path $bin 'hayabusa.cmd')
+                })
+            $hb = @($rows | Where-Object Tool -eq 'Hayabusa')
+            @($hb | Where-Object Status -eq 'Copied')[0].DestRelative | Should -Match '^analysis\\external\\hayabusa\\fresh\.csv$'
+            Test-Path -LiteralPath (Join-Path $old 'fresh.csv') | Should -Be $true
+            Test-Path -LiteralPath (Join-Path $old 'stale.csv') | Should -Be $false
+            @(Get-ChildItem -LiteralPath (Join-Path $pkg 'analysis\external') -Force -Filter '.hayabusa.*') | Should -HaveCount 0
         }
         finally {
             Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

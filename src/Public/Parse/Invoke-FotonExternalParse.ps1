@@ -161,7 +161,7 @@ function Invoke-FotonExternalParse {
                 $null = $rows.Add([PSCustomObject]@{
                         Tool         = $j.Tool
                         Status       = 'Retained'
-                        DestRelative = $f.FullName.Substring($root.Length).TrimStart('\')
+                        DestRelative = $f.FullName.Substring($root.Length).TrimStart('\', '/')
                         SHA256       = (Get-FotonSafeHash -Path $f.FullName)
                         Version      = ''
                         RulesVersion = ''
@@ -218,8 +218,7 @@ function Invoke-FotonExternalParse {
         }
         # Run into a staging folder; earlier output is replaced only when this run
         # actually produces files, so a failed rerun cannot destroy the last good one.
-        $stage = Join-Path $extRoot ('.{0}.staging' -f $j.Tool.ToLowerInvariant())
-        if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
+        $stage = Join-Path $extRoot ('.{0}.staging-{1}' -f $j.Tool.ToLowerInvariant(), [guid]::NewGuid().ToString('N'))
         New-Item -Path $stage -ItemType Directory -Force | Out-Null
         $arg = & $j.Args $exe $j.NeedDir $stage
         $log = Join-Path $stage 'tool_stderr.txt'
@@ -244,10 +243,33 @@ function Invoke-FotonExternalParse {
         }
         $newOuts = @(Get-ChildItem -LiteralPath $stage -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @('tool_stderr.txt', 'tool_stdout.txt') })
         if ($newOuts.Count -gt 0) {
-            Get-ChildItem -LiteralPath $toolDir -Force -ErrorAction SilentlyContinue |
-                Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-            Get-ChildItem -LiteralPath $stage -Force -ErrorAction SilentlyContinue |
-                Move-Item -Destination $toolDir -Force
+            # Swap by directory rename (same volume): the earlier output is deleted only
+            # after the new folder is in place, and is restored if that rename fails.
+            $prev = Join-Path $extRoot ('.{0}.prev-{1}' -f $j.Tool.ToLowerInvariant(), [guid]::NewGuid().ToString('N'))
+            $swapError = ''
+            try {
+                Move-Item -LiteralPath $toolDir -Destination $prev -ErrorAction Stop
+                try { Move-Item -LiteralPath $stage -Destination $toolDir -ErrorAction Stop }
+                catch {
+                    Move-Item -LiteralPath $prev -Destination $toolDir -ErrorAction SilentlyContinue
+                    throw
+                }
+                Remove-Item -LiteralPath $prev -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            catch { $swapError = $_.Exception.Message }
+            if ($swapError) {
+                $null = $rows.Add([PSCustomObject]@{
+                        Tool         = $j.Tool
+                        Status       = 'SwapError'
+                        DestRelative = $stage.Substring($root.Length).TrimStart('\', '/')
+                        SHA256       = ''
+                        Version      = $toolVer
+                        RulesVersion = $rulesVer
+                        Note         = ("{0} produced output, but it could not replace the earlier output ({1}); a file in that folder may be open. The new output was left in the staging folder." -f $j.Tool, $swapError)
+                    })
+                & $addRetained 'SwapError'
+                continue
+            }
         }
         else {
             # Nothing new: keep earlier output, but replace the logs so they describe this run.
@@ -290,7 +312,7 @@ function Invoke-FotonExternalParse {
         }
         $outs = @(Get-ChildItem -LiteralPath $toolDir -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @('tool_stderr.txt', 'tool_stdout.txt') })
         foreach ($f in $outs) {
-            $rel = $f.FullName.Substring($root.Length).TrimStart('\')
+            $rel = $f.FullName.Substring($root.Length).TrimStart('\', '/')
             $null = $rows.Add([PSCustomObject]@{
                     Tool         = $j.Tool
                     Status       = 'Copied'
