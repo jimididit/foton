@@ -411,7 +411,7 @@ Describe 'Install-FotonTool and resolve' {
         New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
         New-Item -Path (Join-Path $pkg '05_Event_Logs\evtx') -ItemType Directory -Force | Out-Null
         try {
-            # Empty tool root so manifest cannot satisfy Hayabusa; PATH may still have it —
+            # Empty tool root so manifest cannot satisfy Hayabusa; PATH may still have it -
             # force isolation by pointing ToolRoot at empty and ToolPath empty; if PATH has
             # hayabusa the row will be Copied/NoInput instead. Assert the NotOnPath wording
             # only when Status is NotOnPath.

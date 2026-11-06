@@ -13,7 +13,7 @@ Invoke-FotonCarve -Path D:\evidence\unalloc-sample.bin
 
 ## Why not NTFS in PowerShell
 
-NTFS `FILE` records, fixups, attribute lists, and slack need careful little-endian parsing at volume scale. A half-correct parser invents timestamps and parent paths—in DFIR that is worse than “not parsed.” Live images are tens to hundreds of GB; Windows PowerShell 5.1 arrays do not stream that well.
+NTFS `FILE` records, fixups, attribute lists, and slack need careful little-endian parsing at volume scale. A half-correct parser invents timestamps and parent paths-in DFIR that is worse than “not parsed.” Live images are tens to hundreds of GB; Windows PowerShell 5.1 arrays do not stream that well.
 
 ## Out of scope
 

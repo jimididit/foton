@@ -71,7 +71,7 @@ Writes `Foton_<HOSTNAME>_<UTC>Z\`. Alters the host. Findings in the HTML are obs
 | `-LoadUserHives` | Load NTUSER.DAT for users not logged on (unloaded in `finally`) |
 | `-IncludeFileTimeline` | Extra user-writable exe sweep (not a MACB timeline) |
 | `-IncludeUsnJournal` | Also copy `$J` when possible. Default is `fsutil usn queryjournal` text only. **`$MFT` is never copied** (KAPE/ORC). |
-| `-Deep` | Opt-in extended Collect. Forces `-IncludeFileTimeline` and `-IncludeUsnJournal`, and adds task-referenced script copies, PnP inventory, DriverStore FileRepository inventory (hashes for `.sys`/`.inf`/`.cat` only — not a full binary tree), and elevated `gpresult /h` HTML. Larger/slower package. Task-script copies use raised caps (10k files / 1 GiB), skip if the output volume has under 2 GiB free, refuse UNC paths (`SkippedUnc`, no remote auth), and keep drive letters in package paths so `C:\` vs `D:\` do not collide. Default Collect stays unchanged without this switch. |
+| `-Deep` | Opt-in extended Collect. Forces `-IncludeFileTimeline` and `-IncludeUsnJournal`, and adds task-referenced script copies, PnP inventory, DriverStore FileRepository inventory (hashes for `.sys`/`.inf`/`.cat` only - not a full binary tree), and elevated `gpresult /h` HTML. Larger/slower package. Task-script copies use raised caps (10k files / 1 GiB), skip if the output volume has under 2 GiB free, refuse UNC paths (`SkippedUnc`, no remote auth), and keep drive letters in package paths so `C:\` vs `D:\` do not collide. Default Collect stays unchanged without this switch. |
 | `-NoZip` | Folder only |
 | `-RequireAdministrator` | Exit if not elevated |
 
@@ -130,9 +130,9 @@ Foton.cmd carve    D:\blob.bin
 
 Parse HTML is **not** findings. Analyze HTML is **not** a parsed artifact dump. Re-reporting does not rewrite collect `hashes.csv`.
 
-Pointing `analyze`, `parse`, or `compose` at a **ZIP** extracts it to a temp folder that is not preserved, so those commands write their reports next to the ZIP instead. The report's relative artifact links (`06_Security_Posture\...`) only resolve when you analyze an **extracted case folder** — the HTML says so in its limitations section.
+Pointing `analyze`, `parse`, or `compose` at a **ZIP** extracts it to a temp folder that is not preserved, so those commands write their reports next to the ZIP instead. The report's relative artifact links (`06_Security_Posture\...`) only resolve when you analyze an **extracted case folder** - the HTML says so in its limitations section.
 
-**Extract the ZIP before chaining these commands.** Each ZIP open extracts to a *new* temp folder, so `compose` writes `analysis\external\` into a directory that a later `analyze` never sees — the tool output is silently lost and cannot feed findings. Against a case folder the three steps accumulate correctly, in this order:
+**Extract the ZIP before chaining these commands.** Each ZIP open extracts to a *new* temp folder, so `compose` writes `analysis\external\` into a directory that a later `analyze` never sees - the tool output is silently lost and cannot feed findings. Against a case folder the three steps accumulate correctly, in this order:
 
 ```powershell
 Expand-Archive D:\Cases\Foton_HOSTNAME_...Z.zip -DestinationPath D:\Cases
@@ -218,7 +218,7 @@ Copy-Item D:\Baselines\dayN\...\baseline_diff.csv `
 
 #### Fleet recipe (host vs golden / role image)
 
-Capture a **role** golden once (hostname will differ from candidates). Compare each host against that golden. Wording is Fleet — not a certificate that the host is clean.
+Capture a **role** golden once (hostname will differ from candidates). Compare each host against that golden. Wording is Fleet - not a certificate that the host is clean.
 
 ```powershell
 # Golden for role "web" (any representative build host)
@@ -232,7 +232,7 @@ Compare-FotonBaseline `
   -DifferencePath D:\Baselines\hosts\WEB01\FotonBaseline_WEB01_...Z
 ```
 
-Expect noise: hostname, SIDs, domain join, local admin via LAPS, software version bumps (Info). High attention (service PathName, new Administrators member, Winlogon, IFEO, Root CA add, …) still cites provider false-positive notes — confirm against the role image, do not treat as compromise.
+Expect noise: hostname, SIDs, domain join, local admin via LAPS, software version bumps (Info). High attention (service PathName, new Administrators member, Winlogon, IFEO, Root CA add, …) still cites provider false-positive notes - confirm against the role image, do not treat as compromise.
 
 Schema **1.14.0** refuses older JSON. Recapture golden and day0 after a schema bump.
 
@@ -296,7 +296,7 @@ New-FotonReport
 
 Or: `Foton.cmd tools Hayabusa` then `Foton.cmd compose <case-folder>`.
 
-Outputs land under `analysis\external\<tool>\` and are hashed. Inventory rows include **Version** and **RulesVersion** when the tool came from the Foton manifest. Missing tools are inventory rows (`NotOnPath`), not failures — Hayabusa's note names `Install-FotonTool`. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. **PECmd** and **EvtxECmd** CSVs also feed `Invoke-FotonAnalysis` (coverage, user-writable path references, and a short list of high-attention EventIds such as 1102/7045) — still observations that cite the tool, not a reimplementation of those parsers. Analyze reads only PECmd, EvtxECmd, and Hayabusa output. RECmd, Chainsaw, LECmd, JLECmd, and AmcacheParser output is hashed and listed in the inventory for the examiner, but does not become findings.
+Outputs land under `analysis\external\<tool>\` and are hashed. Inventory rows include **Version** and **RulesVersion** when the tool came from the Foton manifest. Missing tools are inventory rows (`NotOnPath`), not failures - Hayabusa's note names `Install-FotonTool`. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. **PECmd** and **EvtxECmd** CSVs also feed `Invoke-FotonAnalysis` (coverage, user-writable path references, and a short list of high-attention EventIds such as 1102/7045) - still observations that cite the tool, not a reimplementation of those parsers. Analyze reads only PECmd, EvtxECmd, and Hayabusa output. RECmd, Chainsaw, LECmd, JLECmd, and AmcacheParser output is hashed and listed in the inventory for the examiner, but does not become findings.
 
 Analyze noise rules (apply to every package):
 
@@ -309,11 +309,11 @@ Analyze noise rules (apply to every package):
 
 Account findings: a 4720 followed by a 4726 for the same SID within 60 seconds is reported separately (Low, "created and deleted within a minute") - typical of provisioning or local-admin rotation scripts. Persistent accounts and additions to privileged groups stay Medium; a new account joining its default primary group (RID 513) is not a privilege change.
 
-**Collector footprint.** Script block logging records Foton's own PowerShell, so hunt rules for suspicious scripting and for registry or credential access fire on the collection itself. On a real package this was the single largest medium-level "detection". `Invoke-FotonAnalysis` attributes such rows to the collection — by timestamp inside the collection window read from `00_Collection\collection.log`, and by rows naming a Foton function outside it — excludes them from the severity bands, and reports the count as an Info methodology finding. That exclusion is inference, not process identity: genuine host activity during the collection window is excluded too, so filter the Hayabusa CSV to that window yourself if something could have coincided.
+**Collector footprint.** Script block logging records Foton's own PowerShell, so hunt rules for suspicious scripting and for registry or credential access fire on the collection itself. On a real package this was the single largest medium-level "detection". `Invoke-FotonAnalysis` attributes such rows to the collection - by timestamp inside the collection window read from `00_Collection\collection.log`, and by rows naming a Foton function outside it - excludes them from the severity bands, and reports the count as an Info methodology finding. That exclusion is inference, not process identity: genuine host activity during the collection window is excluded too, so filter the Hayabusa CSV to that window yourself if something could have coincided.
 
 Hayabusa notes: v4 renamed `csv-timeline` to `dfir-timeline`, and Foton probes `--help` so both generations work. Foton always passes `-w` (no wizard) and `-U` (UTC timestamps). Rules are loaded from the `rules\` folder beside the binary. Each tool is launched with its own install directory as the working directory. Catalog pin and refresh: `Install-FotonTool -List` (manifest under `src/Private/Tools/`).
 
-Why this matters for `analyze`: **Collect already ran the heuristics on the endpoint**, so `analyze` on an untouched package reproduces `00_Collection\findings.csv` rather than adding detection, and it now says so. Parse, compose, `ioc`, and baseline compare are what add new findings — run them, then analyze again.
+Why this matters for `analyze`: **Collect already ran the heuristics on the endpoint**, so `analyze` on an untouched package reproduces `00_Collection\findings.csv` rather than adding detection, and it now says so. Parse, compose, `ioc`, and baseline compare are what add new findings - run them, then analyze again.
 
 ### Analyze, IOC, report, carve
 
@@ -342,6 +342,6 @@ Invoke-FotonCarve -Path D:\evidence\unalloc-sample.bin
 - A copy task whose files could not be captured shows **Partial** or **Failed** in the manifest, `collection_errors.csv`, and `collection_coverage.json` - not Good.
 - Findings are **observations**, not “infected.”
 - Empty findings is not a clean host.
-- A post-incident baseline is a picture of that observed state—not proof of when or who.
+- A post-incident baseline is a picture of that observed state-not proof of when or who.
 
 Carve limits: [CARVE.md](CARVE.md). Vulnerability reporting: [SECURITY.md](../SECURITY.md).

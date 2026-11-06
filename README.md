@@ -5,19 +5,19 @@
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
 [![Module](https://img.shields.io/badge/module-1.37.1-informational)](Foton.psd1)
 
-Windows DFIR, baseline, and security-audit toolkit. Capture host state into a hashed **package**, then parse, compare, and analyze **offline**. Findings are observations—not a compromise verdict.
+Windows DFIR, baseline, and security-audit toolkit. Capture host state into a hashed **package**, then parse, compare, and analyze **offline**. Findings are observations-not a compromise verdict.
 
 ## Quick start
 
-**Endpoint (one file, no module install)** — build or download a Collect flatten, then:
+**Endpoint (one file, no module install)** - build or download a Collect flatten, then:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Foton-Collect.ps1 -CaseNumber "CASE-0001" -OutputPath D:\Cases
 ```
 
-Open `Foton_Report.html` **inside** the new case folder. Ship the ZIP + `*_PACKAGE_HASH.txt` (or the whole folder)—not HTML alone.
+Open `Foton_Report.html` **inside** the new case folder. Ship the ZIP + `*_PACKAGE_HASH.txt` (or the whole folder)-not HTML alone.
 
-**Workstation (this repo)** — full catalog in [docs/USAGE.md](docs/USAGE.md):
+**Workstation (this repo)** - full catalog in [docs/USAGE.md](docs/USAGE.md):
 
 ```powershell
 Import-Module .\Foton.psd1 -Force
@@ -28,7 +28,7 @@ Get-FotonVersion
 ```text
 Foton.cmd parse   D:\Cases\Foton_HOSTNAME_...Z
 Foton.cmd compose D:\Cases\Foton_HOSTNAME_...Z
-Foton.cmd analyze D:\Cases\Foton_HOSTNAME_...Z   # last — consumes parse/compose
+Foton.cmd analyze D:\Cases\Foton_HOSTNAME_...Z   # last - consumes parse/compose
 ```
 
 ## Two machines
@@ -53,7 +53,7 @@ Prefer the versioned leaf (`Foton-Collect_v1.37.1_schema1.13.0.ps1`) so module a
 
 - Windows · PowerShell **5.1+** (PowerShell 7 on Windows also fine)
 - No extra modules on the endpoint
-- **Administrator recommended** (not required). Unelevated runs skip Security log, Prefetch/Amcache/SRUM copies, registry hive exports, VSS, and other users’ files—recorded as visibility gaps, not a clean host
+- **Administrator recommended** (not required). Unelevated runs skip Security log, Prefetch/Amcache/SRUM copies, registry hive exports, VSS, and other users’ files-recorded as visibility gaps, not a clean host
 - Scripts are **unsigned** today; use `-ExecutionPolicy Bypass` or a signed release when available
 
 ## What Foton is (and is not)
@@ -70,8 +70,8 @@ Live collect **changes the host**. Capture memory/disk first when the case plan 
 
 | Doc | Audience |
 |-----|----------|
-| [docs/USAGE.md](docs/USAGE.md) | Operators — every command, switch, and recipe |
-| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Contributors — how to extend Collect / Baseline / Analyze |
+| [docs/USAGE.md](docs/USAGE.md) | Operators - every command, switch, and recipe |
+| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Contributors - how to extend Collect / Baseline / Analyze |
 | [docs/CARVE.md](docs/CARVE.md) | Carve limits (signature scan ≠ NTFS) |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting |
 | [LICENSE](LICENSE) | MIT |
