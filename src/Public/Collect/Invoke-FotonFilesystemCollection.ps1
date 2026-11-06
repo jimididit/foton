@@ -475,7 +475,7 @@ function Invoke-FotonFilesystemCollection {
         Copy-FotonCappedHostFileList -Items $items -DestinationDirectory $destRoot -PackageRelativeDirectory $relRoot -MaxFiles 500 -MaxTotalBytes 52428800
     } | Out-Null
 
-    # Deep only: copy script bodies referenced by scheduled-task Actions (Accanto-shaped gap).
+    # Deep only: copy script bodies referenced by scheduled-task Actions. The task CSV records the Actions, but without the script files the package cannot show what they ran.
     if ($script:FotonSession.Deep) {
         Invoke-FotonCollection -Category 'Filesystem' -Name 'task_action_scripts' -Format 'Csv' -Description 'Deep: copied local script files referenced by scheduled-task Execute/Arguments (raised caps; UNC skipped; under 2 GiB free skips copy).' -Script {
             $destRoot = Join-Path $script:FotonSession.Dirs['Filesystem'] 'task_scripts'
