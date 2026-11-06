@@ -718,6 +718,20 @@ Describe 'Get-FotonPackage and offline analysis' {
         }
     }
 
+    It 'pairs transient accounts when event times are typed DateTime values' {
+        InModuleScope Foton {
+            $t0 = [datetime]::SpecifyKind([datetime]'2026-10-28 20:34:54', [DateTimeKind]::Local)
+            $sid = 'S-1-5-21-1-2-3-1014'
+            $facts = @(Get-FotonAccountEventFacts -Rows @(
+                    [PSCustomObject]@{ TimeCreated = $t0; EventId = 4720; Message = "New Account: Security ID: $sid Account Name: tempadmin Account Domain: HOST" }
+                    [PSCustomObject]@{ TimeCreated = $t0.AddSeconds(1); EventId = 4726; Message = "Target Account: Security ID: $sid Account Name: tempadmin Account Domain: HOST" }
+                ))
+            $facts[0].TimeUtc | Should -Not -BeNullOrEmpty
+            $facts[0].TimeUtc.Kind | Should -Be 'Utc'
+            (Get-FotonAccountChangeSummary -Facts $facts).Transient | Should -HaveCount 1
+        }
+    }
+
     It 'discloses earlier Foton packages that profile scans skipped' {
         InModuleScope Foton {
             Initialize-FotonSession
@@ -779,6 +793,18 @@ Describe 'Get-FotonPackage and offline analysis' {
             $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
             Invoke-FotonAnalysis
             @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Service install events in the exported logs' }) | Should -HaveCount 0
+
+            Initialize-FotonSession
+            $script:FotonSession.Data['system_service_and_driver'] = @(
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 17:27:20'; EventId = 7045; Message = 'A service was installed in the system. Service Name:  WpnUserService_1701f8 Service File Name:  C:\Windows\system32\svchost.exe' }
+                [PSCustomObject]@{ TimeCreatedUtc = '2026-10-28 17:27:21'; EventId = 7045; Message = 'A service was installed in the system. Service Name:  Contoso Agent Service File Name:  C:\Program Files\Contoso\agent.exe' }
+            )
+            $script:FotonSession.Data['security_process_creation'] = @([PSCustomObject]@{ EventId = 4688 })
+            Invoke-FotonAnalysis
+            $f = @($script:FotonSession.Findings | Where-Object { $_.Title -eq 'Service install events in the exported logs' })
+            $f | Should -HaveCount 1
+            $f[0].Observation | Should -Match '^1 service install'
+            $f[0].Observation | Should -Match 'Excludes 1 per-user service instance'
         }
     }
 

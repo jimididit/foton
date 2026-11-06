@@ -90,10 +90,18 @@ function Get-FotonAccountEventFacts {
         $eid = [string]$r.EventId
         if (-not $eid) { $eid = [string]$r.EventID }
         if ($eid -notin @('4720', '4726', '4728', '4732', '4756')) { continue }
-        $tsText = [string]$r.TimeCreatedUtc
-        if (-not $tsText) { $tsText = [string]$r.TimeCreated }
+        $tsRaw = $r.TimeCreatedUtc
+        if (-not $tsRaw) { $tsRaw = $r.TimeCreated }
         $ts = $null
-        if ($tsText.Length -ge 19) {
+        # Typed values (Get-WinEvent objects, ConvertFrom-Json in PS7) do not stringify
+        # as yyyy-MM-dd and would otherwise drop out of transient-pair matching.
+        if ($tsRaw -is [datetimeoffset]) { $ts = $tsRaw.UtcDateTime }
+        elseif ($tsRaw -is [datetime]) {
+            if ($tsRaw.Kind -eq [DateTimeKind]::Local) { $ts = $tsRaw.ToUniversalTime() }
+            else { $ts = [datetime]::SpecifyKind($tsRaw, [DateTimeKind]::Utc) }
+        }
+        $tsText = [string]$tsRaw
+        if ($null -eq $ts -and $tsText.Length -ge 19) {
             $d = [datetime]::MinValue
             if ([datetime]::TryParseExact($tsText.Substring(0, 19), 'yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture,
                     [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal, [ref]$d)) { $ts = $d }

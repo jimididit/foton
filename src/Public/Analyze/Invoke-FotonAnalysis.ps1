@@ -486,11 +486,16 @@ function Invoke-FotonAnalysis {
     }
     $svcEvents = $script:FotonSession.Data['system_service_and_driver']
     if ($svcEvents) {
-        $installs = @($svcEvents | Where-Object { [string]$_.EventId -eq '7045' -and -not (Test-FotonPerUserServiceEvent -Row $_) })
+        $all7045 = @($svcEvents | Where-Object { [string]$_.EventId -eq '7045' })
+        $installs = @($all7045 | Where-Object { -not (Test-FotonPerUserServiceEvent -Row $_) })
         if ($installs.Count -gt 0) {
             $names = @($installs | ForEach-Object { Get-FotonServiceNameFromEvent -Row $_ } | Where-Object { $_ } | Sort-Object -Unique)
             $nameText = ''
             if ($names.Count -gt 0) { $nameText = (' Services: {0}.' -f ((@($names | Select-Object -First 12)) -join '; ')) }
+            $perUserNative = $all7045.Count - $installs.Count
+            if ($perUserNative -gt 0) {
+                $nameText += (' Excludes {0} per-user service instance(s) of known Windows templates hosted by System32 svchost.exe; the event does not record ServiceDll, so check Services\<name>\Parameters\ServiceDll in the SYSTEM hive if a template name is in doubt.' -f $perUserNative)
+            }
             # The event export covers the configured lookback (EventLogDays), not the
             # minutes the collector ran - "during the collection window" overstated it.
             Add-FotonFinding -Severity 'Medium' -Category 'EventLogs' -Tier 1 -Title 'Service install events in the exported logs' `
@@ -1188,7 +1193,7 @@ function Invoke-FotonAnalysis {
                 $svcNames = @($attNames[$eid].Keys | Sort-Object)
                 if ($svcNames.Count -gt 0) { $extra = (' Services: {0}.' -f ((@($svcNames | Select-Object -First 12)) -join '; ')) }
                 if ($eid -in @('4697', '7045') -and $perUserSkipped -gt 0) {
-                    $extra += (' Excludes {0} per-user service instance(s) of known Windows templates (OneSyncSvc_<hex> and similar) that Windows creates at every logon.' -f $perUserSkipped)
+                    $extra += (' Excludes {0} per-user service instance(s) of known Windows templates (OneSyncSvc_<hex> and similar) hosted by System32 svchost.exe, which Windows creates at every logon. The event does not record the ServiceDll, so a copied template name loading another DLL through svchost would also be excluded; check Services\<name>\Parameters\ServiceDll in the SYSTEM hive if that matters here.' -f $perUserSkipped)
                 }
                 Add-FotonFinding -Severity $meta.Severity -Category 'EventLogs' -Tier 1 `
                     -Title ("EvtxECmd: {0}" -f $meta.Label) `
