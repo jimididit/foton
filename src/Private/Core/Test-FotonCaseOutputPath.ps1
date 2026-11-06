@@ -27,9 +27,11 @@ function Test-FotonCaseOutputPath {
     if ($cache.ContainsKey($root)) { return $cache[$root] }
 
     $isPackage = $false
+    $label = 'earlier Foton package'
     if ($script:FotonSession -and $script:FotonSession.CaseRoot -and
         [string]::Equals(([string]$script:FotonSession.CaseRoot).TrimEnd('\', '/'), $root, [StringComparison]::OrdinalIgnoreCase)) {
         $isPackage = $true
+        $label = 'this collection''s own case folder'
     }
     elseif ((Test-Path -LiteralPath (Join-Path $root '00_Collection\collection.log') -PathType Leaf) -or
         (Test-Path -LiteralPath (Join-Path $root 'baseline.json') -PathType Leaf)) {
@@ -37,7 +39,7 @@ function Test-FotonCaseOutputPath {
     }
     $cache[$root] = $isPackage
     if ($isPackage -and (Get-Command Write-FotonStatus -ErrorAction SilentlyContinue)) {
-        Write-FotonStatus ("Skipping earlier Foton package in profile scan: {0}" -f $root) 'Info'
+        Write-FotonStatus ("Skipping {0} in profile scan: {1}" -f $label, $root) 'Info'
     }
     return $isPackage
 }
