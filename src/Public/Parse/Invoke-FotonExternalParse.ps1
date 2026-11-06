@@ -75,7 +75,18 @@ function Invoke-FotonExternalParse {
                 $hve = Join-Path $in 'Amcache.hve'
                 @('-f', $hve, '--csv', $out, '--csvf', 'amcacheparser.csv')
             } }
-        @{ Tool = 'RECmd'; Names = @('RECmd.exe', 'RECmd'); NeedDir = $hives; Args = { param($exe, $in, $out) @('-d', $in, '--csv', $out, '--csvf', 'recmd.csv') } }
+        # RECmd exports nothing without a search switch; with only -d/--csv it logs a
+        # warning and exits. A batch file is the whole point of running it here.
+        @{ Tool = 'RECmd'; Names = @('RECmd.exe', 'RECmd'); NeedDir = $hives
+            Pre = { param($exe)
+                if (-not (Find-FotonRecmdBatch -RecmdPath $exe)) {
+                    return [PSCustomObject]@{ Status = 'NoBatch'; Note = 'RECmd found but no BatchExamples\DFIRBatch.reb or Kroll_Batch.reb beside it. RECmd does nothing without a batch or search switch; reinstall EZ Tools with BatchExamples.' }
+                }
+                return $null
+            }
+            Args = { param($exe, $in, $out)
+                @('-d', $in, '--bn', (Find-FotonRecmdBatch -RecmdPath $exe), '--csv', $out, '--csvf', 'recmd.csv')
+            } }
         @{ Tool = 'Hayabusa'; Names = @('hayabusa.exe', 'hayabusa'); NeedDir = $evtx; Args = { param($exe, $in, $out)
                 # v4 renamed csv-timeline to dfir-timeline. Probe the built-in help
                 # rather than guessing, so both generations work.
@@ -90,7 +101,9 @@ function Invoke-FotonExternalParse {
                 # Rules resolve relative to the working directory, so point -r/-c at
                 # the install tree next to the binary.
                 $exeDir = Split-Path -Parent $exe
-                $a = @($sub, '-d', $in, '-o', (Join-Path $out 'hayabusa.csv'), '-w', '-C')
+                # -U writes timestamps in UTC; the default is the workstation's local
+                # zone, which is neither the host's zone nor the package's UTC convention.
+                $a = @($sub, '-d', $in, '-o', (Join-Path $out 'hayabusa.csv'), '-w', '-C', '-U')
                 $rules = Join-Path $exeDir 'rules'
                 if (Test-Path -LiteralPath $rules) {
                     $a += @('-r', $rules)
@@ -99,8 +112,23 @@ function Invoke-FotonExternalParse {
                 }
                 $a
             } }
-        @{ Tool = 'Chainsaw'; Names = @('chainsaw.exe', 'chainsaw'); NeedDir = $evtx; Args = { param($exe, $in, $out)
-                @( 'dump', $in, '-o', (Join-Path $out 'chainsaw'))
+        # Hunt with Sigma/Chainsaw rules shipped beside the binary. Without rules there
+        # is nothing to hunt; the old `dump` fallback re-serialised every EVTX record
+        # (hundreds of MB) and duplicated EvtxECmd, so it is not run.
+        @{ Tool = 'Chainsaw'; Names = @('chainsaw.exe', 'chainsaw'); NeedDir = $evtx
+            Pre = { param($exe)
+                $r = Find-FotonChainsawRules -ChainsawPath $exe
+                if (-not $r.RulesPath -and -not $r.SigmaPath) {
+                    return [PSCustomObject]@{ Status = 'NoRules'; Note = 'Chainsaw found but no rules\ or sigma\ (with mappings\sigma-event-logs-all.yml) beside it. Install the Chainsaw release that bundles rules, then compose again. EvtxECmd and Hayabusa cover the EVTX meanwhile.' }
+                }
+                return $null
+            }
+            Args = { param($exe, $in, $out)
+                $r = Find-FotonChainsawRules -ChainsawPath $exe
+                $a = @('hunt', $in)
+                if ($r.RulesPath) { $a += @('-r', $r.RulesPath) }
+                if ($r.SigmaPath) { $a += @('-s', $r.SigmaPath, '--mapping', $r.MappingPath) }
+                $a + @('--csv', '--output', $out, '--skip-errors')
             } }
     )
 
@@ -123,8 +151,26 @@ function Invoke-FotonExternalParse {
         }
         $toolDir = Join-Path $extRoot $j.Tool.ToLowerInvariant()
         New-Item -Path $toolDir -ItemType Directory -Force | Out-Null
+        # When this run does not execute the tool, output from an earlier compose is
+        # kept (it may be the only copy) but listed as Retained, so the inventory
+        # still describes every file analyze will read.
+        $addRetained = {
+            param([string]$Why)
+            foreach ($f in @(Get-ChildItem -LiteralPath $toolDir -File -Recurse -ErrorAction SilentlyContinue |
+                        Where-Object { $_.Name -notin @('tool_stderr.txt', 'tool_stdout.txt') })) {
+                $null = $rows.Add([PSCustomObject]@{
+                        Tool         = $j.Tool
+                        Status       = 'Retained'
+                        DestRelative = $f.FullName.Substring($root.Length).TrimStart('\', '/')
+                        SHA256       = (Get-FotonSafeHash -Path $f.FullName)
+                        Version      = ''
+                        RulesVersion = ''
+                        Note         = ("Output from an earlier compose run; {0} did not run this time ({1}). Tool version for this file is not recorded here." -f $j.Tool, $Why)
+                    })
+            }
+        }
         if (-not $exe) {
-            $hint = 'Native ConvertFrom-Foton* / Invoke-FotonParse is the fallback. This is a coverage gap, not a parse error.'
+            $hint = 'If it is installed elsewhere, register it once: Install-FotonTool -Name EZTools -Path <folder> (or -Name Chainsaw). Native ConvertFrom-Foton* / Invoke-FotonParse is the fallback. This is a coverage gap, not a parse error.'
             if ($j.Tool -eq 'Hayabusa') {
                 $hint = 'Run Install-FotonTool -Name Hayabusa (or Foton.cmd tools Hayabusa), then compose again. Native ConvertFrom-Foton* remains the air-gap fallback.'
             }
@@ -137,6 +183,7 @@ function Invoke-FotonExternalParse {
                     RulesVersion = ''
                     Note         = ("{0} was not found via -ToolPath, Foton tools.json, or PATH. {1}" -f $j.Tool, $hint)
                 })
+            & $addRetained 'NotOnPath'
             continue
         }
         $anyTool = $true
@@ -150,10 +197,32 @@ function Invoke-FotonExternalParse {
                     RulesVersion = $rulesVer
                     Note         = ("Tool found ({0}) but input folder is missing: {1}. Re-collect elevated if the copy task was skipped." -f $resolveSrc, $j.NeedDir)
                 })
+            & $addRetained 'NoInput'
             continue
         }
-        $arg = & $j.Args $exe $j.NeedDir $toolDir
-        $log = Join-Path $toolDir 'tool_stderr.txt'
+        if ($j.Pre) {
+            $skip = & $j.Pre $exe
+            if ($skip) {
+                $null = $rows.Add([PSCustomObject]@{
+                        Tool         = $j.Tool
+                        Status       = $skip.Status
+                        DestRelative = ''
+                        SHA256       = ''
+                        Version      = $toolVer
+                        RulesVersion = $rulesVer
+                        Note         = $skip.Note
+                    })
+                & $addRetained $skip.Status
+                continue
+            }
+        }
+        # Run into a staging folder; earlier output is replaced only when this run
+        # actually produces files, so a failed rerun cannot destroy the last good one.
+        $stage = Join-Path $extRoot ('.{0}.staging-{1}' -f $j.Tool.ToLowerInvariant(), [guid]::NewGuid().ToString('N'))
+        New-Item -Path $stage -ItemType Directory -Force | Out-Null
+        $arg = & $j.Args $exe $j.NeedDir $stage
+        $log = Join-Path $stage 'tool_stderr.txt'
+        $stdout = Join-Path $stage 'tool_stdout.txt'
         $ok = $false
         # Run in the tool's own install tree, not the output folder. Hayabusa resolves
         # its config/ (profiles, level colours) relative to the working directory, so
@@ -163,27 +232,87 @@ function Invoke-FotonExternalParse {
         $workDir = Split-Path -Parent $exe
         if (-not $workDir -or -not (Test-Path -LiteralPath $workDir)) { $workDir = $toolDir }
         try {
-            $p = Start-Process -FilePath $exe -ArgumentList $arg -Wait -PassThru -NoNewWindow -RedirectStandardError $log -WorkingDirectory $workDir
+            # Start-Process joins an array with bare spaces, which splits any path that
+            # contains a space (D:\My Cases\...). Pass one correctly quoted string.
+            $argLine = ConvertTo-FotonCommandLine -Arguments @($arg)
+            $p = Start-Process -FilePath $exe -ArgumentList $argLine -Wait -PassThru -NoNewWindow -RedirectStandardError $log -RedirectStandardOutput $stdout -WorkingDirectory $workDir
             if ($p.ExitCode -eq 0) { $ok = $true }
         }
         catch {
             Set-Content -LiteralPath $log -Value $_.Exception.Message -Encoding UTF8
         }
-        $outs = @(Get-ChildItem -LiteralPath $toolDir -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'tool_stderr.txt' })
-        if ($outs.Count -eq 0) {
+        $newOuts = @(Get-ChildItem -LiteralPath $stage -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @('tool_stderr.txt', 'tool_stdout.txt') })
+        if ($newOuts.Count -gt 0) {
+            # Swap by directory rename (same volume): the earlier output is deleted only
+            # after the new folder is in place, and is restored if that rename fails.
+            $prev = Join-Path $extRoot ('.{0}.prev-{1}' -f $j.Tool.ToLowerInvariant(), [guid]::NewGuid().ToString('N'))
+            $swapError = ''
+            try {
+                Move-Item -LiteralPath $toolDir -Destination $prev -ErrorAction Stop
+                try { Move-Item -LiteralPath $stage -Destination $toolDir -ErrorAction Stop }
+                catch {
+                    Move-Item -LiteralPath $prev -Destination $toolDir -ErrorAction SilentlyContinue
+                    throw
+                }
+                Remove-Item -LiteralPath $prev -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            catch { $swapError = $_.Exception.Message }
+            if ($swapError) {
+                $null = $rows.Add([PSCustomObject]@{
+                        Tool         = $j.Tool
+                        Status       = 'SwapError'
+                        DestRelative = $stage.Substring($root.Length).TrimStart('\', '/')
+                        SHA256       = ''
+                        Version      = $toolVer
+                        RulesVersion = $rulesVer
+                        Note         = ("{0} produced output, but it could not replace the earlier output ({1}); a file in that folder may be open. The new output was left in the staging folder." -f $j.Tool, $swapError)
+                    })
+                & $addRetained 'SwapError'
+                continue
+            }
+        }
+        else {
+            # Nothing new: keep earlier output, but replace the logs so they describe this run.
+            foreach ($leaf in @('tool_stderr.txt', 'tool_stdout.txt')) {
+                $src = Join-Path $stage $leaf
+                if (Test-Path -LiteralPath $src) { Move-Item -LiteralPath $src -Destination (Join-Path $toolDir $leaf) -Force }
+            }
+        }
+        Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+        $log = Join-Path $toolDir 'tool_stderr.txt'
+        $stdout = Join-Path $toolDir 'tool_stdout.txt'
+        # .NET 10 builds (AmcacheParser has no other) print this and exit when the
+        # runtime is absent; without it the row read as a generic tool error.
+        if ($newOuts.Count -eq 0 -and -not $ok -and (Test-FotonToolMissingRuntime -Paths @($log, $stdout))) {
             $null = $rows.Add([PSCustomObject]@{
                     Tool         = $j.Tool
-                    Status       = $(if ($ok) { 'NoOutput' } else { 'ToolError' })
+                    Status       = 'MissingRuntime'
+                    DestRelative = (Join-Path 'analysis\external' $j.Tool.ToLowerInvariant())
+                    SHA256       = ''
+                    Version      = $toolVer
+                    RulesVersion = $rulesVer
+                    Note         = ("{0} needs a .NET runtime that is not installed on this workstation (see tool_stdout.txt / tool_stderr.txt). Install the runtime it names, then compose again." -f $j.Tool)
+                })
+            & $addRetained 'MissingRuntime'
+            continue
+        }
+        if ($newOuts.Count -eq 0) {
+            $failStatus = $(if ($ok) { 'NoOutput' } else { 'ToolError' })
+            $null = $rows.Add([PSCustomObject]@{
+                    Tool         = $j.Tool
+                    Status       = $failStatus
                     DestRelative = (Join-Path 'analysis\external' $j.Tool.ToLowerInvariant())
                     SHA256       = ''
                     Version      = $toolVer
                     RulesVersion = $rulesVer
                     Note         = ("{0} ran but produced no output files. See tool_stderr.txt. Native parse remains valid." -f $j.Tool)
                 })
+            & $addRetained $failStatus
             continue
         }
+        $outs = @(Get-ChildItem -LiteralPath $toolDir -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @('tool_stderr.txt', 'tool_stdout.txt') })
         foreach ($f in $outs) {
-            $rel = $f.FullName.Substring($root.Length).TrimStart('\')
+            $rel = $f.FullName.Substring($root.Length).TrimStart('\', '/')
             $null = $rows.Add([PSCustomObject]@{
                     Tool         = $j.Tool
                     Status       = 'Copied'

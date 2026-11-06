@@ -100,6 +100,253 @@ Describe 'Install-FotonTool and resolve' {
         }
     }
 
+    It 'registers an existing EZ Tools folder including per-tool subfolders' {
+        $tmp = Join-Path $env:TEMP ('foton-ezreg-' + [guid]::NewGuid().ToString('N'))
+        $ez = Join-Path $tmp 'EZTools'
+        New-Item -Path (Join-Path $ez 'EvtxeCmd') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $ez 'RECmd') -ItemType Directory -Force | Out-Null
+        foreach ($f in @('PECmd.exe', 'LECmd.exe', 'EvtxeCmd\EvtxECmd.exe', 'RECmd\RECmd.exe')) {
+            Set-Content -LiteralPath (Join-Path $ez $f) -Value 'x' -Encoding Ascii
+        }
+        $root = Join-Path $tmp 'tools'
+        try {
+            InModuleScope Foton -Parameters @{ Ez = $ez; Root = $root } {
+                param($Ez, $Root)
+                $rows = @(Install-FotonTool -Name EZTools -Path $Ez -ToolRoot $Root -Force)
+                ($rows | Where-Object Name -eq 'EvtxECmd').Status | Should -Be 'Registered'
+                ($rows | Where-Object Name -eq 'AmcacheParser').Status | Should -Be 'NotFound'
+                $r = Resolve-FotonExternalTool -ToolName EvtxECmd -ExecutableNames @('EvtxECmd.exe') -ToolRoot $Root
+                $r.Source | Should -Be 'Manifest'
+                $r.Path | Should -Match 'EvtxeCmd\\EvtxECmd\.exe$'
+                $rec = Get-FotonInstalledTool -Name RECmd -ToolRoot $Root
+                $rec.Verified | Should -Be $false
+                $rec.ObservedSha256 | Should -Match '^[0-9A-Fa-f]{64}$'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'registers into the default tool root when -ToolRoot is omitted' {
+        $tmp = Join-Path $env:TEMP ('foton-ezdef-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path (Join-Path $tmp 'cs') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $tmp 'cs\chainsaw.exe') -Value 'x' -Encoding Ascii
+        $savedLad = $env:LOCALAPPDATA
+        $env:LOCALAPPDATA = Join-Path $tmp 'lad'
+        try {
+            InModuleScope Foton -Parameters @{ Dir = (Join-Path $tmp 'cs') } {
+                param($Dir)
+                $rows = @(Register-FotonLocalTool -Name Chainsaw -Path $Dir)
+                $rows[0].Status | Should -Be 'Registered'
+                (Get-FotonInstalledTool -Name Chainsaw).ExecutablePath | Should -Match 'chainsaw\.exe$'
+            }
+        }
+        finally {
+            $env:LOCALAPPDATA = $savedLad
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'writes nothing for -Path registration under -WhatIf' {
+        $tmp = Join-Path $env:TEMP ('foton-ezwhatif-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path (Join-Path $tmp 'cs') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $tmp 'cs\chainsaw.exe') -Value 'x' -Encoding Ascii
+        $root = Join-Path $tmp 'tools'
+        try {
+            InModuleScope Foton -Parameters @{ Dir = (Join-Path $tmp 'cs'); Root = $root } {
+                param($Dir, $Root)
+                Install-FotonTool -Name Chainsaw -Path $Dir -ToolRoot $Root -WhatIf | Out-Null
+                Test-Path -LiteralPath (Join-Path $Root 'tools.json') | Should -Be $false
+                Install-FotonTool -Name Chainsaw -Path $Dir -ToolRoot $Root -Force | Out-Null
+                Test-Path -LiteralPath (Join-Path $Root 'tools.json') | Should -Be $true
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'keeps earlier output as Retained when a tool does not run this time' {
+        $tmp = Join-Path $env:TEMP ('foton-retained-' + [guid]::NewGuid().ToString('N'))
+        $pkg = Join-Path $tmp 'Foton_HOST_20260101-000000Z'
+        New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
+        $old = Join-Path $pkg 'analysis\external\pecmd'
+        New-Item -Path $old -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $old 'pecmd.csv') -Value 'old'
+        $savedPath = $env:Path
+        $env:Path = Join-Path $env:SystemRoot 'System32'
+        try {
+            $rows = @(Invoke-FotonExternalParse -PackagePath $pkg -ToolRoot (Join-Path $tmp 'empty'))
+            $pe = @($rows | Where-Object Tool -eq 'PECmd')
+            ($pe | Where-Object Status -eq 'NotOnPath') | Should -Not -BeNullOrEmpty
+            $kept = @($pe | Where-Object Status -eq 'Retained')
+            $kept | Should -HaveCount 1
+            $kept[0].DestRelative | Should -Match 'pecmd\\pecmd\.csv$'
+            Test-Path -LiteralPath (Join-Path $old 'pecmd.csv') | Should -Be $true
+        }
+        finally {
+            $env:Path = $savedPath
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'rejects an unknown tool name for registration' {
+        InModuleScope Foton {
+            { Register-FotonLocalTool -Name 'NotATool' -Path $env:TEMP } | Should -Throw '*Unknown tool*'
+        }
+    }
+
+    It 'finds RECmd batches and Chainsaw rules beside the binary' {
+        $tmp = Join-Path $env:TEMP ('foton-support-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path (Join-Path $tmp 'BatchExamples') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $tmp 'mappings') -ItemType Directory -Force | Out-Null
+        try {
+            InModuleScope Foton -Parameters @{ Dir = $tmp } {
+                param($Dir)
+                $recmd = Join-Path $Dir 'RECmd.exe'
+                Find-FotonRecmdBatch -RecmdPath $recmd | Should -BeNullOrEmpty
+                Set-Content -LiteralPath (Join-Path $Dir 'BatchExamples\Kroll_Batch.reb') -Value 'x'
+                Find-FotonRecmdBatch -RecmdPath $recmd | Should -Match 'Kroll_Batch\.reb$'
+                Set-Content -LiteralPath (Join-Path $Dir 'BatchExamples\DFIRBatch.reb') -Value 'x'
+                Find-FotonRecmdBatch -RecmdPath $recmd | Should -Match 'DFIRBatch\.reb$'
+
+                $cs = Join-Path $Dir 'chainsaw.exe'
+                $none = Find-FotonChainsawRules -ChainsawPath $cs
+                $none.RulesPath | Should -BeNullOrEmpty
+                $none.SigmaPath | Should -BeNullOrEmpty
+                New-Item -Path (Join-Path $Dir 'sigma') -ItemType Directory | Out-Null
+                (Find-FotonChainsawRules -ChainsawPath $cs).SigmaPath | Should -BeNullOrEmpty
+                Set-Content -LiteralPath (Join-Path $Dir 'mappings\sigma-event-logs-all.yml') -Value 'x'
+                $s = Find-FotonChainsawRules -ChainsawPath $cs
+                $s.SigmaPath | Should -Match 'sigma$'
+                $s.MappingPath | Should -Match 'sigma-event-logs-all\.yml$'
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'detects a missing .NET runtime in captured tool output' {
+        $tmp = Join-Path $env:TEMP ('foton-rt-' + [guid]::NewGuid().ToString('N') + '.txt')
+        try {
+            Set-Content -LiteralPath $tmp -Value 'You must install or update .NET to run this application.'
+            InModuleScope Foton -Parameters @{ P = $tmp } {
+                param($P)
+                Test-FotonToolMissingRuntime -Paths @($P, 'C:\foton-no-such.txt') | Should -Be $true
+            }
+            Set-Content -LiteralPath $tmp -Value "It was not possible to find any compatible framework version`r`nThe framework 'Microsoft.NETCore.App', version '10.0.0' (x64) was not found."
+            InModuleScope Foton -Parameters @{ P = $tmp } {
+                param($P)
+                Test-FotonToolMissingRuntime -Paths @($P) | Should -Be $true
+            }
+            Set-Content -LiteralPath $tmp -Value 'Processed 12 files'
+            InModuleScope Foton -Parameters @{ P = $tmp } {
+                param($P)
+                Test-FotonToolMissingRuntime -Paths @($P) | Should -Be $false
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'runs RECmd with a batch, Hayabusa in UTC, and records Chainsaw NoRules' {
+        $tmp = Join-Path $env:TEMP ('foton-composeargs-' + [guid]::NewGuid().ToString('N'))
+        $pkg = Join-Path $tmp 'Foton_HOST_20260101-000000Z'
+        New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pkg '07_Event_Logs\evtx') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pkg '08_Filesystem\hives\machine') -ItemType Directory -Force | Out-Null
+        $bin = Join-Path $tmp 'bin'
+        New-Item -Path (Join-Path $bin 'BatchExamples') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $bin 'BatchExamples\DFIRBatch.reb') -Value 'x'
+        # Fake tools: record their arguments beside themselves.
+        $fake = "@echo %* > `"%~dp0args_%~n0.txt`"`r`n@exit /b 0`r`n"
+        foreach ($n in @('recmd', 'hayabusa', 'chainsaw')) {
+            Set-Content -LiteralPath (Join-Path $bin "$n.cmd") -Value $fake -Encoding Ascii -NoNewline
+        }
+        try {
+            $rows = @(Invoke-FotonExternalParse -PackagePath $pkg -ToolRoot (Join-Path $tmp 'empty') -ToolPath @{
+                    RECmd    = (Join-Path $bin 'recmd.cmd')
+                    Hayabusa = (Join-Path $bin 'hayabusa.cmd')
+                    Chainsaw = (Join-Path $bin 'chainsaw.cmd')
+                })
+            (Get-Content -LiteralPath (Join-Path $bin 'args_recmd.txt') -Raw) | Should -Match '--bn .*DFIRBatch\.reb'
+            (Get-Content -LiteralPath (Join-Path $bin 'args_hayabusa.txt') -Raw) | Should -Match '(^| )-U( |$)'
+            ($rows | Where-Object Tool -eq 'Chainsaw').Status | Should -Be 'NoRules'
+            Test-Path -LiteralPath (Join-Path $bin 'args_chainsaw.txt') | Should -Be $false
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'quotes arguments so paths with spaces survive the command line' {
+        InModuleScope Foton {
+            ConvertTo-FotonCommandLine -Arguments @('-d', 'D:\My Cases\x', '-U') | Should -Be '-d "D:\My Cases\x" -U'
+            ConvertTo-FotonCommandLine -Arguments @('C:\a b\', '') | Should -Be '"C:\a b\\" ""'
+            ConvertTo-FotonCommandLine -Arguments @('say "hi"') | Should -Be '"say \"hi\""'
+            ConvertTo-FotonCommandLine -Arguments @('C:\plain\path.csv') | Should -Be 'C:\plain\path.csv'
+        }
+    }
+
+    It 'keeps the earlier output when a rerun fails, and quotes a spaced case path' {
+        $tmp = Join-Path $env:TEMP ('foton-stage-' + [guid]::NewGuid().ToString('N'))
+        $pkg = Join-Path $tmp 'My Cases\Foton_HOST_20260101-000000Z'
+        New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pkg '07_Event_Logs\evtx') -ItemType Directory -Force | Out-Null
+        $old = Join-Path $pkg 'analysis\external\hayabusa'
+        New-Item -Path $old -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $old 'hayabusa.csv') -Value 'old'
+        $bin = Join-Path $tmp 'bin'
+        New-Item -Path $bin -ItemType Directory -Force | Out-Null
+        $fake = "@echo %* > `"%~dp0args_%~n0.txt`"`r`n@exit /b 1`r`n"
+        Set-Content -LiteralPath (Join-Path $bin 'hayabusa.cmd') -Value $fake -Encoding Ascii -NoNewline
+        try {
+            $rows = @(Invoke-FotonExternalParse -PackagePath $pkg -ToolRoot (Join-Path $tmp 'empty') -ToolPath @{
+                    Hayabusa = (Join-Path $bin 'hayabusa.cmd')
+                })
+            $hb = @($rows | Where-Object Tool -eq 'Hayabusa')
+            ($hb | Where-Object Status -eq 'ToolError') | Should -Not -BeNullOrEmpty
+            @($hb | Where-Object Status -eq 'Retained')[0].DestRelative | Should -Match 'hayabusa\\hayabusa\.csv$'
+            (Get-Content -LiteralPath (Join-Path $old 'hayabusa.csv') -Raw).Trim() | Should -Be 'old'
+            @(Get-ChildItem -LiteralPath (Join-Path $pkg 'analysis\external') -Force -Filter '.hayabusa.*') | Should -HaveCount 0
+            (Get-Content -LiteralPath (Join-Path $bin 'args_hayabusa.txt') -Raw) | Should -Match '"[^"]*My Cases[^"]*"'
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'replaces earlier output only after a successful run, leaving no staging folders' {
+        $tmp = Join-Path $env:TEMP ('foton-swap-' + [guid]::NewGuid().ToString('N'))
+        $pkg = Join-Path $tmp 'Foton_HOST_20260101-000000Z'
+        New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pkg '07_Event_Logs\evtx') -ItemType Directory -Force | Out-Null
+        $old = Join-Path $pkg 'analysis\external\hayabusa'
+        New-Item -Path $old -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $old 'stale.csv') -Value 'old'
+        $bin = Join-Path $tmp 'bin'
+        New-Item -Path $bin -ItemType Directory -Force | Out-Null
+        # Writes a file into the folder that follows -o (its parent is the staging folder).
+        $fake = "@echo off`r`n:loop`r`nif `"%~1`"==`"`" exit /b 0`r`nif /i `"%~1`"==`"-o`" echo new> `"%~dp2fresh.csv`"`r`nshift`r`ngoto loop`r`n"
+        Set-Content -LiteralPath (Join-Path $bin 'hayabusa.cmd') -Value $fake -Encoding Ascii -NoNewline
+        try {
+            $rows = @(Invoke-FotonExternalParse -PackagePath $pkg -ToolRoot (Join-Path $tmp 'empty') -ToolPath @{
+                    Hayabusa = (Join-Path $bin 'hayabusa.cmd')
+                })
+            $hb = @($rows | Where-Object Tool -eq 'Hayabusa')
+            @($hb | Where-Object Status -eq 'Copied')[0].DestRelative | Should -Match '^analysis\\external\\hayabusa\\fresh\.csv$'
+            Test-Path -LiteralPath (Join-Path $old 'fresh.csv') | Should -Be $true
+            Test-Path -LiteralPath (Join-Path $old 'stale.csv') | Should -Be $false
+            @(Get-ChildItem -LiteralPath (Join-Path $pkg 'analysis\external') -Force -Filter '.hayabusa.*') | Should -HaveCount 0
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'tells compose to use Install-FotonTool when Hayabusa is missing' {
         $pkg = Join-Path $env:TEMP ('foton-compose-miss-' + [guid]::NewGuid().ToString('N'))
         New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null

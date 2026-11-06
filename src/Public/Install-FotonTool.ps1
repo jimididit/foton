@@ -25,6 +25,13 @@ function Install-FotonTool {
         Offline install: path to the already-downloaded release zip. Still verifies
         ExpectedSha256 from the catalog.
 
+    .PARAMETER Path
+        Register a tool that is already on disk instead of downloading one. Accepts a
+        folder or an executable. -Name EZTools registers PECmd, LECmd, JLECmd,
+        EvtxECmd, AmcacheParser, and RECmd from one EZ Tools folder, including the
+        per-tool subfolders. Writes tools.json only; nothing is downloaded and PATH
+        is not changed. The recorded SHA-256 is observed, not verified.
+
     .PARAMETER CatalogPath
         Optional catalog JSON override (tests).
 
@@ -45,6 +52,12 @@ function Install-FotonTool {
         Install-FotonTool -Name Hayabusa -ArchivePath D:\Offline\hayabusa-4.0.0-win-x64.zip -Force
 
         Air-gapped install from a local archive.
+
+    .EXAMPLE
+        Install-FotonTool -Name EZTools -Path C:\Tools\EZTools
+
+        Registers an existing Eric Zimmerman tools folder so compose finds every tool,
+        including EvtxeCmd\EvtxECmd.exe and RECmd\RECmd.exe in their subfolders.
     #>
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
     param(
@@ -52,9 +65,27 @@ function Install-FotonTool {
         [switch]$List,
         [string]$ToolRoot,
         [string]$ArchivePath,
+        [string]$Path,
         [string]$CatalogPath,
         [switch]$Force
     )
+
+    if ($Path) {
+        if (-not $Name) { throw 'Use -Name with -Path (for example -Name EZTools -Path C:\Tools\EZTools).' }
+        # -Force skips the confirmation prompt only; -WhatIf still writes nothing.
+        if ($Force) { $ConfirmPreference = 'None' }
+        $manifest = Get-FotonToolManifestPath -ToolRoot $ToolRoot
+        if (-not $PSCmdlet.ShouldProcess($manifest, ("Register existing {0} install from {1}" -f $Name, $Path))) {
+            return
+        }
+        $rows = @(Register-FotonLocalTool -Name $Name -Path $Path -ToolRoot $ToolRoot)
+        Write-Host ''
+        Write-Host '  Foton tool registration (existing install; nothing downloaded)' -ForegroundColor Cyan
+        $rows | Select-Object Name, Status, Version, ExecutablePath | Format-Table -AutoSize | Out-Host
+        Write-Host '  SHA-256 values in tools.json are observed on disk, not verified against an upstream hash.' -ForegroundColor Yellow
+        Write-Host '  PATH was not changed. Compose resolves these tools via tools.json.' -ForegroundColor Green
+        return $rows
+    }
 
     $catalog = @(Get-FotonToolCatalog -CatalogPath $CatalogPath)
     if ($List -or -not $Name) {
