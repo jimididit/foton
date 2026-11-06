@@ -23,6 +23,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Nothing here pushes with git; gh gets GH_TOKEN explicitly in its own step.
+          persist-credentials: false
 
       - name: Check tag matches ModuleVersion
         if: startsWith(github.ref, 'refs/tags/')
