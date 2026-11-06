@@ -3,6 +3,11 @@ name: Release
 # Tag vX.Y.Z (matching ModuleVersion in Foton.psd1) to publish a release.
 # Run manually (workflow_dispatch) for a dry run: builds, tests, and uploads the
 # assets as a workflow artifact without creating a release or publishing.
+#
+# Two jobs so the write-scoped token never reaches repository code: `build` runs the
+# tests and build scripts with a read-only token; `publish` runs no repository code and
+# only attests, releases, and publishes the exact files `build` uploaded.
+# Actions are pinned to commit SHAs (tag in the trailing comment).
 
 on:
   push:
@@ -13,18 +18,15 @@ permissions:
   contents: read
 
 jobs:
-  release:
-    name: Build and publish
+  build:
+    name: Build and test
     runs-on: windows-latest
     permissions:
-      contents: write       # create the GitHub release
-      id-token: write       # build provenance attestation
-      attestations: write
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # Nothing here pushes with git; gh gets GH_TOKEN explicitly in its own step.
           persist-credentials: false
 
       - name: Check tag matches ModuleVersion
@@ -62,35 +64,69 @@ jobs:
           $ErrorActionPreference = 'Stop'
           & .\build\Build-Release.ps1
 
-      - name: Attest build provenance
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: |
-            dist/release/*.ps1
-            dist/release/*.zip
-
-      - name: Upload assets (workflow artifact)
-        uses: actions/upload-artifact@v4
+      - name: Upload assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: foton-release-assets
+          if-no-files-found: error
           path: |
             dist/release/*.ps1
             dist/release/*.zip
             dist/release/SHA256SUMS.txt
+            dist/release/gallery/
+
+  publish:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    permissions:
+      contents: write       # create the GitHub release
+      id-token: write       # build provenance attestation
+      attestations: write
+    steps:
+      - name: Download assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: foton-release-assets
+          path: assets
+
+      - name: Verify SHA256SUMS
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = (Resolve-Path assets).Path
+          foreach ($line in Get-Content (Join-Path $dir 'SHA256SUMS.txt')) {
+            $hash, $leaf = $line -split '  ', 2
+            $actual = (Get-FileHash (Join-Path $dir $leaf) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $hash) { throw "Hash mismatch for $leaf" }
+          }
+          "ASSET_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: |
+            assets/*.ps1
+            assets/Foton-Workstation_v*.zip
 
       - name: Create GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          HAS_GALLERY_KEY: ${{ secrets.PSGALLERY_API_KEY != '' }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $ver = (Import-PowerShellDataFile .\Foton.psd1).ModuleVersion
-          $all = [string](Import-PowerShellDataFile .\Foton.psd1).PrivateData.PSData.ReleaseNotes
+          # Foton.psd1 is a data file; Import-PowerShellDataFile does not execute code.
+          $man = Import-PowerShellDataFile (Join-Path $env:ASSET_DIR 'gallery\Foton\Foton.psd1')
+          $ver = [string]$man.ModuleVersion
+          if ("v$ver" -ne $env:GITHUB_REF_NAME) { throw "Tag $env:GITHUB_REF_NAME does not match ModuleVersion $ver." }
+          $all = [string]$man.PrivateData.PSData.ReleaseNotes
           # Newest entry only: text up to the next "x.y.z:" heading.
           $m = [regex]::Match($all, '^\s*' + [regex]::Escape($ver) + ':\s*(?<n>.*?)(?=\s\d+\.\d+\.\d+:|$)', 'Singleline')
           $changes = $(if ($m.Success) { $m.Groups['n'].Value.Trim() } else { 'See Foton.psd1 ReleaseNotes.' })
+          $gallery = ''
+          if ($env:HAS_GALLERY_KEY -eq 'true') { $gallery = '- Or install the workstation module: `Install-Module Foton -Scope CurrentUser`' }
           $notes = @"
           ## Changes
           $changes
@@ -99,7 +135,7 @@ jobs:
           - **Foton-Collect_v*.ps1**: endpoint live triage collector (one file).
           - **Foton-Baseline_v*.ps1**: endpoint baseline capture (one file).
           - **Foton-Workstation_v*.zip**: parse, compose, analyze, compare on an analyst workstation without cloning the repo.
-          - Or install the workstation module: ``Install-Module Foton -Scope CurrentUser``
+          $gallery
 
           ## Verify before use
           Scripts are not Authenticode-signed. Check the hash and the build provenance:
@@ -111,12 +147,11 @@ jobs:
           "@
           $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
           Set-Content -LiteralPath $notesFile -Value $notes -Encoding UTF8
-          $files = @(Get-ChildItem dist\release -File | Where-Object { $_.Extension -in '.ps1', '.zip', '.txt' } | ForEach-Object FullName)
-          gh release create $env:GITHUB_REF_NAME @files --title "Foton $ver" --notes-file $notesFile
+          $files = @(Get-ChildItem $env:ASSET_DIR -File | Where-Object { $_.Extension -in '.ps1', '.zip', '.txt' } | ForEach-Object FullName)
+          gh release create $env:GITHUB_REF_NAME @files --repo $env:GITHUB_REPOSITORY --title "Foton $ver" --notes-file $notesFile
           if ($LASTEXITCODE -ne 0) { throw "gh release create failed ($LASTEXITCODE)" }
 
       - name: Publish to PowerShell Gallery
-        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         env:
           PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
@@ -126,4 +161,5 @@ jobs:
             Write-Host '::notice::PSGALLERY_API_KEY is not set; skipping PowerShell Gallery publish.'
             exit 0
           }
-          Publish-PSResource -Path .\dist\release\gallery\Foton -Repository PSGallery -ApiKey $env:PSGALLERY_API_KEY
+          $module = Join-Path $env:ASSET_DIR 'gallery\Foton'
+          Publish-PSResource -Path $module -Repository PSGallery -ApiKey $env:PSGALLERY_API_KEY
