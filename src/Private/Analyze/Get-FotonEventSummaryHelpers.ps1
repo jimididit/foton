@@ -63,6 +63,21 @@ function Get-FotonServiceImageFromEvent {
     return ''
 }
 
+function Test-FotonSystem32Leaf {
+    <#
+        True when -Path names a file directly in System32 (no subfolder), written as
+        %SystemRoot%\System32, %windir%\System32, \SystemRoot\System32, <drive>:\Windows\System32,
+        or the host's own SystemDirectory from os_info (Windows not on C:\Windows).
+        Leading quotes and trailing arguments are ignored.
+    #>
+    param([string]$Path, [string]$SystemDirectory)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    $roots = @('%SystemRoot%\\System32', '%windir%\\System32', '\\SystemRoot\\System32', '[A-Z]:\\Windows\\System32')
+    if ($SystemDirectory) { $roots += [regex]::Escape($SystemDirectory.TrimEnd('\')) }
+    $pattern = '(?i)^"?(?:' + ($roots -join '|') + ')\\[^\\"]+?(?:"|\s|$)'
+    return ($Path.Trim() -match $pattern)
+}
+
 function Test-FotonPerUserServiceEvent {
     <#
         True only when the service name is a known per-user template instance AND the
@@ -77,18 +92,18 @@ function Test-FotonPerUserServiceEvent {
         Instances already removed at collection time (they go at logoff) have no row
         and keep the name-and-image decision.
     #>
-    param([object]$Row, [hashtable]$ServiceIndex)
+    param([object]$Row, [hashtable]$ServiceIndex, [string]$SystemDirectory)
     $name = Get-FotonServiceNameFromEvent -Row $Row
     if (-not (Test-FotonPerUserServiceName -Name $name)) { return $false }
     $img = Get-FotonServiceImageFromEvent -Row $Row
-    if ($img -notmatch '(?i)^"?(?:%SystemRoot%|%windir%|\\SystemRoot|[A-Z]:\\Windows)\\System32\\svchost\.exe"?(?:\s|$)') { return $false }
+    if ($img -notmatch '(?i)^"?[^"]*\\svchost\.exe"?(?:\s|$)' -or -not (Test-FotonSystem32Leaf -Path $img -SystemDirectory $SystemDirectory)) { return $false }
     if ($ServiceIndex -and $ServiceIndex.ContainsKey($name)) {
         $svc = $ServiceIndex[$name]
         $dll = [string]$svc.ServiceDll
         if ($dll) {
             $src = [string]$svc.ServiceDllSource
             if ($src -and $src -notlike 'Template:*') { return $false }
-            if ($dll -notmatch '(?i)^[A-Z]:\\Windows\\System32\\[^\\]+\.dll$') { return $false }
+            if ($dll -notmatch '(?i)\.dll"?$' -or -not (Test-FotonSystem32Leaf -Path $dll -SystemDirectory $SystemDirectory)) { return $false }
             if ([string]$svc.ServiceDllUserWritablePath -eq 'True') { return $false }
             if ([string]$svc.ServiceDllSignatureStatus -in @('NotSigned', 'HashMismatch')) { return $false }
         }

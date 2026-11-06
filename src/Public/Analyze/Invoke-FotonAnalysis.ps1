@@ -348,6 +348,8 @@ function Invoke-FotonAnalysis {
 
     $svcs = $script:FotonSession.Data['services']
     $svcIndex = Get-FotonServiceIndex -Services @($svcs)
+    $hostSys32 = ''
+    if ($osInfo -and $osInfo.PSObject.Properties['SystemDirectory']) { $hostSys32 = [string]$osInfo.SystemDirectory }
     if ($svcs) {
         $svcUserPath = @($svcs | Where-Object { $_.UserWritablePath -eq $true -and $_.ResolvedExe })
         # ServiceDll columns exist from collect schema 1.13.0; older packages lack them.
@@ -499,7 +501,7 @@ function Invoke-FotonAnalysis {
     $svcEvents = $script:FotonSession.Data['system_service_and_driver']
     if ($svcEvents) {
         $all7045 = @($svcEvents | Where-Object { [string]$_.EventId -eq '7045' })
-        $installs = @($all7045 | Where-Object { -not (Test-FotonPerUserServiceEvent -Row $_ -ServiceIndex $svcIndex) })
+        $installs = @($all7045 | Where-Object { -not (Test-FotonPerUserServiceEvent -Row $_ -ServiceIndex $svcIndex -SystemDirectory $hostSys32) })
         if ($installs.Count -gt 0) {
             $names = @($installs | ForEach-Object { Get-FotonServiceNameFromEvent -Row $_ } | Where-Object { $_ } | Sort-Object -Unique)
             $nameText = ''
@@ -1148,7 +1150,7 @@ function Invoke-FotonAnalysis {
                                 $svcName = ''
                                 if ($eid -in @('4697', '7045')) {
                                     $svcName = Get-FotonServiceNameFromEvent -Row $row
-                                    if (Test-FotonPerUserServiceEvent -Row $row -ServiceIndex $svcIndex) { $perUserSkipped++; $eid = $null }
+                                    if (Test-FotonPerUserServiceEvent -Row $row -ServiceIndex $svcIndex -SystemDirectory $hostSys32) { $perUserSkipped++; $eid = $null }
                                 }
                                 if ($eid) {
                                     if (-not $attCounts.ContainsKey($eid)) { $attCounts[$eid] = 0; $attNames[$eid] = @{} }

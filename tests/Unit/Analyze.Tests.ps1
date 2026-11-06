@@ -718,6 +718,24 @@ Describe 'Get-FotonPackage and offline analysis' {
         }
     }
 
+    It 'recognises System32 leaf paths in every written form, including a non-default Windows folder' {
+        InModuleScope Foton {
+            Test-FotonSystem32Leaf -Path 'C:\WINDOWS\system32\svchost.exe -k UnistackSvcGroup' | Should -Be $true
+            Test-FotonSystem32Leaf -Path '%SystemRoot%\System32\APHostService.dll' | Should -Be $true
+            Test-FotonSystem32Leaf -Path '"%windir%\system32\svchost.exe" -k netsvcs' | Should -Be $true
+            Test-FotonSystem32Leaf -Path '\SystemRoot\System32\drivers' | Should -Be $true
+            Test-FotonSystem32Leaf -Path 'C:\Windows\System32\evil\x.dll' | Should -Be $false
+            Test-FotonSystem32Leaf -Path 'C:\ProgramData\System32\x.dll' | Should -Be $false
+            Test-FotonSystem32Leaf -Path 'D:\WINNT\system32\unistore.dll' | Should -Be $false
+            Test-FotonSystem32Leaf -Path 'D:\WINNT\system32\unistore.dll' -SystemDirectory 'D:\WINNT\system32' | Should -Be $true
+
+            $row = [PSCustomObject]@{ PayloadData1 = 'Name: UnistoreSvc_1701f8'; ExecutableInfo = 'D:\WINNT\System32\svchost.exe -k UnistackSvcGroup' }
+            $idx = @{ 'UnistoreSvc_1701f8' = [PSCustomObject]@{ ServiceDll = 'D:\WINNT\System32\unistore.dll'; ServiceDllSource = 'Template:UnistoreSvc'; ServiceDllUserWritablePath = 'False'; ServiceDllSignatureStatus = 'Valid' } }
+            Test-FotonPerUserServiceEvent -Row $row -ServiceIndex $idx -SystemDirectory 'D:\WINNT\system32' | Should -Be $true
+            Test-FotonPerUserServiceEvent -Row $row -ServiceIndex $idx | Should -Be $false
+        }
+    }
+
     It 'flags user-writable and unsigned ServiceDll, and stays quiet for older packages' {
         InModuleScope Foton {
             Initialize-FotonSession
