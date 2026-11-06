@@ -42,6 +42,6 @@ Normalized snapshots of **stable** configuration. Schema **1.14.0** (recapture d
 | Winlogon | `Name` | Value | EDR/MFA Userinit/Shell |
 | AppInitDll | `Key` + `Name` | Value | Legacy injectors |
 
-Volatile fields (PID, service State, ephemeral UDP, connection tuples) are not captured. Planned providers: [docs/COVERAGE.md](../../../docs/COVERAGE.md).
+Volatile fields (PID, service State, ephemeral UDP, connection tuples) are not captured. The Service record does not yet compare `ServiceDll` (Collect records it since collect schema 1.13.0); adding it is a baseline schema bump.
 
 `New-FotonBaseline` captures on a live host (`-Path` JSON, or `-OutputPath` package folder with HTML/hashes/ZIP). Flattened endpoint script: `dist/Foton-Baseline.ps1`. `Compare-FotonBaseline` is offline (JSON or package folder) and **refuses** a schema mismatch; it writes `Foton_BaselineCompare.html` beside the difference JSON unless `-NoHtml`. Diffs are Tier 1 change facts; High attention for persistence/trust surfaces (service/driver PathName, IFEO, Winlogon Userinit/Shell, RemoteAccessConfig, LsaPackage Added/Removed, PrintMonitor Name/Driver, BitsJob NotifyCmdLine, CmdAutoRun, SessionManager, KnownDll, ProxyServer/WinHttp, WinsockLsp, ActiveSetup StubPath, SilentProcessExit MonitorProcess, NetshHelper Dll, TimeProvider DllName, WdacApplockerPolicy PolicyHash, new shares, hosts adds, WMI consumers, System32 hash change) - still not a conclusion.

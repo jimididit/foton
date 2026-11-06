@@ -29,6 +29,46 @@ function Get-FotonComposeToolExecutables {
     throw ("Unknown tool '{0}'. Use EZTools, PECmd, LECmd, JLECmd, EvtxECmd, AmcacheParser, RECmd, Hayabusa, or Chainsaw." -f $Name)
 }
 
+function Get-FotonToolCliVersion {
+    <#
+        Version printed by the tool itself, for binaries with no file version resource
+        (Chainsaw is a Rust build: `chainsaw --version` prints "chainsaw 2.17.1").
+        Only tools listed here are run, with a short timeout; empty when unknown.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$ExecutablePath,
+        [int]$TimeoutMs = 5000
+    )
+    $versionArgs = @{ Chainsaw = '--version' }
+    if (-not $versionArgs.ContainsKey($Name)) { return '' }
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $ExecutablePath
+        $psi.Arguments = $versionArgs[$Name]
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.RedirectStandardInput = $true
+        $psi.CreateNoWindow = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $proc.StandardInput.Close()
+        # Drain both streams: an unread pipe that fills blocks the tool until the timeout.
+        $stdout = $proc.StandardOutput.ReadToEndAsync()
+        $stderr = $proc.StandardError.ReadToEndAsync()
+        if (-not $proc.WaitForExit($TimeoutMs)) {
+            try { $proc.Kill() } catch { }
+            return ''
+        }
+        foreach ($text in @([string]$stdout.Result, [string]$stderr.Result)) {
+            $m = [regex]::Match($text, '\d+\.\d+(?:\.\d+){0,2}')
+            if ($m.Success) { return $m.Value }
+        }
+    }
+    catch { }
+    return ''
+}
+
 function Register-FotonLocalTool {
     <#
         Record an already-installed tool (or the EZ Tools folder) in tools.json
@@ -75,6 +115,7 @@ function Register-FotonLocalTool {
         }
         $ver = ''
         try { $ver = [string]$exe.VersionInfo.FileVersion } catch { }
+        if (-not $ver.Trim()) { $ver = Get-FotonToolCliVersion -Name $tool -ExecutablePath $exe.FullName }
         $rulesPath = ''
         $rulesVer = ''
         foreach ($leaf in @('rules', 'sigma')) {

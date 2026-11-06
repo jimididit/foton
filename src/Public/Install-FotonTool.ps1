@@ -16,7 +16,10 @@ function Install-FotonTool {
         Catalog tool name (e.g. Hayabusa). Required unless -List.
 
     .PARAMETER List
-        Print supported catalog tools and exit.
+        List every tool Foton knows about on this workstation: pinned catalog tools
+        (Source Installed, or Catalog with the download URL when not yet installed) and
+        existing installs registered with -Path (Source Registered). Location is the
+        executable compose will run. Tools found only on PATH are not listed.
 
     .PARAMETER ToolRoot
         Install root. Default: %LOCALAPPDATA%\Foton\tools.
@@ -41,7 +44,7 @@ function Install-FotonTool {
     .EXAMPLE
         Install-FotonTool -List
 
-        Shows pinned tools and versions.
+        Shows pinned and registered tools, their versions, and where compose finds them.
 
     .EXAMPLE
         Install-FotonTool -Name Hayabusa
@@ -89,12 +92,47 @@ function Install-FotonTool {
 
     $catalog = @(Get-FotonToolCatalog -CatalogPath $CatalogPath)
     if ($List -or -not $Name) {
-        $catalog | Select-Object Name, Version, License, DownloadUrl, ExpectedSha256, Notes |
-            Format-Table -AutoSize -Wrap
+        # One row per tool: pinned catalog entries (Installed when tools.json has them,
+        # else Catalog with the download URL) and registered local installs (Registered,
+        # observed hash only). Location is what compose will run.
+        $installed = @(Get-FotonInstalledToolList -ToolRoot $ToolRoot)
+        $rows = New-Object System.Collections.ArrayList
+        foreach ($entry in $catalog) {
+            $have = $installed | Where-Object { [string]$_.Name -eq [string]$entry.Name } | Select-Object -First 1
+            $null = $rows.Add([PSCustomObject]@{
+                    Name           = [string]$entry.Name
+                    Version        = $(if ($have) { [string]$have.Version } else { [string]$entry.Version })
+                    Source         = $(if ($have) { 'Installed' } else { 'Catalog' })
+                    Location       = $(if ($have) { [string]$have.ExecutablePath } else { [string]$entry.DownloadUrl })
+                    Verified       = [bool]$have
+                    License        = [string]$entry.License
+                    ExpectedSha256 = [string]$entry.ExpectedSha256
+                    Notes          = [string]$entry.Notes
+                })
+        }
+        $catalogNames = @($catalog | ForEach-Object { [string]$_.Name })
+        foreach ($have in @($installed | Where-Object { $catalogNames -notcontains [string]$_.Name } | Sort-Object Name)) {
+            $null = $rows.Add([PSCustomObject]@{
+                    Name           = [string]$have.Name
+                    Version        = [string]$have.Version
+                    Source         = 'Registered'
+                    Location       = [string]$have.ExecutablePath
+                    Verified       = $false
+                    License        = ''
+                    ExpectedSha256 = ''
+                    Notes          = ('Registered existing install; observed SHA-256 {0}, not verified against upstream.' -f [string]$have.ObservedSha256)
+                })
+        }
+        # Default view keeps the console to one compact table; Format-List * shows the rest.
+        $view = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet', [string[]]@('Name', 'Version', 'Source', 'Location'))
+        $members = [System.Management.Automation.PSMemberInfo[]]@($view)
+        foreach ($r in $rows) {
+            $r | Add-Member -MemberType MemberSet -Name PSStandardMembers -Value $members -Force
+        }
         if (-not $List -and -not $Name) {
             Write-Host "  Usage: Install-FotonTool -Name Hayabusa   (or -List)" -ForegroundColor Cyan
         }
-        return $catalog
+        return @($rows)
     }
 
     $entry = Get-FotonToolCatalogEntry -Name $Name -CatalogPath $CatalogPath

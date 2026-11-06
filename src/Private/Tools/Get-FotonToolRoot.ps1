@@ -47,6 +47,23 @@ function Get-FotonInstalledTool {
     return $null
 }
 
+function Get-FotonInstalledToolList {
+    <#
+        .SYNOPSIS
+        Every tool row in tools.json (pinned installs and registered folders). Empty when none.
+    #>
+    param([string]$ToolRoot)
+
+    $manPath = Get-FotonToolManifestPath -ToolRoot $ToolRoot
+    if (-not (Test-Path -LiteralPath $manPath)) { return @() }
+    try {
+        $man = Get-Content -LiteralPath $manPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch { return @() }
+    if (-not $man -or -not $man.Installed) { return @() }
+    return @($man.Installed)
+}
+
 function Save-FotonToolManifestEntry {
     <#
         .SYNOPSIS

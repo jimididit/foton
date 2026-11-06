@@ -9,7 +9,7 @@ Foton has **two machines**. Mixing them is what usually causes confusion.
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-**Versions** (from `Foton.psd1`): module **1.31.0**, collect schema **1.10.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+**Versions** (from `Foton.psd1`): module **1.37.1**, collect schema **1.13.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
 
 ---
 
@@ -24,14 +24,14 @@ Obtain a flatten script from a [GitHub Release](https://github.com/jimididit/fot
 
 That writes a **versioned** leaf and an unversioned alias (same bytes) under `dist\` (generated locally; not committed):
 
-- `dist\Foton-Collect_v1.31.0_schema1.10.0.ps1` and `dist\Foton-Collect.ps1`
-- `dist\Foton-Baseline_v1.31.0_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
+- `dist\Foton-Collect_v1.37.1_schema1.13.0.ps1` and `dist\Foton-Collect.ps1`
+- `dist\Foton-Baseline_v1.37.1_schema1.14.0.ps1` and `dist\Foton-Baseline.ps1`
 
 Copy **one** file to the target (USB, RMM, email). Prefer the versioned leaf so the module and schema stay in the filename.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.31.0_schema1.10.0.ps1
-powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.31.0_schema1.14.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Collect_v1.37.1_schema1.13.0.ps1
+powershell -ExecutionPolicy Bypass -File .\Foton-Baseline_v1.37.1_schema1.14.0.ps1
 ```
 
 ### If antivirus blocks the collector
@@ -75,7 +75,7 @@ Writes `Foton_<HOSTNAME>_<UTC>Z\`. Alters the host. Findings in the HTML are obs
 | `-NoZip` | Folder only |
 | `-RequireAdministrator` | Exit if not elevated |
 
-Unelevated runs skip Security log, Prefetch/Amcache/SRUM copies, VSS, auditpol/secedit, other users. That is a **visibility gap**, not a clean host.
+Unelevated runs skip Security log, Prefetch/Amcache/SRUM copies, registry hive exports, VSS, auditpol/secedit, other users. That is a **visibility gap**, not a clean host.
 
 ```powershell
 .\Foton-Collect.ps1 -CaseNumber "CASE-0001" -Examiner "A. Examiner" `
@@ -123,7 +123,7 @@ Foton.cmd carve    D:\blob.bin
 | `compare` | Diff two baselines | Table + `Foton_BaselineCompare.html` beside the second JSON |
 | `parse` | Offline Prefetch / LNK / jumplist / EVTX / Amcache | `analysis\parsed_records.csv`, `analysis\Foton_Parse.html` |
 | `compose` | If EZ Tools / Hayabusa / Chainsaw are available (`-ToolPath`, `tools.json` from `tools`, or PATH), run them on copied files | `analysis\external\<tool>\` hashed CSV; inventory CSV with Version/RulesVersion. Native parse if missing |
-| `tools` | One-time workstation setup: install a **pinned** catalog tool (`tools Hayabusa`), or register an existing install (`tools EZTools <folder>`, `tools Chainsaw <folder>`) | `%LOCALAPPDATA%\Foton\tools` + `tools.json`. Does **not** change PATH |
+| `tools` | One-time workstation setup: install a **pinned** catalog tool (`tools Hayabusa`), or register an existing install (`tools EZTools <folder>`, `tools Chainsaw <folder>`). `tools` alone lists every known tool: Source `Installed` / `Catalog` (pinned download) / `Registered` (existing folder), and the Location compose will run | `%LOCALAPPDATA%\Foton\tools` + `tools.json`. Does **not** change PATH |
 | `analyze` | Load package, run heuristics, write HTML | Case folder: `Foton_Report.html`, `analysis\findings.csv`. ZIP: `<zip-stem>_Report.html` + `<zip-stem>_findings.csv` **beside the ZIP** |
 | `ioc` | Match a text/CSV/JSON IOC list to the package | Match table (Tier 2 hits) |
 | `carve` | MZ/PE signature scan of a blob (capped) | Hit table. Not NTFS unallocated |
@@ -159,7 +159,7 @@ Every command below except `Get-FotonVersion` is meant to work on a **package** 
 
 | Command | Purpose | How |
 |---------|---------|-----|
-| `Get-FotonVersion` | Module + collect / baseline / findings schema | `Get-FotonVersion` |
+| `Get-FotonVersion` | Module version, release date (shown as Updated in the banner), collect / baseline / findings schema | `Get-FotonVersion` |
 | `Get-FotonPackage` | Open a case folder or ZIP; load CSVs into the session | `Get-FotonPackage -Path D:\Cases\Foton_HOSTNAME_...Z` |
 
 Historical `WinFoton_*` folders still open.
@@ -262,7 +262,7 @@ SRUM ESE is **copied, not parsed**.
 
 Native `ConvertFrom-Foton*` is the air-gap fallback. Prefer a one-time `Install-FotonTool` for Hayabusa (pinned version + SHA-256 into `%LOCALAPPDATA%\Foton\tools`). Compose then finds it via `tools.json` without touching PATH.
 
-EZ Tools and Chainsaw are not downloaded by Foton. If you already have them, register the folder once. EZ Tools unpacks several tools into subfolders (`EvtxeCmd\`, `RECmd\`, `AmcacheParser\`) that a single PATH entry does not cover; registration records each executable's full path. The SHA-256 written to `tools.json` is what Foton observed on disk, not a verification against upstream.
+EZ Tools and Chainsaw are not downloaded by Foton. If you already have them, register the folder once. EZ Tools unpacks several tools into subfolders (`EvtxeCmd\`, `RECmd\`, `AmcacheParser\`) that a single PATH entry does not cover; registration records each executable's full path. The SHA-256 written to `tools.json` is what Foton observed on disk, not a verification against upstream. Versions come from each executable's file version; Chainsaw has none, so registration runs `chainsaw --version` once (5-second timeout) to record it.
 
 ```powershell
 Install-FotonTool -Name EZTools -Path C:\Tools\EZTools
@@ -296,13 +296,14 @@ New-FotonReport
 
 Or: `Foton.cmd tools Hayabusa` then `Foton.cmd compose <case-folder>`.
 
-Outputs land under `analysis\external\<tool>\` and are hashed. Inventory rows include **Version** and **RulesVersion** when the tool came from the Foton manifest. Missing tools are inventory rows (`NotOnPath`), not failures — Hayabusa's note names `Install-FotonTool`. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. **PECmd** and **EvtxECmd** CSVs also feed `Invoke-FotonAnalysis` (coverage, user-writable path references, and a short list of high-attention EventIds such as 1102/7045) — still observations that cite the tool, not a reimplementation of those parsers.
+Outputs land under `analysis\external\<tool>\` and are hashed. Inventory rows include **Version** and **RulesVersion** when the tool came from the Foton manifest. Missing tools are inventory rows (`NotOnPath`), not failures — Hayabusa's note names `Install-FotonTool`. Hayabusa hits are that engine's inferences (Tier 2); name the tool in the finding. **PECmd** and **EvtxECmd** CSVs also feed `Invoke-FotonAnalysis` (coverage, user-writable path references, and a short list of high-attention EventIds such as 1102/7045) — still observations that cite the tool, not a reimplementation of those parsers. Analyze reads only PECmd, EvtxECmd, and Hayabusa output. RECmd, Chainsaw, LECmd, JLECmd, and AmcacheParser output is hashed and listed in the inventory for the examiner, but does not become findings.
 
-EvtxECmd noise rules (apply to every package):
+Analyze noise rules (apply to every package):
 
 - Suspicious-command patterns are matched only on events that carry command text (4688, Sysmon 1, 4104, 4697, 7045, 4698, 4702). On 4673/4674 the `ExecutableInfo` is the calling image (often `lsass.exe`), not a command.
 - Rows inside the collection window (from `collection.log`) are excluded from the path and pattern counts and reported as an Info methodology finding. Attribution is by time only.
-- Service installs exclude per-user service instances (`OneSyncSvc_1701f8` and similar), which Windows creates at every logon. Only instances of known Microsoft per-user templates whose image is System32 `svchost.exe` are excluded; any other `Name_<hex>` service, a template name pointing at another binary, or a row without a readable image is still counted. The finding names the remaining services and states how many were excluded. Service install events do not record `ServiceDll`, so analyze looks the instance up in `services.csv` (collect schema 1.13.0+). A genuine instance has no `ServiceDll` of its own (Collect records the template's, `ServiceDllSource` = `Template:<name>`), so an instance with its own DLL counts, as does a `ServiceDll` outside System32, in a user-writable path, or `NotSigned`/`HashMismatch` makes the event count. Instances already removed at logoff have no row and cannot be checked this way; for those, read `Services\<name>\Parameters\ServiceDll` in the collected SYSTEM hive.
+- Service installs (native 7045 and EvtxECmd 4697/7045) exclude per-user service instances (`OneSyncSvc_1701f8` and similar), which Windows creates at every logon. Only instances of known Microsoft per-user templates whose image is System32 `svchost.exe` are excluded; any other `Name_<hex>` service, a template name pointing at another binary, or a row without a readable image is still counted. System32 is recognised as `%SystemRoot%`, `%windir%`, `\SystemRoot`, `<drive>:\Windows`, or the host's own `SystemDirectory` from `os_info`. The finding names the remaining services and states how many were excluded.
+- Service install events do not record `ServiceDll`, so analyze looks the instance up in `services.csv` (collect schema 1.13.0+). A genuine instance has no `ServiceDll` of its own (Collect records the template's, `ServiceDllSource` = `Template:<name>`). The event counts when the instance has its own DLL, or when the DLL is outside System32, in a user-writable path, or `NotSigned`/`HashMismatch`. Instances already removed at logoff have no row and cannot be checked this way; for those, read `Services\<name>\Parameters\ServiceDll` in the collected SYSTEM hive.
 - `services.csv` carries `ServiceDll`, its signature, signer, SHA-256, and a user-writable flag for svchost-hosted services. A user-writable `ServiceDll` joins the High user-writable service finding; a `NotSigned` or `HashMismatch` one raises a Medium finding. Third-party and in-house svchost services are the usual benign source.
 - Profile scans skip earlier Foton package folders on the host. Each skipped folder is listed in `collection_coverage.json` (`ExcludedEarlierPackages`) and in an Info finding, because the name and marker files that identify a package can be forged.
 

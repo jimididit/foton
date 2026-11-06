@@ -18,6 +18,7 @@ $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $srcRoot = Join-Path $RepoRoot 'src'
 $psd1 = Import-PowerShellDataFile -LiteralPath (Join-Path $RepoRoot 'Foton.psd1')
 $version = [string]$psd1.ModuleVersion
+$releaseDate = [string]$psd1.PrivateData.Foton.ReleaseDate
 $collectSchema = [string]$psd1.PrivateData.Foton.CollectSchemaVersion
 $aliasPath = $null
 if (-not $OutputPath) {
@@ -129,7 +130,7 @@ param(
 `$ProgressPreference = 'SilentlyContinue'
 `$script:FotonModuleRoot = `$PSScriptRoot
 `$script:FotonSrcRoot = `$null
-`$script:FotonSession = @{ Version = '$version' }
+`$script:FotonSession = @{ Version = '$version'; ReleaseDate = '$releaseDate' }
 `$script:FotonEmbeddedPatterns = @{
     UserWritablePatterns      = $(ConvertTo-FotonQuotedArrayLiteral $writable)
     SuspiciousCommandPatterns = @()

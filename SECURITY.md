@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Fixes land on `main` and the latest tagged release. Older tags are not backported unless a release advisory says otherwise.
+There are no tagged releases yet. Fixes land on `main`; build the Collect and Baseline flattens from the current `main`. Once releases are tagged, fixes go to `main` and the latest release, and older tags are not backported unless a release advisory says otherwise.
 
 ## Reporting a vulnerability
 
@@ -21,14 +21,14 @@ You should receive an acknowledgement within a few business days.
 - Analyze / Parse / Carve reading the live host or network (must stay offline)
 - Package or hash integrity bypasses
 - Path traversal or unsafe handling when opening a case folder or ZIP
-- Unintended credential or secret leakage in default logs or reports
+- Unintended credential or secret leakage in default logs or reports (SAM and SECURITY hives are deliberately not collected)
 
 ## Out of scope
 
 - Antivirus / AMSI false positives on Collect flatten scripts (common for DFIR tooling; see [docs/USAGE.md](docs/USAGE.md))
 - Findings that match legitimate admin tools (pattern lists are intentionally broad)
 - Missing coverage of a Windows artifact (feature request)
-- Expected live-collection side effects (Prefetch, event logs, optional hive load)—disclosed in operator docs
+- Expected live-collection side effects (Prefetch, event logs, `reg save` hive exports into the case folder, optional `-LoadUserHives` load/unload)—disclosed in operator docs
 
 ## Signing and ExecutionPolicy
 

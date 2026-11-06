@@ -28,6 +28,7 @@ function Get-FotonVersion {
     [PSCustomObject]@{
         ProductName             = 'Foton'
         ModuleVersion           = [string]$man.ModuleVersion
+        ReleaseDate             = [string]$meta.ReleaseDate
         CollectSchemaVersion    = [string]$meta.CollectSchemaVersion
         BaselineSchemaVersion   = [string]$meta.BaselineSchemaVersion
         FindingsSchemaVersion   = [string]$meta.FindingsSchemaVersion

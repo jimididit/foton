@@ -27,7 +27,7 @@
     which degrades to '?' on a CP437 / CP1252 console.
 
     Wordmark is figlet ANSI Shadow, with figlet Standard as the ASCII
-    fallback. Bump BrandUpdated with credit changes.
+    fallback. The Updated line is PrivateData.Foton.ReleaseDate in Foton.psd1.
 #>
 
 # ---------------------------------------------------------------------------
@@ -379,15 +379,22 @@ function Write-FotonBanner {
     )
 
     $ver = 'unknown'
+    $released = 'unknown'
     if ($script:FotonSession -and $script:FotonSession.Version) {
         $ver = [string]$script:FotonSession.Version
+        if ($script:FotonSession.ReleaseDate) { $released = [string]$script:FotonSession.ReleaseDate }
     }
     elseif ($script:FotonModuleRoot) {
         $psd1 = Join-Path $script:FotonModuleRoot 'Foton.psd1'
         if (Test-Path -LiteralPath $psd1) {
+            # Text match, not Import-PowerShellDataFile: Windows PowerShell started from a
+            # PowerShell 7 prompt inherits its module path and that cmdlet fails to load.
             try {
-                $man = Import-PowerShellDataFile -LiteralPath $psd1
-                $ver = [string]$man.ModuleVersion
+                $raw = [IO.File]::ReadAllText($psd1)
+                $m = [regex]::Match($raw, "(?m)^\s*ModuleVersion\s*=\s*'([^']+)'")
+                if ($m.Success) { $ver = $m.Groups[1].Value }
+                $m = [regex]::Match($raw, "(?m)^\s*ReleaseDate\s*=\s*'([^']+)'")
+                if ($m.Success) { $released = $m.Groups[1].Value }
             }
             catch { }
         }
@@ -478,7 +485,7 @@ function Write-FotonBanner {
     Write-Host '     Windows DFIR / baseline / audit' -ForegroundColor Gray
     Write-Host '     Author      jimididit' -ForegroundColor DarkGray
     Write-Host ("     Version     {0}" -f $ver) -ForegroundColor DarkGray
-    Write-Host '     Updated     08-22-2026' -ForegroundColor DarkGray
+    Write-Host ("     Updated     {0}" -f $released) -ForegroundColor DarkGray
     Write-Host ("     Mode        {0}" -f $mode) -ForegroundColor Gray
     Write-Host '     Opening a window...closes a door' -ForegroundColor DarkGray
     Write-Host ''

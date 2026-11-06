@@ -18,17 +18,17 @@ Collect on the endpoint and Analyze on the workstation compose without recollect
 ## What schema is not
 
 Schema versions do **not** list every Windows artifact Foton might one day collect.
-That inventory (use cases, Collect vs Baseline, ASEP gaps, parse backlog) is
-[docs/COVERAGE.md](../../../docs/COVERAGE.md).
+What Collect captures today is in [docs/USAGE.md](../../../docs/USAGE.md); the
+maintainers keep the planned-coverage inventory separately.
 
 | If you… | Bump |
 |---------|------|
 | Add a Collect CSV with a new task name or columns | CollectSchemaVersion |
 | Add or change a baseline RecordType / identity / compared fields | BaselineSchemaVersion (recapture day0) |
 | Add a finding property | FindingsSchemaVersion |
-| Only document a *planned* provider | Nothing - edit COVERAGE.md |
+| Only document a *planned* provider | Nothing |
 
-Collect packages: **1.10.0** (`SuspiciousHits` / `SuspiciousCmdHits` are now written empty - the columns remain, but the matching moved to Analyze; see below). **1.9.0** added registry hive / LNK / jumplist / task XML / browser DB / host log copies + optional USN + expanded EVTX + prior Prefetch/Amcache/SRUM. Baseline **1.14.0** (WdacApplockerPolicy).
+Collect packages: **1.13.0** adds `ServiceDll`, `ServiceDllSource`, and ServiceDll signature/hash/user-writable columns to `services.csv`. **1.12.0** exports loaded hives with `reg save` (SAM/SECURITY recorded as `NotCollectedByDesign`), copy tasks report `Partial`/`Failed`, `collection_coverage.json` gains `IncompleteTasks` and `ExcludedEarlierPackages`, `os_info` gains SMBIOS/BIOS release/EC fields, and `boot_and_firmware` gains `FirmwareDevices`. **1.11.0** adds the `-Deep` tasks (task scripts, PnP, DriverStore, gpresult). **1.10.0** (`SuspiciousHits` / `SuspiciousCmdHits` are now written empty - the columns remain, but the matching moved to Analyze; see below). **1.9.0** added registry hive / LNK / jumplist / task XML / browser DB / host log copies + optional USN + expanded EVTX + prior Prefetch/Amcache/SRUM. Baseline **1.14.0** (WdacApplockerPolicy).
 
 The suspicious-command pattern list is deliberately **not** embedded in the Collect
 flatten: inlined as a literal array it is a contiguous list of credential-theft and

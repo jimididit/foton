@@ -14,6 +14,65 @@ Describe 'Install-FotonTool and resolve' {
         }
     }
 
+    It 'lists catalog and registered tools once each, with source and location' {
+        $root = Join-Path $env:TEMP ('foton-list-' + [guid]::NewGuid().ToString('N'))
+        try {
+            $rows = @(Install-FotonTool -List -ToolRoot $root)
+            $rows | Should -HaveCount 1
+            $rows[0].Source | Should -Be 'Catalog'
+            $rows[0].Location | Should -Match 'hayabusa-4\.0\.0-win-x64\.zip$'
+            $rows[0].ExpectedSha256.Length | Should -Be 64
+            @($rows[0].PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames) | Should -Be @('Name', 'Version', 'Source', 'Location')
+            ([regex]::Matches((Install-FotonTool -List -ToolRoot $root | Out-String), 'hayabusa-4\.0\.0-win-x64')).Count | Should -Be 1
+
+            $bin = Join-Path $root 'ez'
+            New-Item -ItemType Directory -Path $bin -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $bin 'PECmd.exe') -Value 'x'
+            Install-FotonTool -Name PECmd -Path (Join-Path $bin 'PECmd.exe') -ToolRoot $root -Force | Out-Null
+            $rows = @(Install-FotonTool -List -ToolRoot $root)
+            $pe = @($rows | Where-Object Name -eq 'PECmd')
+            $pe | Should -HaveCount 1
+            $pe[0].Source | Should -Be 'Registered'
+            # CI temp paths can be 8.3 short names; compare the file, not the spelling.
+            $pe[0].Location | Should -Match '\\ez\\PECmd\.exe$'
+            Test-Path -LiteralPath $pe[0].Location | Should -Be $true
+            $pe[0].Verified | Should -Be $false
+            ($rows | Where-Object Name -eq 'Hayabusa').Source | Should -Be 'Catalog'
+        }
+        finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'reads a version from the tool itself when the binary has no version resource' {
+        $tmp = Join-Path $env:TEMP ('foton-cliver-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmp | Out-Null
+        try {
+            $ok = Join-Path $tmp 'chainsaw-ok.cmd'
+            Set-Content -LiteralPath $ok -Value "@echo chainsaw 2.17.1`r`n" -Encoding Ascii -NoNewline
+            $hang = Join-Path $tmp 'chainsaw-hang.cmd'
+            Set-Content -LiteralPath $hang -Value "@ping -n 6 127.0.0.1 >nul`r`n@echo chainsaw 9.9.9`r`n" -Encoding Ascii -NoNewline
+            # ~200 KB on stderr overflows an undrained pipe; the version is printed afterwards.
+            $noisy = Join-Path $tmp 'chainsaw-noisy.cmd'
+            Set-Content -LiteralPath $noisy -Value "@for /l %%i in (1,1,2500) do @echo warning line %%i padding padding padding padding padding 1>&2`r`n@echo chainsaw 3.0.1`r`n" -Encoding Ascii -NoNewline
+            $errOnly = Join-Path $tmp 'chainsaw-stderr.cmd'
+            Set-Content -LiteralPath $errOnly -Value "@echo chainsaw 4.5.6 1>&2`r`n" -Encoding Ascii -NoNewline
+            InModuleScope Foton -Parameters @{ Ok = $ok; Hang = $hang; Noisy = $noisy; ErrOnly = $errOnly } {
+                param($Ok, $Hang, $Noisy, $ErrOnly)
+                Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $Ok | Should -Be '2.17.1'
+                Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $Noisy -TimeoutMs 15000 | Should -Be '3.0.1'
+                Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $ErrOnly | Should -Be '4.5.6'
+                Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $Hang -TimeoutMs 500 | Should -Be ''
+                # Tools without a known version flag are never executed.
+                Get-FotonToolCliVersion -Name PECmd -ExecutablePath $Ok | Should -Be ''
+            }
+        }
+        finally {
+            Start-Sleep -Milliseconds 200
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'installs from a local archive when the hash matches, and refuses a mismatch' {
         $tmp = Join-Path $env:TEMP ('foton-tooltest-' + [guid]::NewGuid().ToString('N'))
         $toolRoot = Join-Path $tmp 'tools'

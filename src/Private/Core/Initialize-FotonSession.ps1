@@ -18,12 +18,17 @@ function Initialize-FotonSession {
     )
 
     $keepVersion = $null
+    $keepReleaseDate = $null
     if ($null -ne $script:FotonSession -and $script:FotonSession.ContainsKey('Version')) {
         $keepVersion = $script:FotonSession.Version
+    }
+    if ($null -ne $script:FotonSession -and $script:FotonSession.ContainsKey('ReleaseDate')) {
+        $keepReleaseDate = $script:FotonSession.ReleaseDate
     }
 
     $script:FotonSession = @{
         Version                   = $keepVersion
+        ReleaseDate               = $keepReleaseDate
         Data                      = @{}
         Findings                  = New-Object System.Collections.ArrayList
         Manifest                  = New-Object System.Collections.ArrayList

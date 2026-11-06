@@ -64,6 +64,7 @@ Bump `BaselineSchemaVersion` in `Foton.psd1` when identity keys or compared fiel
 - Output: `Add-FotonFinding` with Tier, Artifact, WhyItMatters (include a benign reading), optional NextStep
 - Tests: one record that must fire, one that must not
 - Never assert compromise, attribution, intent, or causation
+- Shared rule helpers go under `src/Private/Analyze/`. Collect runs analysis at the end of a triage, so the Collect flatten includes those helpers: keep them PowerShell **5.1**-compatible and free of long attack-string lists (AMSI). `tests/Unit/Build.Tests.ps1` fails if a flatten calls a Foton function it does not define
 
 ## Add a parser
 
@@ -88,6 +89,12 @@ if ($e) { $e } else { 'PARSE OK' }
 ```
 
 Accepted ScriptAnalyzer exceptions in this repo include `PSAvoidUsingWriteHost`, empty catch on best-effort collect paths, and a few naming rules. HTML reports must include the offline search/nav chrome (`Get-FotonReportNavCss` and friends)—no CDN.
+
+## Branches and pull requests
+
+- Branch from current `main` (`feature/...`, `fix/...`, `chore/...`), push, and open a PR into `main`. Do not commit to `main` directly.
+- The Pester CI check must pass before merge; `main` is protected. Merged branches are deleted automatically.
+- Keep a PR to one change when practical. Bump `ModuleVersion`, `ReleaseDate`, and the schema version you changed in `Foton.psd1` for behavior or format changes, and add a `ReleaseNotes` entry.
 
 ## What we will not accept
 

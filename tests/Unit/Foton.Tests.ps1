@@ -19,10 +19,71 @@ Describe 'Foton module scaffold' {
         Import-Module $script:FotonPsd1 -Force
         $v = Get-FotonVersion
         $v.ProductName | Should -Be 'Foton'
-        $v.ModuleVersion | Should -Be '1.37.0'
+        $v.ModuleVersion | Should -Be '1.37.1'
         $v.CollectSchemaVersion | Should -Be '1.13.0'
         $v.BaselineSchemaVersion | Should -Be '1.14.0'
         $v.FindingsSchemaVersion | Should -Be '1.0.0'
+        $v.ReleaseDate | Should -Match '^\d{4}-\d{2}-\d{2}$'
+    }
+
+    It 'reads the banner version and release date from top-level manifest keys only' {
+        Import-Module $script:FotonPsd1 -Force
+        $tmp = Join-Path $env:TEMP ('foton-banner-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmp | Out-Null
+        try {
+            @(
+                '@{'
+                "    RequiredModules = @(@{ ModuleName = 'Other'; ModuleVersion = '9.9.9' })"
+                "    ModuleVersion     = '1.2.3'"
+                '    PrivateData = @{'
+                '        Foton = @{'
+                "            ReleaseDate = '2026-01-02'"
+                '        }'
+                '    }'
+                '}'
+            ) | Set-Content -LiteralPath (Join-Path $tmp 'Foton.psd1')
+            $out = InModuleScope Foton -Parameters @{ Root = $tmp } {
+                param($Root)
+                $savedRoot = $script:FotonModuleRoot
+                $savedSession = $script:FotonSession
+                try {
+                    $script:FotonModuleRoot = $Root
+                    $script:FotonSession = $null
+                    Write-FotonBanner -Kind Analyze -Color None 6>&1 | Out-String
+                }
+                finally {
+                    $script:FotonModuleRoot = $savedRoot
+                    $script:FotonSession = $savedSession
+                }
+            }
+            $out | Should -Match 'Version\s+1\.2\.3'
+            $out | Should -Match 'Updated\s+2026-01-02'
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'keeps public docs and the banner on the current version' {
+        $man = Import-PowerShellDataFile -LiteralPath $script:FotonPsd1
+        $ver = [string]$man.ModuleVersion
+        $collect = [string]$man.PrivateData.Foton.CollectSchemaVersion
+        $baseline = [string]$man.PrivateData.Foton.BaselineSchemaVersion
+        $root = Split-Path $script:FotonPsd1 -Parent
+        $readme = Get-Content -LiteralPath (Join-Path $root 'README.md') -Raw
+        $usage = Get-Content -LiteralPath (Join-Path $root 'docs\USAGE.md') -Raw
+        $readme | Should -Match ([regex]::Escape("badge/module-$ver-"))
+        $usage | Should -Match ([regex]::Escape("module **$ver**, collect schema **$collect**, baseline schema **$baseline**"))
+        foreach ($doc in @($readme, $usage)) {
+            foreach ($m in [regex]::Matches($doc, 'Foton-(Collect|Baseline)_v(?<v>[\d.]+)_schema(?<s>[\d.]+)\.ps1')) {
+                $m.Groups['v'].Value | Should -Be $ver
+                $expectSchema = $collect
+                if ($m.Value -like 'Foton-Baseline*') { $expectSchema = $baseline }
+                $m.Groups['s'].Value | Should -Be $expectSchema
+            }
+        }
+        $banner = Get-Content -LiteralPath (Join-Path $root 'src\Private\Core\Write-FotonBanner.ps1') -Raw
+        $banner | Should -Not -Match "Updated\s+\d"
     }
 
     It 'exports package, analysis, and report commands (Collect stays unexported)' {

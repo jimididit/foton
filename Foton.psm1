@@ -56,19 +56,24 @@ if (Test-Path -LiteralPath $manifestPath) {
     # from module scope during import. A missing version stamp must never fail
     # the import, so fall back to reading ModuleVersion out of the manifest text.
     $ver = ''
+    $released = ''
     try {
         $man = Import-PowerShellDataFile -LiteralPath $manifestPath -ErrorAction Stop
         $ver = [string]$man.ModuleVersion
+        $released = [string]$man.PrivateData.Foton.ReleaseDate
     }
     catch {
         try {
             $raw = [IO.File]::ReadAllText($manifestPath)
-            $m = [regex]::Match($raw, "ModuleVersion\s*=\s*'([^']+)'")
+            $m = [regex]::Match($raw, "(?m)^\s*ModuleVersion\s*=\s*'([^']+)'")
             if ($m.Success) { $ver = $m.Groups[1].Value }
+            $m = [regex]::Match($raw, "(?m)^\s*ReleaseDate\s*=\s*'([^']+)'")
+            if ($m.Success) { $released = $m.Groups[1].Value }
         }
         catch { }
     }
     if ($ver) { $script:FotonSession.Version = $ver }
+    if ($released) { $script:FotonSession.ReleaseDate = $released }
 }
 
 # Public exports are declared in Foton.psd1 (FunctionsToExport).
