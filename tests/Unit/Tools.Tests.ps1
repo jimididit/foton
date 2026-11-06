@@ -48,7 +48,9 @@ Describe 'Install-FotonTool and resolve' {
             ($cat | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $catalogPath -Encoding UTF8
 
             InModuleScope Foton -Parameters @{
-                Zip = $zip; Root = $toolRoot; Cat = $catalogPath; Bad = ($hash -replace '.$', '0')
+                # Flip the last hex digit to a different value; replacing it with a fixed
+                # '0' left the pin unchanged whenever the real hash already ended in 0.
+                Zip = $zip; Root = $toolRoot; Cat = $catalogPath; Bad = ($hash.Substring(0, 63) + $(if ($hash[63] -eq '0') { '1' } else { '0' }))
             } {
                 param($Zip, $Root, $Cat, $Bad)
 
