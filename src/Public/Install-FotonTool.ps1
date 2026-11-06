@@ -72,6 +72,12 @@ function Install-FotonTool {
 
     if ($Path) {
         if (-not $Name) { throw 'Use -Name with -Path (for example -Name EZTools -Path C:\Tools\EZTools).' }
+        # -Force skips the confirmation prompt only; -WhatIf still writes nothing.
+        if ($Force) { $ConfirmPreference = 'None' }
+        $manifest = Get-FotonToolManifestPath -ToolRoot $ToolRoot
+        if (-not $PSCmdlet.ShouldProcess($manifest, ("Register existing {0} install from {1}" -f $Name, $Path))) {
+            return
+        }
         $rows = @(Register-FotonLocalTool -Name $Name -Path $Path -ToolRoot $ToolRoot)
         Write-Host ''
         Write-Host '  Foton tool registration (existing install; nothing downloaded)' -ForegroundColor Cyan

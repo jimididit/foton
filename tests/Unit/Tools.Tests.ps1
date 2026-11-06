@@ -110,7 +110,7 @@ Describe 'Install-FotonTool and resolve' {
         try {
             InModuleScope Foton -Parameters @{ Ez = $ez; Root = $root } {
                 param($Ez, $Root)
-                $rows = @(Install-FotonTool -Name EZTools -Path $Ez -ToolRoot $Root)
+                $rows = @(Install-FotonTool -Name EZTools -Path $Ez -ToolRoot $Root -Force)
                 ($rows | Where-Object Name -eq 'EvtxECmd').Status | Should -Be 'Registered'
                 ($rows | Where-Object Name -eq 'AmcacheParser').Status | Should -Be 'NotFound'
                 $r = Resolve-FotonExternalTool -ToolName EvtxECmd -ExecutableNames @('EvtxECmd.exe') -ToolRoot $Root
@@ -142,6 +142,49 @@ Describe 'Install-FotonTool and resolve' {
         }
         finally {
             $env:LOCALAPPDATA = $savedLad
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'writes nothing for -Path registration under -WhatIf' {
+        $tmp = Join-Path $env:TEMP ('foton-ezwhatif-' + [guid]::NewGuid().ToString('N'))
+        New-Item -Path (Join-Path $tmp 'cs') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $tmp 'cs\chainsaw.exe') -Value 'x' -Encoding Ascii
+        $root = Join-Path $tmp 'tools'
+        try {
+            InModuleScope Foton -Parameters @{ Dir = (Join-Path $tmp 'cs'); Root = $root } {
+                param($Dir, $Root)
+                Install-FotonTool -Name Chainsaw -Path $Dir -ToolRoot $Root -WhatIf | Out-Null
+                Test-Path -LiteralPath (Join-Path $Root 'tools.json') | Should -Be $false
+                Install-FotonTool -Name Chainsaw -Path $Dir -ToolRoot $Root -Force | Out-Null
+                Test-Path -LiteralPath (Join-Path $Root 'tools.json') | Should -Be $true
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'keeps earlier output as Retained when a tool does not run this time' {
+        $tmp = Join-Path $env:TEMP ('foton-retained-' + [guid]::NewGuid().ToString('N'))
+        $pkg = Join-Path $tmp 'Foton_HOST_20260101-000000Z'
+        New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
+        $old = Join-Path $pkg 'analysis\external\pecmd'
+        New-Item -Path $old -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $old 'pecmd.csv') -Value 'old'
+        $savedPath = $env:Path
+        $env:Path = Join-Path $env:SystemRoot 'System32'
+        try {
+            $rows = @(Invoke-FotonExternalParse -PackagePath $pkg -ToolRoot (Join-Path $tmp 'empty'))
+            $pe = @($rows | Where-Object Tool -eq 'PECmd')
+            ($pe | Where-Object Status -eq 'NotOnPath') | Should -Not -BeNullOrEmpty
+            $kept = @($pe | Where-Object Status -eq 'Retained')
+            $kept | Should -HaveCount 1
+            $kept[0].DestRelative | Should -Match 'pecmd\\pecmd\.csv$'
+            Test-Path -LiteralPath (Join-Path $old 'pecmd.csv') | Should -Be $true
+        }
+        finally {
+            $env:Path = $savedPath
             Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
@@ -190,6 +233,11 @@ Describe 'Install-FotonTool and resolve' {
             InModuleScope Foton -Parameters @{ P = $tmp } {
                 param($P)
                 Test-FotonToolMissingRuntime -Paths @($P, 'C:\foton-no-such.txt') | Should -Be $true
+            }
+            Set-Content -LiteralPath $tmp -Value "It was not possible to find any compatible framework version`r`nThe framework 'Microsoft.NETCore.App', version '10.0.0' (x64) was not found."
+            InModuleScope Foton -Parameters @{ P = $tmp } {
+                param($P)
+                Test-FotonToolMissingRuntime -Paths @($P) | Should -Be $true
             }
             Set-Content -LiteralPath $tmp -Value 'Processed 12 files'
             InModuleScope Foton -Parameters @{ P = $tmp } {

@@ -41,7 +41,8 @@ function Test-FotonToolMissingRuntime {
         if (-not $p -or -not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
         try {
             $text = Get-Content -LiteralPath $p -Raw -ErrorAction Stop
-            if ($text -match 'You must install or update \.NET|install the missing framework') { return $true }
+            # Wording differs across .NET host versions; match the known variants.
+            if ($text -match 'You must install (?:or update )?\.NET|install the missing framework|It was not possible to find any compatible framework version|The framework ''Microsoft\.(?:NETCore|WindowsDesktop)\.App'', version ''[^'']+'' (?:\([^)]*\) )?was not found') { return $true }
         }
         catch { }
     }

@@ -135,7 +135,7 @@ switch ($cmd) {
             if ([IO.Path]::GetExtension($Rest[0]) -eq '.zip') { $archive = $Rest[0] } else { $existing = $Rest[0] }
         }
         if ($existing) {
-            Install-FotonTool -Name $Target -Path $existing | Out-Null
+            Install-FotonTool -Name $Target -Path $existing -Force | Out-Null
         }
         elseif ($archive) {
             Install-FotonTool -Name $Target -ArchivePath $archive -Force

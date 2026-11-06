@@ -279,7 +279,7 @@ Compose resolution order stays `-ToolPath` → `tools.json` → PATH.
 | Hayabusa | `dfir-timeline` (or `csv-timeline`) with `-U`, so timestamps are UTC | `NotOnPath` points at `Install-FotonTool` |
 | Any | stdout/stderr captured as `tool_stdout.txt` / `tool_stderr.txt` | `MissingRuntime` when the tool reports a missing .NET runtime (AmcacheParser is .NET 10 only) |
 
-Re-running compose clears that tool's earlier output first, so the inventory describes this run only.
+When a tool runs, compose replaces that tool's earlier output, so its rows describe this run. When a tool does not run (`NotOnPath`, `NoInput`, `NoRules`, `NoBatch`), earlier output is kept and listed as `Retained` with its hash, so the inventory still covers every file analyze reads. Registration asks for confirmation unless `-Force` is given and honours `-WhatIf`.
 
 ```powershell
 Install-FotonTool -List

@@ -151,6 +151,24 @@ function Invoke-FotonExternalParse {
         }
         $toolDir = Join-Path $extRoot $j.Tool.ToLowerInvariant()
         New-Item -Path $toolDir -ItemType Directory -Force | Out-Null
+        # When this run does not execute the tool, output from an earlier compose is
+        # kept (it may be the only copy) but listed as Retained, so the inventory
+        # still describes every file analyze will read.
+        $addRetained = {
+            param([string]$Why)
+            foreach ($f in @(Get-ChildItem -LiteralPath $toolDir -File -Recurse -ErrorAction SilentlyContinue |
+                        Where-Object { $_.Name -notin @('tool_stderr.txt', 'tool_stdout.txt') })) {
+                $null = $rows.Add([PSCustomObject]@{
+                        Tool         = $j.Tool
+                        Status       = 'Retained'
+                        DestRelative = $f.FullName.Substring($root.Length).TrimStart('\')
+                        SHA256       = (Get-FotonSafeHash -Path $f.FullName)
+                        Version      = ''
+                        RulesVersion = ''
+                        Note         = ("Output from an earlier compose run; {0} did not run this time ({1}). Tool version for this file is not recorded here." -f $j.Tool, $Why)
+                    })
+            }
+        }
         if (-not $exe) {
             $hint = 'If it is installed elsewhere, register it once: Install-FotonTool -Name EZTools -Path <folder> (or -Name Chainsaw). Native ConvertFrom-Foton* / Invoke-FotonParse is the fallback. This is a coverage gap, not a parse error.'
             if ($j.Tool -eq 'Hayabusa') {
@@ -165,6 +183,7 @@ function Invoke-FotonExternalParse {
                     RulesVersion = ''
                     Note         = ("{0} was not found via -ToolPath, Foton tools.json, or PATH. {1}" -f $j.Tool, $hint)
                 })
+            & $addRetained 'NotOnPath'
             continue
         }
         $anyTool = $true
@@ -178,12 +197,9 @@ function Invoke-FotonExternalParse {
                     RulesVersion = $rulesVer
                     Note         = ("Tool found ({0}) but input folder is missing: {1}. Re-collect elevated if the copy task was skipped." -f $resolveSrc, $j.NeedDir)
                 })
+            & $addRetained 'NoInput'
             continue
         }
-        # Outputs from an earlier compose would otherwise be re-listed as this run's,
-        # or (when this run is skipped) sit beside a NoRules/NoBatch row unexplained.
-        Get-ChildItem -LiteralPath $toolDir -Force -ErrorAction SilentlyContinue |
-            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         if ($j.Pre) {
             $skip = & $j.Pre $exe
             if ($skip) {
@@ -196,9 +212,13 @@ function Invoke-FotonExternalParse {
                         RulesVersion = $rulesVer
                         Note         = $skip.Note
                     })
+                & $addRetained $skip.Status
                 continue
             }
         }
+        # The tool runs now: replace its earlier output so this inventory is one run.
+        Get-ChildItem -LiteralPath $toolDir -Force -ErrorAction SilentlyContinue |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         $arg = & $j.Args $exe $j.NeedDir $toolDir
         $log = Join-Path $toolDir 'tool_stderr.txt'
         $stdout = Join-Path $toolDir 'tool_stdout.txt'
