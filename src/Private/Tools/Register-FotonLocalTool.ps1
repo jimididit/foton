@@ -53,13 +53,17 @@ function Get-FotonToolCliVersion {
         $psi.CreateNoWindow = $true
         $proc = [System.Diagnostics.Process]::Start($psi)
         $proc.StandardInput.Close()
+        # Drain both streams: an unread pipe that fills blocks the tool until the timeout.
         $stdout = $proc.StandardOutput.ReadToEndAsync()
+        $stderr = $proc.StandardError.ReadToEndAsync()
         if (-not $proc.WaitForExit($TimeoutMs)) {
             try { $proc.Kill() } catch { }
             return ''
         }
-        $m = [regex]::Match([string]$stdout.Result, '\d+\.\d+(?:\.\d+){0,2}')
-        if ($m.Success) { return $m.Value }
+        foreach ($text in @([string]$stdout.Result, [string]$stderr.Result)) {
+            $m = [regex]::Match($text, '\d+\.\d+(?:\.\d+){0,2}')
+            if ($m.Success) { return $m.Value }
+        }
     }
     catch { }
     return ''

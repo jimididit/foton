@@ -52,9 +52,16 @@ Describe 'Install-FotonTool and resolve' {
             Set-Content -LiteralPath $ok -Value "@echo chainsaw 2.17.1`r`n" -Encoding Ascii -NoNewline
             $hang = Join-Path $tmp 'chainsaw-hang.cmd'
             Set-Content -LiteralPath $hang -Value "@ping -n 6 127.0.0.1 >nul`r`n@echo chainsaw 9.9.9`r`n" -Encoding Ascii -NoNewline
-            InModuleScope Foton -Parameters @{ Ok = $ok; Hang = $hang } {
-                param($Ok, $Hang)
+            # ~200 KB on stderr overflows an undrained pipe; the version is printed afterwards.
+            $noisy = Join-Path $tmp 'chainsaw-noisy.cmd'
+            Set-Content -LiteralPath $noisy -Value "@for /l %%i in (1,1,2500) do @echo warning line %%i padding padding padding padding padding 1>&2`r`n@echo chainsaw 3.0.1`r`n" -Encoding Ascii -NoNewline
+            $errOnly = Join-Path $tmp 'chainsaw-stderr.cmd'
+            Set-Content -LiteralPath $errOnly -Value "@echo chainsaw 4.5.6 1>&2`r`n" -Encoding Ascii -NoNewline
+            InModuleScope Foton -Parameters @{ Ok = $ok; Hang = $hang; Noisy = $noisy; ErrOnly = $errOnly } {
+                param($Ok, $Hang, $Noisy, $ErrOnly)
                 Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $Ok | Should -Be '2.17.1'
+                Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $Noisy -TimeoutMs 15000 | Should -Be '3.0.1'
+                Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $ErrOnly | Should -Be '4.5.6'
                 Get-FotonToolCliVersion -Name Chainsaw -ExecutablePath $Hang -TimeoutMs 500 | Should -Be ''
                 # Tools without a known version flag are never executed.
                 Get-FotonToolCliVersion -Name PECmd -ExecutablePath $Ok | Should -Be ''
