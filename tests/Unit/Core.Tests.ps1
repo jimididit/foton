@@ -367,12 +367,35 @@ InModuleScope Foton {
     }
 
     Describe 'Test-FotonCaseOutputPath' {
-        It 'matches an earlier collect package on the Desktop' {
-            Test-FotonCaseOutputPath -Path 'C:\Users\u\Desktop\Foton_HOST_20261028-180601Z\08_Filesystem\lnk_jumplist\a.lnk' | Should -Be $true
+        BeforeEach {
+            Initialize-FotonSession
+            $script:root = Join-Path $env:TEMP ('foton-own-' + [guid]::NewGuid().ToString('N'))
+            New-Item -Path $script:root -ItemType Directory | Out-Null
         }
-        It 'matches baseline and historical WinFoton folders' {
-            Test-FotonCaseOutputPath -Path 'C:\Users\u\Desktop\FotonBaseline_HOST_20261023-121245Z' | Should -Be $true
-            Test-FotonCaseOutputPath -Path 'D:\Cases\WinFoton_HOST_20250101-010101Z\x.csv' | Should -Be $true
+        AfterEach {
+            Remove-Item -LiteralPath $script:root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        It 'matches an earlier collect package that has a collection log' {
+            $pkg = Join-Path $script:root 'Foton_HOST_20261028-180601Z'
+            New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $pkg '00_Collection\collection.log') -Value 'Foton collection log'
+            Test-FotonCaseOutputPath -Path (Join-Path $pkg '08_Filesystem\lnk_jumplist\a.lnk') | Should -Be $true
+        }
+        It 'matches a baseline package that has baseline.json' {
+            $pkg = Join-Path $script:root 'FotonBaseline_HOST_20261023-121245Z'
+            New-Item -Path $pkg -ItemType Directory -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $pkg 'baseline.json') -Value '{}'
+            Test-FotonCaseOutputPath -Path (Join-Path $pkg 'x.txt') | Should -Be $true
+        }
+        It 'does not skip a host folder that only imitates the package name' {
+            $fake = Join-Path $script:root 'Foton_HOST_20260101-000000Z'
+            New-Item -Path $fake -ItemType Directory -Force | Out-Null
+            Test-FotonCaseOutputPath -Path (Join-Path $fake 'payload.exe') | Should -Be $false
+        }
+        It 'matches the current run''s own case folder' {
+            $own = Join-Path $script:root 'Foton_HOST_20261106-013025Z'
+            $script:FotonSession.CaseRoot = $own
+            Test-FotonCaseOutputPath -Path (Join-Path $own '08_Filesystem\x.lnk') | Should -Be $true
         }
         It 'does not match the collector script or unrelated folders' {
             Test-FotonCaseOutputPath -Path 'C:\Users\u\Downloads\Foton-Collect.ps1' | Should -Be $false

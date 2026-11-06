@@ -31,8 +31,9 @@ function Invoke-FotonSystemCollection {
             BiosVersion        = if ($bios) { ($bios.BIOSVersion -join ' ') } else { '' }
             SmbiosBiosVersion  = if ($bios) { [string]$bios.SMBIOSBIOSVersion } else { '' }
             BiosReleaseDateUtc = if ($bios -and $bios.ReleaseDate) { $bios.ReleaseDate.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
-            # 255.255 means the platform does not report an embedded controller version.
-            EmbeddedControllerVersion = if ($bios -and $null -ne $bios.EmbeddedControllerMajorVersion) { '{0}.{1}' -f $bios.EmbeddedControllerMajorVersion, $bios.EmbeddedControllerMinorVersion } else { '' }
+            # SMBIOS uses 255 (0xFF) for "no embedded controller version"; emitting
+            # "255.255" would read as a real version.
+            EmbeddedControllerVersion = if (-not $bios -or $null -eq $bios.EmbeddedControllerMajorVersion) { '' } elseif ([int]$bios.EmbeddedControllerMajorVersion -eq 255) { 'NotReported' } else { '{0}.{1}' -f $bios.EmbeddedControllerMajorVersion, $bios.EmbeddedControllerMinorVersion }
             BiosSerial         = if ($bios) { $bios.SerialNumber } else { '' }
             TimeZone           = [System.TimeZoneInfo]::Local.Id
             UtcOffset          = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).ToString()
