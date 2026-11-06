@@ -41,4 +41,12 @@ Name mapping from the historical v1 collector (if `WinFoton.ps1` is still in the
 
 `ConvertFrom-FotonFileTimeUtc` / `Get-FotonBamDamRows` support Collect BAM/DAM. AppCompatCache is a raw blob export, not a parsed Shimcache table.
 
+`Save-FotonRegistryHive` exports a loaded hive with `reg save` (SYSTEM, SOFTWARE, DEFAULT, signed-in users' NTUSER/UsrClass); a FileShare copy of a loaded hive always fails. SAM and SECURITY are never saved.
+
+`Get-FotonCopyTaskStatus` turns per-file `Status` rows (CopyError, SaveError) into a task status of Success, Partial, or Failed, which `Invoke-FotonCollection` writes to the manifest and coverage.
+
+`Test-FotonCaseOutputPath` keeps profile scans out of this run's case folder and earlier Foton packages (name pattern plus a `collection.log` / `baseline.json` marker). Skipped earlier packages are listed in `collection_coverage.json` because the markers can be forged.
+
+`Get-FotonLocalGroupMemberAdsi` is the WinNT ADSI fallback when `Get-LocalGroupMember` fails (error 1789 on orphaned SIDs).
+
 Hive mount prefix is `Foton_<SID>`. `Get-FotonUserHiveRoot` also accepts historical `WinFoton_<SID>` mounts.

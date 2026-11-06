@@ -89,8 +89,9 @@ function Install-FotonTool {
 
     $catalog = @(Get-FotonToolCatalog -CatalogPath $CatalogPath)
     if ($List -or -not $Name) {
+        # Out-Host so wrappers can Out-Null the returned objects without killing the table.
         $catalog | Select-Object Name, Version, License, DownloadUrl, ExpectedSha256, Notes |
-            Format-Table -AutoSize -Wrap
+            Format-Table -AutoSize -Wrap | Out-Host
         if (-not $List -and -not $Name) {
             Write-Host "  Usage: Install-FotonTool -Name Hayabusa   (or -List)" -ForegroundColor Cyan
         }

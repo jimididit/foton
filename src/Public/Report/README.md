@@ -23,4 +23,4 @@ Default path is `Foton_Report.html` at the case root. Baseline packages use
 emitted by `Foton-Baseline.ps1`). Parse HTML is `analysis/Foton_Parse.html`
 (not `findings.csv`). Re-reporting must not rewrite collect `hashes.csv`.
 
-In-report CSV browser: see `docs/TODO.md`.
+An in-report CSV browser is planned, not built.

@@ -26,21 +26,21 @@ function Show-FotonEasyHelp {
     Write-Host '  Baseline (known-state snapshot, different file):'
     Write-Host '    .\build\Build-BaselineStandalone.ps1'
     Write-Host '    Copy dist\Foton-Baseline_v*_schema*.ps1 (or Foton-Baseline.ps1) to the target, then run it.'
-    Write-Host '    Open Foton_Baseline.html inside FotonBaseline_HOST_...Z'
+    Write-Host '    Open Foton_Baseline.html inside FotonBaseline_HOSTNAME_...Z'
     Write-Host ''
-    Write-Host '  On this repo (workstation):'
-    Write-Host '    Foton.cmd analyze  C:\FotonCases\Foton_HOST_...Z'
-    Write-Host '    Foton.cmd baseline C:\Baselines'
-    Write-Host '    Foton.cmd baseline C:\Baselines\this-pc.json'
-    Write-Host '    Foton.cmd compare  C:\Baselines\day0.json C:\Baselines\day1.json'
-    Write-Host '    Foton.cmd parse    C:\FotonCases\Foton_HOST_...Z'
-    Write-Host '    Foton.cmd compose  C:\FotonCases\Foton_HOST_...Z'
+    Write-Host '  On this repo (workstation). Extract a ZIP first, then parse, compose, analyze (last):'
+    Write-Host '    Foton.cmd parse    D:\Cases\Foton_HOSTNAME_...Z'
+    Write-Host '    Foton.cmd compose  D:\Cases\Foton_HOSTNAME_...Z'
+    Write-Host '    Foton.cmd analyze  D:\Cases\Foton_HOSTNAME_...Z'
+    Write-Host '    Foton.cmd ioc      D:\Cases\Foton_HOSTNAME_...Z D:\intel\iocs.txt'
+    Write-Host '    Foton.cmd baseline D:\Baselines'
+    Write-Host '    Foton.cmd baseline D:\Baselines\this-pc.json'
+    Write-Host '    Foton.cmd compare  D:\Baselines\day0.json D:\Baselines\day1.json'
     Write-Host '    Foton.cmd tools    Hayabusa          (one-time workstation setup; does not change PATH)'
     Write-Host '    Foton.cmd tools    EZTools C:\Tools\EZTools   (register an existing install; also Chainsaw <dir>)'
     Write-Host '    Foton.cmd tools                      (list pinned tools)'
-    Write-Host '    Foton.cmd ioc      C:\FotonCases\Foton_HOST_...Z C:\intel\iocs.txt'
-    Write-Host '    Foton.cmd carve    C:\blob.bin'
-    Write-Host '    Foton.cmd collect  C:\FotonCases     (runs dist\Foton-Collect.ps1 if built)'
+    Write-Host '    Foton.cmd carve    D:\blob.bin'
+    Write-Host '    Foton.cmd collect  D:\Cases          (runs dist\Foton-Collect.ps1 if built)'
     Write-Host ''
     Write-Host '  Open Foton_Report.html after analyze. Open analysis\Foton_Parse.html after parse.'
     Write-Host '  Findings are observations, not conclusions. Full command list: docs\USAGE.md'
@@ -122,6 +122,7 @@ switch ($cmd) {
     'tools' {
         # One-time workstation setup. Never runs inside compose (offline invariant).
         if (-not $Target -or $Target -in @('list', '-list', '/list')) {
+            # Table goes to host; Out-Null only drops the returned catalog objects.
             Install-FotonTool -List | Out-Null
             return
         }
