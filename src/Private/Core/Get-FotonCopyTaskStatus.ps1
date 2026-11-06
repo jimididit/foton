@@ -12,7 +12,9 @@ function Get-FotonCopyTaskStatus {
     param([object]$Rows)
 
     $result = [PSCustomObject]@{ Status = 'Success'; Message = '' }
-    $list = @($Rows | Where-Object { $null -ne $_ -and $_.PSObject.Properties['Status'] })
+    # Copy rows carry both SourcePath and Status; data rows that merely have a
+    # Status column (services, PnP devices) are not considered.
+    $list = @($Rows | Where-Object { $null -ne $_ -and $_.PSObject.Properties['Status'] -and $_.PSObject.Properties['SourcePath'] })
     if ($list.Count -eq 0) { return $result }
 
     $failed = @($list | Where-Object { [string]$_.Status -in @('CopyError', 'SaveError') })

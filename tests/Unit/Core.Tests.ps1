@@ -380,6 +380,8 @@ InModuleScope Foton {
             New-Item -Path (Join-Path $pkg '00_Collection') -ItemType Directory -Force | Out-Null
             Set-Content -LiteralPath (Join-Path $pkg '00_Collection\collection.log') -Value 'Foton collection log'
             Test-FotonCaseOutputPath -Path (Join-Path $pkg '08_Filesystem\lnk_jumplist\a.lnk') | Should -Be $true
+            # Skips are disclosed, not silent: the folder is recorded for coverage.
+            @($script:FotonSession['ExcludedEarlierPackages']) | Should -Contain $pkg
         }
         It 'matches a baseline package that has baseline.json' {
             $pkg = Join-Path $script:root 'FotonBaseline_HOST_20261023-121245Z'
@@ -396,6 +398,7 @@ InModuleScope Foton {
             $own = Join-Path $script:root 'Foton_HOST_20261106-013025Z'
             $script:FotonSession.CaseRoot = $own
             Test-FotonCaseOutputPath -Path (Join-Path $own '08_Filesystem\x.lnk') | Should -Be $true
+            $script:FotonSession.ContainsKey('ExcludedEarlierPackages') | Should -Be $false
         }
         It 'does not match the collector script or unrelated folders' {
             Test-FotonCaseOutputPath -Path 'C:\Users\u\Downloads\Foton-Collect.ps1' | Should -Be $false

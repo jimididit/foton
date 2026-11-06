@@ -19,6 +19,9 @@ function Write-FotonCollectionCoverage {
         SkippedTasks           = @($skipped | ForEach-Object { $_.Task })
         IncompleteTaskCount    = $incomplete.Count
         IncompleteTasks        = @($incomplete | ForEach-Object { '{0} ({1})' -f $_.Task, $_.Status })
+        # Folders that profile scans skipped as earlier Foton packages (forgeable by
+        # the host, so disclosed rather than trusted).
+        ExcludedEarlierPackages = @($(if ($script:FotonSession.ContainsKey('ExcludedEarlierPackages')) { $script:FotonSession['ExcludedEarlierPackages'] }))
         WorthCollectingWithoutAdmin = @(
             'Current-user processes (image hash/signature only if the file is readable)',
             'TCP connections and listeners the token can enumerate',

@@ -150,8 +150,20 @@ function Invoke-FotonFilesystemCollection {
                 # (.LOG*, .regtrans-ms) stay in the package as context.
                 if ($primary -and $primary.Status -eq 'CopyError' -and $userProfile.HiveLoaded -and
                     (Test-FotonPathAccessible -Path ('Registry::HKEY_USERS\{0}' -f ($h.Key -replace '^HKU\\', '')))) {
-                    $saved = Save-FotonRegistryHive -RegistryPath $h.Key -DestinationPath (Join-Path $userDest $h.File) `
-                        -PackageRelativePath (Join-Path $userRel $h.File)
+                    # The on-disk hive size is readable even while locked; respect the
+                    # per-collection user-hive budget before exporting.
+                    $onDisk = [int64]0
+                    try { $onDisk = (Get-Item -LiteralPath $h.Src -Force -ErrorAction Stop).Length } catch { }
+                    if ($onDisk -gt $budget) {
+                        $saved = [PSCustomObject]@{
+                            SourcePath = $h.Key; DestRelative = ''; SizeBytes = $onDisk; SHA256 = ''; Status = 'CappedSkip'
+                            Note       = 'Loaded hive exceeds the remaining user-hive copy budget; not exported.'
+                        }
+                    }
+                    else {
+                        $saved = Save-FotonRegistryHive -RegistryPath $h.Key -DestinationPath (Join-Path $userDest $h.File) `
+                            -PackageRelativePath (Join-Path $userRel $h.File)
+                    }
                     $rest = @($fam | Where-Object { $_ -ne $primary })
                     if ($saved.Status -eq 'Saved') {
                         # Locked .LOG sidecars are moot once the hive is exported whole.
