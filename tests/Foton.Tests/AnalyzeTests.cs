@@ -118,6 +118,8 @@ namespace Foton.Tests
                     new Finding { Severity = "High\"><script>", Category = "X", Title = "T", Observation = "o", Artifact = "javascript:alert(1)" },
                     new Finding { Severity = "Low", Category = "X", Title = "T2", Observation = "o", Artifact = "java\tscript:alert(2)" },
                     new Finding { Severity = "Low", Category = "X", Title = "T3", Observation = "o", Artifact = "java\nscript&#58;alert(3)" },
+                    new Finding { Severity = "Low", Category = "X", Title = "T4", Observation = "o", Artifact = "  //evil.example/x" },
+                    new Finding { Severity = "Low", Category = "X", Title = "T5", Observation = "o", Artifact = " \\\\evil\\share" },
                 },
                 Manifest = new[]
                 {
@@ -128,6 +130,7 @@ namespace Foton.Tests
             Assert.DoesNotContain("<script>", html.Replace("<script>\r\n(function", ""));
             Assert.DoesNotContain("href=\"javascript:", html);
             Assert.DoesNotContain("href=\"java", html);
+            Assert.DoesNotMatch("href=\"[^\"]*evil", html);
             Assert.DoesNotContain("href=\"//attacker", html);
             Assert.DoesNotContain("<img src=x", html);
             Assert.Contains("<a href=\"01_System/os_info.json\">os_info.json</a>", html);
