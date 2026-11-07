@@ -339,6 +339,20 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_tool_missing_its_NET_runtime_is_reported_with_its_logs_kept()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"08_Filesystem\prefetch");
+                Write(t.File(@"bin\pecmd.cmd"), "@echo You must install or update .NET to run this application.\r\n@exit /b 2147516566\r\n");
+                var row = Compose(pkg, t.File("empty"), new Dictionary<string, string> { ["PECmd"] = t.File(@"bin\pecmd.cmd") })
+                    .Rows.Single(r => r.Tool == "PECmd");
+                Assert.Equal("MissingRuntime", row.Status);
+                Assert.Contains("You must install", File.ReadAllText(Path.Combine(pkg, @"analysis\external\pecmd\tool_stdout.txt")));
+            }
+        }
+
+        [Fact]
         public void AmcacheParser_without_the_hive_is_NoInput_and_is_not_run()
         {
             using (var t = new TempDir())

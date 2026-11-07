@@ -219,6 +219,7 @@ namespace Foton.Tools
                 else
                 {
                     // Nothing new: keep earlier output, but replace the logs so they describe this run.
+                    Directory.CreateDirectory(toolDir);
                     foreach (var leaf in new[] { StdErr, StdOut })
                     {
                         var from = Path.Combine(stage, leaf);
