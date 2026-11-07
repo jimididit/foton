@@ -36,7 +36,8 @@ namespace Foton.Cli
             Banner.Write(log, Banner.Kind.Workstation);
             FotonPackage p;
             try { p = FotonPackage.Open(path); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException
+                || ex is ArgumentException || ex is NotSupportedException)
             {
                 log.Write("Cannot open package: " + ex.Message, StatusLevel.Error);
                 return 1;
@@ -53,6 +54,8 @@ namespace Foton.Cli
                 log.Write("ZIP verified from a temporary extraction that is removed afterwards; chain parse/compose/analyze on an extracted folder.", StatusLevel.Info);
             if (p.NestedDuplicate != null)
                 log.Write($"This package contains a full copy of itself at {Path.GetFileName(p.NestedDuplicate)}. It is skipped so artifacts are not counted twice.", StatusLevel.Warn);
+            foreach (var other in p.OtherNestedCases)
+                log.Write($"This package contains another case folder, {Path.GetFileName(other)}, that is not a copy of it. Its files are not loaded as this case's artifacts; review it separately.", StatusLevel.Warn);
 
             var v = p.VerifyHashes();
             if (!v.HashesFilePresent)

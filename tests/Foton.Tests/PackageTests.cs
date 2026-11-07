@@ -82,19 +82,55 @@ namespace Foton.Tests
         }
 
         [Fact]
-        public void Skip_texts_and_a_nested_copy_are_not_loaded_as_data()
+        public void Skip_texts_are_not_loaded_as_data()
         {
             using (var t = new TempDir())
             {
                 var folder = CopyFixture(t);
                 TextFile.Write(Path.Combine(folder, "06_Security_Posture", "auditpol.csv"), TaskRunner.SkippedText("auditpol"));
-                var nested = Path.Combine(folder, "copy", "00_Collection");
-                Directory.CreateDirectory(nested);
-                File.WriteAllText(Path.Combine(folder, "copy", "inner_only.json"), "{\"a\":1}");
+                Assert.False(FotonPackage.Open(folder).Artifacts.ContainsKey("auditpol"));
+            }
+        }
+
+        [Theory]
+        [InlineData("same-name")]
+        [InlineData("same-hashes")]
+        public void A_verified_copy_of_the_case_is_skipped_as_a_duplicate(string kind)
+        {
+            using (var t = new TempDir())
+            {
+                var folder = CopyFixture(t);
+                var childName = kind == "same-name" ? Path.GetFileName(folder) : "re-extracted";
+                var child = Path.Combine(folder, childName);
+                Directory.CreateDirectory(Path.Combine(child, "00_Collection"));
+                if (kind == "same-hashes")
+                    File.Copy(Path.Combine(folder, "00_Collection", "hashes.csv"), Path.Combine(child, "00_Collection", "hashes.csv"));
+                File.WriteAllText(Path.Combine(child, "inner_only.json"), "{\"a\":1}");
                 var p = FotonPackage.Open(folder);
-                Assert.False(p.Artifacts.ContainsKey("auditpol"));
+                Assert.Equal(child, p.NestedDuplicate);
+                Assert.Empty(p.OtherNestedCases);
                 Assert.False(p.Artifacts.ContainsKey("inner_only"));
-                Assert.Equal(Path.Combine(folder, "copy"), p.NestedDuplicate);
+                Assert.DoesNotContain(p.VerifyHashes().Unlisted, u => u.Contains("inner_only"));
+            }
+        }
+
+        [Fact]
+        public void A_planted_case_folder_is_reported_not_loaded_and_stays_visible_to_verification()
+        {
+            // A crafted package could plant a child 00_Collection to hide files. It is not treated as a copy:
+            // it is reported, cannot override this case's artifacts, and its files show as unlisted.
+            using (var t = new TempDir())
+            {
+                var folder = CopyFixture(t);
+                var planted = Path.Combine(folder, "planted");
+                Directory.CreateDirectory(Path.Combine(planted, "00_Collection"));
+                File.WriteAllText(Path.Combine(planted, "os_info.json"), "{\"forged\":true}");
+                var p = FotonPackage.Open(folder);
+                Assert.Null(p.NestedDuplicate);
+                Assert.Equal(new[] { planted }, p.OtherNestedCases);
+                var os = (System.Collections.Generic.Dictionary<string, object>)p.Artifacts["os_info"].Json!;
+                Assert.False(os.ContainsKey("forged"));
+                Assert.Contains(@"planted\os_info.json", p.VerifyHashes().Unlisted);
             }
         }
 

@@ -47,8 +47,13 @@ namespace Foton.Package
             if (ExtractedTo == null || !Directory.Exists(ExtractedTo)) return;
             try { Directory.Delete(ExtractedTo, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
-        /// <summary>A full copy of the case nested inside it, skipped by every recursive walk.</summary>
+        /// <summary>A verified full copy of the case nested inside it, skipped by every recursive walk.</summary>
         public string? NestedDuplicate { get; private set; }
+        /// <summary>
+        /// Other case folders embedded in this one (not a verified copy). Not loaded as this case's artifacts,
+        /// so they cannot override them; their files stay visible to VerifyHashes as unlisted.
+        /// </summary>
+        public IReadOnlyList<string> OtherNestedCases { get; private set; } = new string[0];
         /// <summary>From the folder name (..._yyyyMMdd-HHmmssZ), when present.</summary>
         public DateTime? StartTimeUtc { get; private set; }
         public IReadOnlyList<Dictionary<string, string?>> Manifest { get; private set; } = new Dictionary<string, string?>[0];
@@ -97,6 +102,7 @@ namespace Foton.Package
             }
             p.CaseRoot = root;
             p.NestedDuplicate = CaseTree.FindNestedDuplicate(p.CaseRoot);
+            p.OtherNestedCases = CaseTree.OtherChildCases(p.CaseRoot);
             p.Load();
             return p;
         }
@@ -112,7 +118,7 @@ namespace Foton.Package
             var artifacts = new Dictionary<string, Artifact>(StringComparer.OrdinalIgnoreCase);
             // Ordinal path order so "same name in two folders" resolves the same way on every run (last wins).
             var files = Directory.GetFiles(CaseRoot, "*", SearchOption.AllDirectories)
-                .Where(f => !CaseTree.IsUnder(f, NestedDuplicate))
+                .Where(f => !CaseTree.IsUnder(f, NestedDuplicate) && !OtherNestedCases.Any(c => CaseTree.IsUnder(f, c)))
                 .Where(f => Regex.IsMatch(Path.GetExtension(f), @"^\.(json|csv|txt)$", RegexOptions.IgnoreCase))
                 .Where(f => !SkipNames.Contains(Path.GetFileName(f)))
                 .Where(f => !SkipDirs.IsMatch(Path.GetDirectoryName(f)!.Substring(CaseRoot.Length)))
