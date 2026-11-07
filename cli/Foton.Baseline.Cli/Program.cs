@@ -84,8 +84,9 @@ namespace Foton.Baseline.Cli
                 log.Write("Baseline snapshot report: " + html, StatusLevel.Good);
                 return html;
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException || ex is ArgumentException)
+            catch (Exception ex)
             {
+                // Runs inside package writing, before hashing: any failure here must leave a hashed package behind.
                 log.Write("Baseline snapshot report not written: " + ex.Message, StatusLevel.Warn);
                 return null;
             }

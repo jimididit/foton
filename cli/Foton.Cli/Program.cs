@@ -130,8 +130,9 @@ namespace Foton.Cli
                     Foton.Baseline.Compare.BaselineCompareReport.Write(r, html);
                     log.Write("Baseline compare report: " + html, StatusLevel.Good);
                 }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+                catch (Exception ex)
                 {
+                    // The diff and baseline_diff.csv are already written; the HTML is a preview.
                     log.Write("Baseline compare report not written: " + ex.Message, StatusLevel.Warn);
                 }
             }
