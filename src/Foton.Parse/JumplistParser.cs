@@ -29,6 +29,8 @@ namespace Foton.Parse
     {
         static readonly byte[] ShellLinkClsid = { 0x01, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 };
         static readonly Regex HexName = new Regex("^[0-9a-fA-F]+$");
+        // 1.38.x stopped silently at 40; with every entry per category now read, a real file can hold more.
+        const int MaxCustomLnks = 400;
 
         public static List<ParseRecord> Parse(string path)
         {
@@ -80,7 +82,7 @@ namespace Foton.Parse
             }
 
             int found = 0, i = 0;
-            while (i <= bytes.Length - 20 && found < 40)
+            while (i <= bytes.Length - 20 && found < MaxCustomLnks)
             {
                 bool hit = true;
                 for (int c = 0; c < 16; c++)
@@ -110,6 +112,8 @@ namespace Foton.Parse
                 rows.Add(Row("CustomDestinations", lnk.Supported, lnk.LocalBasePath, verNote + lnk.Note, lnkPath: lnk.LocalBasePath));
                 i = Math.Max(end, lnkStart + 1);
             }
+            if (found >= MaxCustomLnks && i <= bytes.Length - 20)
+                rows.Add(Row("CustomDestinations", false, "", $"Stopped after {MaxCustomLnks} embedded LNKs; later entries in this file were not parsed. Use a jumplist tool for the rest."));
             if (rows.Count == 0)
                 rows.Add(Row("Unsupported-NotJumplist", false, "", "Not an OLE automatic destinations file and no Shell Link CLSID+LNK header was found. Paths were not guessed."));
             return rows;

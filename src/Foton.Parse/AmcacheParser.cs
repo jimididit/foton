@@ -27,34 +27,39 @@ namespace Foton.Parse
         /// <summary>"Compressed" key and value names are 8-bit Latin-1 (1.38.x decoded ASCII, turning accents into '?').</summary>
         static readonly Encoding Latin1 = Encoding.GetEncoding(28591);
 
-        static byte[]? Cell(byte[] b, long cellOffset)
+        /// <summary>
+        /// Payload of an allocated cell, read in place (no copy, so overlapping or oversized cells cannot multiply
+        /// memory). Allocated cells have a negative size; a reference into a free cell (positive size) is stale or
+        /// corrupt and fails closed, where 1.38.x read it as live data.
+        /// </summary>
+        static bool Cell(byte[] b, long cellOffset, out int start, out int length)
         {
-            if (cellOffset < 0) return null;
+            start = length = 0;
+            if (cellOffset < 0) return false;
             long pos = 0x1000 + cellOffset;
-            if (pos + 4 > b.Length) return null;
+            if (pos + 4 > b.Length) return false;
             long raw = BitConverter.ToInt32(b, (int)pos);
-            if (raw == 0) return null;
-            long len = Math.Abs(raw);
-            if (len < 8 || pos + len > b.Length) return null;
-            var payload = new byte[len - 4];
-            Array.Copy(b, pos + 4, payload, 0, payload.Length);
-            return payload;
+            if (raw >= 0) return false;
+            long len = -raw;
+            if (len < 8 || pos + len > b.Length) return false;
+            start = (int)pos + 4;
+            length = (int)len - 4;
+            return true;
         }
 
         public static Key? Nk(byte[] b, int cellOffset)
         {
-            var p = Cell(b, cellOffset);
-            if (p == null || p.Length < 0x4C || p[0] != 0x6E || p[1] != 0x6B) return null;
-            int flags = BitConverter.ToUInt16(p, 2);
-            int nameLen = BitConverter.ToUInt16(p, 0x48);
-            if (0x4C + nameLen > p.Length) return null;
+            if (!Cell(b, cellOffset, out var s, out var l) || l < 0x4C || b[s] != 0x6E || b[s + 1] != 0x6B) return null;
+            int flags = BitConverter.ToUInt16(b, s + 2);
+            int nameLen = BitConverter.ToUInt16(b, s + 0x48);
+            if (0x4C + nameLen > l) return null;
             var name = nameLen == 0 ? ""
-                : ((flags & 0x0020) != 0 ? Latin1.GetString(p, 0x4C, nameLen) : Encoding.Unicode.GetString(p, 0x4C, nameLen)).Trim('\0');
+                : ((flags & 0x0020) != 0 ? Latin1.GetString(b, s + 0x4C, nameLen) : Encoding.Unicode.GetString(b, s + 0x4C, nameLen)).Trim('\0');
             return new Key
             {
-                CellOffset = cellOffset, Name = name, KeyLastWriteUtc = Bin.FileTimeUtc(p, 4),
-                SubkeyCount = BitConverter.ToInt32(p, 0x14), SubkeyListOffset = BitConverter.ToInt32(p, 0x1C),
-                ValueCount = BitConverter.ToInt32(p, 0x24), ValueListOffset = BitConverter.ToInt32(p, 0x28),
+                CellOffset = cellOffset, Name = name, KeyLastWriteUtc = Bin.FileTimeUtc(b, s + 4),
+                SubkeyCount = BitConverter.ToInt32(b, s + 0x14), SubkeyListOffset = BitConverter.ToInt32(b, s + 0x1C),
+                ValueCount = BitConverter.ToInt32(b, s + 0x24), ValueListOffset = BitConverter.ToInt32(b, s + 0x28),
             };
         }
 
@@ -63,14 +68,13 @@ namespace Foton.Parse
             // Nested ri lists recurse; 1.38.x had no bound, so a cyclic list never returned. Each list is read
             // once and reading stops at the key's subkey count, so a fan-out of self-references stays linear.
             if (listOffset < 0 || depth > 8 || output.Count >= expected || !visited.Add(listOffset)) return;
-            var p = Cell(b, listOffset);
-            if (p == null || p.Length < 4) return;
-            var sig = Encoding.ASCII.GetString(p, 0, 2);
-            int count = BitConverter.ToUInt16(p, 2);
+            if (!Cell(b, listOffset, out var s, out var l) || l < 4) return;
+            var sig = Encoding.ASCII.GetString(b, s, 2);
+            int count = BitConverter.ToUInt16(b, s + 2);
             if (string.Equals(sig, "ri", StringComparison.OrdinalIgnoreCase))
             {
-                for (int i = 0; i < count && 4 + i * 4 + 4 <= p.Length && output.Count < expected; i++)
-                    SubkeyOffsets(b, BitConverter.ToInt32(p, 4 + i * 4), expected, output, depth + 1, visited);
+                for (int i = 0; i < count && 4 + i * 4 + 4 <= l && output.Count < expected; i++)
+                    SubkeyOffsets(b, BitConverter.ToInt32(b, s + 4 + i * 4), expected, output, depth + 1, visited);
                 return;
             }
             int entrySize;
@@ -80,8 +84,8 @@ namespace Foton.Parse
             for (int i = 0; i < count && output.Count < expected; i++)
             {
                 int at = 4 + i * entrySize;
-                if (at + 4 > p.Length) break;
-                output.Add(BitConverter.ToInt32(p, at));
+                if (at + 4 > l) break;
+                output.Add(BitConverter.ToInt32(b, s + at));
             }
         }
 
@@ -105,16 +109,15 @@ namespace Foton.Parse
 
         static KeyValuePair<string, string>? Vk(byte[] b, int vkOffset)
         {
-            var p = Cell(b, vkOffset);
-            if (p == null || p.Length < 0x14 || p[0] != 0x76 || p[1] != 0x6B) return null;
-            int nameLen = BitConverter.ToUInt16(p, 2);
-            uint sizeField = BitConverter.ToUInt32(p, 4);
-            int dataOff = BitConverter.ToInt32(p, 8);
-            int type = BitConverter.ToInt32(p, 0x0C);
-            int vflags = BitConverter.ToUInt16(p, 0x10);
-            if (0x14 + nameLen > p.Length) return null;
+            if (!Cell(b, vkOffset, out var s, out var l) || l < 0x14 || b[s] != 0x76 || b[s + 1] != 0x6B) return null;
+            int nameLen = BitConverter.ToUInt16(b, s + 2);
+            uint sizeField = BitConverter.ToUInt32(b, s + 4);
+            int dataOff = BitConverter.ToInt32(b, s + 8);
+            int type = BitConverter.ToInt32(b, s + 0x0C);
+            int vflags = BitConverter.ToUInt16(b, s + 0x10);
+            if (0x14 + nameLen > l) return null;
             var name = nameLen == 0 ? "(default)"
-                : ((vflags & 0x0001) != 0 ? Latin1.GetString(p, 0x14, nameLen) : Encoding.Unicode.GetString(p, 0x14, nameLen)).Trim('\0');
+                : ((vflags & 0x0001) != 0 ? Latin1.GetString(b, s + 0x14, nameLen) : Encoding.Unicode.GetString(b, s + 0x14, nameLen)).Trim('\0');
             int dlen = (int)(sizeField & 0x7FFFFFFF);
             byte[] data;
             if ((sizeField & 0x80000000) != 0)
@@ -125,10 +128,11 @@ namespace Foton.Parse
             else if (dlen == 0) data = new byte[0];
             else
             {
-                var dp = Cell(b, dataOff);
-                if (dp == null) return null;
-                data = new byte[Math.Min(dlen, dp.Length)];
-                Array.Copy(dp, data, data.Length);
+                // Values over 16344 bytes live in "db" big-data cells this walker does not follow; 1.38.x decoded the
+                // db header as text. Skip them rather than emit garbage.
+                if (dlen > 16344 || !Cell(b, dataOff, out var ds, out var dl)) return null;
+                data = new byte[Math.Min(dlen, dl)];
+                Array.Copy(b, ds, data, 0, data.Length);
             }
             var text = "";
             if (type == 1 || type == 2)
@@ -146,11 +150,10 @@ namespace Foton.Parse
             var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (nk == null || nk.ValueCount <= 0) return map;
             int n = Math.Min(nk.ValueCount, 500);
-            var lp = Cell(b, nk.ValueListOffset);
-            if (lp == null) return map;
-            for (int i = 0; i < n && i * 4 + 4 <= lp.Length; i++)
+            if (!Cell(b, nk.ValueListOffset, out var s, out var l)) return map;
+            for (int i = 0; i < n && i * 4 + 4 <= l; i++)
             {
-                var vk = Vk(b, BitConverter.ToInt32(lp, i * 4));
+                var vk = Vk(b, BitConverter.ToInt32(b, s + i * 4));
                 if (vk != null && vk.Value.Key.Length > 0 && vk.Value.Value.Length > 0) map[vk.Value.Key] = vk.Value.Value;
             }
             return map;

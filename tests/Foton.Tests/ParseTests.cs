@@ -95,6 +95,40 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_key_in_a_free_cell_is_not_read_as_live()
+        {
+            var b = File.ReadAllBytes(Path.Combine(Fixture(Case), "08_Filesystem", "amcache", "Amcache.hve"));
+            var name = System.Text.Encoding.ASCII.GetBytes("aabbcc");
+            int at = Enumerable.Range(0x1000, b.Length - 0x1000 - name.Length).First(i => b.Skip(i).Take(name.Length).SequenceEqual(name));
+            int cell = at - 0x4C - 4;
+            BitConverter.GetBytes(Math.Abs(BitConverter.ToInt32(b, cell))).CopyTo(b, cell);
+            using (var t = new TempDir())
+            {
+                var path = t.File("Amcache.hve");
+                File.WriteAllBytes(path, b);
+                var row = AmcacheParser.Parse(path).Single();
+                Assert.Equal("AmcacheHive", row.Format);
+                Assert.Equal("", row.Identity);
+            }
+        }
+
+        [Fact]
+        public void Custom_destinations_say_when_the_entry_cap_is_reached()
+        {
+            var one = File.ReadAllBytes(Path.Combine(Fixture(Case), "08_Filesystem", "jumplists", "4d5e6f.customDestinations-ms"));
+            var entry = one.Skip(12).Take(one.Length - 16).ToArray();
+            var many = one.Take(12).Concat(Enumerable.Repeat(entry, 401).SelectMany(e => e)).Concat(one.Skip(one.Length - 4)).ToArray();
+            using (var t = new TempDir())
+            {
+                var path = t.File("many.customDestinations-ms");
+                File.WriteAllBytes(path, many);
+                var rows = JumplistParser.Parse(path);
+                Assert.Equal(401, rows.Count);
+                Assert.StartsWith("Stopped after 400 embedded LNKs", rows.Last().Note);
+            }
+        }
+
+        [Fact]
         public void An_empty_DestList_is_reported_as_empty_not_as_a_read_failure()
         {
             using (var t = new TempDir())
