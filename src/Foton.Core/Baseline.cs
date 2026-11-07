@@ -38,8 +38,15 @@ namespace Foton.Core
     {
         public BaselineHeader Header { get; set; } = new BaselineHeader();
         public List<ProviderMeta> Providers { get; set; } = new List<ProviderMeta>();
-        /// <summary>RecordType to records (field to value) in capture order.</summary>
-        public Dictionary<string, List<Dictionary<string, object?>>> Records { get; set; } = new Dictionary<string, List<Dictionary<string, object?>>>();
+        /// <summary>RecordType (case-insensitive, as 1.38.x property lookup was) to records in capture order.</summary>
+        public Dictionary<string, List<Dictionary<string, object?>>> Records { get; set; } =
+            new Dictionary<string, List<Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The "Records" value exactly as parsed from the file. The payload hash of a loaded baseline is
+        /// computed from this, so it verifies the file's own bytes whatever shape each type was stored in.
+        /// </summary>
+        object? _parsedRecords;
 
         public const string HeaderNote =
             "Header timestamps are not part of the compared payload hash. Diff proves change between observations, not attribution. A baseline taken after an incident is a picture of that state.";
@@ -50,13 +57,19 @@ namespace Foton.Core
         /// </summary>
         public string ComputePayloadSha256()
         {
-            var payload = new Dictionary<string, object?>();
-            foreach (var kv in Records) payload[kv.Key] = kv.Value;
+            object payload;
+            if (_parsedRecords != null) payload = _parsedRecords;
+            else
+            {
+                var d = new Dictionary<string, object?>();
+                foreach (var kv in Records) d[kv.Key] = kv.Value;
+                payload = d;
+            }
             var json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 256 }.Serialize(payload);
             return Hashing.Sha256Hex(Encoding.UTF8.GetBytes(json));
         }
 
-        /// <summary>False when the records were edited after capture (or the header hash is a placeholder).</summary>
+        /// <summary>False when the file's records were edited after capture (or the header hash is a placeholder).</summary>
         public bool PayloadMatches() =>
             string.Equals(ComputePayloadSha256(), Header.PayloadSha256, StringComparison.OrdinalIgnoreCase);
 
@@ -97,7 +110,8 @@ namespace Foton.Core
                     ComparedFields = Items(p.TryGetValue("ComparedFields", out var c) ? c : null).Select(x => PsString(x)).ToArray(),
                     FalsePositives = Str(p, "FalsePositives"),
                 });
-            if (root.TryGetValue("Records", out var r) && r is Dictionary<string, object> rd)
+            if (root.TryGetValue("Records", out var r)) doc._parsedRecords = r;
+            if (r is Dictionary<string, object> rd)
                 foreach (var kv in rd)
                     doc.Records[kv.Key] = Items(kv.Value).OfType<Dictionary<string, object>>()
                         .Select(x => x.ToDictionary(f => f.Key, f => (object?)f.Value)).ToList();

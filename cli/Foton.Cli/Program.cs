@@ -111,8 +111,8 @@ namespace Foton.Cli
                 var n = r.Findings.Count(f => f.Severity == sev);
                 if (n > 0) log.Write($"{sev}: {n}", sev == "High" ? StatusLevel.Warn : StatusLevel.Info);
             }
-            foreach (var pair in r.Changes.Zip(r.Findings, (c, f) => new { c, f }).Where(x => x.f.Severity == "High").Take(25))
-                log.Write($"{pair.f.Title}: {pair.f.Observation}", StatusLevel.Warn);
+            foreach (var f in r.Findings.Where(x => x.Severity == "High").Take(25))
+                log.Write($"{f.Title}: {f.Observation}", StatusLevel.Warn);
             if (r.DiffCsvPath != null) log.Write("Change table: " + r.DiffCsvPath, StatusLevel.Info);
             log.WriteConsole("     A diff records change between two snapshots. It does not show when, who, or that the host is compromised.", ConsoleColor.DarkGray);
             return 0;

@@ -55,12 +55,49 @@ namespace Foton.Tests
             {
                 var r = RunGolden(t, "baseline-dif.json");
                 Assert.False(r.ReferencePayloadIntact); // the fixtures carry "00"
-                var doc = BaselineDocument.Load(t.File("ref.json"));
-                doc.Header.PayloadSha256 = doc.ComputePayloadSha256();
-                Assert.True(doc.PayloadMatches());
-                doc.Records["Service"][0]["PathName"] = @"C:\other.exe";
-                Assert.False(doc.PayloadMatches());
+
+                // Seal a copy with its true hash, then tamper with one record in the file.
+                var json = File.ReadAllText(t.File("ref.json"));
+                var sealedHash = BaselineDocument.Load(t.File("ref.json")).ComputePayloadSha256();
+                File.WriteAllText(t.File("sealed.json"), json.Replace("\"00\"", "\"" + sealedHash + "\""));
+                Assert.True(BaselineDocument.Load(t.File("sealed.json")).PayloadMatches());
+                File.WriteAllText(t.File("tampered.json"), File.ReadAllText(t.File("sealed.json")).Replace("spoolsv.exe", "spoolsv2.exe"));
+                Assert.False(BaselineDocument.Load(t.File("tampered.json")).PayloadMatches());
             }
+        }
+
+        [Fact]
+        public void Payload_hash_verifies_the_file_whatever_shape_a_type_was_stored_in()
+        {
+            using (var t = new TempDir())
+            {
+                const string records = "{\"Service\":{\"Name\":\"Solo\",\"PathName\":\"x\"},\"Missing\":null,\"Listed\":[{\"Name\":\"a\"}]}";
+                var sha = Hashing.Sha256Hex(System.Text.Encoding.UTF8.GetBytes(records));
+                File.WriteAllText(t.File("b.json"), "{\"Header\":{\"PayloadSha256\":\"" + sha + "\"},\"Records\":" + records + "}");
+                var doc = BaselineDocument.Load(t.File("b.json"));
+                Assert.True(doc.PayloadMatches());
+                Assert.Single(doc.Records["Service"]);
+                Assert.Empty(doc.Records["Missing"]);
+            }
+        }
+
+        [Fact]
+        public void A_type_only_the_difference_knows_uses_its_contract_and_type_names_are_case_insensitive()
+        {
+            var keyed = new ProviderMeta { RecordType = "KnownDll", IdentityFields = new[] { "Key" }, ComparedFields = new[] { "MappedFile" } };
+            var reference = new BaselineDocument { Header = { BaselineSchemaVersion = "1.14.0", Hostname = "H" } };
+            reference.Records["service"] = new List<Dictionary<string, object?>> { new Dictionary<string, object?> { ["Name"] = "Spooler" } };
+            var difference = new BaselineDocument { Header = { BaselineSchemaVersion = "1.14.0", Hostname = "H" }, Providers = { keyed } };
+            difference.Records["Service"] = new List<Dictionary<string, object?>> { new Dictionary<string, object?> { ["Name"] = "Spooler" } };
+            difference.Records["KnownDll"] = new List<Dictionary<string, object?>>
+            {
+                new Dictionary<string, object?> { ["Key"] = "kernel32", ["MappedFile"] = "kernel32.dll" },
+                new Dictionary<string, object?> { ["Key"] = "user32", ["MappedFile"] = "user32.dll" },
+            };
+            var r = BaselineComparer.Compare(reference, difference, "dif.json");
+            // Two Added rows keyed by Key (1.38.x keyed by the absent Name and collapsed them into one);
+            // "service" and "Service" are the same type, so no Removed/Added pair for Spooler.
+            Assert.Equal(new[] { "Added KnownDll kernel32", "Added KnownDll user32" }, r.Changes.Select(c => $"{c.ChangeType} {c.RecordType} {c.Identity}"));
         }
 
         [Fact]

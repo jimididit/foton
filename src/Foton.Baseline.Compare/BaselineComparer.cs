@@ -60,12 +60,16 @@ namespace Foton.Baseline.Compare
                 DifferencePayloadIntact = difference.PayloadMatches(),
             };
 
-            // Identity and compared fields come from the reference baseline's provider contracts.
+            // Identity and compared fields come from the reference baseline's provider contracts; a type only
+            // the difference baseline knows uses its contract (1.38.x fell back to "Name", which collapses
+            // every record onto one empty identity when the type has no Name field).
             var meta = new Dictionary<string, ProviderMeta>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in difference.Providers) meta[p.RecordType] = p;
             foreach (var p in reference.Providers) meta[p.RecordType] = p;
 
             var types = reference.Records.Keys.ToList();
-            foreach (var t in difference.Records.Keys) if (!types.Contains(t)) types.Add(t);
+            foreach (var t in difference.Records.Keys)
+                if (!types.Contains(t, StringComparer.OrdinalIgnoreCase)) types.Add(t);
 
             foreach (var type in types.OrderBy(t => t, Order))
             {

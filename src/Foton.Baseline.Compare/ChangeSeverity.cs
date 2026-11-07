@@ -16,7 +16,8 @@ namespace Foton.Baseline.Compare
             bool F(string field) => Eq(c.Field, field);
             bool C(params string[] kinds) => kinds.Any(k => Eq(c.ChangeType, k));
             bool I(params string[] ids) => ids.Any(i => Eq(c.Identity, i));
-            bool Like(string prefix) => c.Identity.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+            var identity = c.Identity ?? "";
+            bool Like(string prefix) => identity.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
 
             var sev = "Medium";
             if (T("InstalledSoftware") && F("DisplayVersion")) sev = "Info";
@@ -50,7 +51,7 @@ namespace Foton.Baseline.Compare
             if (T("SessionManager")) sev = "High";
             if (T("KnownDll")) sev = "High";
             if (T("ProxyConfig")) sev = "High";
-            if (T("ProxyConfig") && c.Identity.EndsWith("|AutoConfigURL", StringComparison.OrdinalIgnoreCase)) sev = "Medium";
+            if (T("ProxyConfig") && identity.EndsWith("|AutoConfigURL", StringComparison.OrdinalIgnoreCase)) sev = "Medium";
             if (T("WinsockLsp")) sev = "High";
             if (T("ActiveSetup") && (C("Added", "Removed") || F("StubPath"))) sev = "High";
             if (T("ActiveSetup") && F("Version")) sev = "Info";
@@ -62,6 +63,6 @@ namespace Foton.Baseline.Compare
             return sev;
         }
 
-        static bool Eq(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        static bool Eq(string? a, string b) => string.Equals(a ?? "", b, StringComparison.OrdinalIgnoreCase);
     }
 }
