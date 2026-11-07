@@ -96,6 +96,25 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Package_values_cannot_inject_markup_or_script_links_into_the_report()
+        {
+            var html = TriageReport.Render(new TriageReportInput
+            {
+                Findings = new[] { new Finding { Severity = "High\"><script>", Category = "X", Title = "T", Observation = "o", Artifact = "javascript:alert(1)" } },
+                Manifest = new[]
+                {
+                    new Dictionary<string, string?> { ["Category"] = "System", ["File"] = @"\\attacker\share\x.json", ["Records"] = "<img src=x onerror=alert(1)>", ["Status"] = "Success" },
+                    new Dictionary<string, string?> { ["Category"] = "System", ["File"] = @"01_System\os_info.json", ["Records"] = "1", ["Status"] = "Success" },
+                },
+            });
+            Assert.DoesNotContain("<script>", html.Replace("<script>\r\n(function", ""));
+            Assert.DoesNotContain("href=\"javascript:", html);
+            Assert.DoesNotContain("href=\"//attacker", html);
+            Assert.DoesNotContain("<img src=x", html);
+            Assert.Contains("<a href=\"01_System/os_info.json\">os_info.json</a>", html);
+        }
+
+        [Fact]
         public void Without_the_pattern_list_the_gap_is_stated_and_pattern_rules_stay_quiet()
         {
             using (var t = new TempDir())

@@ -36,6 +36,15 @@ namespace Foton.Analyze
 
         static string E(object? v) => Html.Encode(Str(v));
 
+        static readonly System.Text.RegularExpressions.Regex Scheme = new System.Text.RegularExpressions.Regex(@"^\s*([a-zA-Z][a-zA-Z0-9+.\-]*:|[\\/]{2})");
+
+        /// <summary>
+        /// A link to a path inside the package, or plain text. Paths come from package files, so anything with a
+        /// scheme (javascript:, file:, http:), a drive, or a UNC prefix is not made clickable.
+        /// </summary>
+        static string Link(string target, string text) =>
+            Scheme.IsMatch(target) ? Html.Encode(text) : $"<a href=\"{Html.Encode(target)}\">{Html.Encode(text)}</a>";
+
         /// <summary>
         /// Severity then category, with Sort-Object's algorithm (PsSort), so findings with equal keys land in the same
         /// order 1.38.x rendered them for the same findings.
@@ -157,9 +166,9 @@ namespace Foton.Analyze
                     case "Medium": cls = "f-med"; chip = "chip-med"; break;
                     case "Low": cls = "f-low"; chip = "chip-low"; break;
                 }
-                sb.AppendLine($"<div class=\"finding {cls}\" data-sev=\"{f.Severity}\">");
+                sb.AppendLine($"<div class=\"finding {cls}\" data-sev=\"{Html.Encode(f.Severity)}\">");
                 sb.AppendLine("<div class=\"f-head\">");
-                sb.AppendLine($"<span class=\"chip {chip}\">{f.Severity}</span>");
+                sb.AppendLine($"<span class=\"chip {chip}\">{Html.Encode(f.Severity)}</span>");
                 sb.AppendLine("<span class=\"chip chip-cat\">" + Html.Encode(f.Category) + "</span>");
                 sb.AppendLine("<span class=\"f-title\">" + Html.Encode(f.Title) + "</span>");
                 sb.AppendLine($"<span class=\"chip chip-tier\">Tier {f.Tier}</span>");
@@ -169,7 +178,7 @@ namespace Foton.Analyze
                 sb.AppendLine("</div>");
                 if (f.WhyItMatters.Length > 0) sb.AppendLine("<p><span class=\"lbl\">Why it matters</span>" + Html.Encode(f.WhyItMatters) + "</p>");
                 if (f.NextStep.Length > 0) sb.AppendLine("<p><span class=\"lbl\">Suggested next step</span>" + Html.Encode(f.NextStep) + "</p>");
-                if (f.Artifact.Length > 0) sb.AppendLine($"<p><span class=\"lbl\">Source artifact</span><a href=\"{Html.Encode(f.Artifact)}\">{Html.Encode(f.Artifact)}</a></p>");
+                if (f.Artifact.Length > 0) sb.AppendLine("<p><span class=\"lbl\">Source artifact</span>" + Link(f.Artifact, f.Artifact) + "</p>");
                 sb.AppendLine("</div></div>");
             }
             sb.AppendLine("<div id=\"nores\" style=\"display:none;color:#7f93a8;padding:14px\">No observations match the current filter.</div>");
@@ -217,7 +226,7 @@ namespace Foton.Analyze
                 var statusClass = Eq(status, "NoData") ? "dim" : Ne(status, "Success") ? "bad" : "ok";
                 var file = V(m, "File");
                 var leaf = file.Split('\\', '/').Last();
-                sb.AppendLine($"<tr><td class=\"dim\">{Html.Encode(V(m, "Category"))}</td><td><a href=\"{Html.Encode(file.Replace('\\', '/'))}\">{Html.Encode(leaf)}</a></td><td>{Html.Encode(V(m, "Description"))}</td><td>{V(m, "Records")}</td><td class=\"{statusClass}\">{Html.Encode(status)}</td></tr>");
+                sb.AppendLine($"<tr><td class=\"dim\">{Html.Encode(V(m, "Category"))}</td><td>{Link(file.Replace('\\', '/'), leaf)}</td><td>{Html.Encode(V(m, "Description"))}</td><td>{Html.Encode(V(m, "Records"))}</td><td class=\"{statusClass}\">{Html.Encode(status)}</td></tr>");
             }
             sb.AppendLine("</table>");
 
@@ -240,7 +249,7 @@ namespace Foton.Analyze
                         var hash = V(row, "SHA256");
                         if (hash.Length > 16) hash = hash.Substring(0, 16) + "...";
                         var dest = V(row, "DestRelative");
-                        var outCell = dest.Length > 0 ? $"<a href=\"{Html.Encode(dest.Replace('\\', '/'))}\">{Html.Encode(dest)}</a>" : "<span class=\"dim\">-</span>";
+                        var outCell = dest.Length > 0 ? Link(dest.Replace('\\', '/'), dest) : "<span class=\"dim\">-</span>";
                         var ver = V(row, "Version");
                         var rules = V(row, "RulesVersion");
                         sb.AppendLine($"<tr><td>{Html.Encode(V(row, "Tool"))}</td><td class=\"dim\">{Html.Encode(ver.Length > 0 ? ver : "-")}</td><td class=\"dim\">{Html.Encode(rules.Length > 0 ? rules : "-")}</td><td class=\"{cls}\">{Html.Encode(st)}</td><td>{outCell}</td><td class=\"dim\">{Html.Encode(hash)}</td><td>{Html.Encode(V(row, "Note"))}</td></tr>");
