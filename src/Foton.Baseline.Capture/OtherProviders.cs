@@ -19,7 +19,7 @@ namespace Foton.Baseline.Capture
             RecordType = "BitsJob", IdentityFields = new[] { "JobId" }, ComparedFields = new[] { "DisplayName", "TransferType", "OwnerAccount", "Priority", "ProxyUsage", "NotifyCmdLine" },
             FalsePositives = "Windows Update and Store use BITS. Added/Removed JobIds between captures are common. A new or changed NotifyCmdLine (bitsadmin /SetNotifyCmdLine) is the usual review item, not BytesTransferred.",
             SortKeys = new[] { "JobId" },
-            Collect = ctx => Safe(() => Bits.Jobs().Where(j => j.JobId.Length > 0).Select(j => Row(
+            Collect = ctx => ctx.Safe(() => Bits.Jobs().Where(j => j.JobId.Length > 0).Select(j => Row(
                 "JobId", j.JobId,
                 "DisplayName", j.DisplayName.Length > 0 ? j.DisplayName : "(not set)",
                 "TransferType", j.TransferType.Length > 0 ? j.TransferType : "(not set)",
@@ -42,7 +42,7 @@ namespace Foton.Baseline.Capture
             RecordType = "Certificate", IdentityFields = new[] { "Store", "Thumbprint" }, ComparedFields = new[] { "Subject", "Issuer", "NotAfter" },
             FalsePositives = "Enterprise Root CA rollout and Intune add roots. A new Root thumbprint that is not Microsoft/your org CA is the usual review item. Renewal changes NotAfter for the same thumbprint only if the cert is reissued with the same key - often a new thumbprint (Added+Removed).",
             SortKeys = new[] { "Store", "Thumbprint" },
-            Collect = ctx => Stores.SelectMany(s => Safe(() =>
+            Collect = ctx => Stores.SelectMany(s => ctx.Safe(() =>
             {
                 var rows = new List<Dictionary<string, object?>>();
                 using (var store = new X509Store(s.Value, StoreLocation.LocalMachine))
@@ -62,7 +62,7 @@ namespace Foton.Baseline.Capture
             RecordType = "HostsEntry", IdentityFields = new[] { "Address", "Hostname" }, ComparedFields = new string[0],
             FalsePositives = "Local development (localhost, kubernetes.docker.internal), ad-block lists, and MDM-managed hosts files. IPv6 localhost (::1) is expected.",
             SortKeys = new[] { "Address", "Hostname" },
-            Collect = ctx => Safe(() =>
+            Collect = ctx => ctx.Safe(() =>
             {
                 var rows = new List<Dictionary<string, object?>>();
                 var path = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", @"System32\drivers\etc\hosts");
@@ -87,7 +87,7 @@ namespace Foton.Baseline.Capture
             RecordType = "LocalGroupMember", IdentityFields = new[] { "Group", "SID" }, ComparedFields = new[] { "Member" },
             FalsePositives = "Domain join adds Domain Admins. Intune/LAPS may add a local admin. Compare to the role golden image, not a random workstation.",
             SortKeys = new[] { "Group", "SID" },
-            Collect = ctx => Safe(() => LocalGroups.Groups().SelectMany(g => Safe(() => LocalGroups.Members(g)
+            Collect = ctx => ctx.Safe(() => LocalGroups.Groups().SelectMany(g => ctx.Safe(() => LocalGroups.Members(g)
                 .Select(m => Row("Group", m.Group, "SID", m.Sid, "Member", m.Member))))),
         };
 
@@ -103,7 +103,7 @@ namespace Foton.Baseline.Capture
                     new KeyValuePair<string, string>("Common", Path.Combine(Environment.GetEnvironmentVariable("ProgramData") ?? @"C:\ProgramData", @"Microsoft\Windows\Start Menu\Programs\StartUp")),
                 };
                 dirs.AddRange(ctx.Profiles.Where(p => p.Exists).Select(p => new KeyValuePair<string, string>(p.Sid, Path.Combine(p.ProfilePath, @"AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"))));
-                return dirs.SelectMany(d => Safe(() =>
+                return dirs.SelectMany(d => ctx.Safe(() =>
                     !HostInfo.Accessible(d.Value) ? Enumerable.Empty<Dictionary<string, object?>>()
                     : Directory.GetFiles(d.Value).Select(f => new FileInfo(f))
                         .Where(f => !string.Equals(f.Name, "desktop.ini", StringComparison.OrdinalIgnoreCase))
@@ -150,7 +150,7 @@ namespace Foton.Baseline.Capture
                 {
                     Row("Kind", "Wdac", "Name", "SiPolicy.p7b", "Path", si, "PolicyHash", File.Exists(si) ? Hashing.SafeHash(si, false) : "(not present)"),
                 };
-                rows.AddRange(Safe(() => Directory.Exists(ci)
+                rows.AddRange(ctx.Safe(() => Directory.Exists(ci)
                     ? Directory.GetFiles(ci, "*.cip").Select(f => Row("Kind", "WdacCip", "Name", Path.GetFileName(f), "Path", f, "PolicyHash", Hashing.SafeHash(f, false)))
                     : Enumerable.Empty<Dictionary<string, object?>>()));
                 var xml = AppLocker.EffectiveXml();

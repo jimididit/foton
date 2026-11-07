@@ -38,7 +38,7 @@ namespace Foton.Baseline.Capture
             RecordType = "DefenderPreference", IdentityFields = new[] { "Kind", "Name" }, ComparedFields = new[] { "Value" },
             FalsePositives = "Intune, GPO, and tamper-protection UI change these. An exclusion add is a new row (Kind + path), not proof of compromise.",
             SortKeys = new[] { "Kind", "Name" },
-            Collect = ctx => Safe(() =>
+            Collect = ctx => ctx.Safe(() =>
             {
                 var p = Wmi.Query(@"root\Microsoft\Windows\Defender", "SELECT * FROM MSFT_MpPreference").FirstOrDefault();
                 if (p == null) return Enumerable.Empty<Dictionary<string, object?>>();
@@ -63,7 +63,7 @@ namespace Foton.Baseline.Capture
             RecordType = "Driver", IdentityFields = new[] { "Name" }, ComparedFields = new[] { "DisplayName", "StartMode", "PathName" },
             FalsePositives = "Windows Update replaces driver PathName. Catalog-signed drivers still show odd signature status in Collect; this snapshot does not include signature.",
             SortKeys = new[] { "Name" },
-            Collect = ctx => Safe(() => Wmi.Query(@"root\cimv2", "SELECT Name, DisplayName, StartMode, PathName FROM Win32_SystemDriver").Select(d =>
+            Collect = ctx => ctx.Safe(() => Wmi.Query(@"root\cimv2", "SELECT Name, DisplayName, StartMode, PathName FROM Win32_SystemDriver").Select(d =>
             {
                 var path = Wmi.Str(d, "PathName");
                 if (path.Length > 0) path = Environment.ExpandEnvironmentVariables(path.Trim('"'));
@@ -76,7 +76,7 @@ namespace Foton.Baseline.Capture
             RecordType = "FirewallRule", IdentityFields = new[] { "Name", "Direction" }, ComparedFields = new[] { "Action", "Enabled", "Profile" },
             FalsePositives = "Windows and vendor installers add allow rules. A new inbound Allow is worth review; a new outbound Allow is common.",
             SortKeys = new[] { "Name", "Direction" },
-            Collect = ctx => Safe(() => Wmi.Query(@"root\StandardCimv2", "SELECT * FROM MSFT_NetFirewallRule").Select(r => Row(
+            Collect = ctx => ctx.Safe(() => Wmi.Query(@"root\StandardCimv2", "SELECT * FROM MSFT_NetFirewallRule").Select(r => Row(
                 // Get-NetFirewallRule's Name and Profile are CDXML aliases for InstanceID and Profiles.
                 "Name", Wmi.Str(r, "InstanceID"),
                 "Direction", Enum<FwDirection>(Wmi.Prop(r, "Direction")),
@@ -93,9 +93,9 @@ namespace Foton.Baseline.Capture
             Collect = ctx =>
             {
                 // State 2 = Listen. Ephemeral UDP (49152-65535) is process-lifetime noise, not stable config.
-                var rows = Safe(() => Wmi.Query(@"root\StandardCimv2", "SELECT LocalAddress, LocalPort FROM MSFT_NetTCPConnection WHERE State = 2")
+                var rows = ctx.Safe(() => Wmi.Query(@"root\StandardCimv2", "SELECT LocalAddress, LocalPort FROM MSFT_NetTCPConnection WHERE State = 2")
                     .Select(c => Row("Protocol", "TCP", "LocalAddress", Wmi.Str(c, "LocalAddress"), "LocalPort", Wmi.Str(c, "LocalPort")))).ToList();
-                rows.AddRange(Safe(() => Wmi.Query(@"root\StandardCimv2", "SELECT LocalAddress, LocalPort FROM MSFT_NetUDPEndpoint")
+                rows.AddRange(ctx.Safe(() => Wmi.Query(@"root\StandardCimv2", "SELECT LocalAddress, LocalPort FROM MSFT_NetUDPEndpoint")
                     .Where(u => !(int.TryParse(Wmi.Str(u, "LocalPort"), out var port) && port >= 49152))
                     .Select(u => Row("Protocol", "UDP", "LocalAddress", Wmi.Str(u, "LocalAddress"), "LocalPort", Wmi.Str(u, "LocalPort")))));
                 return rows;
@@ -107,7 +107,7 @@ namespace Foton.Baseline.Capture
             RecordType = "LocalAccount", IdentityFields = new[] { "SID" }, ComparedFields = new[] { "Name", "Enabled", "PasswordRequired", "PasswordExpires" },
             FalsePositives = "Built-in accounts differ by Windows edition. Enabled Guest is unusual; a renamed Administrator SID is still S-1-5-21-*-500.",
             SortKeys = new[] { "SID" },
-            Collect = ctx => Safe(() => Wmi.Query(@"root\cimv2", "SELECT SID, Name, Disabled, PasswordRequired, PasswordExpires FROM Win32_UserAccount WHERE LocalAccount = True").Select(u => Row(
+            Collect = ctx => ctx.Safe(() => Wmi.Query(@"root\cimv2", "SELECT SID, Name, Disabled, PasswordRequired, PasswordExpires FROM Win32_UserAccount WHERE LocalAccount = True").Select(u => Row(
                 "SID", Wmi.Str(u, "SID"),
                 "Name", Wmi.Str(u, "Name"),
                 "Enabled", !(Wmi.Prop(u, "Disabled") is bool d && d),
@@ -120,7 +120,7 @@ namespace Foton.Baseline.Capture
             RecordType = "NetworkShare", IdentityFields = new[] { "Name" }, ComparedFields = new[] { "Path", "Type", "Description" },
             FalsePositives = "Print and scan shares, OneDrive/File History, and C$/ADMIN$/IPC$ are normal. Type is the Win32_Share numeric type, not a verdict.",
             SortKeys = new[] { "Name" },
-            Collect = ctx => Safe(() => Wmi.Query(@"root\cimv2", "SELECT Name, Path, Type, Description FROM Win32_Share").Select(s => Row(
+            Collect = ctx => ctx.Safe(() => Wmi.Query(@"root\cimv2", "SELECT Name, Path, Type, Description FROM Win32_Share").Select(s => Row(
                 "Name", Wmi.Str(s, "Name"), "Path", Wmi.Str(s, "Path"), "Type", Wmi.Str(s, "Type"), "Description", Wmi.Str(s, "Description")))),
         };
 
@@ -131,7 +131,7 @@ namespace Foton.Baseline.Capture
             RecordType = "ScheduledTask", IdentityFields = new[] { "TaskPath", "TaskName" }, ComparedFields = new[] { "Actions", "RunAsUser", "RunLevel", "Triggers" },
             FalsePositives = "Vendor software registers tasks after install. Root-folder SYSTEM tasks are more interesting than nested Microsoft\\Windows tasks, but still often legitimate.",
             SortKeys = new[] { "TaskPath", "TaskName" },
-            Collect = ctx => Safe(() => Wmi.Query(@"root\Microsoft\Windows\TaskScheduler", "SELECT TaskPath, TaskName, Actions, Triggers, Principal FROM MSFT_ScheduledTask").Select(t =>
+            Collect = ctx => ctx.Safe(() => Wmi.Query(@"root\Microsoft\Windows\TaskScheduler", "SELECT TaskPath, TaskName, Actions, Triggers, Principal FROM MSFT_ScheduledTask").Select(t =>
             {
                 var actions = new List<string>();
                 foreach (var a in Wmi.Prop(t, "Actions") as ManagementBaseObject[] ?? new ManagementBaseObject[0])
@@ -168,7 +168,7 @@ namespace Foton.Baseline.Capture
             RecordType = "Service", IdentityFields = new[] { "Name" }, ComparedFields = new[] { "DisplayName", "StartMode", "StartName", "PathName" },
             FalsePositives = "Patch Tuesday can replace PathName for the same service. Third-party updaters change StartMode. Compare against a provisioning snapshot, not a post-compromise one.",
             SortKeys = new[] { "Name" },
-            Collect = ctx => Safe(() => Wmi.Query(@"root\cimv2", "SELECT Name, DisplayName, StartMode, StartName, PathName FROM Win32_Service").Select(s => Row(
+            Collect = ctx => ctx.Safe(() => Wmi.Query(@"root\cimv2", "SELECT Name, DisplayName, StartMode, StartName, PathName FROM Win32_Service").Select(s => Row(
                 "Name", Wmi.Str(s, "Name"), "DisplayName", Wmi.Str(s, "DisplayName"), "StartMode", Wmi.Str(s, "StartMode"),
                 "StartName", Wmi.Str(s, "StartName"), "PathName", Wmi.Str(s, "PathName")))),
         };
@@ -181,14 +181,14 @@ namespace Foton.Baseline.Capture
             Collect = ctx =>
             {
                 const string ns = @"root\subscription";
-                var rows = Safe(() => Wmi.Query(ns, "SELECT Name, Query FROM __EventFilter").Select(f => Row("Kind", "EventFilter", "Name", Wmi.Str(f, "Name"), "Detail", Wmi.Str(f, "Query")))).ToList();
-                rows.AddRange(Safe(() => Wmi.Query(ns, "SELECT Name, CommandLineTemplate FROM CommandLineEventConsumer").Select(c => Row("Kind", "CommandLineConsumer", "Name", Wmi.Str(c, "Name"), "Detail", Wmi.Str(c, "CommandLineTemplate")))));
-                rows.AddRange(Safe(() => Wmi.Query(ns, "SELECT Name, ScriptText FROM ActiveScriptEventConsumer").Select(c =>
+                var rows = ctx.Safe(() => Wmi.Query(ns, "SELECT Name, Query FROM __EventFilter").Select(f => Row("Kind", "EventFilter", "Name", Wmi.Str(f, "Name"), "Detail", Wmi.Str(f, "Query")))).ToList();
+                rows.AddRange(ctx.Safe(() => Wmi.Query(ns, "SELECT Name, CommandLineTemplate FROM CommandLineEventConsumer").Select(c => Row("Kind", "CommandLineConsumer", "Name", Wmi.Str(c, "Name"), "Detail", Wmi.Str(c, "CommandLineTemplate")))));
+                rows.AddRange(ctx.Safe(() => Wmi.Query(ns, "SELECT Name, ScriptText FROM ActiveScriptEventConsumer").Select(c =>
                 {
                     var text = Wmi.Str(c, "ScriptText");
                     return Row("Kind", "ActiveScriptConsumer", "Name", Wmi.Str(c, "Name"), "Detail", text.Length > 400 ? text.Substring(0, 400) : text);
                 })));
-                rows.AddRange(Safe(() => Wmi.Query(ns, "SELECT Filter, Consumer FROM __FilterToConsumerBinding").Select(b =>
+                rows.AddRange(ctx.Safe(() => Wmi.Query(ns, "SELECT Filter, Consumer FROM __FilterToConsumerBinding").Select(b =>
                 {
                     var f = Wmi.CimRefString(Wmi.Str(b, "Filter"));
                     var c = Wmi.CimRefString(Wmi.Str(b, "Consumer"));

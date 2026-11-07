@@ -46,6 +46,14 @@ namespace Foton.Baseline.Capture
                     error = ex.Message;
                     session.Status.Write($"Baseline provider {p.RecordType} failed: {error}", StatusLevel.Warn);
                 }
+                var gaps = ctx.TakeGaps();
+                if (gaps.Count > 0 && status == "Success")
+                {
+                    // Some reads failed; the rows that were read are kept. Zero records here is not "nothing configured".
+                    status = "Partial";
+                    error = string.Join("; ", gaps);
+                    session.Status.Write($"Baseline provider {p.RecordType} read partially: {error}", StatusLevel.Warn);
+                }
                 doc.Records[p.RecordType] = rows;
                 result.Coverage.Add(new ProviderCoverage { RecordType = p.RecordType, Status = status, Count = rows.Count, Error = error });
             }

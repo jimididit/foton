@@ -84,8 +84,11 @@ namespace Foton.Tests
                 yield return new Dictionary<string, object?> { ["Name"] = "first" };
                 throw new InvalidOperationException("enumeration failed");
             }
-            var p = new Provider { RecordType = "T", SortKeys = new[] { "Name" }, Collect = _ => R.Safe(() => Throws().Select(r => r)) };
-            Assert.Empty(p.Run(new CaptureContext(false)));
+            var ctx = new CaptureContext(false);
+            var p = new Provider { RecordType = "T", SortKeys = new[] { "Name" }, Collect = c => c.Safe(() => Throws().Select(r => r)) };
+            Assert.Empty(p.Run(ctx));
+            Assert.Equal(new[] { "InvalidOperationException: enumeration failed" }, ctx.TakeGaps());
+            Assert.Empty(ctx.TakeGaps());
         }
 
         [Fact]
@@ -156,7 +159,9 @@ namespace Foton.Tests
                 var s = new FotonSession(new SessionOptions(), DateTime.UtcNow, Environment.MachineName, HostInfo.Account(), HostInfo.IsElevated(), log);
                 var r = BaselineCapture.Capture(s);
                 Assert.Equal(Providers.All.Select(p => p.RecordType), r.Coverage.Select(c => c.RecordType));
-                Assert.All(r.Coverage, c => Assert.Equal("Success", c.Status));
+                // Partial is legitimate on a standard-user CI runner; an escaped exception is not.
+                Assert.All(r.Coverage, c => Assert.NotEqual("Error", c.Status));
+                Assert.All(r.Coverage.Where(c => c.Status == "Partial"), c => Assert.NotEqual("", c.Error));
                 Assert.Equal("1.15.0", r.Document.Header.BaselineSchemaVersion);
                 var json = BaselineCapture.WriteJson(r, t.File("snap.json"));
                 var reloaded = BaselineDocument.Load(json);

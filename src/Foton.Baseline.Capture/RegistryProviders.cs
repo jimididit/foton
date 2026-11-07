@@ -16,7 +16,7 @@ namespace Foton.Baseline.Capture
             RecordType = "ActiveSetup", IdentityFields = new[] { "Key", "Guid" }, ComparedFields = new[] { "StubPath", "Version", "IsInstalled" },
             FalsePositives = "Office, browsers, and runtimes add GUIDs and bump Version. StubPath changing to a user-writable binary is the review item. HKCU once-per-user stamps are Collect-only.",
             SortKeys = new[] { "Key", "Guid" },
-            Collect = ctx => Each(new[]
+            Collect = ctx => Each(ctx, new[]
             {
                 @"HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components",
                 @"HKLM:\SOFTWARE\Wow6432Node\Microsoft\Active Setup\Installed Components",
@@ -416,7 +416,7 @@ namespace Foton.Baseline.Capture
             },
         };
 
-        static IEnumerable<Dictionary<string, object?>> Each(IEnumerable<string> roots, Func<string, IEnumerable<Dictionary<string, object?>>> read) =>
-            roots.SelectMany(r => Safe(() => read(r)));
+        static IEnumerable<Dictionary<string, object?>> Each(CaptureContext ctx, IEnumerable<string> roots, Func<string, IEnumerable<Dictionary<string, object?>>> read) =>
+            roots.SelectMany(r => ctx.Safe(() => read(r)));
     }
 }

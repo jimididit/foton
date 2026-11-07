@@ -20,6 +20,31 @@ namespace Foton.Baseline.Capture
         public List<UserHive> Hives => _hives ?? (_hives = HostInfo.HiveRoots(Elevated));
 
         public List<UserProfile> Profiles => _profiles ?? (_profiles = HostInfo.Profiles(Elevated));
+
+        readonly List<string> _gaps = new List<string>();
+
+        /// <summary>
+        /// Runs a best-effort read. A failure yields no rows from that read (1.38.x caught and moved on), but the
+        /// reason is kept so coverage shows a partial read instead of a clean zero: absence is not evidence.
+        /// </summary>
+        public IEnumerable<Dictionary<string, object?>> Safe(Func<IEnumerable<Dictionary<string, object?>>> read)
+        {
+            try { return read().ToList(); }
+            catch (Exception ex)
+            {
+                var msg = TextFile.OneLine(ex.GetType().Name + ": " + ex.Message).Trim();
+                if (!_gaps.Contains(msg)) _gaps.Add(msg);
+                return Enumerable.Empty<Dictionary<string, object?>>();
+            }
+        }
+
+        /// <summary>Read failures recorded since the last call (one provider's worth).</summary>
+        internal List<string> TakeGaps()
+        {
+            var g = new List<string>(_gaps);
+            _gaps.Clear();
+            return g;
+        }
     }
 
     /// <summary>
@@ -91,12 +116,5 @@ namespace Foton.Baseline.Capture
 
         /// <summary>"(not set)" for null or empty, else the [string] value.</summary>
         public static string NotSet(object? v) => v == null || S(v).Length == 0 ? "(not set)" : S(v);
-
-        /// <summary>Runs a best-effort read; a failure yields no rows (1.38.x providers caught and moved on).</summary>
-        public static IEnumerable<Dictionary<string, object?>> Safe(Func<IEnumerable<Dictionary<string, object?>>> read)
-        {
-            try { return read().ToList(); }
-            catch (Exception) { return Enumerable.Empty<Dictionary<string, object?>>(); }
-        }
     }
 }
