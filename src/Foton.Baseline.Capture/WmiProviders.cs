@@ -51,7 +51,7 @@ namespace Foton.Baseline.Capture
                 foreach (var kind in new[] { "ExclusionPath", "ExclusionProcess", "ExclusionExtension", "ExclusionIpAddress" })
                 {
                     var items = (Wmi.Prop(p, kind) as string[] ?? new string[0]).Where(s => !string.IsNullOrEmpty(s))
-                        .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
+                        .Distinct(StringComparer.InvariantCultureIgnoreCase).OrderBy(s => s, StringComparer.InvariantCultureIgnoreCase);
                     rows.AddRange(items.Select(s => Row("Kind", kind, "Name", s, "Value", "listed")));
                 }
                 return rows;

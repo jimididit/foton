@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- HTML report building blocks. Offline. Chrome assets are byte-identical copies of the 1.38.x here-strings. -->
   <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="Resources\*" LogicalName="Foton.Report.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using Foton.Baseline.Capture;
 using Foton.Core;
+using Foton.Report;
 using Foton.Win;
 
 namespace Foton.Baseline.Cli
@@ -54,7 +55,8 @@ namespace Foton.Baseline.Cli
             {
                 var r = BaselineCapture.Capture(session);
                 var json = BaselineCapture.WriteJson(r, path);
-                Summary(log, r, json, null, null);
+                var html = noHtml ? null : SnapshotHtml(log, json);
+                Summary(log, r, json, null, html, null);
                 return 0;
             }
 
@@ -64,10 +66,30 @@ namespace Foton.Baseline.Cli
             var result = BaselineCapture.Capture(session);
             foreach (var c in result.Coverage)
                 log.Write($"{c.RecordType} ({c.Count} records)" + (c.Status == "Success" ? "" : " - " + c.Status + ": " + c.Error), c.Status == "Success" ? StatusLevel.Good : StatusLevel.Warn);
-            if (!noHtml) log.Write("Foton_Baseline.html is not produced by this v2 pre-release; compare and report on a workstation.", StatusLevel.Info);
-            var pkg = BaselineCapture.WritePackage(session, result, zip: !noZip);
-            Summary(log, result, pkg.JsonPath, pkg.Root, pkg.ZipPath);
+            string? snapshot = null;
+            // Written before hashing, so the HTML preview is part of the hashed package (1.38.x order).
+            var pkg = BaselineCapture.WritePackage(session, result, zip: !noZip,
+                beforeHashing: root => { if (!noHtml) snapshot = SnapshotHtml(log, Path.Combine(root, "baseline.json")); });
+            Summary(log, result, pkg.JsonPath, pkg.Root, snapshot, pkg.ZipPath);
+            if (snapshot != null) log.WriteConsole("   Open Foton_Baseline.html from inside the folder. Compare uses baseline.json.", ConsoleColor.DarkGray);
             return 0;
+        }
+
+        /// <summary>The capped HTML preview beside the JSON. A report failure never loses the capture.</summary>
+        static string? SnapshotHtml(StatusLog log, string json)
+        {
+            try
+            {
+                var html = BaselineSnapshotReport.Write(json);
+                log.Write("Baseline snapshot report: " + html, StatusLevel.Good);
+                return html;
+            }
+            catch (Exception ex)
+            {
+                // Runs inside package writing, before hashing: any failure here must leave a hashed package behind.
+                log.Write("Baseline snapshot report not written: " + ex.Message, StatusLevel.Warn);
+                return null;
+            }
         }
 
         /// <summary>
@@ -82,15 +104,16 @@ namespace Foton.Baseline.Cli
             return string.IsNullOrEmpty(profile) ? Directory.GetCurrentDirectory() : Path.Combine(profile, "Desktop");
         }
 
-        static void Summary(StatusLog log, CaptureResult r, string json, string? root, string? zip)
+        static void Summary(StatusLog log, CaptureResult r, string json, string? root, string? html, string? zip)
         {
             int total = r.Coverage.Sum(c => c.Count);
-            int failed = r.Coverage.Count(c => c.Status != "Success");
+            int incomplete = r.Coverage.Count(c => c.Status != "Success");
             log.WriteConsole("");
-            log.WriteConsole($"   Records         : {total} across {r.Coverage.Count} record types" + (failed > 0 ? $" ({failed} provider(s) failed)" : ""), ConsoleColor.White);
+            log.WriteConsole($"   Records         : {total} across {r.Coverage.Count} record types" + (incomplete > 0 ? $" ({incomplete} provider(s) incomplete; see coverage)" : ""), ConsoleColor.White);
             log.WriteConsole("   PayloadSha256   : " + r.Document.Header.PayloadSha256, ConsoleColor.White);
             if (root != null) log.WriteConsole("   Baseline folder : " + root, ConsoleColor.White);
             log.WriteConsole("   Snapshot JSON   : " + json, ConsoleColor.White);
+            if (html != null) log.WriteConsole("   Snapshot HTML   : " + html, ConsoleColor.White);
             if (zip != null) log.WriteConsole("   Package         : " + zip, ConsoleColor.White);
             log.WriteConsole("   A baseline taken after an incident is a picture of that state. Store it off-host.", ConsoleColor.DarkGray);
             log.WriteConsole("");
