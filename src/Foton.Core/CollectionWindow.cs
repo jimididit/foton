@@ -35,7 +35,8 @@ namespace Foton.Core
                     if (max == null || t > max) max = t;
                 }
             }
-            catch (IOException) { return null; }
+            // Unreadable (locked, access denied, ...) means "cannot attribute", never an exception for the caller.
+            catch (Exception) { return null; }
             return min.HasValue && max.HasValue ? new CollectionWindow(min.Value, max.Value) : null;
         }
 

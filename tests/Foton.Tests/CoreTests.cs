@@ -178,6 +178,30 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Case_tree_helpers_tolerate_missing_folders_and_either_separator()
+        {
+            Assert.Null(CaseTree.FindCaseRoot(Path.Combine(Path.GetTempPath(), "foton-missing-" + Guid.NewGuid().ToString("N"))));
+            Assert.True(CaseTree.IsUnder(@"C:\cases\x\copy\a.txt", "C:/cases/x/copy"));
+            Assert.True(CaseTree.IsUnder("C:/cases/x/copy/a.txt", @"C:\cases\x\copy\"));
+            Assert.False(CaseTree.IsUnder(@"C:\cases\x\copy2\a.txt", @"C:\cases\x\copy"));
+            Assert.False(CaseTree.IsUnder(@"C:\cases\x\a.txt", null));
+        }
+
+        [Fact]
+        public void Collection_window_is_unknown_when_the_log_cannot_be_read()
+        {
+            using (var t = new TempDir())
+            {
+                var root = Path.Combine(t.Path, "case");
+                Directory.CreateDirectory(Path.Combine(root, "00_Collection"));
+                var log = Path.Combine(root, "00_Collection", "collection.log");
+                TextFile.Write(log, "2026-01-15 12:00:05 UTC  [Info] a");
+                using (new FileStream(log, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                    Assert.Null(CollectionWindow.FromCase(root));
+            }
+        }
+
+        [Fact]
         public void Collection_window_spans_the_logged_stamps_or_is_unknown()
         {
             using (var t = new TempDir())

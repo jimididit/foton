@@ -11,6 +11,7 @@ namespace Foton.Core
         /// <summary>The folder itself if it holds 00_Collection, else the first child that does; null if none.</summary>
         public static string? FindCaseRoot(string searchRoot)
         {
+            if (!Directory.Exists(searchRoot)) return null;
             if (Directory.Exists(Path.Combine(searchRoot, CollectionFolder))) return searchRoot;
             return Directory.GetDirectories(searchRoot).OrderBy(d => d, System.StringComparer.OrdinalIgnoreCase)
                 .FirstOrDefault(d => Directory.Exists(Path.Combine(d, CollectionFolder)));
@@ -29,7 +30,12 @@ namespace Foton.Core
                 .FirstOrDefault(d => Directory.Exists(Path.Combine(d, CollectionFolder)));
         }
 
-        public static bool IsUnder(string path, string? root) =>
-            root != null && path.StartsWith(root.TrimEnd('\\') + "\\", System.StringComparison.OrdinalIgnoreCase);
+        /// <summary>True when path is inside root. Both are normalized, so / and \ forms compare equal.</summary>
+        public static bool IsUnder(string path, string? root)
+        {
+            if (root == null) return false;
+            var r = Path.GetFullPath(root).TrimEnd('\\') + "\\";
+            return Path.GetFullPath(path).StartsWith(r, System.StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
