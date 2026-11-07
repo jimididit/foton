@@ -5,11 +5,13 @@ Foton has **two machines**. Mixing them is what usually causes confusion.
 | Where | What you run | What you get |
 |-------|----------------|--------------|
 | **Endpoint** | One Collect or Baseline flatten script | Hashed case folder or baseline folder |
-| **Workstation** (this repo) | `Foton.cmd` or `Import-Module .\Foton.psd1` | Parse, compose, analyze, compare, reports |
+| **Workstation** (release zip, Gallery module, or `legacy\powershell` in a clone) | `Foton.cmd` or `Import-Module .\Foton.psd1` | Parse, compose, analyze, compare, reports |
 
 You do **not** copy the module tree to a target. You do **not** `Import-Module` on an engagement host.
 
-**Versions** (from `Foton.psd1`): module **1.38.1**, collect schema **1.13.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+**Versions** (from `legacy\powershell\Foton.psd1`): module **1.38.1**, collect schema **1.13.0**, baseline schema **1.14.0**. `Get-FotonVersion` prints the same after import.
+
+1.38.x is the final PowerShell release line: security fixes only ([SECURITY.md](../SECURITY.md)). Foton v2 (C# single-file executables) is in development; this guide describes 1.38.x until v2 ships.
 
 ---
 
@@ -49,13 +51,13 @@ gh attestation verify .\Foton-Collect_v1.38.1_schema1.13.0.ps1 --repo jimididit/
 - A module installed from the Gallery is not marked, so `RemoteSigned` loads it as-is.
 - Windows client defaults to `Restricted`, which blocks every script. `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` on the analyst account is enough for both.
 
-Building from source instead (`build\Build-Release.ps1` writes the same assets to `dist\release`) is covered below.
+Building from source instead (`legacy\powershell\build\Build-Release.ps1` writes the same assets to `legacy\powershell\dist\release`) is covered below.
 
 ---
 
 ## 1. Endpoint: Collect and Baseline capture
 
-Obtain a flatten script from a [GitHub Release](https://github.com/jimididit/foton/releases) (section 0), or build on a trusted workstation:
+Obtain a flatten script from a [GitHub Release](https://github.com/jimididit/foton/releases) (section 0), or build on a trusted workstation from a clone, in `legacy\powershell`:
 
 ```powershell
 .\build\Build-Standalone.ps1
@@ -142,7 +144,7 @@ A baseline taken after an incident is a picture of **that** state. Compare prove
 
 ## 2. Workstation: `Foton.cmd` (no cmdlets required)
 
-From the repo root. Import happens inside the wrapper.
+From the extracted workstation zip folder, or `legacy\powershell` in a clone. Import happens inside the wrapper.
 
 ```
 Foton.cmd help

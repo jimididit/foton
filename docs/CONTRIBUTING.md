@@ -2,6 +2,13 @@
 
 Thank you for contributing. Foton is structured so you can add a **collector**, **baseline provider**, **parser**, or **analysis rule** without rewriting the core.
 
+## Status: PowerShell line frozen, v2 in C#
+
+- **1.38.x (PowerShell, `legacy/powershell/`) is frozen.** Only security fixes are accepted (see [SECURITY.md](../SECURITY.md)). It also serves as the parity reference for the port, so do not refactor it.
+- **New features target Foton v2**, single-file C# executables on in-box .NET Framework 4.6.2+ (Windows 10 / Server 2016+). The C# solution and its contributor guide land in a follow-up change. Until then, please open an issue to discuss feature work instead of a PowerShell PR.
+
+Everything below describes the 1.38.x PowerShell tree. **Paths are relative to `legacy/powershell/`.**
+
 ## Ground rules
 
 1. Read [USAGE.md](USAGE.md) so operator-facing behavior stays consistent.
@@ -13,7 +20,7 @@ Thank you for contributing. Foton is structured so you can add a **collector**, 
 
 ```powershell
 git clone https://github.com/jimididit/foton.git
-Set-Location foton
+Set-Location foton\legacy\powershell
 Set-ExecutionPolicy -Scope Process Bypass -Force
 Import-Module .\Foton.psd1 -Force
 Get-FotonVersion
@@ -98,13 +105,13 @@ Accepted ScriptAnalyzer exceptions in this repo include `PSAvoidUsingWriteHost`,
 
 ## Releases
 
-Maintainers release from `main` after the version PR merges:
+Maintainers release a 1.38.x security fix from `main` after the version PR merges:
 
-1. `Foton.psd1` has the new `ModuleVersion`, `ReleaseDate`, and a `ReleaseNotes` entry at the front (the release page shows that entry).
-2. `git tag v<ModuleVersion>` on the merge commit and push the tag. `.github/workflows/release.yml` refuses a tag that does not match `ModuleVersion`, runs the tests, builds the assets (`build/Build-Release.ps1`), attests provenance, creates the GitHub release, and publishes to the PowerShell Gallery when the `PSGALLERY_API_KEY` repository secret is set.
+1. `legacy/powershell/Foton.psd1` has the new `ModuleVersion`, `ReleaseDate`, and a `ReleaseNotes` entry at the front (the release page shows that entry).
+2. `git tag v<ModuleVersion>` (a `v1.*` tag; `v2` tags belong to the C# release) on the merge commit and push the tag. `.github/workflows/release.yml` refuses a tag that does not match `ModuleVersion`, runs the tests, builds the assets (`build/Build-Release.ps1`), attests provenance, creates the GitHub release, and publishes to the PowerShell Gallery when the `PSGALLERY_API_KEY` repository secret is set.
 3. Run the workflow manually (Actions, Release, Run workflow) for a dry run: same build and tests, assets uploaded as a workflow artifact, nothing published.
 
-`build/Build-Release.ps1` produces the same assets locally in `dist\release`. The workstation zip and Gallery module ship an allow-list (module, `src`, `Foton.cmd` + wrapper, flattens, operator docs); `tests/Unit/Release.Tests.ps1` fails if anything else gets in.
+`build/Build-Release.ps1` produces the same assets locally in `dist\release`, taking operator docs and `LICENSE` from the repository root (`-DocsRoot`, default two levels up). The workstation zip and Gallery module ship an allow-list (module, `src`, `Foton.cmd` + wrapper, flattens, operator docs); `tests/Unit/Release.Tests.ps1` fails if anything else gets in.
 
 ## What we will not accept
 
