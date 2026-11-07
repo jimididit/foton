@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Field-level baseline diff, severity, findings, baseline_diff.csv. Offline: reads baseline files only. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+  </ItemGroup>
+</Project>

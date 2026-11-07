@@ -1,0 +1,92 @@
+﻿{
+    "Header":  {
+                   "BaselineSchemaVersion":  "1.1.0",
+                   "ToolVersion":  "1.4.0",
+                   "Hostname":  "PC1",
+                   "CapturedUtc":  "2026-01-01 00:00:00",
+                   "Elevated":  true,
+                   "PayloadSha256":  "00",
+                   "Note":  "fixture"
+               },
+    "Providers":  [
+                      {
+                          "RecordType":  "Service",
+                          "IdentityFields":  [
+                                                 "Name"
+                                             ],
+                          "ComparedFields":  [
+                                                 "DisplayName",
+                                                 "StartMode",
+                                                 "StartName",
+                                                 "PathName"
+                                             ],
+                          "FalsePositives":  "Patch Tuesday can replace PathName for the same service. Third-party updaters change StartMode. Compare against a provisioning snapshot, not a post-compromise one."
+                      },
+                      {
+                          "RecordType":  "LocalGroupMember",
+                          "IdentityFields":  [
+                                                 "Group",
+                                                 "SID"
+                                             ],
+                          "ComparedFields":  [
+                                                 "Member"
+                                             ],
+                          "FalsePositives":  "Domain join adds Domain Admins. Intune/LAPS may add a local admin. Compare to the role golden image, not a random workstation."
+                      },
+                      {
+                          "RecordType":  "HardeningRegistry",
+                          "IdentityFields":  [
+                                                 "Setting"
+                                             ],
+                          "ComparedFields":  [
+                                                 "Value"
+                                             ],
+                          "FalsePositives":  "Domain GPO and Windows edition change defaults. Expected values in the Collect table are a common lab baseline, not proof of compromise when they differ."
+                      },
+                      {
+                          "RecordType":  "InstalledSoftware",
+                          "IdentityFields":  [
+                                                 "DisplayName",
+                                                 "Publisher"
+                                             ],
+                          "ComparedFields":  [
+                                                 "DisplayVersion",
+                                                 "InstallLocation"
+                                             ],
+                          "FalsePositives":  "Patch Tuesday and in-place upgrades change DisplayVersion. Publisher string is not stable across all MSI packages."
+                      }
+                  ],
+    "Records":  {
+                    "Service":  [
+                                    {
+                                        "Name":  "Spooler",
+                                        "DisplayName":  "Print Spooler",
+                                        "StartMode":  "Auto",
+                                        "StartName":  "LocalSystem",
+                                        "PathName":  "C:\\Windows\\System32\\spoolsv.exe"
+                                    }
+                                ],
+                    "LocalGroupMember":  [
+                                             {
+                                                 "Group":  "Administrators",
+                                                 "SID":  "S-1-5-21-1-2-3-500",
+                                                 "Member":  "PC1\\Administrator"
+                                             }
+                                         ],
+                    "HardeningRegistry":  [
+                                              {
+                                                  "Setting":  "UseLogonCredential",
+                                                  "Key":  "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest",
+                                                  "Value":  "0"
+                                              }
+                                          ],
+                    "InstalledSoftware":  [
+                                              {
+                                                  "DisplayName":  "Foton Lab App",
+                                                  "Publisher":  "JDI",
+                                                  "DisplayVersion":  "1.0",
+                                                  "InstallLocation":  "C:\\Program Files\\FotonLab"
+                                              }
+                                          ]
+                }
+}

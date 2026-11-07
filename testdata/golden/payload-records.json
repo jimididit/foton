@@ -1,0 +1,30 @@
+﻿{
+    "Service":  [
+                    {
+                        "Name":  "a\"quote",
+                        "DisplayName":  "back\\slash \u003ctag\u003e \u0026 \u0027apos\u0027",
+                        "StartMode":  "tab\there",
+                        "StartName":  "ünïcödé ✓",
+                        "PathName":  "ctl\u0001end"
+                    },
+                    {
+                        "Name":  "b",
+                        "DisplayName":  "",
+                        "StartMode":  null,
+                        "StartName":  "line1\r\nline2",
+                        "PathName":  "\u2028sep"
+                    }
+                ],
+    "LocalAccount":  [
+                         {
+                             "SID":  "S-1-5-21-1-2-3-500",
+                             "Name":  "Administrator",
+                             "Enabled":  false,
+                             "PasswordRequired":  true,
+                             "PasswordExpires":  ""
+                         }
+                     ],
+    "Empty":  [
+
+              ]
+}
