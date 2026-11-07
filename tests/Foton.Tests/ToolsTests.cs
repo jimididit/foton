@@ -324,6 +324,21 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void First_compose_run_swaps_in_output_with_no_earlier_folder()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"07_Event_Logs\evtx");
+                Write(t.File(@"bin\hayabusa.cmd"),
+                    "@echo off\r\n:loop\r\nif \"%~1\"==\"\" exit /b 0\r\nif /i \"%~1\"==\"-o\" echo new> \"%~dp2fresh.csv\"\r\nshift\r\ngoto loop\r\n");
+                var hb = Compose(pkg, t.File("empty"), new Dictionary<string, string> { ["Hayabusa"] = t.File(@"bin\hayabusa.cmd") })
+                    .Rows.Single(r => r.Tool == "Hayabusa");
+                Assert.Equal("Copied", hb.Status);
+                Assert.True(File.Exists(Path.Combine(pkg, @"analysis\external\hayabusa\fresh.csv")));
+            }
+        }
+
+        [Fact]
         public void A_missing_Hayabusa_points_to_foton_tools()
         {
             using (var t = new TempDir())
