@@ -5,7 +5,27 @@ Thank you for contributing. Foton is structured so you can add a **collector**, 
 ## Status: PowerShell line frozen, v2 in C#
 
 - **1.38.x (PowerShell, `legacy/powershell/`) is frozen.** Only security fixes are accepted (see [SECURITY.md](../SECURITY.md)). It also serves as the parity reference for the port, so do not refactor it.
-- **New features target Foton v2**, single-file C# executables on in-box .NET Framework 4.6.2+ (Windows 10 / Server 2016+). The C# solution and its contributor guide land in a follow-up change. Until then, please open an issue to discuss feature work instead of a PowerShell PR.
+- **New features target Foton v2**, single-file C# executables on in-box .NET Framework 4.6.2+ (Windows 10 / Server 2016+). The port goes layer by layer with parity against 1.38.x, so open an issue before starting feature work.
+
+## v2 (C#) development
+
+Prerequisites: Windows, the .NET SDK pinned in [`global.json`](../global.json) (10.0.x). The SDK only builds; the executables target `net462` and need nothing installed on endpoints.
+
+```powershell
+dotnet build Foton.sln -c Release -warnaserror
+dotnet test Foton.sln -c Release --no-build
+.\cli\Foton.Collect.Cli\bin\Release\net462\foton-collect.exe -Version
+```
+
+| Rule | Enforced by |
+|------|-------------|
+| One `.exe` per role, no loose DLLs (project DLLs merged by ILRepack in Release) | `tests/Foton.ArchitectureTests` (SingleFileRules) |
+| Offline layers (Core, Report, Package, Baseline.Compare, Analyze, Patterns, Parse, Carve) never reference `Foton.Win`, WMI, or HTTP | LayerRules |
+| Endpoint executables never reference Parse, Carve, Tools, or Patterns | LayerRules |
+| P/Invoke only in `src/Foton.Win`; no `Assembly.Load(byte[])` or `AssemblyResolve` embedding | LayerRules |
+| Runtime dependencies are in-box .NET Framework assemblies only; NuGet packages are build- or test-time | `Directory.Packages.props` review + vulnerable-package CI step |
+
+Version and schema numbers live once in [`Directory.Build.props`](../Directory.Build.props) and are read at runtime (`FotonVersion`). CI job `dotnet` must pass alongside `Pester`.
 
 Everything below describes the 1.38.x PowerShell tree. **Paths are relative to `legacy/powershell/`.**
 
@@ -100,7 +120,7 @@ Accepted ScriptAnalyzer exceptions in this repo include `PSAvoidUsingWriteHost`,
 ## Branches and pull requests
 
 - Branch from current `main` (`feature/...`, `fix/...`, `chore/...`), push, and open a PR into `main`. Do not commit to `main` directly.
-- The Pester CI check must pass before merge; `main` is protected. Merged branches are deleted automatically.
+- The `Pester` and `dotnet` CI checks must pass before merge; `main` is protected. Merged branches are deleted automatically.
 - Keep a PR to one change when practical. Bump `ModuleVersion`, `ReleaseDate`, and the schema version you changed in `Foton.psd1` for behavior or format changes, and add a `ReleaseNotes` entry.
 
 ## Releases

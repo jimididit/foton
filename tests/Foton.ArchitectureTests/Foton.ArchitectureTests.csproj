@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Reads project files and sources only; references no Foton project so it can judge all of them. -->
+  <PropertyGroup>
+    <!-- Tests run on dev/CI machines only; the xUnit runner needs 4.7.2+. Product code stays net462. -->
+    <TargetFramework>net472</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
+</Project>

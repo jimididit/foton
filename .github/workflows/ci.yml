@@ -39,3 +39,33 @@ jobs:
           $ErrorActionPreference = 'Stop'
           & .\legacy\powershell\tests\Invoke-FotonTests.ps1
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  # Foton v2 (C#). Builds net462 executables with the SDK pinned in global.json.
+  dotnet:
+    name: dotnet
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Build (Release, warnings as errors)
+        run: dotnet build Foton.sln -c Release -warnaserror
+
+      # Includes the architecture tests: layer rules, P/Invoke only in Foton.Win,
+      # no in-memory assembly loading, and one exe per role with no loose DLLs.
+      - name: Test
+        run: dotnet test Foton.sln -c Release --no-build
+
+      - name: Vulnerable packages
+        shell: pwsh
+        run: |
+          $out = dotnet list Foton.sln package --vulnerable --include-transitive 2>&1 | Out-String
+          Write-Host $out
+          if ($out -match 'has the following vulnerable packages') { throw 'A vulnerable NuGet package is referenced.' }

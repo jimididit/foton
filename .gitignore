@@ -33,3 +33,10 @@ docs/COVERAGE.md
 docs/MIGRATION.md
 docs/ARCHITECTURE.md
 docs/REVIEW.md
+
+# C# build output
+bin/
+obj/
+.vs/
+*.user
+TestResults/

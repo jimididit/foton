@@ -7,3 +7,10 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
+  # Build- and test-time NuGet packages (nothing ships inside the executables).
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
