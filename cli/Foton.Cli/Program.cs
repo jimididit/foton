@@ -17,6 +17,8 @@ namespace Foton.Cli
             }
             if (args.Length == 2 && string.Equals(args[0], "package", StringComparison.OrdinalIgnoreCase))
                 return PackageCommand(args[1]);
+            if (args.Length == 2 && string.Equals(args[0], "parse", StringComparison.OrdinalIgnoreCase))
+                return ParseCommand(args[1]);
             if (args.Length >= 3 && string.Equals(args[0], "compare", StringComparison.OrdinalIgnoreCase))
             {
                 bool noCsv = false, noHtml = false;
@@ -40,12 +42,14 @@ namespace Foton.Cli
             Console.WriteLine("Usage:");
             Console.WriteLine("  foton -Version");
             Console.WriteLine("  foton package <case-folder-or-zip>   open a package and verify hashes.csv");
+            Console.WriteLine("  foton parse <case-folder-zip-or-file> parse copied Prefetch, LNK, jumplists, EVTX, Amcache;");
+            Console.WriteLine("                                        writes analysis\\parsed_records.csv and Foton_Parse.html");
             Console.WriteLine("  foton compare <reference> <difference> [-NoCsv] [-NoHtml] [-OutputPath <html>]");
             Console.WriteLine("                                        diff two baselines (baseline.json or package folder);");
             Console.WriteLine("                                        writes baseline_diff.csv and Foton_BaselineCompare.html");
             Console.WriteLine("                                        beside the difference baseline");
             Console.WriteLine();
-            Console.WriteLine("Parse, compose, and analyze are not implemented in this v2 pre-release.");
+            Console.WriteLine("Compose and analyze are not implemented in this v2 pre-release.");
             Console.WriteLine("For casework use Foton 1.38.x (the Foton-Workstation_v1.38.1.zip module) from https://github.com/jimididit/foton/releases.");
             return 1;
         }
@@ -137,6 +141,25 @@ namespace Foton.Cli
                 }
             }
             log.WriteConsole("     A diff records change between two snapshots. It does not show when, who, or that the host is compromised.", ConsoleColor.DarkGray);
+            return 0;
+        }
+
+        /// <summary>Exit 0 after a parse (unsupported rows are records, not failures), 1 when the path cannot be opened.</summary>
+        static int ParseCommand(string path)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            Foton.Parse.ParseRun run;
+            try { run = Foton.Parse.ParseRunner.Run(path, log); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException
+                || ex is ArgumentException || ex is NotSupportedException)
+            {
+                log.Write("Cannot parse: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
+            if (run.CsvPath == null)
+                foreach (var r in run.Records)
+                    log.WriteConsole($"   {r.Format,-24} {(r.Supported ? "supported" : "unsupported"),-11} {r.Identity}", ConsoleColor.White);
             return 0;
         }
 

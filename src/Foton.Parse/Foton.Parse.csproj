@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Offline parsers over bytes already copied into a package (workstation only). No live host reads. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+    <ProjectReference Include="..\Foton.Package\Foton.Package.csproj" />
+    <ProjectReference Include="..\Foton.Report\Foton.Report.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Foton.Tests" />
+  </ItemGroup>
+</Project>

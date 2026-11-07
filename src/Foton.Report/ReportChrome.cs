@@ -24,6 +24,7 @@ namespace Foton.Report
         /// <summary>Report-specific &lt;style&gt; elements (the 1.38.x here-strings), placed before NavCss.</summary>
         public static string BaselineCss => Load("baseline.css");
         public static string CompareCss => Load("compare.css");
+        public static string ParseCss => Load("parse.css");
 
         static string Load(string name)
         {

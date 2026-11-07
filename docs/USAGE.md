@@ -13,23 +13,24 @@ You do **not** copy the module tree to a target. You do **not** `Import-Module` 
 
 1.38.x is the final PowerShell release line: security fixes only ([SECURITY.md](../SECURITY.md)). Foton v2 (C# single-file executables) is in development; this guide describes 1.38.x until v2 ships.
 
-### Foton v2 pre-release (baseline only)
+### Foton v2 (in development)
 
-`v2.*` releases marked **Pre-release** carry single-file executables for Windows 10 / Server 2016 and newer (in-box .NET Framework 4.6.2+, nothing to install). They cover baseline capture and compare only; use 1.38.x for live triage, parse, compose, and analyze.
+There is no public v2 release until `foton-collect.exe` is ported; use 1.38.x for casework. Test builds of the single-file executables (Windows 10 / Server 2016 and newer, in-box .NET Framework 4.6.2+, nothing to install) come from the **Release v2** workflow run manually: it uploads them as a workflow artifact without publishing anything.
 
 | Executable | Runs on | Purpose |
 |------------|---------|---------|
 | `foton-baseline.exe` | Endpoint | Capture a baseline package (`baseline.json`, `coverage.json`, `Foton_Baseline.html`, hashes, ZIP). Same switches as the Baseline flatten |
-| `foton.exe` | Workstation | `foton compare <reference> <difference>` writes `baseline_diff.csv` and `Foton_BaselineCompare.html` beside the difference baseline; `foton package <folder-or-zip>` verifies hashes |
+| `foton.exe` | Workstation | `compare` two baselines (`baseline_diff.csv`, `Foton_BaselineCompare.html`); `parse` copied Prefetch, LNK, jumplists, EVTX and Amcache in a package (`analysis\parsed_records.csv`, `Foton_Parse.html`); `package` verifies hashes |
 
 ```powershell
 .\foton-baseline.exe -OutputPath D:\Baselines -NoZip        # package folder (Desktop by default)
 .\foton-baseline.exe -Path D:\Baselines\HOSTNAME.json       # bare snapshot JSON (+ HTML beside it)
 .\foton.exe compare D:\Baselines\day0 D:\Baselines\dayN     # folders or baseline.json files
 .\foton.exe compare D:\day0.json D:\dayN.json -NoHtml -NoCsv
+.\foton.exe parse D:\Cases\Foton_HOSTNAME_20260823-011150Z  # case folder or ZIP; a single file prints its rows
 ```
 
-The executables are not Authenticode-signed yet, so SmartScreen may warn on first run. Compare the hash with `SHA256SUMS.txt`, run `gh attestation verify .\foton-baseline.exe --repo jimididit/foton`, then `Unblock-File`. v2 writes baseline schema **1.15.0**; `foton compare` accepts a 1.14.0 baseline from 1.38.x and prints which one-time format and coverage differences to expect.
+The executables are not Authenticode-signed yet, so SmartScreen may warn on first run. Compare the hash with `SHA256SUMS.txt`, run `gh attestation verify .\foton-baseline.exe --repo jimididit/foton`, then `Unblock-File`. v2 writes baseline schema **1.15.0**; `foton compare` accepts a 1.14.0 baseline from 1.38.x and prints which one-time format and coverage differences to expect. v2 `parse` also returns EVTX events and automatic-destinations jumplist entries that 1.38.x `Invoke-FotonParse` silently missed.
 
 ---
 
