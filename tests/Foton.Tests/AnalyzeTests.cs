@@ -153,6 +153,9 @@ namespace Foton.Tests
             // ...and a ServiceDll in a System32 subfolder whose name contains a space.
             Assert.Contains("OneSyncSvc_1a2b3c", Install(@"%SystemRoot%\system32\svchost.exe -k UnistackSvcGroup", @"C:\Windows\System32\Sub Folder\x.dll", "Template:OneSyncSvc"));
             Assert.Equal("", Install(@"%SystemRoot%\system32\svchost.exe -k UnistackSvcGroup", @"C:\Windows\System32\APHostService.dll", "Template:OneSyncSvc"));
+            // Forward-slash traversal out of System32, and a look-alike System32 on another drive.
+            Assert.Contains("OneSyncSvc_1a2b3c", Install(@"%SystemRoot%\system32\svchost.exe -k UnistackSvcGroup", @"C:\Windows\System32\../../Users/Public/x.dll", "Template:OneSyncSvc"));
+            Assert.Contains("OneSyncSvc_1a2b3c", Install(@"E:\Windows\System32\svchost.exe -k UnistackSvcGroup"));
         }
 
         [Fact]

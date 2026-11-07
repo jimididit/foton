@@ -61,10 +61,15 @@ namespace Foton.Analyze
             return "";
         }
 
+        /// <summary>
+        /// System32 as the event may write it: the environment forms, plus the host's own SystemDirectory from
+        /// os_info (C:\Windows\System32 when the package does not record one). 1.38.x accepted any drive letter, and
+        /// a user can create D:\Windows\System32 on a writable data drive.
+        /// </summary>
         static string System32Roots(string systemDirectory)
         {
-            var roots = new List<string> { @"%SystemRoot%\\System32", @"%windir%\\System32", @"\\SystemRoot\\System32", @"[A-Z]:\\Windows\\System32" };
-            if (systemDirectory.Length > 0) roots.Add(Regex.Escape(systemDirectory.TrimEnd('\\')));
+            var roots = new List<string> { @"%SystemRoot%\\System32", @"%windir%\\System32", @"\\SystemRoot\\System32" };
+            roots.Add(systemDirectory.Length > 0 ? Regex.Escape(systemDirectory.TrimEnd('\\')) : @"C:\\Windows\\System32");
             return "(?:" + string.Join("|", roots) + ")";
         }
 
@@ -80,7 +85,7 @@ namespace Foton.Analyze
         /// "System32\Sub Folder\x.dll" passed as a System32 file.
         /// </summary>
         static bool System32Dll(string dll, string systemDirectory) =>
-            Regex.IsMatch(dll.Trim(), @"(?i)^""?" + System32Roots(systemDirectory) + @"\\[^\\""]+\.dll""?$", RegexOptions.IgnoreCase);
+            !dll.Contains("..") && Regex.IsMatch(dll.Trim(), @"(?i)^""?" + System32Roots(systemDirectory) + @"\\[^\\/""]+\.dll""?$", RegexOptions.IgnoreCase);
 
         /// <summary>
         /// True only for a known per-user template instance hosted by System32 svchost.exe; with services.csv, an
