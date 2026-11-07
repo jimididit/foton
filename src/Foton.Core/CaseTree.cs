@@ -17,7 +17,7 @@ namespace Foton.Core
             return ChildCases(searchRoot).FirstOrDefault();
         }
 
-        /// <summary>Child folders that hold their own 00_Collection, in ordinal order.</summary>
+        /// <summary>Child folders that hold their own 00_Collection, in case-insensitive ordinal order (NTFS semantics).</summary>
         public static IReadOnlyList<string> ChildCases(string? caseRoot)
         {
             if (caseRoot == null || !Directory.Exists(caseRoot)) return new string[0];
