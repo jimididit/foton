@@ -2,4 +2,5 @@
 # from them. Line-ending conversion would break the parity tests, so Git must not touch them.
 testdata/golden/** -text
 testdata/parse/** -text
+testdata/analyze/** -text
 src/Foton.Report/Resources/** -text
