@@ -21,10 +21,9 @@ namespace Foton.ArchitectureTests
             foreach (var p in Repo.Projects.Values)
             {
                 var asm = Repo.LoadBuilt(path(p));
-#if !DEBUG
-                Assert.True(asm != null, path(p) + " missing; build the solution with -c Release first.");
-#endif
-                if (asm != null) yield return (p, asm);
+                // Missing output fails in every configuration: these rules must never pass by not looking.
+                Assert.True(asm != null, path(p) + " missing; build the solution (" + Repo.Configuration + ") first.");
+                yield return (p, asm!);
             }
         }
 
@@ -102,9 +101,7 @@ namespace Foton.ArchitectureTests
                         foreach (var callee in IlReader.Callees(m))
                             Assert.False(IsByteLoad(callee), p.Name + ": " + t.FullName + "." + m.Name + " calls " + callee.DeclaringType + "." + callee.Name + "(byte[])");
                     }
-#if !DEBUG
             Assert.True(scanned > 0, "No method bodies were scanned; the rule would pass vacuously.");
-#endif
         }
 
         static bool IsByteLoad(MethodBase callee)

@@ -35,6 +35,8 @@
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <DebugType>embedded</DebugType>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Only cli projects reference ILRepack (cli\Directory.Build.targets); this makes them merge in every configuration. -->
+    <ILRepackTargetsFile>$(MSBuildThisFileDirectory)cli\ILRepack.targets</ILRepackTargetsFile>
   </PropertyGroup>
 
   <ItemGroup>

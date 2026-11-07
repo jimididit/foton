@@ -1,0 +1,22 @@
+<Project>
+  <!--
+    Replaces the ILRepack package's Release-only default: merge in EVERY configuration, so a Debug test
+    run checks the same single-file output as Release (the architecture rules never pass vacuously).
+    Selected via ILRepackTargetsFile in the root Directory.Build.props.
+  -->
+  <!-- Not named "ILRepack": the package defines a target of that name later, and MSBuild keeps the last definition. -->
+  <Target Name="FotonMergeSingleExe" AfterTargets="Build" Condition="'$(IsCrossTargetingBuild)' != 'true'">
+    <ItemGroup>
+      <InputAssemblies Include="$(OutputPath)$(TargetName)$(TargetExt)" />
+      <InputAssemblies Include="$(OutputPath)*.dll" Exclude="$(OutputPath)$(TargetName)$(TargetExt)" />
+    </ItemGroup>
+    <ILRepack
+        Parallel="true"
+        DebugInfo="true"
+        AllowDuplicateResources="false"
+        InputAssemblies="@(InputAssemblies)"
+        TargetKind="SameAsPrimaryAssembly"
+        OutputFile="$(OutputPath)$(TargetName)$(TargetExt)" />
+    <Delete Files="@(ReferenceCopyLocalPaths->'$(OutDir)%(DestinationSubDirectory)%(Filename)%(Extension)')" />
+  </Target>
+</Project>

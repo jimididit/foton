@@ -19,7 +19,7 @@ dotnet test Foton.sln -c Release --no-build
 
 | Rule | Enforced by |
 |------|-------------|
-| One `.exe` per role, no loose DLLs (project DLLs merged by ILRepack in Release) | `tests/Foton.ArchitectureTests` (SingleFileRules) |
+| One `.exe` per role, no loose DLLs (project DLLs merged by ILRepack in every configuration, `cli/ILRepack.targets`) | `tests/Foton.ArchitectureTests` (SingleFileRules) |
 | Offline layers (Core, Report, Package, Baseline.Compare, Analyze, Patterns, Parse, Carve) never reference `Foton.Win`, WMI, or HTTP | LayerRules |
 | Endpoint executables never reference Parse, Carve, Tools, or Patterns | LayerRules |
 | P/Invoke only in `src/Foton.Win`; no `Assembly.Load(byte[])` or `AssemblyResolve` embedding | LayerRules |
