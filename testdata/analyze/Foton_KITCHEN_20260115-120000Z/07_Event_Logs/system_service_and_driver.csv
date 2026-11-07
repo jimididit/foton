@@ -1,0 +1,4 @@
+﻿"EventId","TimeCreatedUtc","Message"
+"7045","2026-01-14 03:01:00","A service was installed in the system.  Service Name:  EvilSvc  Service File Name:  C:\Users\Public\svc.exe  Service Type:  user mode service"
+"7045","2026-01-14 02:00:00","A service was installed in the system.  Service Name:  OneSyncSvc_1701f8  Service File Name:  %SystemRoot%\system32\svchost.exe -k UnistackSvcGroup  Service Type:  user mode service"
+"7036","2026-01-14 01:00:00","state change"

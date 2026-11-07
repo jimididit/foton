@@ -1,0 +1,4 @@
+﻿"SourcePath","Format","Supported","Identity","SizeBytes","SHA256","Note"
+"08_Filesystem\lnk\a.lnk","LNK","True","C:\Users\Public\evil.exe","100","A",""
+"08_Filesystem\lnk\b.lnk","LNK","True","C:\Windows\notepad.exe","100","B",""
+"08_Filesystem\lnk\c.lnk","LNK","True","C:\Temp\drop.exe","100","C",""

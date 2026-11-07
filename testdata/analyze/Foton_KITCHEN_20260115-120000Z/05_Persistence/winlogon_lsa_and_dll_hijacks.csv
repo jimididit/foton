@@ -1,0 +1,5 @@
+﻿"Mechanism","Location","Name","Value"
+"IFEO","HKLM\...\sethc.exe","Debugger","cmd.exe"
+"AppInit","HKLM\...\Windows","AppInit_DLLs","C:\Temp\inj.dll"
+"Winlogon","HKLM\...\Winlogon","Shell","explorer.exe"
+"Winlogon","HKLM\...\Winlogon","Userinit","C:\Windows\system32\userinit.exe, C:\Temp\u.exe"

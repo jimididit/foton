@@ -1,0 +1,5 @@
+﻿=== __EventFilter ===
+Name: Evil
+Query: SELECT * FROM __InstanceModificationEvent
+=== CommandLineEventConsumer ===
+Name: Evil

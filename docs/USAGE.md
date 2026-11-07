@@ -20,7 +20,7 @@ There is no public v2 release until `foton-collect.exe` is ported; use 1.38.x fo
 | Executable | Runs on | Purpose |
 |------------|---------|---------|
 | `foton-baseline.exe` | Endpoint | Capture a baseline package (`baseline.json`, `coverage.json`, `Foton_Baseline.html`, hashes, ZIP). Same switches as the Baseline flatten |
-| `foton.exe` | Workstation | `compare` two baselines (`baseline_diff.csv`, `Foton_BaselineCompare.html`); `parse` copied Prefetch, LNK, jumplists, EVTX and Amcache in a package (`analysis\parsed_records.csv`, `Foton_Parse.html`); `package` verifies hashes |
+| `foton.exe` | Workstation | `compare` two baselines (`baseline_diff.csv`, `Foton_BaselineCompare.html`); `parse` copied Prefetch, LNK, jumplists, EVTX and Amcache in a package (`analysis\parsed_records.csv`, `Foton_Parse.html`); `analyze` a package with the triage heuristics (`analysis\findings.csv`; the HTML report comes later); `package` verifies hashes |
 
 ```powershell
 .\foton-baseline.exe -OutputPath D:\Baselines -NoZip        # package folder (Desktop by default)
@@ -28,6 +28,7 @@ There is no public v2 release until `foton-collect.exe` is ported; use 1.38.x fo
 .\foton.exe compare D:\Baselines\day0 D:\Baselines\dayN     # folders or baseline.json files
 .\foton.exe compare D:\day0.json D:\dayN.json -NoHtml -NoCsv
 .\foton.exe parse D:\Cases\Foton_HOSTNAME_20260823-011150Z  # case folder or ZIP; a single file prints its rows
+.\foton.exe analyze D:\Cases\Foton_HOSTNAME_20260823-011150Z # re-run after parse / compose / compare to include their output
 ```
 
 The executables are not Authenticode-signed yet, so SmartScreen may warn on first run. Compare the hash with `SHA256SUMS.txt`, run `gh attestation verify .\foton-baseline.exe --repo jimididit/foton`, then `Unblock-File`. v2 writes baseline schema **1.15.0**; `foton compare` accepts a 1.14.0 baseline from 1.38.x and prints which one-time format and coverage differences to expect. v2 `parse` also returns EVTX events and automatic-destinations jumplist entries that 1.38.x `Invoke-FotonParse` silently missed.

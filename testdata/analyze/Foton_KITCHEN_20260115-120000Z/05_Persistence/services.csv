@@ -1,0 +1,6 @@
+﻿"Name","State","StartMode","PathName","ResolvedExe","SignatureStatus","UserWritablePath","UnquotedPath","ServiceDll","ServiceDllSource","ServiceDllUserWritablePath","ServiceDllSignatureStatus"
+"EvilSvc","Running","Auto","C:\Users\Public\svc.exe","C:\Users\Public\svc.exe","NotSigned","True","False","","","False",""
+"HijackSvc","Running","Manual","C:\Windows\System32\svchost.exe -k netsvcs","C:\Windows\System32\svchost.exe","Valid","False","False","C:\ProgramData\h.dll","Parameters","True","NotSigned"
+"Vendor Agent","Stopped","Auto","C:\Program Files\Vendor Agent\agent.exe","C:\Program Files\Vendor Agent\agent.exe","Valid","False","True","","","False",""
+"Sysmon64","Stopped","Auto","C:\Windows\Sysmon64.exe","C:\Windows\Sysmon64.exe","Valid","False","False","","","False",""
+"OneSyncSvc_1701f8","Running","Auto","C:\Windows\system32\svchost.exe -k UnistackSvcGroup","C:\Windows\system32\svchost.exe","Valid","False","False","D:\Win\System32\APHostService.dll","Template:OneSyncSvc","False","Valid"

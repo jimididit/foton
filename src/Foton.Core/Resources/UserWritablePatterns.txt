@@ -1,0 +1,8 @@
+\\AppData\\
+\\Users\\Public\\
+\\ProgramData\\
+\\Windows\\Temp\\
+\\Temp\\
+\\Downloads\\
+\\Recycle
+\\PerfLogs\\

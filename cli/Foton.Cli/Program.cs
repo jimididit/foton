@@ -19,6 +19,8 @@ namespace Foton.Cli
                 return PackageCommand(args[1]);
             if (args.Length == 2 && string.Equals(args[0], "parse", StringComparison.OrdinalIgnoreCase))
                 return ParseCommand(args[1]);
+            if (args.Length == 2 && string.Equals(args[0], "analyze", StringComparison.OrdinalIgnoreCase))
+                return AnalyzeCommand(args[1]);
             if (args.Length >= 3 && string.Equals(args[0], "compare", StringComparison.OrdinalIgnoreCase))
             {
                 bool noCsv = false, noHtml = false;
@@ -44,12 +46,13 @@ namespace Foton.Cli
             Console.WriteLine("  foton package <case-folder-or-zip>   open a package and verify hashes.csv");
             Console.WriteLine("  foton parse <case-folder-zip-or-file> parse copied Prefetch, LNK, jumplists, EVTX, Amcache;");
             Console.WriteLine("                                        writes analysis\\parsed_records.csv and Foton_Parse.html");
+            Console.WriteLine("  foton analyze <case-folder-or-zip>   run triage heuristics over a package; writes analysis\\findings.csv");
             Console.WriteLine("  foton compare <reference> <difference> [-NoCsv] [-NoHtml] [-OutputPath <html>]");
             Console.WriteLine("                                        diff two baselines (baseline.json or package folder);");
             Console.WriteLine("                                        writes baseline_diff.csv and Foton_BaselineCompare.html");
             Console.WriteLine("                                        beside the difference baseline");
             Console.WriteLine();
-            Console.WriteLine("Compose and analyze are not implemented in this v2 pre-release.");
+            Console.WriteLine("Compose, IOC matching, and the triage HTML report are not implemented in this v2 pre-release.");
             Console.WriteLine("For casework use Foton 1.38.x (the Foton-Workstation_v1.38.1.zip module) from https://github.com/jimididit/foton/releases.");
             return 1;
         }
@@ -160,6 +163,29 @@ namespace Foton.Cli
             if (run.CsvPath == null)
                 foreach (var r in run.Records)
                     log.WriteConsole($"   {r.Format,-24} {(r.Supported ? "supported" : "unsupported"),-11} {r.Identity}", ConsoleColor.White);
+            return 0;
+        }
+
+        /// <summary>Exit 0 after analysis (findings are observations, not failures), 1 when the package cannot be opened.</summary>
+        static int AnalyzeCommand(string path)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            Foton.Analyze.AnalysisRun run;
+            try { run = Foton.Analyze.Analyzer.RunPackage(path, log, Foton.Patterns.WorkstationPatterns.SuspiciousCommands); }
+            catch (Exception ex)
+            {
+                // Rule groups already turn bad data into findings; anything left here is opening or writing the package.
+                log.Write("Cannot analyze: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
+            foreach (var sev in new[] { "High", "Medium", "Low", "Info" })
+            {
+                var n = run.Findings.Count(f => f.Severity == sev);
+                if (n > 0) log.Write($"{sev}: {n}", sev == "High" ? StatusLevel.Warn : StatusLevel.Info);
+            }
+            log.Write("Findings: " + (run.FindingsPath ?? run.BesideZipPath), StatusLevel.Good);
+            log.WriteConsole("     Findings are observations with a tier and a benign explanation. None is a compromise verdict.", ConsoleColor.DarkGray);
             return 0;
         }
 

@@ -1,0 +1,9 @@
+﻿{
+    "Elevated":  false,
+    "CoverageProfile":  "StandardUser",
+    "CollectionAccount":  "HOST\\analyst",
+    "SkippedTaskCount":  7,
+    "ExcludedEarlierPackages":  [
+                                    "C:\\Users\\analyst\\Desktop\\Foton_HOST_20260101-000000Z"
+                                ]
+}

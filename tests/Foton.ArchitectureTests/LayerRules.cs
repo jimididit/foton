@@ -57,6 +57,14 @@ namespace Foton.ArchitectureTests
         }
 
         [Fact]
+        public void Analyze_takes_pattern_lists_as_input_so_the_endpoint_can_run_it()
+        {
+            // Collect runs analysis at the end of a triage; the suspicious-command list must never ride along.
+            if (Repo.Projects.ContainsKey("Foton.Analyze"))
+                Assert.False(Repo.Closure("Foton.Analyze").Contains("Foton.Patterns"), "Foton.Analyze must not reference Foton.Patterns; pass the lists in.");
+        }
+
+        [Fact]
         public void Only_Foton_Tools_uses_HTTP()
         {
             foreach (var p in Repo.Projects.Values.Where(p => p.Name != "Foton.Tools"))

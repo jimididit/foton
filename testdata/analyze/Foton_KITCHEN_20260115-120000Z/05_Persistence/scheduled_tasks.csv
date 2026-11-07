@@ -1,0 +1,3 @@
+﻿"TaskPath","TaskName","RunAsUser","Actions","UserWritableTarget","SuspiciousHits"
+"\","Sync","SYSTEM","powershell -File C:\Temp\s.ps1","False",""
+"\Microsoft\Windows\","Defrag","SYSTEM","defrag.exe -c","False",""
