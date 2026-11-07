@@ -28,10 +28,15 @@ namespace Foton.ArchitectureTests
             }
         }
 
+        // Fail closed: a type that cannot load is a type these rules cannot inspect.
         static IEnumerable<Type> TypesOf(Assembly a)
         {
             try { return a.GetTypes(); }
-            catch (ReflectionTypeLoadException e) { return e.Types.Where(t => t != null)!; }
+            catch (ReflectionTypeLoadException e)
+            {
+                var why = string.Join("; ", e.LoaderExceptions.Select(x => x?.Message).Distinct());
+                throw new InvalidOperationException(a.GetName().Name + ": types failed to load, so they cannot be checked: " + why, e);
+            }
         }
 
         const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
@@ -69,14 +74,25 @@ namespace Foton.ArchitectureTests
             }
         }
 
+        /// <remarks>
+        /// Static calls, virtual calls, and method groups (ldftn) are covered. A call made through
+        /// reflection (GetMethod("Load").Invoke) is not visible in IL; code review covers that.
+        /// </remarks>
         [Fact]
         public void No_code_loads_assemblies_from_bytes()
         {
+            int scanned = 0;
             foreach (var (p, asm) in Built(p => p.IntermediateAssembly))
                 foreach (var t in TypesOf(asm))
-                    foreach (var m in t.GetMethods(All).Cast<MethodBase>().Concat(t.GetConstructors(All)))
-                        foreach (var callee in Callees(m))
+                    foreach (var m in t.GetMethods(All).Cast<MethodBase>().Concat(t.GetConstructors(All)).Concat(t.TypeInitializer == null ? new MethodBase[0] : new[] { t.TypeInitializer }).Distinct())
+                    {
+                        scanned++;
+                        foreach (var callee in IlReader.Callees(m))
                             Assert.False(IsByteLoad(callee), p.Name + ": " + t.FullName + "." + m.Name + " calls " + callee.DeclaringType + "." + callee.Name + "(byte[])");
+                    }
+#if !DEBUG
+            Assert.True(scanned > 0, "No method bodies were scanned; the rule would pass vacuously.");
+#endif
         }
 
         static bool IsByteLoad(MethodBase callee)
@@ -88,25 +104,5 @@ namespace Foton.ArchitectureTests
             return ps.Length > 0 && ps[0].ParameterType == typeof(byte[]);
         }
 
-        /// <summary>Methods called by m (call / callvirt / newobj / ldftn operands), decoded from raw IL.</summary>
-        static IEnumerable<MethodBase> Callees(MethodBase m)
-        {
-            byte[]? il;
-            try { il = m.GetMethodBody()?.GetILAsByteArray(); } catch { yield break; }
-            if (il == null) yield break;
-            for (int i = 0; i + 4 < il.Length; i++)
-            {
-                bool call = il[i] == 0x28 || il[i] == 0x6F || il[i] == 0x73;
-                bool ldftn = il[i] == 0xFE && i + 5 < il.Length && (il[i + 1] == 0x06 || il[i + 1] == 0x07);
-                if (!call && !ldftn) continue;
-                int at = ldftn ? i + 2 : i + 1;
-                int token = BitConverter.ToInt32(il, at);
-                if ((token >> 24) != 0x0A && (token >> 24) != 0x06 && (token >> 24) != 0x2B) continue;
-                MethodBase? target = null;
-                try { target = m.Module.ResolveMethod(token, m.DeclaringType?.GetGenericArguments(), m.IsGenericMethod ? m.GetGenericArguments() : null); }
-                catch { }
-                if (target != null) yield return target;
-            }
-        }
     }
 }
