@@ -23,6 +23,16 @@ namespace Foton.Cli
                 return AnalyzeCommand(args[1]);
             if (args.Length == 3 && string.Equals(args[0], "ioc", StringComparison.OrdinalIgnoreCase))
                 return IocCommand(args[1], args[2]);
+            if (args.Length == 2 && string.Equals(args[0], "compose", StringComparison.OrdinalIgnoreCase))
+                return ComposeCommand(args[1]);
+            if (args.Length >= 1 && args.Length <= 4 && string.Equals(args[0], "tools", StringComparison.OrdinalIgnoreCase))
+            {
+                var rest = args.Skip(1).ToList();
+                bool force = rest.RemoveAll(a => string.Equals(a, "-Force", StringComparison.OrdinalIgnoreCase)) > 0;
+                if (rest.Count == 0 || (rest.Count == 1 && string.Equals(rest[0], "list", StringComparison.OrdinalIgnoreCase)))
+                    return ToolsListCommand();
+                if (rest.Count <= 2) return ToolsCommand(rest[0], rest.Count == 2 ? rest[1] : null, force);
+            }
             if (args.Length >= 3 && string.Equals(args[0], "compare", StringComparison.OrdinalIgnoreCase))
             {
                 bool noCsv = false, noHtml = false;
@@ -52,12 +62,19 @@ namespace Foton.Cli
             Console.WriteLine("  foton ioc <case-folder-or-zip> <ioc-file>");
             Console.WriteLine("                                        match an IOC list (.txt sha256:/path:/text:, .csv, .json);");
             Console.WriteLine("                                        writes analysis\\ioc_matches.csv");
+            Console.WriteLine("  foton compose <case-folder>          run EZ Tools / Hayabusa / Chainsaw on copied files;");
+            Console.WriteLine("                                        writes analysis\\external\\ and external_parse_inventory.csv");
+            Console.WriteLine("  foton tools                          list pinned and registered tools");
+            Console.WriteLine("  foton tools Hayabusa [-Force]        download and install the pinned release (hash-verified)");
+            Console.WriteLine("  foton tools Hayabusa <release.zip>   install from a downloaded archive (hash-verified)");
+            Console.WriteLine("  foton tools <EZTools|Chainsaw|...> <folder-or-exe>");
+            Console.WriteLine("                                        register an existing install in tools.json");
             Console.WriteLine("  foton compare <reference> <difference> [-NoCsv] [-NoHtml] [-OutputPath <html>]");
             Console.WriteLine("                                        diff two baselines (baseline.json or package folder);");
             Console.WriteLine("                                        writes baseline_diff.csv and Foton_BaselineCompare.html");
             Console.WriteLine("                                        beside the difference baseline");
             Console.WriteLine();
-            Console.WriteLine("Compose, tool install, and carve are not implemented in this v2 pre-release.");
+            Console.WriteLine("Carve is not implemented in this v2 pre-release.");
             Console.WriteLine("For casework use Foton 1.38.x (the Foton-Workstation_v1.38.1.zip module) from https://github.com/jimididit/foton/releases.");
             return 1;
         }
@@ -213,6 +230,88 @@ namespace Foton.Cli
             log.Write("Matches: " + run.HitsPath, StatusLevel.Good);
             log.WriteConsole("     A match is a lead to verify against the cited artifact (lists match admin tools too), not a conclusion.", ConsoleColor.DarkGray);
             return 0;
+        }
+
+        /// <summary>Exit 0 after compose (missing tools are coverage rows, not failures), 1 when the package cannot be used.</summary>
+        static int ComposeCommand(string path)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            Foton.Tools.ComposeRun run;
+            try { run = Foton.Tools.ComposeRunner.Run(path, log); }
+            catch (Exception ex)
+            {
+                log.Write("Cannot compose: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
+            foreach (var r in run.Rows)
+                log.WriteConsole($"   {r.Tool,-14} {(r.Version.Length > 0 ? r.Version : "-"),-12} {r.Status,-14} {(r.DestRelative.Length > 0 ? r.DestRelative : r.Note)}",
+                    r.Status == "Copied" ? ConsoleColor.White : ConsoleColor.DarkGray);
+            log.Write(@"Inventory: analysis\external\external_parse_inventory.csv. Native foton parse if tools are missing.", StatusLevel.Good);
+            log.WriteConsole("     Missing Hayabusa: foton tools Hayabusa. Existing EZ Tools / Chainsaw folder: foton tools EZTools <dir>", ConsoleColor.DarkGray);
+            return 0;
+        }
+
+        static int ToolsListCommand()
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            foreach (var r in Foton.Tools.ToolInstaller.List(null))
+                log.WriteConsole($"   {r.Name,-14} {r.Version,-16} {r.Source,-11} {r.Location}", ConsoleColor.White);
+            log.WriteConsole("     Location is what compose runs (or the pinned download). Tools only on PATH are not listed.", ConsoleColor.DarkGray);
+            return 0;
+        }
+
+        /// <summary>
+        /// One-time workstation setup; never runs inside compose. A folder or .exe is registered, a .zip is installed
+        /// against the catalog pin, and no path downloads the pinned release after a confirmation (or -Force).
+        /// </summary>
+        static int ToolsCommand(string name, string? path, bool force)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            try
+            {
+                if (path != null && !path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    log.WriteConsole("  Foton tool registration (existing install; nothing downloaded)", ConsoleColor.Cyan);
+                    foreach (var r in Foton.Tools.ToolRegistry.Register(name, path, null))
+                        log.WriteConsole($"   {r.Name,-14} {r.Status,-11} {r.Version,-16} {r.ExecutablePath}", ConsoleColor.White);
+                    log.Write("SHA-256 values in tools.json are observed on disk, not verified against an upstream hash.", StatusLevel.Warn);
+                    log.Write("PATH was not changed. Compose resolves these tools via tools.json.", StatusLevel.Good);
+                    return 0;
+                }
+
+                var entry = Foton.Tools.ToolCatalog.Entry(name);
+                var dest = Foton.Tools.ToolInstaller.Destination(entry, null);
+                log.WriteConsole("  Foton tool install (workstation setup - not part of a case package)", ConsoleColor.Cyan);
+                log.WriteConsole($"  Tool:     {entry.Name} {entry.Version}", ConsoleColor.White);
+                log.WriteConsole($"  License:  {entry.License}  {entry.ProjectUrl}", ConsoleColor.White);
+                log.WriteConsole($"  Source:   {path ?? entry.DownloadUrl}", ConsoleColor.White);
+                log.WriteConsole($"  SHA-256:  {entry.ExpectedSha256}", ConsoleColor.White);
+                log.WriteConsole($"  Dest:     {dest}", ConsoleColor.White);
+                log.WriteConsole($"  Note:     {entry.Notes}", ConsoleColor.White);
+                if (path == null && !force)
+                {
+                    Console.Write($"  Install {entry.Name} {entry.Version} into {dest}? [y/N] ");
+                    var answer = Console.ReadLine();
+                    if (!string.Equals(answer?.Trim(), "y", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(answer?.Trim(), "yes", StringComparison.OrdinalIgnoreCase))
+                    {
+                        log.Write("Cancelled.", StatusLevel.Warn);
+                        return 1;
+                    }
+                }
+                Foton.Tools.ToolInstaller.Install(entry, path, null, log);
+                log.Write("PATH was not changed. Compose resolves this tool via tools.json.", StatusLevel.Good);
+                log.Write("Next: foton compose <case-folder>", StatusLevel.Good);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                log.Write("Tool setup failed: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
         }
 
         static bool IsVersionSwitch(string arg) =>
