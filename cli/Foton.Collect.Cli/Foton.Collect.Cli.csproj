@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>foton-collect</AssemblyName>
+    <RootNamespace>Foton.Collect.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Foton.Core\Foton.Core.csproj" />
+  </ItemGroup>
+</Project>

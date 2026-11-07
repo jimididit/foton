@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared by all three executables: session, manifest, hashing, writers, versions. No live-host access (that is Foton.Win). -->
+</Project>

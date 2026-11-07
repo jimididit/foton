@@ -1,0 +1,10 @@
+<Project>
+  <!--
+    Each endpoint/workstation role ships as ONE file: project DLLs are merged into the exe at build
+    time (ILRepack) and the merged inputs are deleted. Never embed DLLs as resources and load them with
+    Assembly.Load(byte[]) - .NET Framework 4.8 AMSI scans that path and it looks like a malware loader.
+  -->
+  <ItemGroup>
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

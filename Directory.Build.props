@@ -1,0 +1,49 @@
+<Project>
+  <!--
+    One version and one set of schema numbers for every Foton v2 project.
+    Bump FotonVersion (and the schema you changed) on behavior or format changes.
+    Schema numbers start where 1.38.x left them; the port changes them only with a disclosed reason.
+  -->
+  <PropertyGroup>
+    <FotonVersion>2.0.0</FotonVersion>
+    <FotonPrerelease>alpha.0</FotonPrerelease>
+    <FotonCollectSchemaVersion>1.13.0</FotonCollectSchemaVersion>
+    <FotonBaselineSchemaVersion>1.14.0</FotonBaselineSchemaVersion>
+    <FotonFindingsSchemaVersion>1.0.0</FotonFindingsSchemaVersion>
+
+    <Version>$(FotonVersion)-$(FotonPrerelease)</Version>
+    <AssemblyVersion>$(FotonVersion).0</AssemblyVersion>
+    <FileVersion>$(FotonVersion).0</FileVersion>
+    <Product>Foton</Product>
+    <Company>JDI Consulting</Company>
+    <Authors>jimididit</Authors>
+    <Copyright>Copyright (c) 2026 jimididit</Copyright>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- In-box on Windows 10 / Server 2016+, so endpoints install nothing. -->
+    <TargetFramework>net462</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <DebugType>embedded</DebugType>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Only cli projects reference ILRepack (cli\Directory.Build.targets); this makes them merge in every configuration. -->
+    <ILRepackTargetsFile>$(MSBuildThisFileDirectory)cli\ILRepack.targets</ILRepackTargetsFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Runtime reads these (FotonVersion); every assembly carries them so ILRepack keeps them on the merged exe. -->
+    <AssemblyMetadata Include="FotonCollectSchemaVersion" Value="$(FotonCollectSchemaVersion)" />
+    <AssemblyMetadata Include="FotonBaselineSchemaVersion" Value="$(FotonBaselineSchemaVersion)" />
+    <AssemblyMetadata Include="FotonFindingsSchemaVersion" Value="$(FotonFindingsSchemaVersion)" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
