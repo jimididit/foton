@@ -176,6 +176,75 @@ namespace Foton.Tests
             }
         }
 
+        /// <summary>A regf with one ROOT key whose subkey list is built by <paramref name="list"/> (cell offset of ROOT, add-cell).</summary>
+        static byte[] HostileHive(Func<int, Func<byte[], int>, int> list)
+        {
+            var b = new byte[0x40000];
+            System.Text.Encoding.ASCII.GetBytes("regf").CopyTo(b, 0);
+            System.Text.Encoding.ASCII.GetBytes("hbin").CopyTo(b, 0x1000);
+            int next = 0x20;
+            int Add(byte[] payload)
+            {
+                int len = 4 + payload.Length, total = len + (8 - len % 8) % 8, off = next;
+                BitConverter.GetBytes(-total).CopyTo(b, 0x1000 + off);
+                payload.CopyTo(b, 0x1000 + off + 4);
+                next += total;
+                return off;
+            }
+            var nk = new byte[0x4C + 4];
+            nk[0] = 0x6E; nk[1] = 0x6B; nk[2] = 0x20;
+            BitConverter.GetBytes(20000).CopyTo(nk, 0x14);
+            BitConverter.GetBytes(-1).CopyTo(nk, 0x28);
+            BitConverter.GetBytes((ushort)4).CopyTo(nk, 0x48);
+            System.Text.Encoding.ASCII.GetBytes("ROOT").CopyTo(nk, 0x4C);
+            int root = Add(nk);
+            int listOff = list(root, Add);
+            BitConverter.GetBytes(listOff).CopyTo(b, 0x1000 + root + 4 + 0x1C);
+            BitConverter.GetBytes(root).CopyTo(b, 0x24);
+            return b;
+        }
+
+        [Theory]
+        [InlineData("ri-fanout")]
+        [InlineData("self-listing")]
+        public void Cyclic_hive_lists_finish_quickly(string kind)
+        {
+            var hive = HostileHive((root, add) =>
+            {
+                if (kind == "self-listing")
+                {
+                    // An lf list naming ROOT itself 5000 times.
+                    var lf = new byte[4 + 5000 * 8];
+                    lf[0] = (byte)'l'; lf[1] = (byte)'f';
+                    BitConverter.GetBytes((ushort)5000).CopyTo(lf, 2);
+                    for (int i = 0; i < 5000; i++) BitConverter.GetBytes(root).CopyTo(lf, 4 + i * 8);
+                    return add(lf);
+                }
+                // An ri list whose 2000 entries all point back at itself.
+                var ri = new byte[4 + 2000 * 4];
+                ri[0] = (byte)'r'; ri[1] = (byte)'i';
+                BitConverter.GetBytes((ushort)2000).CopyTo(ri, 2);
+                int self = add(ri);
+                return self;
+            });
+            if (kind == "ri-fanout")
+            {
+                // Patch the ri entries to its own offset now that it is known.
+                int self = BitConverter.ToInt32(hive, 0x1000 + BitConverter.ToInt32(hive, 0x24) + 4 + 0x1C);
+                for (int i = 0; i < 2000; i++) BitConverter.GetBytes(self).CopyTo(hive, 0x1000 + self + 4 + 4 + i * 4);
+            }
+            using (var t = new TempDir())
+            {
+                var path = t.File("Amcache.hve");
+                File.WriteAllBytes(path, hive);
+                var sw = Stopwatch.StartNew();
+                var rows = AmcacheParser.Parse(path);
+                sw.Stop();
+                Assert.Equal("AmcacheHive", rows.Single().Format);
+                Assert.True(sw.Elapsed < TimeSpan.FromSeconds(2), "Hive walk took " + sw.Elapsed);
+            }
+        }
+
         [Fact]
         public void Garbage_behind_valid_headers_never_throws()
         {

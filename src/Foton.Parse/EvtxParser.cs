@@ -66,11 +66,11 @@ namespace Foton.Parse
             {
                 using (var reader = new EventLogReader(new EventLogQuery(full, PathType.FilePath) { ReverseDirection = true }))
                 {
-                    for (EventRecord? e = reader.ReadEvent(); e != null && output.Count < maxEvents; e = reader.ReadEvent())
-                        using (e)
+                    while (output.Count < maxEvents)
+                        using (var e = reader.ReadEvent())
                         {
-                            if (!SelectedIds.Contains(e.Id)) continue;
-                            output.Add(Event(full, len, sha, e));
+                            if (e == null) break;
+                            if (SelectedIds.Contains(e.Id)) output.Add(Event(full, len, sha, e));
                         }
                 }
             }

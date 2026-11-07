@@ -55,25 +55,26 @@ namespace Foton.Parse
             };
         }
 
-        static void SubkeyOffsets(byte[] b, int listOffset, int expected, List<int> output, int depth)
+        static void SubkeyOffsets(byte[] b, int listOffset, int expected, List<int> output, int depth, HashSet<int> visited)
         {
-            // Nested ri lists recurse; 1.38.x had no bound, so a cyclic list never returned.
-            if (listOffset < 0 || expected <= 0 || depth > 8) return;
+            // Nested ri lists recurse; 1.38.x had no bound, so a cyclic list never returned. Each list is read
+            // once and reading stops at the key's subkey count, so a fan-out of self-references stays linear.
+            if (listOffset < 0 || depth > 8 || output.Count >= expected || !visited.Add(listOffset)) return;
             var p = Cell(b, listOffset);
             if (p == null || p.Length < 4) return;
             var sig = Encoding.ASCII.GetString(p, 0, 2);
             int count = BitConverter.ToUInt16(p, 2);
             if (string.Equals(sig, "ri", StringComparison.OrdinalIgnoreCase))
             {
-                for (int i = 0; i < count && 4 + i * 4 + 4 <= p.Length; i++)
-                    SubkeyOffsets(b, BitConverter.ToInt32(p, 4 + i * 4), expected, output, depth + 1);
+                for (int i = 0; i < count && 4 + i * 4 + 4 <= p.Length && output.Count < expected; i++)
+                    SubkeyOffsets(b, BitConverter.ToInt32(p, 4 + i * 4), expected, output, depth + 1, visited);
                 return;
             }
             int entrySize;
             if (string.Equals(sig, "lf", StringComparison.OrdinalIgnoreCase) || string.Equals(sig, "lh", StringComparison.OrdinalIgnoreCase)) entrySize = 8;
             else if (string.Equals(sig, "li", StringComparison.OrdinalIgnoreCase)) entrySize = 4;
             else return;
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count && output.Count < expected; i++)
             {
                 int at = 4 + i * entrySize;
                 if (at + 4 > p.Length) break;
@@ -87,7 +88,7 @@ namespace Foton.Parse
             if (nk == null || nk.SubkeyCount <= 0) return list;
             int n = Math.Min(nk.SubkeyCount, 20000);
             var offs = new List<int>();
-            SubkeyOffsets(b, nk.SubkeyListOffset, n, offs, 0);
+            if (nk.SubkeyCount > 0) SubkeyOffsets(b, nk.SubkeyListOffset, n, offs, 0, new HashSet<int>());
             for (int i = 0; i < offs.Count && i < n; i++)
             {
                 var child = Nk(b, offs[i]);
@@ -159,6 +160,8 @@ namespace Foton.Parse
         public static Key? Find(byte[] b, Key? start, string name, int maxDepth = 4)
         {
             if (start == null || name.Length == 0) return null;
+            // Each key cell is queued once, so a key that lists itself (or a cycle) cannot grow the queue.
+            var queued = new HashSet<int> { start.CellOffset };
             var queue = new Queue<KeyValuePair<Key, int>>();
             queue.Enqueue(new KeyValuePair<Key, int>(start, 0));
             for (int seen = 0; queue.Count > 0 && seen < 8000; seen++)
@@ -166,7 +169,8 @@ namespace Foton.Parse
                 var item = queue.Dequeue();
                 if (item.Key.Name.Length > 0 && string.Equals(item.Key.Name.ToLowerInvariant(), name.ToLowerInvariant(), StringComparison.Ordinal)) return item.Key;
                 if (item.Value >= maxDepth) continue;
-                foreach (var ch in Subkeys(b, item.Key)) queue.Enqueue(new KeyValuePair<Key, int>(ch, item.Value + 1));
+                foreach (var ch in Subkeys(b, item.Key))
+                    if (queued.Add(ch.CellOffset)) queue.Enqueue(new KeyValuePair<Key, int>(ch, item.Value + 1));
             }
             return null;
         }

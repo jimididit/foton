@@ -143,14 +143,23 @@ namespace Foton.Parse
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
-                long size = 0;
-                try { size = new FileInfo(f).Length; } catch (Exception e2) when (e2 is IOException || e2 is UnauthorizedAccessException) { }
-                return new List<ParseRecord>
-                {
-                    new ParseRecord { SourcePath = Path.GetFullPath(f), SizeBytes = size, SHA256 = "HASH_ERROR", Format = "Unsupported-ReadError",
-                        Note = "File could not be read: " + TextFile.OneLine(ex.Message) + ". Nothing was guessed." },
-                };
+                return Failed(f, "Unsupported-ReadError", "File could not be read: " + TextFile.OneLine(ex.Message) + ". Nothing was guessed.");
             }
+            catch (Exception ex)
+            {
+                // Parsers fail closed on malformed bytes; anything they did not anticipate stays one file's problem.
+                return Failed(f, "Unsupported-ParseError", "Parser stopped on malformed content: " + TextFile.OneLine(ex.GetType().Name + ": " + ex.Message) + ". Nothing was guessed.");
+            }
+        }
+
+        static List<ParseRecord> Failed(string f, string format, string note)
+        {
+            long size = 0;
+            try { size = new FileInfo(f).Length; } catch (Exception e2) when (e2 is IOException || e2 is UnauthorizedAccessException) { }
+            return new List<ParseRecord>
+            {
+                new ParseRecord { SourcePath = Path.GetFullPath(f), SizeBytes = size, SHA256 = Bin.Sha256(f), Format = format, Note = note },
+            };
         }
 
         static ParsedRow ToRow(ParseRecord r, string? caseRoot)
