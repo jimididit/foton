@@ -153,6 +153,12 @@ namespace Foton.Baseline.Capture
                 rows.AddRange(ctx.Safe(() => Directory.Exists(ci)
                     ? Directory.GetFiles(ci, "*.cip").Select(f => Row("Kind", "WdacCip", "Name", Path.GetFileName(f), "Path", f, "PolicyHash", Hashing.SafeHash(f, false)))
                     : Enumerable.Empty<Dictionary<string, object?>>()));
+                // Multiple-policy format (1903+) loads from CiPolicies\Active, which 1.38.x did not read. A policy
+                // dropped here can block security tooling from loading, so it is the folder worth diffing.
+                var active = Path.Combine(ci, @"CiPolicies\Active");
+                rows.AddRange(ctx.Safe(() => Directory.Exists(active)
+                    ? Directory.GetFiles(active, "*.cip").Select(f => Row("Kind", "WdacActiveCip", "Name", Path.GetFileName(f), "Path", f, "PolicyHash", Hashing.SafeHash(f, false)))
+                    : Enumerable.Empty<Dictionary<string, object?>>()));
                 rows.AddRange(ctx.Safe(() =>
                 {
                     var xml = AppLocker.EffectiveXml();
