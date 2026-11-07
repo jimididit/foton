@@ -28,6 +28,20 @@ namespace Foton.Core
             using (var w = new StreamWriter(path, true, enc)) { w.Write(line); w.Write("\r\n"); }
         }
 
+        /// <summary>
+        /// A value safe to embed in a line-oriented record: CR, LF, and other control characters become
+        /// spaces. Host-supplied text (OS caption, paths, error messages) must not forge lines in custody
+        /// records, or a fake "yyyy-MM-dd HH:mm:ss UTC" line in collection.log that widens the collection window.
+        /// </summary>
+        public static string OneLine(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return value ?? "";
+            var chars = value!.ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
+                if (char.IsControl(chars[i]) && chars[i] != '\t') chars[i] = ' ';
+            return new string(chars);
+        }
+
         /// <summary>Reads text written by either line (BOM or not, CRLF or LF).</summary>
         public static string[] ReadLines(string path) => File.ReadAllLines(path, Encoding.UTF8);
     }

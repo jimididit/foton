@@ -108,20 +108,22 @@ namespace Foton.Tests
         }
 
         [Fact]
-        public void Hashes_skip_hash_files_and_a_nested_copy_and_zip_keeps_the_case_folder()
+        public void Hashes_cover_every_file_but_the_hash_files_and_zip_keeps_the_case_folder()
         {
             using (var t = new TempDir())
             {
                 var s = Sessions.New(t.Path);
                 File.WriteAllText(Path.Combine(s.Dir("System"), "os.json"), "{}");
+                // At collect time a folder is only a "copy of the case" with an identical hashes.csv, which
+                // cannot exist before hashing: anything in the case folder is hashed and shipped as found.
                 var nested = Path.Combine(s.CaseRoot!, "Foton_HOST_20260115-120000Z", "00_Collection");
                 Directory.CreateDirectory(nested);
                 File.WriteAllText(Path.Combine(nested, "dup.txt"), "dup");
                 PackageFiles.WriteManifestFiles(s);
-                Assert.Equal(3, PackageFiles.WriteArtifactHashes(s)); // collection.log, collection_manifest.csv, os.json
+                Assert.Equal(4, PackageFiles.WriteArtifactHashes(s)); // collection.log, collection_manifest.csv, os.json, dup.txt
                 var hashes = Csv.Read(Path.Combine(s.Dir("Collection"), "hashes.csv"));
                 Assert.Contains(hashes, r => r["RelativePath"] == @"01_System\os.json" && r["SHA256"] == Hashing.Sha256Hex(System.Text.Encoding.ASCII.GetBytes("{}")));
-                Assert.DoesNotContain(hashes, r => r["RelativePath"]!.Contains("dup"));
+                Assert.DoesNotContain(hashes, r => r["RelativePath"]!.StartsWith("00_Collection\\hashes."));
                 Assert.False(File.Exists(Path.Combine(s.Dir("Collection"), "findings.csv")));
                 var txt = TextFile.ReadLines(Path.Combine(s.Dir("Collection"), "hashes.txt"));
                 Assert.Equal("Foton artifact hashes (SHA-256) - generated 2026-01-15 12:00:00 UTC", txt[0]);
@@ -131,7 +133,7 @@ namespace Foton.Tests
                 {
                     Assert.All(z.Entries, e => Assert.StartsWith("Foton_HOST_20260115-120000Z/", e.FullName));
                     Assert.Contains(z.Entries, e => e.FullName == "Foton_HOST_20260115-120000Z/01_System/os.json");
-                    Assert.DoesNotContain(z.Entries, e => e.FullName.EndsWith("dup.txt"));
+                    Assert.Contains(z.Entries, e => e.FullName.EndsWith("dup.txt"));
                 }
                 var hash = PackageFiles.WritePackageHashRecord(s, zip);
                 var record = TextFile.ReadLines(s.CaseRoot + "_PACKAGE_HASH.txt");
@@ -174,6 +176,25 @@ namespace Foton.Tests
                 Assert.Contains("Operating System     : Windows 11 Pro 10.0.26100 (build 26100)", admin);
                 Assert.Contains("Executable SHA-256   : AB", admin);
                 Assert.DoesNotContain(admin, l => l.StartsWith("Coverage profile STANDARD USER"));
+            }
+        }
+
+        [Fact]
+        public void Host_or_operator_text_cannot_forge_log_or_custody_lines()
+        {
+            using (var t = new TempDir())
+            {
+                const string forged = "x\r\n2025-01-01 00:00:00 UTC  [Info] forged";
+                var s = Sessions.New(t.Path, options: new SessionOptions { CaseNumber = forged, Examiner = "e\nExaminer : someone else" });
+                s.Status.Write("path " + forged, StatusLevel.Warn);
+                var log = TextFile.ReadLines(s.LogFile!);
+                Assert.Equal(2, log.Length);
+                Assert.Equal(new DateTime(2026, 1, 15, 12, 0, 0, DateTimeKind.Utc), CollectionWindow.FromCase(s.CaseRoot)!.StartUtc);
+
+                var custody = ChainOfCustody.Lines(s, new CustodyFacts { OsCaption = "Windows\r\nLast Boot UTC        : 1999-01-01 00:00:00", OsVersion = " " });
+                Assert.Single(custody, l => l.StartsWith("Last Boot UTC"));
+                Assert.Single(custody, l => l.StartsWith("Examiner"));
+                Assert.Contains(custody, l => l.StartsWith("Operating System     : Windows  Last Boot UTC") && l.EndsWith("unknown (build unknown)"));
             }
         }
 

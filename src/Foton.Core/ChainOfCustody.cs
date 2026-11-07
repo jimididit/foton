@@ -35,31 +35,33 @@ namespace Foton.Core
         public static IReadOnlyList<string> Lines(FotonSession s, CustodyFacts f)
         {
             var o = s.Options;
-            string Or(string? v) => string.IsNullOrEmpty(v) ? "unknown" : v!;
+            // Every embedded value is one line (host facts and operator input could carry CR/LF).
+            string L(string? v) => TextFile.OneLine(v);
+            string Or(string? v) => string.IsNullOrWhiteSpace(v) ? "unknown" : L(v);
             var offset = f.TimeZone.GetUtcOffset(f.LocalTimeAtStart);
-            var os = f.OsCaption == null ? "unknown" : $"{f.OsCaption} {f.OsVersion} (build {f.OsBuild})";
-            var model = f.Manufacturer == null && f.Model == null ? "unknown" : $"{f.Manufacturer} {f.Model}".Trim();
+            var os = string.IsNullOrWhiteSpace(f.OsCaption) ? "unknown" : $"{L(f.OsCaption)} {Or(f.OsVersion)} (build {Or(f.OsBuild)})";
+            var model = string.IsNullOrWhiteSpace(f.Manufacturer) && string.IsNullOrWhiteSpace(f.Model) ? "unknown" : $"{L(f.Manufacturer)} {L(f.Model)}".Trim();
             var l = new List<string>
             {
                 "================================================================",
                 " Foton - Collection Record / Chain of Custody Header",
                 "================================================================",
                 "",
-                "Case Number          : " + (string.IsNullOrEmpty(o.CaseNumber) ? "(not supplied)" : o.CaseNumber),
-                "Examiner             : " + o.Examiner,
+                "Case Number          : " + (string.IsNullOrWhiteSpace(o.CaseNumber) ? "(not supplied)" : L(o.CaseNumber)),
+                "Examiner             : " + L(o.Examiner),
                 "Collection Tool      : Foton v" + s.Version,
                 "Collection Type      : Live (running system) logical collection",
                 "Collection Start UTC : " + FotonTime.Format(s.StartTimeUtc),
                 "Local Time At Start  : " + f.LocalTimeAtStart.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-                "System Time Zone     : " + f.TimeZone.Id + " (UTC offset " + offset.ToString("c", CultureInfo.InvariantCulture) + ")",
+                "System Time Zone     : " + L(f.TimeZone.Id) + " (UTC offset " + offset.ToString("c", CultureInfo.InvariantCulture) + ")",
                 "",
-                "Hostname             : " + s.Hostname,
+                "Hostname             : " + L(s.Hostname),
                 "Domain / Workgroup   : " + Or(f.Domain),
                 "Manufacturer / Model : " + model,
                 "Operating System     : " + os,
                 "Last Boot UTC        : " + (f.LastBootUtc.HasValue ? FotonTime.Format(f.LastBootUtc.Value) : "unknown"),
                 "",
-                "Collection Account   : " + s.Account,
+                "Collection Account   : " + L(s.Account),
                 "Elevated (Admin)     : " + (s.IsElevated ? "True" : "False"),
                 "Coverage Profile     : " + Coverage.Profile(s.IsElevated),
                 "Runtime              : .NET Framework (CLR " + Environment.Version + ")",
@@ -67,7 +69,7 @@ namespace Foton.Core
                 "Executable SHA-256   : " + Or(f.ExecutableSha256),
                 "",
                 "Parameters Used:",
-                "  OutputPath          = " + o.OutputPath,
+                "  OutputPath          = " + L(o.OutputPath),
                 "  EventLogDays        = " + o.EventLogDays.ToString(CultureInfo.InvariantCulture),
                 "  MaxEventsPerLog     = " + o.MaxEventsPerLog.ToString(CultureInfo.InvariantCulture),
                 "  SkipEvtxExport      = " + o.SkipEvtxExport,

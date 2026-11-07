@@ -26,10 +26,11 @@ namespace Foton.Core
         }
 
         /// <summary>
-        /// The "package contains a copy of itself" duplicate: a child case folder with the same name as the
-        /// case, or whose hashes.csv is byte-identical (extracted into the case and re-zipped in transit).
-        /// Recursive walks skip it so artifacts are not counted twice. Any other embedded case folder is not
-        /// a duplicate (see OtherChildCases): it is reported, never silently treated as a copy.
+        /// The "package contains a copy of itself" duplicate: a child case folder whose hashes.csv is
+        /// byte-identical to the case's (extracted into the case and re-zipped in transit). Recursive walks
+        /// skip it so artifacts are not counted twice. A matching folder name alone is not proof (names in a
+        /// crafted package are attacker-chosen). Any other embedded case folder is reported (OtherChildCases),
+        /// never silently treated as a copy.
         /// </summary>
         public static string? FindNestedDuplicate(string? caseRoot) =>
             ChildCases(caseRoot).FirstOrDefault(c => IsDuplicateOf(c, caseRoot!));
@@ -40,8 +41,6 @@ namespace Foton.Core
 
         static bool IsDuplicateOf(string child, string root)
         {
-            if (string.Equals(Path.GetFileName(child), Path.GetFileName(root.TrimEnd('\\', '/')), System.StringComparison.OrdinalIgnoreCase))
-                return true;
             var a = Path.Combine(child, CollectionFolder, "hashes.csv");
             var b = Path.Combine(root, CollectionFolder, "hashes.csv");
             if (!File.Exists(a) || !File.Exists(b)) return false;

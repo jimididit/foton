@@ -43,7 +43,8 @@ namespace Foton.Core
                 WriteConsole(line, color);
                 if (LogFile != null)
                 {
-                    try { TextFile.AppendLine(LogFile, FotonTime.Format(UtcNow()) + " UTC  [" + level + "] " + message); }
+                    // One physical line per entry: a message cannot inject a forged timestamped line.
+                    try { TextFile.AppendLine(LogFile, FotonTime.Format(UtcNow()) + " UTC  [" + level + "] " + TextFile.OneLine(message)); }
                     catch (Exception) { }
                 }
             }
@@ -58,7 +59,7 @@ namespace Foton.Core
             lock (_gate)
             {
                 if (LogFile == null) return;
-                try { TextFile.AppendLine(LogFile, FotonTime.Format(UtcNow()) + " UTC  [Info] " + reason); }
+                try { TextFile.AppendLine(LogFile, FotonTime.Format(UtcNow()) + " UTC  [Info] " + TextFile.OneLine(reason)); }
                 catch (Exception) { }
                 LogFile = null;
             }

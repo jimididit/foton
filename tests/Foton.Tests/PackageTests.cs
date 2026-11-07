@@ -92,19 +92,15 @@ namespace Foton.Tests
             }
         }
 
-        [Theory]
-        [InlineData("same-name")]
-        [InlineData("same-hashes")]
-        public void A_verified_copy_of_the_case_is_skipped_as_a_duplicate(string kind)
+        [Fact]
+        public void A_verified_copy_of_the_case_is_skipped_as_a_duplicate()
         {
             using (var t = new TempDir())
             {
                 var folder = CopyFixture(t);
-                var childName = kind == "same-name" ? Path.GetFileName(folder) : "re-extracted";
-                var child = Path.Combine(folder, childName);
+                var child = Path.Combine(folder, "re-extracted");
                 Directory.CreateDirectory(Path.Combine(child, "00_Collection"));
-                if (kind == "same-hashes")
-                    File.Copy(Path.Combine(folder, "00_Collection", "hashes.csv"), Path.Combine(child, "00_Collection", "hashes.csv"));
+                File.Copy(Path.Combine(folder, "00_Collection", "hashes.csv"), Path.Combine(child, "00_Collection", "hashes.csv"));
                 File.WriteAllText(Path.Combine(child, "inner_only.json"), "{\"a\":1}");
                 var p = FotonPackage.Open(folder);
                 Assert.Equal(child, p.NestedDuplicate);
@@ -114,15 +110,18 @@ namespace Foton.Tests
             }
         }
 
-        [Fact]
-        public void A_planted_case_folder_is_reported_not_loaded_and_stays_visible_to_verification()
+        [Theory]
+        [InlineData("planted")]
+        [InlineData("same-name-as-the-case")]
+        public void A_planted_case_folder_is_reported_not_loaded_and_stays_visible_to_verification(string name)
         {
-            // A crafted package could plant a child 00_Collection to hide files. It is not treated as a copy:
-            // it is reported, cannot override this case's artifacts, and its files show as unlisted.
+            // A crafted package could plant a child 00_Collection, even one named like the case, to hide files.
+            // Without an identical hashes.csv it is not a copy: reported, cannot override this case's
+            // artifacts, and its files show as unlisted.
             using (var t = new TempDir())
             {
                 var folder = CopyFixture(t);
-                var planted = Path.Combine(folder, "planted");
+                var planted = Path.Combine(folder, name == "planted" ? "planted" : Path.GetFileName(folder));
                 Directory.CreateDirectory(Path.Combine(planted, "00_Collection"));
                 File.WriteAllText(Path.Combine(planted, "os_info.json"), "{\"forged\":true}");
                 var p = FotonPackage.Open(folder);
@@ -130,7 +129,7 @@ namespace Foton.Tests
                 Assert.Equal(new[] { planted }, p.OtherNestedCases);
                 var os = (System.Collections.Generic.Dictionary<string, object>)p.Artifacts["os_info"].Json!;
                 Assert.False(os.ContainsKey("forged"));
-                Assert.Contains(@"planted\os_info.json", p.VerifyHashes().Unlisted);
+                Assert.Contains(Path.GetFileName(planted) + @"\os_info.json", p.VerifyHashes().Unlisted);
             }
         }
 
