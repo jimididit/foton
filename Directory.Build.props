@@ -10,7 +10,10 @@
     <!-- UTC date of the change that set FotonVersion; the banner shows it as Updated. -->
     <FotonReleaseDate>2026-11-07</FotonReleaseDate>
     <FotonCollectSchemaVersion>1.13.0</FotonCollectSchemaVersion>
-    <FotonBaselineSchemaVersion>1.14.0</FotonBaselineSchemaVersion>
+    <!-- 64-bit on 64-bit Windows: a 32-bit process is redirected to SysWOW64 and the 32-bit registry view. -->
+    <Prefer32Bit>false</Prefer32Bit>
+    <!-- 1.15.0: values only (Defender "(not reported)", BitsJob "(not set)"); Compare accepts 1.14.0 against it. -->
+    <FotonBaselineSchemaVersion>1.15.0</FotonBaselineSchemaVersion>
     <FotonFindingsSchemaVersion>1.0.0</FotonFindingsSchemaVersion>
 
     <Version>$(FotonVersion)-$(FotonPrerelease)</Version>
