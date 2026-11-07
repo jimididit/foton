@@ -80,9 +80,12 @@ namespace Foton.Core
         /// Rows as column-to-value maps (Import-Csv). Accepts a BOM, CRLF or LF, quoted newlines,
         /// and the "#TYPE" line older Export-Csv calls wrote. A short row leaves later columns null.
         /// </summary>
-        public static List<Dictionary<string, string?>> Read(string path)
+        public static List<Dictionary<string, string?>> Read(string path) => ReadText(File.ReadAllText(path, Encoding.UTF8));
+
+        /// <summary>Rows from CSV text (see <see cref="Read"/>).</summary>
+        public static List<Dictionary<string, string?>> ReadText(string text)
         {
-            var text = File.ReadAllText(path, Encoding.UTF8);
+            if (text.Length > 0 && text[0] == '\uFEFF') text = text.Substring(1);
             var records = Parse(text);
             var result = new List<Dictionary<string, string?>>();
             int start = 0;

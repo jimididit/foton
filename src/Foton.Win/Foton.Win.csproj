@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The only project that touches the live host: registry (read-only), WMI, COM, and Win32.
+    All P/Invoke and COM interop lives here (architecture tests enforce it).
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+</Project>

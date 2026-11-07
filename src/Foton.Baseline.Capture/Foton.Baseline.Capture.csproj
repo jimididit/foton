@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Baseline providers: live reads of stable configuration on the endpoint (one file per area, mirrors src/Private/Baseline/Providers). -->
+  <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+    <ProjectReference Include="..\Foton.Win\Foton.Win.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+</Project>

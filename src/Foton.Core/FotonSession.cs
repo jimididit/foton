@@ -66,6 +66,28 @@ namespace Foton.Core
             Dirs.TryGetValue(category, out var d) ? d : throw new InvalidOperationException("Case folders are not created yet (call CaseLayout.Create).");
     }
 
+    /// <summary>
+    /// Creates FotonBaseline_&lt;host&gt;_&lt;yyyyMMdd-HHmmss&gt;Z. A baseline package is flat: baseline.json,
+    /// coverage.json, baseline.log, and the hash files all sit in the package root.
+    /// </summary>
+    public static class BaselineLayout
+    {
+        public static string FolderName(string hostname, DateTime startUtc) => "FotonBaseline_" + hostname + "_" + FotonTime.Stamp(startUtc) + "Z";
+
+        public static string Create(FotonSession session, string outputPath)
+        {
+            Directory.CreateDirectory(outputPath);
+            var root = Path.Combine(outputPath, FolderName(session.Hostname, session.StartTimeUtc));
+            Directory.CreateDirectory(root);
+            session.CaseRoot = root;
+            session.Dirs["Collection"] = root;
+            var log = Path.Combine(root, "baseline.log");
+            TextFile.Write(log, "Foton " + session.Version + " baseline capture log");
+            session.Status.LogFile = log;
+            return root;
+        }
+    }
+
     /// <summary>Creates Foton_&lt;host&gt;_&lt;yyyyMMdd-HHmmss&gt;Z with the ten category folders and collection.log.</summary>
     public static class CaseLayout
     {

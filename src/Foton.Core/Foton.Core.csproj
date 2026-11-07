@@ -8,4 +8,8 @@
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Data, not code: the registry hardening table Collect and Baseline read (same file as 1.38.x Patterns). -->
+    <EmbeddedResource Include="Resources\HardeningRegistryChecks.csv" LogicalName="Foton.Core.HardeningRegistryChecks.csv" />
+  </ItemGroup>
 </Project>

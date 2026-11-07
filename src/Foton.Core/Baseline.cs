@@ -171,9 +171,10 @@ namespace Foton.Core
     public static class BaselineSchema
     {
         /// <summary>
-        /// 1.15.0 changed only record values (unreported Defender properties become "(not reported)",
-        /// BitsJob NotifyCmdLine "(not set)"), not identity keys or compared fields, so a 1.14.0 day0
-        /// stays usable; those values show once as Modified.
+        /// 1.15.0 changed record values and coverage, not identity keys or compared fields, so a 1.14.0 day0
+        /// stays usable: unreported Defender properties become "(not reported)", BitsJob NotifyCmdLine
+        /// "(not set)", WinHttpSettings hex, and a standard-user capture now reads loaded user hives that
+        /// 1.14.0 skipped. Those show once as Modified or Added.
         /// </summary>
         static readonly string[][] Compatible = { new[] { "1.14.0", "1.15.0" } };
 
@@ -183,6 +184,6 @@ namespace Foton.Core
         /// <summary>Explanation to show when two different but compatible schemas are compared; null when equal.</summary>
         public static string? CrossVersionNote(string a, string b) =>
             a == b ? null
-            : $"Reference schema {a} and difference schema {b} differ. 1.15.0 records Defender properties the platform no longer reports as \"(not reported)\" (1.14.0 wrote an empty value) and an unset BitsJob NotifyCmdLine as \"(not set)\" (1.14.0 wrote a single space). Those fields can show as Modified once; that is a format change, not a host change.";
+            : $"Reference schema {a} and difference schema {b} differ. 1.15.0 records Defender properties the platform no longer reports as \"(not reported)\" (1.14.0 wrote an empty value) and an unset BitsJob NotifyCmdLine as \"(not set)\" (1.14.0 wrote a single space), and writes the WinHttpSettings proxy blob as hex (1.14.0 wrote decimals). A 1.14.0 standard-user capture also skipped every loaded user hive, so per-user UserAutorun, StartupApproved and ProxyConfig rows can show as Added. That is a format and coverage change, not a host change.";
     }
 }

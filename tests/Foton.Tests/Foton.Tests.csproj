@@ -15,6 +15,8 @@
     <ProjectReference Include="..\..\src\Foton.Package\Foton.Package.csproj" />
     <ProjectReference Include="..\..\src\Foton.Report\Foton.Report.csproj" />
     <ProjectReference Include="..\..\src\Foton.Baseline.Compare\Foton.Baseline.Compare.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Win\Foton.Win.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Baseline.Capture\Foton.Baseline.Capture.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.IO.Compression" />
