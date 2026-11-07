@@ -339,6 +339,21 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void AmcacheParser_without_the_hive_is_NoInput_and_is_not_run()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"08_Filesystem\amcache");
+                Write(t.File(@"bin\amcacheparser.cmd"), ArgsRecorder(0));
+                var row = Compose(pkg, t.File("empty"), new Dictionary<string, string> { ["AmcacheParser"] = t.File(@"bin\amcacheparser.cmd") })
+                    .Rows.Single(r => r.Tool == "AmcacheParser");
+                Assert.Equal("NoInput", row.Status);
+                Assert.Contains("Amcache.hve", row.Note);
+                Assert.False(File.Exists(t.File(@"bin\args_amcacheparser.txt")));
+            }
+        }
+
+        [Fact]
         public void A_missing_Hayabusa_points_to_foton_tools()
         {
             using (var t = new TempDir())

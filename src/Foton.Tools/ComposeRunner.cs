@@ -46,6 +46,8 @@ namespace Foton.Tools
             public string Tool = "";
             public string[] Names = new string[0];
             public string NeedDir = "";
+            /// <summary>A file the tool reads directly (not a folder walk); NoInput when absent.</summary>
+            public string? NeedFile;
             public Func<string, Skip?>? Pre;
             public Func<string, string, string, List<string>> Args = (exe, input, output) => new List<string>();
         }
@@ -82,6 +84,7 @@ namespace Foton.Tools
                 new Job
                 {
                     Tool = "AmcacheParser", Names = new[] { "AmcacheParser.exe", "AmcacheParser" }, NeedDir = amcache,
+                    NeedFile = Path.Combine(amcache, "Amcache.hve"),
                     Args = (e, i, o) => new List<string> { "-f", Path.Combine(i, "Amcache.hve"), "--csv", o, "--csvf", "amcacheparser.csv" },
                 },
                 // RECmd exports nothing without a search switch; with only -d/--csv it logs a warning and exits.
@@ -164,6 +167,12 @@ namespace Foton.Tools
                 if (!Directory.Exists(j.NeedDir))
                 {
                     rows.Add(Row("NoInput", "", $"Tool found ({src}) but input folder is missing: {j.NeedDir}. Re-collect elevated if the copy task was skipped."));
+                    Retained("NoInput");
+                    continue;
+                }
+                if (j.NeedFile != null && !File.Exists(j.NeedFile))
+                {
+                    rows.Add(Row("NoInput", "", $"Tool found ({src}) but input file is missing: {j.NeedFile}. Re-collect elevated if the copy task was skipped."));
                     Retained("NoInput");
                     continue;
                 }
@@ -288,6 +297,11 @@ namespace Foton.Tools
         {
             try
             {
+                if (!Directory.Exists(toolDir))
+                {
+                    Directory.Move(stage, toolDir);
+                    return null;
+                }
                 Directory.Move(toolDir, prev);
                 try { Directory.Move(stage, toolDir); }
                 catch (Exception)
