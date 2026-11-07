@@ -25,7 +25,26 @@ param(
 $ErrorActionPreference = 'Stop'
 if (-not $RepoRoot) { $RepoRoot = Join-Path $PSScriptRoot '..' }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
-if (-not $DocsRoot) { $DocsRoot = Join-Path $RepoRoot '..\..' }
+# Operator docs shipped from DocsRoot. Validate instead of assuming a layout, so a module
+# copied elsewhere fails here with a clear message rather than shipping someone else's docs.
+$docFiles = @('LICENSE', 'README.md', 'SECURITY.md', 'docs\USAGE.md', 'docs\CARVE.md')
+function Test-FotonDocsRoot([string]$Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+    foreach ($f in $docFiles) { if (-not (Test-Path -LiteralPath (Join-Path $Path $f) -PathType Leaf)) { return $false } }
+    return $true
+}
+if ($DocsRoot) {
+    if (-not (Test-FotonDocsRoot $DocsRoot)) {
+        throw "-DocsRoot '$DocsRoot' must contain: $($docFiles -join ', ')."
+    }
+}
+else {
+    # Repository layout (module in legacy\powershell) first, then the pre-move layout (docs beside the module).
+    $DocsRoot = @((Join-Path $RepoRoot '..\..'), $RepoRoot) | Where-Object { Test-FotonDocsRoot $_ } | Select-Object -First 1
+    if (-not $DocsRoot) {
+        throw "Operator docs not found two levels above or inside -RepoRoot '$RepoRoot'. Pass -DocsRoot <folder containing $($docFiles -join ', ')>."
+    }
+}
 $DocsRoot = (Resolve-Path -LiteralPath $DocsRoot).Path
 if (-not $OutputPath) { $OutputPath = Join-Path $RepoRoot 'dist\release' }
 
