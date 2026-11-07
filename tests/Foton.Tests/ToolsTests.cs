@@ -339,6 +339,38 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Output_from_a_run_that_exits_with_an_error_is_kept_but_marked_partial()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"07_Event_Logs\evtx");
+                Write(t.File(@"bin\hayabusa.cmd"),
+                    "@echo off\r\n:loop\r\nif \"%~1\"==\"\" exit /b 3\r\nif /i \"%~1\"==\"-o\" echo new> \"%~dp2fresh.csv\"\r\nshift\r\ngoto loop\r\n");
+                var hb = Compose(pkg, t.File("empty"), new Dictionary<string, string> { ["Hayabusa"] = t.File(@"bin\hayabusa.cmd") })
+                    .Rows.Single(r => r.Tool == "Hayabusa");
+                Assert.Equal("Copied", hb.Status);
+                Assert.Contains("exited with code 3", hb.Note);
+            }
+        }
+
+        [Fact]
+        public void A_log_the_run_did_not_write_is_not_left_from_an_earlier_run()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"08_Filesystem\prefetch");
+                var stale = Path.Combine(pkg, @"analysis\external\pecmd\tool_stdout.txt");
+                Write(stale, "You must install or update .NET to run this application.");
+                // Not a valid executable, so the start fails and only tool_stderr.txt is written.
+                Write(t.File(@"bin\PECmd.exe"), "not a program");
+                var row = Compose(pkg, t.File("empty"), new Dictionary<string, string> { ["PECmd"] = t.File(@"bin\PECmd.exe") })
+                    .Rows.Single(r => r.Tool == "PECmd");
+                Assert.Equal("ToolError", row.Status);
+                Assert.False(File.Exists(stale));
+            }
+        }
+
+        [Fact]
         public void A_tool_missing_its_NET_runtime_is_reported_with_its_logs_kept()
         {
             using (var t = new TempDir())

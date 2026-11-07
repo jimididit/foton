@@ -188,7 +188,7 @@ namespace Foton.Tools
                 // a failed rerun cannot destroy the last good one.
                 var stage = Path.Combine(extRoot, $".{lower}.staging-{Guid.NewGuid():N}");
                 Directory.CreateDirectory(stage);
-                bool ok = false;
+                int? exitCode = null;
                 // Run in the tool's own install tree: Hayabusa resolves config\ relative to the working directory. Every
                 // path passed in is absolute, so this is safe for the EZ Tools too.
                 var workDir = Path.GetDirectoryName(exe);
@@ -197,12 +197,13 @@ namespace Foton.Tools
                 {
                     var args = CommandLine.Join(j.Args(exe, j.NeedDir, stage));
                     log.Write($"{j.Tool}: {exe} {args}", StatusLevel.Info);
-                    ok = ToolProcess.RunToFiles(exe, args, workDir!, Path.Combine(stage, StdOut), Path.Combine(stage, StdErr)) == 0;
+                    exitCode = ToolProcess.RunToFiles(exe, args, workDir!, Path.Combine(stage, StdOut), Path.Combine(stage, StdErr));
                 }
                 catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is IOException || ex is UnauthorizedAccessException)
                 {
                     try { TextFile.Write(Path.Combine(stage, StdErr), ex.Message); } catch (IOException) { }
                 }
+                bool ok = exitCode == 0;
 
                 var fresh = Outputs(stage).ToList();
                 if (fresh.Count > 0)
@@ -218,21 +219,25 @@ namespace Foton.Tools
                 }
                 else
                 {
-                    // Nothing new: keep earlier output, but replace the logs so they describe this run.
+                    // Nothing new: keep earlier output, but replace the logs so they describe only this run (a log this
+                    // run did not write is removed, never left to be read as this run's).
                     Directory.CreateDirectory(toolDir);
                     foreach (var leaf in new[] { StdErr, StdOut })
                     {
                         var from = Path.Combine(stage, leaf);
                         var to = Path.Combine(toolDir, leaf);
-                        if (!File.Exists(from)) continue;
-                        try { if (File.Exists(to)) File.Delete(to); File.Move(from, to); }
+                        try
+                        {
+                            if (File.Exists(to)) File.Delete(to);
+                            if (File.Exists(from)) File.Move(from, to);
+                        }
                         catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                     }
                 }
                 try { if (Directory.Exists(stage)) Directory.Delete(stage, true); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
-                var dirRel = Path.Combine(@"analysis\external", lower);
+                var dirRel = @"analysis\external\" + lower;
                 // .NET 10 builds (AmcacheParser has no other) print this and exit when the runtime is absent.
                 if (fresh.Count == 0 && !ok && ComposeSupport.MissingRuntime(Path.Combine(toolDir, StdErr), Path.Combine(toolDir, StdOut)))
                 {
@@ -248,10 +253,13 @@ namespace Foton.Tools
                     Retained(status);
                     continue;
                 }
+                // A tool that fails partway often still writes valid rows for the inputs it finished, so the output is kept,
+                // but the row says the run did not complete.
+                var partial = ok ? "" : $" The tool exited with {(exitCode.HasValue ? "code " + exitCode.Value : "a start error")}, so this output may be partial; see tool_stderr.txt.";
                 foreach (var f in Outputs(toolDir))
                 {
                     var row = Row("Copied", Relative(f, root),
-                        $"Hashed output from {j.Tool} (resolved via {src}). Hits from this engine are observations named to the tool, not a Foton verdict.");
+                        $"Hashed output from {j.Tool} (resolved via {src}). Hits from this engine are observations named to the tool, not a Foton verdict.{partial}");
                     row.SHA256 = Hashing.SafeHash(f, false);
                     rows.Add(row);
                 }
@@ -305,10 +313,14 @@ namespace Foton.Tools
                 }
                 Directory.Move(toolDir, prev);
                 try { Directory.Move(stage, toolDir); }
-                catch (Exception)
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    try { Directory.Move(prev, toolDir); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                    throw;
+                    try { Directory.Move(prev, toolDir); }
+                    catch (Exception restore) when (restore is IOException || restore is UnauthorizedAccessException)
+                    {
+                        return $"{ex.Message} The earlier output could not be put back either and is in {prev}";
+                    }
+                    return ex.Message;
                 }
                 try { Directory.Delete(prev, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 return null;
