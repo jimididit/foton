@@ -1,0 +1,5 @@
+﻿# kitchen IOC list (synthetic)
+text:evil.exe
+path:\Users\Public\
+sha256:a1b2
+TEXT:203.0.113.5

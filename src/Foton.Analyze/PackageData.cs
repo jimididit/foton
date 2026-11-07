@@ -17,6 +17,7 @@ namespace Foton.Analyze
 
         public object? this[string name] => _data.TryGetValue(name, out var v) ? v : null;
         public bool Contains(string name) => _data.ContainsKey(name);
+        public IEnumerable<string> Names => _data.Keys;
         public void Set(string name, object? value) => _data[name] = value;
 
         public static PackageData From(FotonPackage pkg)

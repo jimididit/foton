@@ -1,4 +1,4 @@
-﻿"ProcessName","RemoteAddress","RemotePort","State","RemoteIsExternal","UserWritablePath"
-"evil.exe","203.0.113.5","443","Established","True","True"
-"chrome.exe","198.51.100.7","443","Established","True","False"
-"svchost.exe","10.0.0.2","135","Established","False","False"
+﻿"ProcessName","OwningPID","ProcessPath","RemoteAddress","RemotePort","State","RemoteIsExternal","UserWritablePath"
+"evil.exe","4100","C:\Users\Public\evil.exe","203.0.113.5","443","Established","True","True"
+"chrome.exe","5100","C:\Program Files\Google\Chrome\chrome.exe","198.51.100.7","443","Established","True","False"
+"svchost.exe","900","C:\Windows\System32\svchost.exe","10.0.0.2","135","Established","False","False"

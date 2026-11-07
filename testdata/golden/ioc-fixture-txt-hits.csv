@@ -1,0 +1,3 @@
+﻿"IocKind","IocValue","Artifact","Property","Sample"
+"text","payload.exe","running_processes","Name","payload.exe"
+"text","payload.exe","running_processes","Path","C:\Users\a\AppData\Local\payload.exe"

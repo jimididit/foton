@@ -26,6 +26,13 @@ namespace Foton.Report
         public static string CompareCss => Load("compare.css");
         public static string ParseCss => Load("parse.css");
 
+        /// <summary>Triage report pieces (New-FotonReport here-strings).</summary>
+        public static string TriageCss => Load("triage.css");
+        public static string TriageScript => Load("triage.js");
+        public static string TriageTiers => Load("triage-tiers.html");
+        public static string TriageLimits => Load("triage-limits.html");
+        public static string TriageLimitsEnd => Load("triage-limits-end.html");
+
         static string Load(string name)
         {
             using (var s = typeof(ReportChrome).Assembly.GetManifestResourceStream("Foton.Report." + name))
