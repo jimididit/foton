@@ -103,11 +103,10 @@ namespace Foton.Analyze
                 if (File.Exists(Path.Combine(root, CaseTree.CollectionFolder, "findings.csv")) && !extras.Any(p => File.Exists(p) || Directory.Exists(p)))
                     log.Write(@"These heuristics already ran on the endpoint during Collect (00_Collection\findings.csv), so this run reproduces that report rather than adding detection. New findings come from parse, compose, IOC matching, or a baseline compare - then re-run analyze.", StatusLevel.Warn);
 
-                var stem = Path.Combine(Path.GetDirectoryName(pkg.SourcePath)!, Path.GetFileNameWithoutExtension(pkg.SourcePath));
                 if (pkg.Kind == PackageKind.Zip)
                 {
                     // The case root is a temporary extraction the operator never sees.
-                    run.BesideZipPath = stem + "_findings.csv";
+                    run.BesideZipPath = BesideZip(pkg, "_findings.csv");
                     Csv.Write(run.BesideZipPath, ctx.Findings);
                 }
                 else
@@ -121,7 +120,7 @@ namespace Foton.Analyze
 
                 // Foton_Report.html in the case root so relative artifact links resolve; beside a ZIP otherwise.
                 log.Write("Building HTML overview report", StatusLevel.Step);
-                run.ReportPath = pkg.Kind == PackageKind.Zip ? stem + "_Report.html" : Path.Combine(root, TriageReport.FileName);
+                run.ReportPath = pkg.Kind == PackageKind.Zip ? BesideZip(pkg, "_Report.html") : Path.Combine(root, TriageReport.FileName);
                 TriageReport.Write(new TriageReportInput
                 {
                     Data = ctx.Data, Findings = ctx.Findings, Manifest = pkg.Manifest, Errors = pkg.Errors, CaseRoot = root,
@@ -148,7 +147,7 @@ namespace Foton.Analyze
                 var run = new IocRun { Hits = IocMatcher.Match(data, data.Names.ToList(), iocs) };
                 log.Write($"IOC matches: {run.Hits.Count} ({iocs.Count} indicator(s))", StatusLevel.Good);
                 if (pkg.Kind == PackageKind.Zip)
-                    run.HitsPath = Path.Combine(Path.GetDirectoryName(pkg.SourcePath)!, Path.GetFileNameWithoutExtension(pkg.SourcePath) + "_ioc_matches.csv");
+                    run.HitsPath = BesideZip(pkg, "_ioc_matches.csv");
                 else
                 {
                     Directory.CreateDirectory(Path.Combine(pkg.CaseRoot, "analysis"));
@@ -159,5 +158,8 @@ namespace Foton.Analyze
             }
             finally { pkg.DeleteExtraction(); }
         }
+
+        static string BesideZip(FotonPackage pkg, string suffix) =>
+            Path.Combine(Path.GetDirectoryName(Path.GetFullPath(pkg.SourcePath)) ?? "", Path.GetFileNameWithoutExtension(pkg.SourcePath) + suffix);
     }
 }
