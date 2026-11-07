@@ -1,0 +1,175 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Foton Parse - (unknown host)</title>
+<style>
+:root{
+  --bg:#0b1016; --panel:#121a24; --panel2:#0f1720; --line:#22303f;
+  --text:#dfe8f1; --beam:#37d6ff; --beam2:#7cf5c4; --med:#ffb340;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 "Segoe UI",system-ui,sans-serif}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 22px 80px}
+header.hero{border:1px solid var(--line);border-radius:14px;padding:26px 28px;background:
+  radial-gradient(1100px 200px at 12% -40%,rgba(55,214,255,.18),transparent 60%),
+  linear-gradient(180deg,#121b26,#0e151e)}
+.brand{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.mark{flex:0 0 auto;display:block;color:var(--beam)}
+h1{margin:0;font-size:28px;letter-spacing:3px;font-weight:700;color:var(--beam);text-transform:uppercase}
+.tagline{color:#93a7bb;font-size:13px;font-style:italic;margin-top:6px}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px 26px;margin-top:20px}
+.meta div{font-size:13px;color:#a9bccf}
+.meta b{display:block;color:#6f8399;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.9px;margin-bottom:2px}
+.notice{margin-top:18px;border-left:3px solid var(--med);background:rgba(255,179,64,.08);padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px;color:#e8d4b4}
+h2{font-size:17px;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h2 small{color:#6f8399;font-weight:400;font-size:12px;margin-left:8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+.card .n{font-size:22px;font-weight:600;color:var(--beam2)}
+.card .l{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:#7f93a8;margin-top:4px}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12.5px}
+th{background:var(--panel2);text-align:left;padding:9px 12px;color:#8fa3b8;font-size:11px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--line)}
+td{padding:8px 12px;border-bottom:1px solid rgba(34,48,63,.6);vertical-align:top;word-break:break-word}
+tr:last-child td{border-bottom:none}
+.dim{color:#7f93a8}
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#6f8399;font-size:12px}
+</style><style>
+.foton-bar{position:sticky;top:0;z-index:50;background:rgba(11,16,22,.94);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:16px 0 8px}
+.foton-bar-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.foton-bar input[type=search]{flex:1;min-width:200px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;color:var(--text);padding:8px 14px;font-size:13px}
+.foton-bar .foton-stat{color:#7f93a8;font-size:12px;white-space:nowrap}
+.foton-bar a.foton-top{color:var(--beam);font-size:12px;text-decoration:none;border:1px solid var(--line);border-radius:20px;padding:6px 12px}
+.foton-bar a.foton-top:hover{border-color:var(--beam)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.btn{background:var(--panel);border:1px solid var(--line);color:#b9cadb;border-radius:20px;padding:6px 15px;font-size:12.5px;cursor:pointer}
+.btn:hover{border-color:var(--beam);color:#fff}
+.btn.on{background:rgba(55,214,255,.14);border-color:var(--beam);color:#fff}
+.foton-toc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:5.6em;overflow:auto}
+.foton-toc a{font-size:11px;color:#8fa3b8;border:1px solid var(--line);border-radius:999px;padding:3px 10px;text-decoration:none;white-space:nowrap}
+.foton-toc a:hover,.foton-toc a:focus{color:var(--beam);border-color:var(--beam)}
+.foton-sec.foton-hidden,.foton-hide{display:none!important}
+a.card{text-decoration:none;color:inherit;display:block}
+a.card:hover{border-color:var(--beam)}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+</style>
+</head><body><div class="wrap" id="top">
+<header class="hero">
+<div class="brand">
+<svg class="mark" width="56" height="56" viewBox="0 0 48 48" aria-hidden="true">
+<polygon points="1.2,24 8,19.6 8,28.4" fill="currentColor"/>
+<path fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" d="M 8.0,23.5 L 8.7,23.0 L 9.3,23.0 L 10.0,23.5 L 10.7,24.3 L 11.4,25.3 L 12.0,26.0 L 12.7,25.7 L 13.4,24.1 L 14.0,21.6 L 14.7,19.5 L 15.4,19.4 L 16.1,22.1 L 16.7,26.9 L 17.4,31.5 L 18.1,33.0 L 18.7,29.7 L 19.4,22.4 L 20.1,14.6 L 20.8,10.7 L 21.4,13.5 L 22.1,22.2 L 22.8,32.4 L 23.4,38.8 L 24.1,37.8 L 24.8,29.9 L 25.5,19.3 L 26.1,11.5 L 26.8,10.5 L 27.5,16.0 L 28.1,24.6 L 28.8,31.7 L 29.5,34.0 L 30.2,31.2 L 30.8,25.7 L 31.5,20.7 L 32.2,18.4 L 32.8,19.3 L 33.5,22.0 L 34.2,24.8 L 34.9,26.4 L 35.5,26.3 L 36.2,25.3 L 36.9,24.1 L 37.5,23.3 L 38.2,22.9 L 38.9,23.1 L 39.6,23.7 L 40.2,24.4 L 40.9,25.0 L 41.6,25.0 L 42.2,24.6 L 42.9,23.8 L 43.6,23.2 L 44.3,22.9 L 44.9,23.2 L 45.6,23.9"/>
+</svg>
+<div class="brand-text">
+<h1>Foton</h1>
+<div class="tagline">Offline parse - Prefetch and LNK already in the package. Not triage findings. Not a compromise verdict.</div>
+</div></div>
+<div class="meta">
+<div><b>Hostname</b>(unknown host)</div>
+<div><b>Rows</b>0</div>
+<div><b>Supported names</b>0</div>
+<div><b>MAM-compressed</b>0</div>
+<div><b>LNK</b>0</div>
+</div>
+<div class="notice"><b>Read this first.</b> CSV is the source of truth (analysis/parsed_records.csv). This HTML is a capped preview. MAM-compressed Prefetch is not inflated. EVTX rows are selected Event IDs only, capped. Amcache KeyLastWriteUtc is hive key last-write, not proof of execution. Legacy Amcache File keys and SRUM ESE copies are not parsed here.</div>
+</header>
+<div class="foton-bar" id="foton-bar">
+  <div class="foton-bar-row">
+    <input id="foton-q" type="search" placeholder="Filter this report (tables, findings, section titles)" autocomplete="off">
+    <span class="foton-stat" id="foton-stat"></span>
+    <a class="foton-top" href="#top">Top</a>
+  </div>
+  <nav class="foton-toc" id="foton-toc" aria-label="Jump to section"></nav>
+</div>
+<h2 id="sec-counts">Parse counts</h2><div class="cards">
+<div class="card"><div class="n">0</div><div class="l">Total</div></div>
+<div class="card"><div class="n">0</div><div class="l">Supported</div></div>
+<div class="card"><div class="n">0</div><div class="l">MAM Prefetch</div></div>
+<div class="card"><div class="n">0</div><div class="l">LNK</div></div>
+</div>
+<h2 id="sec-empty">Nothing parsed</h2>
+<p class="dim">prefetch_files was skipped (not elevated). This package has no copied .pf files. Re-collect elevated with Foton-Collect.ps1 that includes Collect schema 1.2.0.</p>
+<footer>Foton parse report &middot; not findings.csv &middot; source of truth is parsed_records.csv</footer>
+</div>
+<script>
+(function(){
+  var qBox=document.getElementById("foton-q");
+  var toc=document.getElementById("foton-toc");
+  var stat=document.getElementById("foton-stat");
+  var heads=[].slice.call(document.querySelectorAll("h2"));
+  function slug(t,i){
+    var s=(t||"").replace(/<[^>]+>/g," ").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"");
+    return "sec-"+(s||("n"+i));
+  }
+  function titleOf(h){
+    var n=h.cloneNode(true);
+    var sm=n.querySelector("small");
+    if(sm) sm.parentNode.removeChild(sm);
+    return (n.textContent||"").replace(/\s+/g," ").trim();
+  }
+  if(toc){
+    heads.forEach(function(h,i){
+      if(!h.id) h.id=slug(titleOf(h),i);
+      var a=document.createElement("a");
+      a.href="#"+h.id;
+      a.textContent=titleOf(h)||("Section "+(i+1));
+      toc.appendChild(a);
+    });
+  }
+  function sectionBits(h){
+    var n=h.nextElementSibling, bits=[];
+    while(n && n.tagName!=="H2" && !n.classList.contains("foton-bar")){
+      bits.push(n);
+      n=n.nextElementSibling;
+    }
+    return bits;
+  }
+  function apply(){
+    var needle=((qBox&&qBox.value)||"").toLowerCase();
+    var chBtn=document.querySelector(".btn[data-change].on");
+    var ch=chBtn?chBtn.getAttribute("data-change"):"all";
+    var rows=0, shown=0;
+    document.querySelectorAll("table tbody tr").forEach(function(tr){
+      rows++;
+      var okQ=!needle||(tr.textContent||"").toLowerCase().indexOf(needle)>-1;
+      var okC=true;
+      if(ch!=="all" && tr.getAttribute("data-change")) okC=tr.getAttribute("data-change")===ch;
+      if(okQ&&okC){tr.classList.remove("foton-hide");shown++;}else{tr.classList.add("foton-hide");}
+    });
+    heads.forEach(function(h){
+      var bits=sectionBits(h);
+      var hit=!needle||titleOf(h).toLowerCase().indexOf(needle)>-1;
+      if(!hit){
+        bits.forEach(function(el){
+          if(/table|p|div|details/i.test(el.tagName) && (el.textContent||"").toLowerCase().indexOf(needle)>-1) hit=true;
+          el.querySelectorAll("tbody tr").forEach(function(tr){
+            if(!tr.classList.contains("foton-hide")) hit=true;
+          });
+          el.querySelectorAll(".finding").forEach(function(f){
+            if(!f.classList.contains("hidden") && !f.classList.contains("foton-hide")) hit=true;
+          });
+        });
+      }
+      if(needle && !hit){
+        h.classList.add("foton-hide");
+        bits.forEach(function(el){el.classList.add("foton-hide");});
+      }else{
+        h.classList.remove("foton-hide");
+        bits.forEach(function(el){el.classList.remove("foton-hide");});
+      }
+    });
+    if(stat){
+      if(needle||(ch && ch!=="all")) stat.textContent=shown+" / "+rows+" rows";
+      else stat.textContent=heads.length+" sections";
+    }
+  }
+  if(qBox) qBox.addEventListener("input",apply);
+  document.addEventListener("click",function(e){
+    var b=e.target.closest(".btn[data-change]");
+    if(!b) return;
+    document.querySelectorAll(".btn[data-change]").forEach(function(x){x.classList.remove("on");});
+    b.classList.add("on");
+    apply();
+  });
+  apply();
+})();
+</script>
+</body></html>

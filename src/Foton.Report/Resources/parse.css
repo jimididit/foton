@@ -1,0 +1,32 @@
+<style>
+:root{
+  --bg:#0b1016; --panel:#121a24; --panel2:#0f1720; --line:#22303f;
+  --text:#dfe8f1; --beam:#37d6ff; --beam2:#7cf5c4; --med:#ffb340;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 "Segoe UI",system-ui,sans-serif}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 22px 80px}
+header.hero{border:1px solid var(--line);border-radius:14px;padding:26px 28px;background:
+  radial-gradient(1100px 200px at 12% -40%,rgba(55,214,255,.18),transparent 60%),
+  linear-gradient(180deg,#121b26,#0e151e)}
+.brand{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.mark{flex:0 0 auto;display:block;color:var(--beam)}
+h1{margin:0;font-size:28px;letter-spacing:3px;font-weight:700;color:var(--beam);text-transform:uppercase}
+.tagline{color:#93a7bb;font-size:13px;font-style:italic;margin-top:6px}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px 26px;margin-top:20px}
+.meta div{font-size:13px;color:#a9bccf}
+.meta b{display:block;color:#6f8399;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.9px;margin-bottom:2px}
+.notice{margin-top:18px;border-left:3px solid var(--med);background:rgba(255,179,64,.08);padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px;color:#e8d4b4}
+h2{font-size:17px;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h2 small{color:#6f8399;font-weight:400;font-size:12px;margin-left:8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+.card .n{font-size:22px;font-weight:600;color:var(--beam2)}
+.card .l{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:#7f93a8;margin-top:4px}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12.5px}
+th{background:var(--panel2);text-align:left;padding:9px 12px;color:#8fa3b8;font-size:11px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--line)}
+td{padding:8px 12px;border-bottom:1px solid rgba(34,48,63,.6);vertical-align:top;word-break:break-word}
+tr:last-child td{border-bottom:none}
+.dim{color:#7f93a8}
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#6f8399;font-size:12px}
+</style>
