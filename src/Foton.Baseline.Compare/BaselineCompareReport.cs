@@ -94,12 +94,12 @@ namespace Foton.Baseline.Compare
             }
             else
             {
-                // Sort-Object -Unique: culture order, case-insensitive; -eq groups case-insensitively too.
-                var types = shown.Select(c => c.RecordType).Distinct(StringComparer.CurrentCultureIgnoreCase)
-                    .OrderBy(t => t, StringComparer.CurrentCultureIgnoreCase).ToList();
+                // Sort-Object -Unique order (case-insensitive), in invariant culture so the report is the same on every machine.
+                var types = shown.Select(c => c.RecordType).Distinct(StringComparer.InvariantCultureIgnoreCase)
+                    .OrderBy(t => t, StringComparer.InvariantCultureIgnoreCase).ToList();
                 foreach (var type in types)
                 {
-                    var chunk = shown.Where(c => string.Equals(c.RecordType, type, StringComparison.CurrentCultureIgnoreCase)).ToList();
+                    var chunk = shown.Where(c => string.Equals(c.RecordType, type, StringComparison.InvariantCultureIgnoreCase)).ToList();
                     sb.AppendLine($"<h2 id=\"{Html.SectionId(type)}\">{Html.Encode(type)} <small>{chunk.Count} change(s){extra}</small></h2>");
                     sb.AppendLine("<table><thead><tr>");
                     foreach (var col in new[] { "Attention", "Change", "Identity", "Field", "OldValue", "NewValue" })

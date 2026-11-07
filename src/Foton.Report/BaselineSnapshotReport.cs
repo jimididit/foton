@@ -61,7 +61,7 @@ namespace Foton.Report
             sb.AppendLine("</header>");
             sb.AppendLine(ReportChrome.NavBarHtml);
 
-            var types = doc.Records.Keys.OrderBy(k => k, StringComparer.CurrentCultureIgnoreCase).ToList();
+            var types = doc.Records.Keys.OrderBy(k => k, StringComparer.InvariantCultureIgnoreCase).ToList();
             sb.AppendLine("<h2 id=\"sec-counts\">Record counts</h2><div class=\"cards\">");
             foreach (var type in types)
                 sb.AppendLine($"<a class=\"card\" href=\"#{Html.SectionId(type)}\"><div class=\"n\">{doc.Records[type].Count}</div><div class=\"l\">{Html.Encode(type)}</div></a>");

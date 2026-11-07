@@ -92,6 +92,25 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Sort_order_does_not_depend_on_the_machine_locale()
+        {
+            var p = new Provider
+            {
+                RecordType = "Service", SortKeys = new[] { "Name" },
+                Collect = _ => new[] { "zeta", "öst", "alpha" }.Select(n => new Dictionary<string, object?> { ["Name"] = n }),
+            };
+            var saved = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                // Swedish sorts ö after z; invariant culture keeps it beside o.
+                System.Threading.Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("sv-SE");
+                var names = p.Run(new CaptureContext(false)).Select(r => (string)r["Name"]!).ToList();
+                Assert.Equal(new[] { "alpha", "öst", "zeta" }, names);
+            }
+            finally { System.Threading.Thread.CurrentThread.CurrentCulture = saved; }
+        }
+
+        [Fact]
         public void Sort_keys_use_PowerShell_culture_order_not_ordinal()
         {
             var p = new Provider

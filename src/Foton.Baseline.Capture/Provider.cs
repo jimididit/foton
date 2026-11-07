@@ -68,7 +68,8 @@ namespace Foton.Baseline.Capture
         };
 
         /// <summary>
-        /// Collects and sorts by the 1.38.x Sort-Object keys (current culture, case-insensitive). Windows PowerShell
+        /// Collects and sorts by the 1.38.x Sort-Object keys, case-insensitive, in invariant culture so the bytes do
+        /// not depend on the endpoint's locale (1.38.x used the current culture; en-US orders the same). Windows PowerShell
         /// 5.1 sorted unstably, so rows that tie on every key (an MSI and its bundle registering the same DisplayName
         /// and Publisher) landed in arbitrary order, and Compare keeps the last duplicate. v2 breaks ties on every
         /// remaining field so identical machine state always gives identical bytes.
@@ -97,7 +98,7 @@ namespace Foton.Baseline.Capture
 
         static string Key(Dictionary<string, object?> r, string key) => r.TryGetValue(key, out var v) ? BaselineDocument.PsString(v) : "";
 
-        static readonly StringComparer PsOrder = StringComparer.CurrentCultureIgnoreCase;
+        static readonly StringComparer PsOrder = StringComparer.InvariantCultureIgnoreCase;
     }
 
     /// <summary>Row-building helpers with the 1.38.x [string] and "(not set)" conventions.</summary>
