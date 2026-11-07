@@ -1,0 +1,145 @@
+name: Release v2
+
+# Foton v2 (C#). Tag v2.Y.Z or v2.Y.Z-<prerelease> (matching FotonVersion / FotonPrerelease in
+# Directory.Build.props) to publish. A tag with a prerelease suffix publishes a GitHub prerelease.
+# Run manually (workflow_dispatch) for a dry run: builds, tests, and uploads the executables as a
+# workflow artifact without creating a release.
+#
+# Same split as release.yml: `build` runs repository code with a read-only token; `publish` runs no
+# repository code and only verifies, attests, and releases the exact files `build` uploaded.
+# Executables are not Authenticode-signed yet (deferred until public use); provenance attestation
+# and SHA256SUMS.txt are the integrity story until then.
+# Actions are pinned to commit SHAs (tag in the trailing comment).
+
+on:
+  push:
+    tags: ['v2.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Check tag matches the version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $p = ([xml](Get-Content -Raw .\Directory.Build.props)).Project.PropertyGroup | Where-Object { $_.FotonVersion } | Select-Object -First 1
+          $ver = [string]$p.FotonVersion
+          if ([string]$p.FotonPrerelease) { $ver = "$ver-$($p.FotonPrerelease)" }
+          if ("v$ver" -ne $env:GITHUB_REF_NAME) {
+            throw "Tag $env:GITHUB_REF_NAME does not match version $ver in Directory.Build.props."
+          }
+
+      - name: Build (Release, warnings as errors)
+        run: dotnet build Foton.sln -c Release -warnaserror
+
+      - name: Test
+        run: dotnet test Foton.sln -c Release --no-build
+
+      - name: Stage executables
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = New-Item -ItemType Directory -Force -Path 'dist\release-v2'
+          # foton-collect.exe is not ported yet (Phase 4); it ships when it collects.
+          Copy-Item 'cli\Foton.Baseline.Cli\bin\Release\net462\foton-baseline.exe' $out
+          Copy-Item 'cli\Foton.Cli\bin\Release\net462\foton.exe' $out
+          $sums = Get-ChildItem $out -Filter *.exe | Sort-Object Name | ForEach-Object {
+            '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          }
+          [IO.File]::WriteAllLines((Join-Path $out 'SHA256SUMS.txt'), [string[]]$sums)
+          Get-Content (Join-Path $out 'SHA256SUMS.txt')
+
+      - name: Upload executables
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: foton-v2-release
+          if-no-files-found: error
+          path: |
+            dist/release-v2/*.exe
+            dist/release-v2/SHA256SUMS.txt
+
+  publish:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    permissions:
+      contents: write       # create the GitHub release
+      id-token: write       # build provenance attestation
+      attestations: write
+    steps:
+      - name: Download executables
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: foton-v2-release
+          path: assets
+
+      - name: Verify SHA256SUMS
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = (Resolve-Path assets).Path
+          foreach ($line in Get-Content (Join-Path $dir 'SHA256SUMS.txt')) {
+            $hash, $leaf = $line -split '  ', 2
+            $actual = (Get-FileHash (Join-Path $dir $leaf) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $hash) { throw "Hash mismatch for $leaf" }
+          }
+          "ASSET_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: assets/*.exe
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          $pre = @()
+          if ($tag.Contains('-')) { $pre = @('--prerelease') }
+          $notes = @"
+          ## Foton v2 pre-release (C#)
+
+          Single-file executables on in-box .NET Framework 4.6.2+ (Windows 10 / Server 2016 and newer). Nothing to install.
+
+          - **foton-baseline.exe**: capture a baseline of stable configuration (37 record types) into a hashed package with ``Foton_Baseline.html``. Same switches as the 1.38.x flat script: ``-OutputPath``, ``-Path``, ``-NoZip``, ``-NoHtml``, ``-RequireAdministrator``.
+          - **foton.exe**: ``foton compare <reference> <difference>`` (field-level diff, ``baseline_diff.csv``, ``Foton_BaselineCompare.html``) and ``foton package <folder-or-zip>`` (verify hashes).
+
+          Baseline schema 1.15.0. Compare accepts a 1.14.0 baseline from Foton 1.38.x and explains the one-time format and coverage differences.
+
+          **Not in this pre-release:** live triage collection, parse, compose, and analyze. For casework use Foton 1.38.x from the v1 releases.
+
+          ## Verify before use
+          The executables are not Authenticode-signed yet, so Windows SmartScreen may warn on first run. Check the hash and the build provenance, then unblock:
+          ``````powershell
+          Get-FileHash .\foton-baseline.exe -Algorithm SHA256   # compare with SHA256SUMS.txt
+          gh attestation verify .\foton-baseline.exe --repo $env:GITHUB_REPOSITORY
+          Unblock-File .\foton-baseline.exe
+          ``````
+          "@
+          $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
+          Set-Content -LiteralPath $notesFile -Value $notes -Encoding UTF8
+          $files = @(Get-ChildItem $env:ASSET_DIR -File | ForEach-Object FullName)
+          gh release create $tag @files @pre --repo $env:GITHUB_REPOSITORY --title "Foton $tag" --notes-file $notesFile
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed ($LASTEXITCODE)" }

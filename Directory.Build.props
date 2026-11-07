@@ -6,13 +6,12 @@
   -->
   <PropertyGroup>
     <FotonVersion>2.0.0</FotonVersion>
-    <FotonPrerelease>alpha.0</FotonPrerelease>
+    <!-- A tag v$(FotonVersion)-$(FotonPrerelease) publishes a prerelease (release-v2.yml). -->
+    <FotonPrerelease>alpha.1</FotonPrerelease>
     <!-- UTC date of the change that set FotonVersion; the banner shows it as Updated. -->
     <FotonReleaseDate>2026-11-07</FotonReleaseDate>
     <FotonCollectSchemaVersion>1.13.0</FotonCollectSchemaVersion>
-    <!-- 64-bit on 64-bit Windows: a 32-bit process is redirected to SysWOW64 and the 32-bit registry view. -->
-    <Prefer32Bit>false</Prefer32Bit>
-    <!-- 1.15.0: values only (Defender "(not reported)", BitsJob "(not set)"); Compare accepts 1.14.0 against it. -->
+    <!-- 1.15.0: values and coverage, not identity keys or compared fields, so Compare accepts 1.14.0 against it (BaselineSchema.CrossVersionNote). -->
     <FotonBaselineSchemaVersion>1.15.0</FotonBaselineSchemaVersion>
     <FotonFindingsSchemaVersion>1.0.0</FotonFindingsSchemaVersion>
 
@@ -35,6 +34,7 @@
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
     <PlatformTarget>AnyCPU</PlatformTarget>
+    <!-- 64-bit on 64-bit Windows: a 32-bit process is redirected to SysWOW64 and the 32-bit registry view. -->
     <Prefer32Bit>false</Prefer32Bit>
     <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>

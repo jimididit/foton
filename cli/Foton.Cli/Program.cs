@@ -17,11 +17,18 @@ namespace Foton.Cli
             }
             if (args.Length == 2 && string.Equals(args[0], "package", StringComparison.OrdinalIgnoreCase))
                 return PackageCommand(args[1]);
-            if ((args.Length == 3 || args.Length == 4) && string.Equals(args[0], "compare", StringComparison.OrdinalIgnoreCase))
+            if (args.Length >= 3 && string.Equals(args[0], "compare", StringComparison.OrdinalIgnoreCase))
             {
-                bool noCsv = args.Length == 4 && string.Equals(args[3], "-NoCsv", StringComparison.OrdinalIgnoreCase);
-                if (args.Length == 4 && !noCsv) return Usage();
-                return CompareCommand(args[1], args[2], noCsv);
+                bool noCsv = false, noHtml = false;
+                string? html = null;
+                for (int i = 3; i < args.Length; i++)
+                {
+                    if (string.Equals(args[i], "-NoCsv", StringComparison.OrdinalIgnoreCase)) noCsv = true;
+                    else if (string.Equals(args[i], "-NoHtml", StringComparison.OrdinalIgnoreCase)) noHtml = true;
+                    else if (string.Equals(args[i], "-OutputPath", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) html = args[++i];
+                    else return Usage();
+                }
+                return CompareCommand(args[1], args[2], noCsv, noHtml, html);
             }
             return Usage();
         }
@@ -33,9 +40,10 @@ namespace Foton.Cli
             Console.WriteLine("Usage:");
             Console.WriteLine("  foton -Version");
             Console.WriteLine("  foton package <case-folder-or-zip>   open a package and verify hashes.csv");
-            Console.WriteLine("  foton compare <reference> <difference> [-NoCsv]");
+            Console.WriteLine("  foton compare <reference> <difference> [-NoCsv] [-NoHtml] [-OutputPath <html>]");
             Console.WriteLine("                                        diff two baselines (baseline.json or package folder);");
-            Console.WriteLine("                                        writes baseline_diff.csv beside the difference baseline");
+            Console.WriteLine("                                        writes baseline_diff.csv and Foton_BaselineCompare.html");
+            Console.WriteLine("                                        beside the difference baseline");
             Console.WriteLine();
             Console.WriteLine("Parse, compose, and analyze are not implemented in this v2 pre-release.");
             Console.WriteLine("For casework use Foton 1.38.x (the Foton-Workstation_v1.38.1.zip module) from https://github.com/jimididit/foton/releases.");
@@ -94,7 +102,7 @@ namespace Foton.Cli
         }
 
         /// <summary>Exit 0 after a diff (changes are findings, not failures), 1 when a baseline cannot be read or compared.</summary>
-        static int CompareCommand(string reference, string difference, bool noCsv)
+        static int CompareCommand(string reference, string difference, bool noCsv, bool noHtml, string? htmlPath)
         {
             var log = new StatusLog();
             Banner.Write(log, Banner.Kind.Compare);
@@ -114,6 +122,19 @@ namespace Foton.Cli
             foreach (var f in r.Findings.Where(x => x.Severity == "High").Take(25))
                 log.Write($"{f.Title}: {f.Observation}", StatusLevel.Warn);
             if (r.DiffCsvPath != null) log.Write("Change table: " + r.DiffCsvPath, StatusLevel.Info);
+            if (!noHtml)
+            {
+                var html = htmlPath ?? Path.Combine(Path.GetDirectoryName(BaselineDocument.ResolveJsonPath(difference))!, Foton.Baseline.Compare.BaselineCompareReport.FileName);
+                try
+                {
+                    Foton.Baseline.Compare.BaselineCompareReport.Write(r, html);
+                    log.Write("Baseline compare report: " + html, StatusLevel.Good);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+                {
+                    log.Write("Baseline compare report not written: " + ex.Message, StatusLevel.Warn);
+                }
+            }
             log.WriteConsole("     A diff records change between two snapshots. It does not show when, who, or that the host is compromised.", ConsoleColor.DarkGray);
             return 0;
         }

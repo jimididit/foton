@@ -88,6 +88,19 @@ foreach ($case in @(@{ Dif = 'baseline-dif.json'; Tag = 'temporal' }, @{ Dif = '
     Remove-Item -LiteralPath $work -Recurse -Force
 }
 
+# Baseline HTML: snapshot of the difference fixture (full and capped) and both compare modes.
+$work = Join-Path $env:TEMP ('foton-golden-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $work | Out-Null
+Copy-Item (Join-Path $out 'baseline-ref.json') (Join-Path $work 'ref.json')
+Copy-Item (Join-Path $out 'baseline-dif.json') (Join-Path $work 'dif.json')
+Copy-Item (Join-Path $out 'baseline-dif-fleet.json') (Join-Path $work 'fleet.json')
+$null = & $m { param($p, $o) New-FotonBaselineReport -Path $p -OutputPath $o } (Join-Path $work 'dif.json') (Join-Path $out 'baseline-snapshot.html')
+$null = & $m { param($p, $o) New-FotonBaselineReport -Path $p -OutputPath $o -MaxRows 1 } (Join-Path $work 'dif.json') (Join-Path $out 'baseline-snapshot-cap1.html')
+$null = New-FotonBaselineCompareReport -ReferencePath (Join-Path $work 'ref.json') -DifferencePath (Join-Path $work 'dif.json') -OutputPath (Join-Path $out 'compare-temporal.html')
+$null = New-FotonBaselineCompareReport -ReferencePath (Join-Path $work 'ref.json') -DifferencePath (Join-Path $work 'fleet.json') -OutputPath (Join-Path $out 'compare-fleet.html')
+$null = New-FotonBaselineCompareReport -ReferencePath (Join-Path $work 'ref.json') -DifferencePath (Join-Path $work 'dif.json') -OutputPath (Join-Path $out 'compare-temporal-cap2.html') -MaxRows 2
+Remove-Item -LiteralPath $work -Recurse -Force
+
 # PayloadSha256 exactly as New-FotonBaseline computes it, over values that stress JSON escaping.
 $records = [ordered]@{
     Service = @(
