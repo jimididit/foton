@@ -8,5 +8,6 @@
     <ProjectReference Include="..\..\src\Foton.Core\Foton.Core.csproj" />
     <ProjectReference Include="..\..\src\Foton.Package\Foton.Package.csproj" />
     <ProjectReference Include="..\..\src\Foton.Baseline.Compare\Foton.Baseline.Compare.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Parse\Foton.Parse.csproj" />
   </ItemGroup>
 </Project>

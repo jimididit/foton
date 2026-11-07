@@ -1,4 +1,5 @@
 # Byte-exact files: golden outputs from the frozen PowerShell line and the report chrome copied
 # from them. Line-ending conversion would break the parity tests, so Git must not touch them.
 testdata/golden/** -text
+testdata/parse/** -text
 src/Foton.Report/Resources/** -text
