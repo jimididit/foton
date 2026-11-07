@@ -26,23 +26,23 @@ namespace Foton.Analyze
         /// <summary>Runs every rule group in the 1.38.x order (that order is findings.csv row order).</summary>
         public static void Run(AnalysisContext c)
         {
-            PostureRules.Host(c);
-            PostureRules.Defender(c);
-            PostureRules.Hardening(c);
-            PostureRules.FirewallRdp(c);
-            UserProcessRules.Accounts(c);
-            UserProcessRules.Processes(c);
+            Guard(c, "Host and collection", () => PostureRules.Host(c));
+            Guard(c, "Defender", () => PostureRules.Defender(c));
+            Guard(c, "Hardening", () => PostureRules.Hardening(c));
+            Guard(c, "Firewall and RDP", () => PostureRules.FirewallRdp(c));
+            Guard(c, "Accounts", () => UserProcessRules.Accounts(c));
+            Guard(c, "Processes", () => UserProcessRules.Processes(c));
 
             var os = c.Data["os_info"];
             var svcIndex = EventHelpers.ServiceIndex(c.Data["services"]);
             var hostSys32 = os is PsRow osRow && osRow.Has("SystemDirectory") ? Str(osRow["SystemDirectory"]) : "";
 
-            PersistenceRules.Persistence(c);
-            PersistenceRules.Network(c);
-            EventLogRules.Run(c, svcIndex, hostSys32);
-            HostArtifactRules.SoftwareFilesystem(c);
-            HostArtifactRules.VisibilityGaps(c);
-            OfflineInputRules.Run(c, svcIndex, hostSys32);
+            Guard(c, "Persistence", () => PersistenceRules.Persistence(c));
+            Guard(c, "Network", () => PersistenceRules.Network(c));
+            Guard(c, "Event logs", () => EventLogRules.Run(c, svcIndex, hostSys32));
+            Guard(c, "Software and filesystem", () => HostArtifactRules.SoftwareFilesystem(c));
+            Guard(c, "Visibility gaps", () => HostArtifactRules.VisibilityGaps(c));
+            Guard(c, "Workstation outputs", () => OfflineInputRules.Run(c, svcIndex, hostSys32));
 
             // Absence is not evidence: without the suspicious-command list every rule that needs it is inert.
             if (c.SuspiciousPatterns.Count == 0)
@@ -51,6 +51,23 @@ namespace Foton.Analyze
                     "This is a visibility gap, not a negative result: the absence of pattern findings here says nothing about whether such commands ran. The endpoint collector intentionally ships without the pattern list because embedding it causes antivirus to block the collector at load.",
                     "src/Private/Patterns/SuspiciousCommandPatterns.txt",
                     "Re-run Invoke-FotonAnalysis against this package from the Foton module on an analyst workstation, where the pattern list loads and these rules evaluate.");
+        }
+
+        /// <summary>
+        /// One rule group that stops on malformed package data is a stated gap, never a lost run: the other
+        /// groups still evaluate (1.38.x aborted the whole analysis).
+        /// </summary>
+        internal static void Guard(AnalysisContext c, string group, Action rules)
+        {
+            try { rules(); }
+            catch (Exception ex)
+            {
+                c.Add("Info", "Methodology", 1, "An analysis rule group stopped on unexpected package data",
+                    F("The {0} rules stopped and produced no further findings: {1}: {2}", group, ex.GetType().Name, TextFile.OneLine(ex.Message)),
+                    "This is a visibility gap in the analysis, not a negative result: findings the stopped rules would have produced are missing from this report. Other rule groups ran normally.",
+                    "",
+                    "Inspect the artifacts that rule group reads for malformed or unexpected values, and re-run analyze after correcting or removing them.");
+            }
         }
 
         /// <summary>

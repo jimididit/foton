@@ -173,9 +173,9 @@ namespace Foton.Cli
             Banner.Write(log, Banner.Kind.Workstation);
             Foton.Analyze.AnalysisRun run;
             try { run = Foton.Analyze.Analyzer.RunPackage(path, log, Foton.Patterns.WorkstationPatterns.SuspiciousCommands); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException
-                || ex is ArgumentException || ex is NotSupportedException)
+            catch (Exception ex)
             {
+                // Rule groups already turn bad data into findings; anything left here is opening or writing the package.
                 log.Write("Cannot analyze: " + ex.Message, StatusLevel.Error);
                 return 1;
             }

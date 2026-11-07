@@ -129,6 +129,57 @@ namespace Foton.Tests
             Assert.Contains("Services: OneSyncSvc_1a2b3c.", c.Findings.Single(f => f.Title == "Service install events in the exported logs").Observation);
         }
 
+        static string Install(string image, string? dll = null, string? dllSource = null)
+        {
+            var d = new PackageData();
+            d.Set("system_service_and_driver", Csv(new Dictionary<string, string?>
+            {
+                ["EventId"] = "7045", ["TimeCreatedUtc"] = "2026-01-14 03:01:00",
+                ["Message"] = $"A service was installed in the system.  Service Name:  OneSyncSvc_1a2b3c  Service File Name:  {image}  Service Type:  user mode service",
+            }));
+            if (dll != null)
+                d.Set("services", Csv(new Dictionary<string, string?> { ["Name"] = "OneSyncSvc_1a2b3c", ["ServiceDll"] = dll, ["ServiceDllSource"] = dllSource }));
+            var c = Context(d);
+            Analyzer.Run(c);
+            return c.Findings.SingleOrDefault(f => f.Title == "Service install events in the exported logs")?.Observation ?? "";
+        }
+
+        [Fact]
+        public void Per_user_filter_requires_System32_svchost_itself()
+        {
+            Assert.Equal("", Install(@"%SystemRoot%\system32\svchost.exe -k UnistackSvcGroup"));
+            // 1.38.x filtered these: a System32 launcher whose arguments end in svchost.exe.
+            Assert.Contains("OneSyncSvc_1a2b3c", Install(@"C:\Windows\System32\cmd.exe /c C:\Users\Public\svchost.exe"));
+            // ...and a ServiceDll in a System32 subfolder whose name contains a space.
+            Assert.Contains("OneSyncSvc_1a2b3c", Install(@"%SystemRoot%\system32\svchost.exe -k UnistackSvcGroup", @"C:\Windows\System32\Sub Folder\x.dll", "Template:OneSyncSvc"));
+            Assert.Equal("", Install(@"%SystemRoot%\system32\svchost.exe -k UnistackSvcGroup", @"C:\Windows\System32\APHostService.dll", "Template:OneSyncSvc"));
+        }
+
+        [Fact]
+        public void Cert_Publishers_add_is_privileged_by_SID()
+        {
+            var d = new PackageData();
+            d.Set("security_account_management", Csv(new Dictionary<string, string?>
+            {
+                ["EventId"] = "4732", ["TimeCreatedUtc"] = "2026-01-14 05:00:05",
+                ["Message"] = "A member was added.  Member:  Security ID:  S-1-5-21-1-2-3-1011  Account Name:  -  Group:  Security ID:  S-1-5-21-1-2-3-517  Group Name:  Gruppe  Group Domain:  DOMAIN",
+            }));
+            var c = Context(d);
+            Analyzer.Run(c);
+            Assert.Contains("1 addition(s) to privileged groups", c.Findings.Single(f => f.Title == "Accounts created or privileged groups changed in the exported logs").Observation);
+        }
+
+        [Fact]
+        public void A_failing_rule_group_is_a_stated_gap_and_the_rest_still_run()
+        {
+            var c = Context(new PackageData());
+            Analyzer.Guard(c, "Example", () => throw new InvalidCastException("bad value"));
+            var f = c.Findings.Single();
+            Assert.Equal("An analysis rule group stopped on unexpected package data", f.Title);
+            Assert.Contains("The Example rules stopped", f.Observation);
+            Assert.Contains("InvalidCastException: bad value", f.Observation);
+        }
+
         [Fact]
         public void False_positive_text_matches_the_capture_providers()
         {

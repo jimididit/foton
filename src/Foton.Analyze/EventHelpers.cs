@@ -61,14 +61,26 @@ namespace Foton.Analyze
             return "";
         }
 
-        /// <summary>A file directly in System32 in any written form, or the host's own SystemDirectory.</summary>
-        static bool System32Leaf(string? path, string systemDirectory)
+        static string System32Roots(string systemDirectory)
         {
-            if (string.IsNullOrWhiteSpace(path)) return false;
             var roots = new List<string> { @"%SystemRoot%\\System32", @"%windir%\\System32", @"\\SystemRoot\\System32", @"[A-Z]:\\Windows\\System32" };
             if (systemDirectory.Length > 0) roots.Add(Regex.Escape(systemDirectory.TrimEnd('\\')));
-            return Regex.IsMatch(path!.Trim(), @"(?i)^""?(?:" + string.Join("|", roots) + @")\\[^\\""]+?(?:""|\s|$)", RegexOptions.IgnoreCase);
+            return "(?:" + string.Join("|", roots) + ")";
         }
+
+        /// <summary>
+        /// The image is System32's own svchost.exe (any written form of System32), optionally followed by arguments.
+        /// 1.38.x accepted any System32 launcher whose arguments ended in svchost.exe.
+        /// </summary>
+        static bool System32Svchost(string image, string systemDirectory) =>
+            Regex.IsMatch(image.Trim(), @"(?i)^""?" + System32Roots(systemDirectory) + @"\\svchost\.exe""?(?:\s|$)", RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// A DLL path that is a file directly in System32, nothing after it. 1.38.x stopped at the first space, so
+        /// "System32\Sub Folder\x.dll" passed as a System32 file.
+        /// </summary>
+        static bool System32Dll(string dll, string systemDirectory) =>
+            Regex.IsMatch(dll.Trim(), @"(?i)^""?" + System32Roots(systemDirectory) + @"\\[^\\""]+\.dll""?$", RegexOptions.IgnoreCase);
 
         /// <summary>
         /// True only for a known per-user template instance hosted by System32 svchost.exe; with services.csv, an
@@ -78,8 +90,7 @@ namespace Foton.Analyze
         {
             var name = ServiceName(row);
             if (!PerUserServiceName(name)) return false;
-            var img = ServiceImage(row);
-            if (!Regex.IsMatch(img, @"(?i)^""?[^""]*\\svchost\.exe""?(?:\s|$)", RegexOptions.IgnoreCase) || !System32Leaf(img, systemDirectory)) return false;
+            if (!System32Svchost(ServiceImage(row), systemDirectory)) return false;
             if (serviceIndex.TryGetValue(name, out var svc))
             {
                 var dll = Str(Get(svc, "ServiceDll"));
@@ -87,7 +98,7 @@ namespace Foton.Analyze
                 {
                     var src = Str(Get(svc, "ServiceDllSource"));
                     if (src.Length > 0 && !Like(src, "Template:*")) return false;
-                    if (!Regex.IsMatch(dll, @"(?i)\.dll""?$", RegexOptions.IgnoreCase) || !System32Leaf(dll, systemDirectory)) return false;
+                    if (!System32Dll(dll, systemDirectory)) return false;
                     if (Eq(Str(Get(svc, "ServiceDllUserWritablePath")), "True")) return false;
                     if (In(Str(Get(svc, "ServiceDllSignatureStatus")), "NotSigned", "HashMismatch")) return false;
                 }
@@ -182,7 +193,8 @@ namespace Foton.Analyze
         static bool PrivilegedGroup(string sid, string name)
         {
             if (Regex.IsMatch(sid, @"^S-1-5-32-(544|547|548|549|550|551|555|562|573|578|580)$", RegexOptions.IgnoreCase)) return true;
-            if (Regex.IsMatch(sid, @"^S-1-5-21-[\d-]+-(512|518|519|520|526|527)$", RegexOptions.IgnoreCase)) return true;
+            // 517 is Cert Publishers, which the name list already treated as privileged (1.38.x missed it by SID).
+            if (Regex.IsMatch(sid, @"^S-1-5-21-[\d-]+-(512|517|518|519|520|526|527)$", RegexOptions.IgnoreCase)) return true;
             foreach (var candidate in new[] { name, sid.Split('\\').Last() })
                 if (candidate.Length > 0 && In(candidate.Trim(), PrivilegedNames)) return true;
             return false;
