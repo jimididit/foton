@@ -180,8 +180,9 @@ namespace Foton.Parse
                 var item = queue.Dequeue();
                 if (item.Key.Name.Length > 0 && string.Equals(item.Key.Name.ToLowerInvariant(), name.ToLowerInvariant(), StringComparison.Ordinal)) return item.Key;
                 if (item.Value >= maxDepth) continue;
+                // Charge every offset Subkeys will examine, valid or not, so invalid offsets cannot dodge the budget.
+                budget -= Math.Max(1, Math.Min(item.Key.SubkeyCount, 20000));
                 var children = Subkeys(b, item.Key);
-                budget -= Math.Max(1, children.Count);
                 foreach (var ch in children)
                     if (queued.Add(ch.CellOffset)) queue.Enqueue(new KeyValuePair<Key, int>(ch, item.Value + 1));
             }

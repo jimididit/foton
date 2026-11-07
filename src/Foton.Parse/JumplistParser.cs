@@ -187,6 +187,8 @@ namespace Foton.Parse
                 pos = pos + pathOff + pathBytes + (ver == 1 ? 0 : 4);
                 parsed++;
             }
+            if (count == 0)
+                rows.Add(new DestListEntry { Note = $"DestList v{ver} header lists 0 entries. Not proof the jumplist never had entries." });
             if (parsed == n && count > n)
                 rows.Add(new DestListEntry { Note = $"DestList lists {count} entries; stopped after {parsed}. The rest were not parsed." });
             return rows;

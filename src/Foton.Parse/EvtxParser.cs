@@ -74,7 +74,7 @@ namespace Foton.Parse
                         }
                 }
             }
-            catch (Exception ex) when (ex is EventLogException || ex is UnauthorizedAccessException || ex is IOException)
+            catch (Exception ex) when (ex is EventLogException || ex is UnauthorizedAccessException || ex is IOException || ex is PlatformNotSupportedException)
             {
                 if (output.Count == 0)
                     return One(Row("Unsupported-EvtxRead", false, "ElfFile header present but Windows could not read the log: " + TextFile.OneLine(ex.Message) + ". Event IDs were not guessed."));
@@ -84,6 +84,8 @@ namespace Foton.Parse
             }
             if (output.Count == 0)
                 return One(Row("EVTX", true, "ElfFile opened. No selected-ID events within the cap. Other Event IDs in this file were not dumped. Absence here is a filter, not an empty log."));
+            if (output.Count >= maxEvents)
+                output.Add(Row("EVTX", false, $"Stopped at the cap of {maxEvents} selected events (newest first); any older selected events in this file were not read."));
             return output;
         }
 

@@ -142,6 +142,50 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_DestList_listing_zero_entries_says_so()
+        {
+            var b = new byte[32];
+            BitConverter.GetBytes(4u).CopyTo(b, 0);
+            var row = JumplistParser.DestList(b).Single();
+            Assert.Equal("DestList v4 header lists 0 entries. Not proof the jumplist never had entries.", row.Note);
+        }
+
+        [Fact]
+        public void Invalid_child_offsets_count_against_the_hive_walk_budget()
+        {
+            // 8000 keys, each claiming 20000 subkeys through one list of offsets that point nowhere.
+            var hive = HostileHive((root, add) =>
+            {
+                var bad = new byte[4 + 20000 * 8];
+                bad[0] = (byte)'l'; bad[1] = (byte)'f';
+                BitConverter.GetBytes((ushort)20000).CopyTo(bad, 2);
+                for (int i = 0; i < 20000; i++) BitConverter.GetBytes(0x3FFFFFF0).CopyTo(bad, 4 + i * 8);
+                int badList = add(bad);
+                var keys = new int[8000];
+                for (int k = 0; k < keys.Length; k++)
+                {
+                    var nk = new byte[0x4C + 4];
+                    nk[0] = 0x6E; nk[1] = 0x6B; nk[2] = 0x20;
+                    BitConverter.GetBytes(20000).CopyTo(nk, 0x14);
+                    BitConverter.GetBytes(badList).CopyTo(nk, 0x1C);
+                    BitConverter.GetBytes(-1).CopyTo(nk, 0x28);
+                    BitConverter.GetBytes((ushort)4).CopyTo(nk, 0x48);
+                    System.Text.Encoding.ASCII.GetBytes("KEYS").CopyTo(nk, 0x4C);
+                    keys[k] = add(nk);
+                }
+                var lf = new byte[4 + keys.Length * 8];
+                lf[0] = (byte)'l'; lf[1] = (byte)'f';
+                BitConverter.GetBytes((ushort)keys.Length).CopyTo(lf, 2);
+                for (int k = 0; k < keys.Length; k++) BitConverter.GetBytes(keys[k]).CopyTo(lf, 4 + k * 8);
+                return add(lf);
+            }, size: 0x200000);
+            var sw = Stopwatch.StartNew();
+            Assert.Null(Regf.Find(hive, Regf.Root(hive), "InventoryApplicationFile"));
+            sw.Stop();
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(2), "Hive walk took " + sw.Elapsed);
+        }
+
+        [Fact]
         public void An_empty_DestList_is_reported_as_empty_not_as_a_read_failure()
         {
             using (var t = new TempDir())
@@ -245,9 +289,9 @@ namespace Foton.Tests
         }
 
         /// <summary>A regf with one ROOT key whose subkey list is built by <paramref name="list"/> (cell offset of ROOT, add-cell).</summary>
-        static byte[] HostileHive(Func<int, Func<byte[], int>, int> list)
+        static byte[] HostileHive(Func<int, Func<byte[], int>, int> list, int size = 0x40000)
         {
-            var b = new byte[0x40000];
+            var b = new byte[size];
             System.Text.Encoding.ASCII.GetBytes("regf").CopyTo(b, 0);
             System.Text.Encoding.ASCII.GetBytes("hbin").CopyTo(b, 0x1000);
             int next = 0x20;
