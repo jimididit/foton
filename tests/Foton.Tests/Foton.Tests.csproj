@@ -12,5 +12,11 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Foton.Core\Foton.Core.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Package\Foton.Package.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Report\Foton.Report.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
   </ItemGroup>
 </Project>

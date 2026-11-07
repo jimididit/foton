@@ -1,0 +1,10 @@
+{
+  "Hostname": "FIXTURE-PC",
+  "Caption": "Windows 11 Pro",
+  "BuildNumber": "26100",
+  "UptimeDays": 3.2,
+  "TimeZone": "Eastern Standard Time",
+  "UtcOffset": "-05:00:00",
+  "Domain": "WORKGROUP",
+  "LastBootUtc": "2026-01-12 10:00:00"
+}

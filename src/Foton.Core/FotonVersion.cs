@@ -37,6 +37,9 @@ namespace Foton.Core
         public static string BaselineSchema => Metadata("FotonBaselineSchemaVersion");
         public static string FindingsSchema => Metadata("FotonFindingsSchemaVersion");
 
+        /// <summary>UTC date (yyyy-MM-dd) of the change that set the version; the banner's Updated line.</summary>
+        public static string ReleaseDate => Metadata("FotonReleaseDate");
+
         /// <summary>The lines every executable prints for -Version, in the Get-FotonVersion order.</summary>
         public static string[] Describe(string executable) => new[]
         {

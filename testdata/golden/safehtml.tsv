@@ -1,0 +1,6 @@
+plain	plain
+a&b<c>d"e'f	a&amp;b&lt;c&gt;d&quot;e&#39;f
+C:\Path\<x>	C:\Path\&lt;x&gt;
+ünï & çödé	ünï &amp; çödé
+	
+Défense: 100% "ok"	Défense: 100% &quot;ok&quot;

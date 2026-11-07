@@ -1,0 +1,5 @@
+none	Success	
+data	Success	
+ok	Success	
+partial	Partial	1 of 2 file(s) not captured. First: C:\x - in use
+failed	Failed	1 of 2 file(s) not captured. First: C:\h - denied

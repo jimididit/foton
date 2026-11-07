@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Foton.Core\Foton.Core.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Package\Foton.Package.csproj" />
   </ItemGroup>
 </Project>

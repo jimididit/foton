@@ -27,6 +27,10 @@ dotnet test Foton.sln -c Release --no-build
 
 Version and schema numbers live once in [`Directory.Build.props`](../Directory.Build.props) and are read at runtime (`FotonVersion`). CI job `dotnet` must pass alongside `Pester`.
 
+**Parity with 1.38.x.** Formats that must match the PowerShell line byte for byte (Export-Csv and Out-File output, HTML escaping, report chrome, copy-task status) are checked against golden files in `testdata/golden/`. These files are generated from the frozen module by `tests/golden/Update-Golden.ps1` and committed, so tests never call PowerShell. Regenerate them only when a deliberate difference is agreed, and say why in the PR. `.gitattributes` keeps those bytes free of line-ending conversion.
+
+`foton package <case-folder-or-zip>` opens a package (folder or ZIP; unsafe ZIP paths are refused) and re-checks every file against `00_Collection\hashes.csv`. Use it to try changes on real packages.
+
 Everything below describes the 1.38.x PowerShell tree. **Paths are relative to `legacy/powershell/`.**
 
 ## Ground rules

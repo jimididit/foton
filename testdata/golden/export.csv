@@ -1,0 +1,5 @@
+﻿"Name","Quote","Comma","Newline","Empty","Null","Flag","Count","Unicode"
+"plain","say ""hi""","a,b","line1
+line2","",,"True","42","ünï ✓"
+"second","'",",","
+","",,"False","-1",""

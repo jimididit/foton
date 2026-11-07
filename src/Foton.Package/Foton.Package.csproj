@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Opens an already-collected case folder or ZIP. Offline: reads package files only, never the live host. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+</Project>
