@@ -346,10 +346,20 @@ namespace Foton.Tests
                 var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"07_Event_Logs\evtx");
                 Write(t.File(@"bin\hayabusa.cmd"),
                     "@echo off\r\n:loop\r\nif \"%~1\"==\"\" exit /b 3\r\nif /i \"%~1\"==\"-o\" echo new> \"%~dp2fresh.csv\"\r\nshift\r\ngoto loop\r\n");
-                var hb = Compose(pkg, t.File("empty"), new Dictionary<string, string> { ["Hayabusa"] = t.File(@"bin\hayabusa.cmd") })
-                    .Rows.Single(r => r.Tool == "Hayabusa");
+                var tools = new Dictionary<string, string> { ["Hayabusa"] = t.File(@"bin\hayabusa.cmd") };
+                var hb = Compose(pkg, t.File("empty"), tools).Rows.Single(r => r.Tool == "Hayabusa");
                 Assert.Equal("Copied", hb.Status);
                 Assert.Contains("exited with code 3", hb.Note);
+
+                // With complete earlier output present, a failed run's partial output is discarded.
+                var dir = Path.Combine(pkg, @"analysis\external\hayabusa");
+                File.Delete(Path.Combine(dir, "fresh.csv"));
+                Write(Path.Combine(dir, "complete.csv"), "old");
+                var rows = Compose(pkg, t.File("empty"), tools).Rows.Where(r => r.Tool == "Hayabusa").ToList();
+                Assert.Contains("earlier output was kept", rows.Single(r => r.Status == "ToolError").Note);
+                Assert.EndsWith("complete.csv", rows.Single(r => r.Status == "Retained").DestRelative);
+                Assert.False(File.Exists(Path.Combine(dir, "fresh.csv")));
+                Assert.Empty(Directory.GetFileSystemEntries(Path.Combine(pkg, @"analysis\external"), ".hayabusa.*"));
             }
         }
 

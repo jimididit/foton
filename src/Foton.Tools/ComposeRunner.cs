@@ -206,7 +206,9 @@ namespace Foton.Tools
                 bool ok = exitCode == 0;
 
                 var fresh = Outputs(stage).ToList();
-                if (fresh.Count > 0)
+                // A failed run's partial output replaces nothing complete: with earlier output present it is discarded.
+                bool keepEarlier = fresh.Count > 0 && !ok && Outputs(toolDir).Any();
+                if (fresh.Count > 0 && !keepEarlier)
                 {
                     var swapError = Swap(toolDir, stage, Path.Combine(extRoot, $".{lower}.prev-{Guid.NewGuid():N}"));
                     if (swapError != null)
@@ -238,6 +240,13 @@ namespace Foton.Tools
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
                 var dirRel = @"analysis\external\" + lower;
+                if (keepEarlier)
+                {
+                    rows.Add(Row("ToolError", dirRel,
+                        $"{j.Tool} exited with {Exit(exitCode)} after writing partial output, so the earlier output was kept and the partial output discarded. See tool_stderr.txt; to keep a partial run instead, delete {dirRel} and compose again."));
+                    Retained("ToolError");
+                    continue;
+                }
                 // .NET 10 builds (AmcacheParser has no other) print this and exit when the runtime is absent.
                 if (fresh.Count == 0 && !ok && ComposeSupport.MissingRuntime(Path.Combine(toolDir, StdErr), Path.Combine(toolDir, StdOut)))
                 {
@@ -253,9 +262,9 @@ namespace Foton.Tools
                     Retained(status);
                     continue;
                 }
-                // A tool that fails partway often still writes valid rows for the inputs it finished, so the output is kept,
-                // but the row says the run did not complete.
-                var partial = ok ? "" : $" The tool exited with {(exitCode.HasValue ? "code " + exitCode.Value : "a start error")}, so this output may be partial; see tool_stderr.txt.";
+                // With no earlier output, a failed run's files are kept (a tool that fails partway often still wrote valid
+                // rows for the inputs it finished), but the row says the run did not complete.
+                var partial = ok ? "" : $" The tool exited with {Exit(exitCode)}, so this output may be partial; see tool_stderr.txt.";
                 foreach (var f in Outputs(toolDir))
                 {
                     var row = Row("Copied", Relative(f, root),
@@ -333,6 +342,8 @@ namespace Foton.Tools
             !Directory.Exists(dir) ? Enumerable.Empty<string>()
             : FileSearch.Find(dir, "*", int.MaxValue).Where(f => !string.Equals(Path.GetFileName(f), StdErr, StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(Path.GetFileName(f), StdOut, StringComparison.OrdinalIgnoreCase));
+
+        static string Exit(int? code) => code.HasValue ? "code " + code.Value : "a start error";
 
         static string Relative(string path, string root) => path.Substring(root.Length).TrimStart('\\', '/');
     }
