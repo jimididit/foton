@@ -9,5 +9,7 @@
     <ProjectReference Include="..\..\src\Foton.Package\Foton.Package.csproj" />
     <ProjectReference Include="..\..\src\Foton.Baseline.Compare\Foton.Baseline.Compare.csproj" />
     <ProjectReference Include="..\..\src\Foton.Parse\Foton.Parse.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Analyze\Foton.Analyze.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Patterns\Foton.Patterns.csproj" />
   </ItemGroup>
 </Project>

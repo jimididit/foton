@@ -1,0 +1,3 @@
+﻿"LogName","IsEnabled"
+"Security","True"
+"Microsoft-Windows-Sysmon/Operational","NotPresent"

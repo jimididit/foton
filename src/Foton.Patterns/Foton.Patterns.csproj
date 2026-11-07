@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Workstation-only heuristic data. Endpoint executables must never reference this project (architecture
+       test): a list of attacker command fragments in an endpoint binary is what antivirus blocks. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\SuspiciousCommandPatterns.txt" LogicalName="Foton.Patterns.SuspiciousCommandPatterns.txt" />
+  </ItemGroup>
+</Project>

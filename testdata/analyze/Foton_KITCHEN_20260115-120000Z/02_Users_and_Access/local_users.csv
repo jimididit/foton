@@ -1,0 +1,4 @@
+﻿"Name","Enabled","PasswordRequired","SID"
+"Guest","True","False","S-1-5-21-1-2-3-501"
+"kiosk","True","False","S-1-5-21-1-2-3-1003"
+"old","False","False","S-1-5-21-1-2-3-1004"

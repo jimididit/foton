@@ -1,0 +1,9 @@
+﻿{
+    "Hostname":  "KITCHEN",
+    "Caption":  "Microsoft Windows 11 Pro",
+    "BuildNumber":  "26100",
+    "UptimeDays":  3.5,
+    "TimeZone":  "Eastern Standard Time",
+    "UtcOffset":  "-05:00",
+    "SystemDirectory":  "D:\\Win\\System32"
+}

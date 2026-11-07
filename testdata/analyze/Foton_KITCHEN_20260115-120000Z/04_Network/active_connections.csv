@@ -1,0 +1,4 @@
+﻿"ProcessName","RemoteAddress","RemotePort","State","RemoteIsExternal","UserWritablePath"
+"evil.exe","203.0.113.5","443","Established","True","True"
+"chrome.exe","198.51.100.7","443","Established","True","False"
+"svchost.exe","10.0.0.2","135","Established","False","False"

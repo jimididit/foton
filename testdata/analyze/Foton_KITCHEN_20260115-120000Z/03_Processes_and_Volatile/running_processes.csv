@@ -1,0 +1,4 @@
+﻿"Name","PID","ParentName","Path","CommandLine","SignatureStatus","UserWritablePath","SuspiciousCmdHits"
+"evil.exe","4100","explorer.exe","C:\Users\Public\evil.exe","evil.exe","NotSigned","True",""
+"powershell.exe","4200","WINWORD.EXE","C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe","powershell -encodedcommand ZQBjAGgAbwA=","Valid","False",""
+"svchost.exe","900","services.exe","C:\Windows\System32\svchost.exe","svchost.exe -k netsvcs","Valid","False",""

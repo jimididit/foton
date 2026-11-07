@@ -1,0 +1,9 @@
+﻿{
+    "RdpEnabled":  true,
+    "UserAuthentication":  0,
+    "PortNumber":  3389,
+    "RemoteDesktopUsers":  [
+                               "HOST\\a",
+                               "HOST\\b"
+                           ]
+}

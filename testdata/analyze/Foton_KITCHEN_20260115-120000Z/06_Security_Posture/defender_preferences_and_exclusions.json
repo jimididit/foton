@@ -1,0 +1,12 @@
+﻿{
+    "ExclusionPath":  [
+                          "C:\\Users\\Public\\stage",
+                          "D:\\Data"
+                      ],
+    "ExclusionProcess":  [
+                             "tool.exe"
+                         ],
+    "DisableScriptScanning":  true,
+    "DisableBehaviorMonitoring":  false,
+    "DisableIOAVProtection":  false
+}

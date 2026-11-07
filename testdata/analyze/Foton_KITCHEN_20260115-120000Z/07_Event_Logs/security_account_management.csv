@@ -1,0 +1,6 @@
+﻿"EventId","TimeCreatedUtc","Message"
+"4720","2026-01-14 04:00:00","A user account was created.  New Account:  Security ID:  S-1-5-21-1-2-3-1010  Account Name:  temp user  Account Domain:  HOST"
+"4726","2026-01-14 04:00:30","A user account was deleted.  Target Account:  Security ID:  S-1-5-21-1-2-3-1010  Account Name:  temp user  Account Domain:  HOST"
+"4720","2026-01-14 05:00:00","A user account was created.  New Account:  Security ID:  S-1-5-21-1-2-3-1011  Account Name:  backdoor  Account Domain:  HOST"
+"4732","2026-01-14 05:00:05","A member was added.  Member:  Security ID:  S-1-5-21-1-2-3-1011  Account Name:  -  Group:  Security ID:  S-1-5-32-544  Group Name:  Administrators  Group Domain:  Builtin"
+"4732","2026-01-14 05:00:06","A member was added.  Member:  Security ID:  S-1-5-21-1-2-3-1011  Account Name:  -  Group:  Security ID:  S-1-5-21-1-2-3-513  Group Name:  None  Group Domain:  HOST"

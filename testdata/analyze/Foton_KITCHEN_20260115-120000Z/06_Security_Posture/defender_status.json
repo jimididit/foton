@@ -1,0 +1,8 @@
+﻿{
+    "RealTimeProtectionEnabled":  false,
+    "AntivirusEnabled":  true,
+    "AMServiceEnabled":  false,
+    "IsTamperProtected":  false,
+    "AntivirusSignatureAgeDays":  12,
+    "AntivirusSignatureVersion":  "1.401.0.0"
+}

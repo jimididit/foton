@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Triage heuristics over an already-collected package. Offline: never reads the live host. Runs on the
+       workstation and (later) at the end of Collect, so pattern lists are passed in, never referenced here. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+    <ProjectReference Include="..\Foton.Package\Foton.Package.csproj" />
+    <ProjectReference Include="..\Foton.Baseline.Compare\Foton.Baseline.Compare.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Foton.Tests" />
+  </ItemGroup>
+</Project>

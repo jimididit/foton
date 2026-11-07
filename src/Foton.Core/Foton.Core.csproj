@@ -11,5 +11,8 @@
   <ItemGroup>
     <!-- Data, not code: the registry hardening table Collect and Baseline read (same file as 1.38.x Patterns). -->
     <EmbeddedResource Include="Resources\HardeningRegistryChecks.csv" LogicalName="Foton.Core.HardeningRegistryChecks.csv" />
+    <!-- Endpoint-safe heuristic lists (shipped in the 1.38.x Collect flatten too). The suspicious-command list is not here: Foton.Patterns. -->
+    <EmbeddedResource Include="Resources\UserWritablePatterns.txt" LogicalName="Foton.Core.UserWritablePatterns.txt" />
+    <EmbeddedResource Include="Resources\RemoteAccessToolNames.txt" LogicalName="Foton.Core.RemoteAccessToolNames.txt" />
   </ItemGroup>
 </Project>
