@@ -3,9 +3,11 @@
 [![CI](https://github.com/jimididit/foton/actions/workflows/ci.yml/badge.svg)](https://github.com/jimididit/foton/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
-[![Module](https://img.shields.io/badge/module-1.38.1-informational)](Foton.psd1)
+[![Module](https://img.shields.io/badge/module-1.38.1-informational)](legacy/powershell/Foton.psd1)
 
 Windows DFIR, baseline, and security-audit toolkit. Capture host state into a hashed **package**, then parse, compare, and analyze **offline**. Findings are observations-not a compromise verdict.
+
+> **Status:** 1.38.x is the final PowerShell release line and receives security fixes only ([SECURITY.md](SECURITY.md)). Foton v2 (single-file executables built in C# on the .NET Framework that ships with Windows 10 / Server 2016+) is in development on `main`. The PowerShell source lives in [`legacy/powershell/`](legacy/powershell/). Releases and the Gallery module are unchanged.
 
 ## Quick start
 
@@ -19,7 +21,7 @@ powershell -ExecutionPolicy Bypass -File .\Foton-Collect.ps1 -CaseNumber "CASE-0
 
 Open `Foton_Report.html` **inside** the new case folder. Ship the ZIP + `*_PACKAGE_HASH.txt` (or the whole folder)-not HTML alone.
 
-**Workstation (release zip, Gallery module, or this repo)** - full catalog in [docs/USAGE.md](docs/USAGE.md):
+**Workstation (release zip or Gallery module; from a clone, run these in `legacy\powershell`)** - full catalog in [docs/USAGE.md](docs/USAGE.md):
 
 ```powershell
 Import-Module .\Foton.psd1 -Force
@@ -42,7 +44,7 @@ Foton.cmd analyze D:\Cases\Foton_HOSTNAME_...Z   # last - consumes parse/compose
 
 Do **not** copy the module tree to a target. Do **not** `Import-Module` on an engagement host.
 
-Build flattens after Collect/Baseline source changes (`dist\` is generated, not committed):
+Build flattens from a clone (run in `legacy\powershell`; `dist\` is generated, not committed):
 
 ```powershell
 .\build\Build-Standalone.ps1
@@ -80,7 +82,7 @@ Live collect **changes the host**. Capture memory/disk first when the case plan 
 
 ## Contributing
 
-PRs welcome. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Run `.\tests\Invoke-FotonTests.ps1` (Pester 5+) before opening a PR.
+PRs welcome. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). The PowerShell line is frozen (security fixes only); run `.\legacy\powershell\tests\Invoke-FotonTests.ps1` (Pester 5+) before opening a PR that touches it.
 
 ## License
 

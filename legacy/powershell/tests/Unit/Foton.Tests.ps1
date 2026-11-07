@@ -70,8 +70,10 @@ Describe 'Foton module scaffold' {
         $collect = [string]$man.PrivateData.Foton.CollectSchemaVersion
         $baseline = [string]$man.PrivateData.Foton.BaselineSchemaVersion
         $root = Split-Path $script:FotonPsd1 -Parent
-        $readme = Get-Content -LiteralPath (Join-Path $root 'README.md') -Raw
-        $usage = Get-Content -LiteralPath (Join-Path $root 'docs\USAGE.md') -Raw
+        # The module lives in legacy\powershell; public docs and LICENSE stay at the repository root.
+        $repo = [IO.Path]::GetFullPath((Join-Path $root '..\..'))
+        $readme = Get-Content -LiteralPath (Join-Path $repo 'README.md') -Raw
+        $usage = Get-Content -LiteralPath (Join-Path $repo 'docs\USAGE.md') -Raw
         $readme | Should -Match ([regex]::Escape("badge/module-$ver-"))
         $usage | Should -Match ([regex]::Escape("module **$ver**, collect schema **$collect**, baseline schema **$baseline**"))
         foreach ($doc in @($readme, $usage)) {
@@ -86,7 +88,7 @@ Describe 'Foton module scaffold' {
         $banner | Should -Not -Match "Updated\s+\d"
         # The Gallery shows the manifest Author; the banner must name the same author.
         $banner | Should -Match ("Author\s+{0}'" -f [regex]::Escape([string]$man.Author))
-        (Get-Content -LiteralPath (Join-Path $root 'LICENSE') -Raw) | Should -Match ([regex]::Escape([string]$man.Author))
+        (Get-Content -LiteralPath (Join-Path $repo 'LICENSE') -Raw) | Should -Match ([regex]::Escape([string]$man.Author))
     }
 
     It 'exports package, analysis, and report commands (Collect stays unexported)' {

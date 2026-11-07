@@ -1,6 +1,8 @@
 name: Release
 
-# Tag vX.Y.Z (matching ModuleVersion in Foton.psd1) to publish a release.
+# Frozen PowerShell 1.38.x line (legacy\powershell): security fixes only until the C# v2.0.0.
+# Only v1.* tags fire here; v2 tags belong to the C# release workflow.
+# Tag v1.Y.Z (matching ModuleVersion in legacy\powershell\Foton.psd1) to publish a release.
 # Run manually (workflow_dispatch) for a dry run: builds, tests, and uploads the
 # assets as a workflow artifact without creating a release or publishing.
 #
@@ -11,7 +13,7 @@ name: Release
 
 on:
   push:
-    tags: ['v*.*.*']
+    tags: ['v1.*.*']
   workflow_dispatch:
 
 permissions:
@@ -33,9 +35,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          $ver = (Import-PowerShellDataFile .\Foton.psd1).ModuleVersion
+          $ver = (Import-PowerShellDataFile .\legacy\powershell\Foton.psd1).ModuleVersion
           if ("v$ver" -ne $env:GITHUB_REF_NAME) {
-            throw "Tag $env:GITHUB_REF_NAME does not match ModuleVersion $ver in Foton.psd1."
+            throw "Tag $env:GITHUB_REF_NAME does not match ModuleVersion $ver in legacy\powershell\Foton.psd1."
           }
 
       - name: Install Pester 5
@@ -55,14 +57,14 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          & .\tests\Invoke-FotonTests.ps1
+          & .\legacy\powershell\tests\Invoke-FotonTests.ps1
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build release assets
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          & .\build\Build-Release.ps1
+          & .\legacy\powershell\build\Build-Release.ps1 -OutputPath (Join-Path $PWD 'dist\release')
 
       - name: Upload assets
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

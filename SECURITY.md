@@ -2,7 +2,13 @@
 
 ## Supported versions
 
-Fixes land on `main` and ship in the next tagged [release](https://github.com/jimididit/foton/releases) (also published to the PowerShell Gallery as `Foton`). Older releases are not backported unless a release advisory says otherwise.
+| Line | Status |
+|------|--------|
+| **1.38.x** (PowerShell, source in `legacy/powershell/`) | **Security fixes only** until Foton v2.0.0 ships. No new features. After v2.0.0 it is unsupported, but remains available on [Releases](https://github.com/jimididit/foton/releases) and the PowerShell Gallery for hosts older than Windows 10 / Server 2016. |
+| **2.x** (C# executables, in development on `main`) | Not released yet. Supported from v2.0.0. |
+| Older than 1.38 | Unsupported. Upgrade to the latest 1.38.x. |
+
+Security fixes for 1.38.x ship as a new 1.38.x tag (GitHub release and PowerShell Gallery). Older releases are not backported unless a release advisory says otherwise.
 
 ## Reporting a vulnerability
 

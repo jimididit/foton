@@ -13,8 +13,11 @@
 
 [CmdletBinding()]
 param(
+    # Module root (legacy\powershell). Operator docs and LICENSE come from -DocsRoot.
     [string]$RepoRoot,
     [string]$OutputPath,
+    # Repository root holding LICENSE, README.md, SECURITY.md, and docs\.
+    [string]$DocsRoot,
     # Skip rebuilding the flattens (tests that only exercise packaging).
     [switch]$SkipFlattenBuild
 )
@@ -22,6 +25,8 @@ param(
 $ErrorActionPreference = 'Stop'
 if (-not $RepoRoot) { $RepoRoot = Join-Path $PSScriptRoot '..' }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+if (-not $DocsRoot) { $DocsRoot = Join-Path $RepoRoot '..\..' }
+$DocsRoot = (Resolve-Path -LiteralPath $DocsRoot).Path
 if (-not $OutputPath) { $OutputPath = Join-Path $RepoRoot 'dist\release' }
 
 $psd1 = Import-PowerShellDataFile -LiteralPath (Join-Path $RepoRoot 'Foton.psd1')
@@ -45,19 +50,28 @@ foreach ($leaf in @($collectLeaf, $baselineLeaf, 'Foton-Collect.ps1', 'Foton-Bas
 if (Test-Path -LiteralPath $OutputPath) { Remove-Item -LiteralPath $OutputPath -Recurse -Force }
 New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 
-# Allow-list, relative to the repo root. Directories are copied whole.
+# Allow-list. Module files are relative to -RepoRoot, operator docs to -DocsRoot.
+# Directories are copied whole. The shipped layout is the same as before the legacy move.
 $shipped = @(
-    'Foton.psd1', 'Foton.psm1', 'Foton.cmd', 'LICENSE', 'README.md', 'SECURITY.md',
-    'src',
-    'tools\Invoke-FotonEasy.ps1',
-    'docs\USAGE.md', 'docs\CARVE.md',
-    'dist\Foton-Collect.ps1', 'dist\Foton-Baseline.ps1'
+    @{ Root = $RepoRoot; Rel = 'Foton.psd1' }
+    @{ Root = $RepoRoot; Rel = 'Foton.psm1' }
+    @{ Root = $RepoRoot; Rel = 'Foton.cmd' }
+    @{ Root = $RepoRoot; Rel = 'src' }
+    @{ Root = $RepoRoot; Rel = 'tools\Invoke-FotonEasy.ps1' }
+    @{ Root = $RepoRoot; Rel = 'dist\Foton-Collect.ps1' }
+    @{ Root = $RepoRoot; Rel = 'dist\Foton-Baseline.ps1' }
+    @{ Root = $DocsRoot; Rel = 'LICENSE' }
+    @{ Root = $DocsRoot; Rel = 'README.md' }
+    @{ Root = $DocsRoot; Rel = 'SECURITY.md' }
+    @{ Root = $DocsRoot; Rel = 'docs\USAGE.md' }
+    @{ Root = $DocsRoot; Rel = 'docs\CARVE.md' }
 )
 
 function Copy-FotonShippedTree {
     param([string]$Destination)
-    foreach ($rel in $shipped) {
-        $src = Join-Path $RepoRoot $rel
+    foreach ($item in $shipped) {
+        $rel = $item.Rel
+        $src = Join-Path $item.Root $rel
         if (-not (Test-Path -LiteralPath $src)) { throw "Shipped path missing: $rel" }
         $dst = Join-Path $Destination $rel
         New-Item -ItemType Directory -Path (Split-Path -Parent $dst) -Force | Out-Null

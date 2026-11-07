@@ -32,9 +32,10 @@ jobs:
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module Pester -MinimumVersion 5.0.0 -Force -Scope CurrentUser -SkipPublisherCheck
 
-      - name: Run Foton tests
+      # Frozen 1.38.x line (parity oracle for the C# port). Job name stays "Pester": it is a required check.
+      - name: Run Foton tests (legacy PowerShell)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          & .\tests\Invoke-FotonTests.ps1
+          & .\legacy\powershell\tests\Invoke-FotonTests.ps1
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
