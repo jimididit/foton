@@ -187,6 +187,8 @@ namespace Foton.Parse
                 pos = pos + pathOff + pathBytes + (ver == 1 ? 0 : 4);
                 parsed++;
             }
+            if (parsed == n && count > n)
+                rows.Add(new DestListEntry { Note = $"DestList lists {count} entries; stopped after {parsed}. The rest were not parsed." });
             return rows;
         }
     }

@@ -253,6 +253,8 @@ namespace Foton.Parse
                     ["LowerCaseLongPath"] = p, ["Path"] = p,
                 }));
             }
+            if (children.Count > maxEntries)
+                output.Add(Row("AmcacheHive", false, "", $"Stopped after {maxEntries} of {children.Count} InventoryApplicationFile entries; the rest were not parsed. Use an Amcache tool for the full set."));
             return output;
         }
     }

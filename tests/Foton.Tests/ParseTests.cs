@@ -129,6 +129,19 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Entry_caps_are_stated_not_silent()
+        {
+            var fs = Path.Combine(Fixture(Case), "08_Filesystem");
+            var am = AmcacheParser.Parse(Path.Combine(fs, "amcache", "Amcache.hve"), maxEntries: 0);
+            Assert.StartsWith("Stopped after 0 of 1 InventoryApplicationFile entries", am.Single().Note);
+
+            var destList = File.ReadAllBytes(Path.Combine(TestPaths.Root, "legacy", "powershell", "tests", "Fixtures", "Parse", "jumplist-destlist-v1.bin"));
+            var rows = JumplistParser.DestList(destList, maxEntries: 0);
+            Assert.Equal("DestList lists 1 entries; stopped after 0. The rest were not parsed.", rows.Single().Note);
+            Assert.Single(JumplistParser.DestList(destList));
+        }
+
+        [Fact]
         public void An_empty_DestList_is_reported_as_empty_not_as_a_read_failure()
         {
             using (var t = new TempDir())
