@@ -80,6 +80,19 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Ioc_json_list_loads_as_an_array_or_one_object()
+        {
+            using (var t = new TempDir())
+            {
+                File.WriteAllText(t.File("a.json"), "[{\"Kind\":\"SHA256\",\"Value\":\"abc\"},{\"Kind\":\"path\",\"Value\":\"payload.exe\"}]");
+                File.WriteAllText(t.File("b.json"), "{\"Kind\":\"\",\"Value\":\"x\"}");
+                var a = IocMatcher.Load(t.File("a.json"));
+                Assert.Equal(new[] { ("sha256", "ABC"), ("path", "payload.exe") }, a.Select(i => (i.Kind, i.Value)));
+                Assert.Equal(("text", "x"), IocMatcher.Load(t.File("b.json")).Select(i => (i.Kind, i.Value)).Single());
+            }
+        }
+
+        [Fact]
         public void Ioc_text_lines_are_matched_and_empty_indicators_are_dropped()
         {
             using (var t = new TempDir())
@@ -100,7 +113,12 @@ namespace Foton.Tests
         {
             var html = TriageReport.Render(new TriageReportInput
             {
-                Findings = new[] { new Finding { Severity = "High\"><script>", Category = "X", Title = "T", Observation = "o", Artifact = "javascript:alert(1)" } },
+                Findings = new[]
+                {
+                    new Finding { Severity = "High\"><script>", Category = "X", Title = "T", Observation = "o", Artifact = "javascript:alert(1)" },
+                    new Finding { Severity = "Low", Category = "X", Title = "T2", Observation = "o", Artifact = "java\tscript:alert(2)" },
+                    new Finding { Severity = "Low", Category = "X", Title = "T3", Observation = "o", Artifact = "java\nscript&#58;alert(3)" },
+                },
                 Manifest = new[]
                 {
                     new Dictionary<string, string?> { ["Category"] = "System", ["File"] = @"\\attacker\share\x.json", ["Records"] = "<img src=x onerror=alert(1)>", ["Status"] = "Success" },
@@ -109,6 +127,7 @@ namespace Foton.Tests
             });
             Assert.DoesNotContain("<script>", html.Replace("<script>\r\n(function", ""));
             Assert.DoesNotContain("href=\"javascript:", html);
+            Assert.DoesNotContain("href=\"java", html);
             Assert.DoesNotContain("href=\"//attacker", html);
             Assert.DoesNotContain("<img src=x", html);
             Assert.Contains("<a href=\"01_System/os_info.json\">os_info.json</a>", html);

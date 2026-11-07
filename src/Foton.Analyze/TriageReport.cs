@@ -36,14 +36,17 @@ namespace Foton.Analyze
 
         static string E(object? v) => Html.Encode(Str(v));
 
-        static readonly System.Text.RegularExpressions.Regex Scheme = new System.Text.RegularExpressions.Regex(@"^\s*([a-zA-Z][a-zA-Z0-9+.\-]*:|[\\/]{2})");
-
         /// <summary>
-        /// A link to a path inside the package, or plain text. Paths come from package files, so anything with a
-        /// scheme (javascript:, file:, http:), a drive, or a UNC prefix is not made clickable.
+        /// A link to a path inside the package, or plain text. Paths come from package files, so only a relative path
+        /// is clickable: no colon (a scheme, even one split by a tab or newline the browser strips, or a drive), no
+        /// control characters, no leading slash (root or UNC).
         /// </summary>
-        static string Link(string target, string text) =>
-            Scheme.IsMatch(target) ? Html.Encode(text) : $"<a href=\"{Html.Encode(target)}\">{Html.Encode(text)}</a>";
+        static string Link(string target, string text)
+        {
+            bool relative = target.Length > 0 && target.IndexOf(':') < 0 && !target.Any(ch => ch < 0x20 || ch == 0x7F)
+                && target[0] != '/' && target[0] != '\\';
+            return relative ? $"<a href=\"{Html.Encode(target)}\">{Html.Encode(text)}</a>" : Html.Encode(text);
+        }
 
         /// <summary>
         /// Severity then category, with Sort-Object's algorithm (PsSort), so findings with equal keys land in the same
