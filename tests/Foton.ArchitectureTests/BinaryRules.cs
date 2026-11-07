@@ -45,14 +45,26 @@ namespace Foton.ArchitectureTests
             string.Concat((n.GetPublicKeyToken() ?? new byte[0]).Select(b => b.ToString("x2")));
 
         [Fact]
-        public void Shipped_executables_reference_only_Microsoft_framework_assemblies()
+        public void In_box_assembly_set_was_loaded()
+        {
+            // Guards the rule below against passing vacuously on a broken lookup.
+            Assert.True(Repo.InBoxAssemblyNames.Count > 100, "Only " + Repo.InBoxAssemblyNames.Count + " net462 reference assemblies found.");
+            Assert.Contains("System.Management", Repo.InBoxAssemblyNames);
+            Assert.DoesNotContain("System.Memory", Repo.InBoxAssemblyNames);
+        }
+
+        [Fact]
+        public void Shipped_executables_reference_only_in_box_framework_assemblies()
         {
             foreach (var (p, asm) in Built(p => p.OutputAssembly).Where(x => x.Project.IsExe))
             {
                 foreach (var r in asm.GetReferencedAssemblies())
                 {
                     Assert.False(r.Name.StartsWith("Foton", StringComparison.OrdinalIgnoreCase), p.AssemblyName + " still references " + r.Name + " (not merged).");
-                    Assert.True(FrameworkKeys.Contains(Token(r)), p.AssemblyName + " references non-framework assembly " + r.FullName + "; endpoints get in-box .NET Framework only.");
+                    // Name must be in the net462 in-box set AND carry a Microsoft framework key: a Microsoft-signed
+                    // NuGet package (System.Memory, System.Text.Json, ...) has the key but is not in-box.
+                    Assert.True(Repo.InBoxAssemblyNames.Contains(r.Name) && FrameworkKeys.Contains(Token(r)),
+                        p.AssemblyName + " references " + r.FullName + ", which is not an in-box .NET Framework 4.6.2 assembly.");
                 }
                 if (p.Name != "Foton.Cli")
                     Assert.DoesNotContain(asm.GetReferencedAssemblies(), r => r.Name.Equals("System.Net.Http", StringComparison.OrdinalIgnoreCase));
