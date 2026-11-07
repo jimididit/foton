@@ -62,7 +62,7 @@ namespace Foton.Baseline.Capture
                 int c = PsOrder.Compare(Key(a, key), Key(b, key));
                 if (c != 0) return c;
             }
-            foreach (var key in a.Keys)
+            foreach (var key in a.Keys.Union(b.Keys).OrderBy(k => k, StringComparer.Ordinal))
             {
                 int c = string.CompareOrdinal(Key(a, key), Key(b, key));
                 if (c != 0) return c;

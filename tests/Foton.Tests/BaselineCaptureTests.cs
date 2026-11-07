@@ -67,6 +67,28 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Tie_break_is_symmetric_when_rows_carry_different_fields()
+        {
+            var x = new Dictionary<string, object?> { ["Name"] = "n", ["B"] = "2" };
+            var y = new Dictionary<string, object?> { ["Name"] = "n", ["A"] = "1" };
+            List<Dictionary<string, object?>> Run(params Dictionary<string, object?>[] rows) =>
+                new Provider { RecordType = "T", SortKeys = new[] { "Name" }, Collect = _ => rows }.Run(new CaptureContext(false));
+            Assert.Equal(Run(x, y), Run(y, x));
+        }
+
+        [Fact]
+        public void Safe_catches_errors_raised_while_a_lazy_query_enumerates()
+        {
+            IEnumerable<Dictionary<string, object?>> Throws()
+            {
+                yield return new Dictionary<string, object?> { ["Name"] = "first" };
+                throw new InvalidOperationException("enumeration failed");
+            }
+            var p = new Provider { RecordType = "T", SortKeys = new[] { "Name" }, Collect = _ => R.Safe(() => Throws().Select(r => r)) };
+            Assert.Empty(p.Run(new CaptureContext(false)));
+        }
+
+        [Fact]
         public void Sort_keys_use_PowerShell_culture_order_not_ordinal()
         {
             var p = new Provider
