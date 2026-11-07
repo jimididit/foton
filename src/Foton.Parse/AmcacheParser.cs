@@ -92,8 +92,11 @@ namespace Foton.Parse
             int n = Math.Min(nk.SubkeyCount, 20000);
             var offs = new List<int>();
             if (nk.SubkeyCount > 0) SubkeyOffsets(b, nk.SubkeyListOffset, n, offs, 0, new HashSet<int>());
+            // A valid hive never lists the same child twice; a hostile one could repeat it thousands of times.
+            var distinct = new HashSet<int>();
             for (int i = 0; i < offs.Count && i < n; i++)
             {
+                if (!distinct.Add(offs[i])) continue;
                 var child = Nk(b, offs[i]);
                 if (child != null) list.Add(child);
             }

@@ -73,14 +73,18 @@ namespace Foton.Tests
             Assert.Equal(new[] { "Empty", "1", "DestList" }, names);
         }
 
-        [Fact]
-        public void Every_lnk_in_a_custom_destinations_category_is_parsed()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void Every_lnk_in_a_custom_destinations_category_is_parsed(bool clsidPrefixed)
         {
             // 1.38.x stopped each entry only at the category footer, so the second LNK here was skipped.
             var one = File.ReadAllBytes(Path.Combine(Fixture(Case), "08_Filesystem", "jumplists", "4d5e6f.customDestinations-ms"));
             var lnk = File.ReadAllBytes(Path.Combine(Fixture(Case), "08_Filesystem", "z-top.lnk"));
             var entry = one.Skip(12).Take(16).ToArray();
-            var two = one.Take(one.Length - 4).Concat(entry).Concat(lnk).Concat(one.Skip(one.Length - 4)).ToArray();
+            var body = one.Take(one.Length - 4);
+            if (!clsidPrefixed) body = one.Take(12).Concat(one.Skip(28).Take(one.Length - 32));
+            var two = body.Concat(clsidPrefixed ? entry : new byte[0]).Concat(lnk).Concat(one.Skip(one.Length - 4)).ToArray();
             using (var t = new TempDir())
             {
                 var path = t.File("two.customDestinations-ms");

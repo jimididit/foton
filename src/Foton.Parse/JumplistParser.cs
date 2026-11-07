@@ -115,11 +115,15 @@ namespace Foton.Parse
             return rows;
         }
 
-        static bool IsEntryStart(byte[] b, int at)
+        /// <summary>Next entry: CLSID then a 0x4C LNK header, or (header-first layout) a 0x4C header then the CLSID.</summary>
+        static bool IsEntryStart(byte[] b, int at) =>
+            (Clsid(b, at) && BitConverter.ToUInt32(b, at + 16) == 0x4C) || (BitConverter.ToUInt32(b, at) == 0x4C && Clsid(b, at + 4));
+
+        static bool Clsid(byte[] b, int at)
         {
             for (int c = 0; c < 16; c++)
                 if (b[at + c] != ShellLinkClsid[c]) return false;
-            return BitConverter.ToUInt32(b, at + 16) == 0x4C;
+            return true;
         }
 
         /// <summary>DestList stream (libyal dtformats): versions 1 (Win7) and 2/3/4. FILETIME only at offset 100.</summary>

@@ -74,7 +74,7 @@ namespace Foton.Parse
                         }
                 }
             }
-            catch (EventLogException ex)
+            catch (Exception ex) when (ex is EventLogException || ex is UnauthorizedAccessException || ex is IOException)
             {
                 if (output.Count == 0)
                     return One(Row("Unsupported-EvtxRead", false, "ElfFile header present but Windows could not read the log: " + TextFile.OneLine(ex.Message) + ". Event IDs were not guessed."));
