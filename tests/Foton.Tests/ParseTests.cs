@@ -74,6 +74,23 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Every_lnk_in_a_custom_destinations_category_is_parsed()
+        {
+            // 1.38.x stopped each entry only at the category footer, so the second LNK here was skipped.
+            var one = File.ReadAllBytes(Path.Combine(Fixture(Case), "08_Filesystem", "jumplists", "4d5e6f.customDestinations-ms"));
+            var lnk = File.ReadAllBytes(Path.Combine(Fixture(Case), "08_Filesystem", "z-top.lnk"));
+            var entry = one.Skip(12).Take(16).ToArray();
+            var two = one.Take(one.Length - 4).Concat(entry).Concat(lnk).Concat(one.Skip(one.Length - 4)).ToArray();
+            using (var t = new TempDir())
+            {
+                var path = t.File("two.customDestinations-ms");
+                File.WriteAllBytes(path, two);
+                var rows = JumplistParser.Parse(path);
+                Assert.Equal(new[] { "C:\\Tools\\caf\u00e9.exe", "C:\\Windows\\System32\\cmd.exe" }, rows.Select(r => r.Identity));
+            }
+        }
+
+        [Fact]
         public void An_empty_DestList_is_reported_as_empty_not_as_a_read_failure()
         {
             using (var t = new TempDir())

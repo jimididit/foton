@@ -24,6 +24,9 @@ namespace Foton.Parse
             public int ValueListOffset { get; internal set; }
         }
 
+        /// <summary>"Compressed" key and value names are 8-bit Latin-1 (1.38.x decoded ASCII, turning accents into '?').</summary>
+        static readonly Encoding Latin1 = Encoding.GetEncoding(28591);
+
         static byte[]? Cell(byte[] b, long cellOffset)
         {
             if (cellOffset < 0) return null;
@@ -46,7 +49,7 @@ namespace Foton.Parse
             int nameLen = BitConverter.ToUInt16(p, 0x48);
             if (0x4C + nameLen > p.Length) return null;
             var name = nameLen == 0 ? ""
-                : ((flags & 0x0020) != 0 ? Encoding.ASCII.GetString(p, 0x4C, nameLen) : Encoding.Unicode.GetString(p, 0x4C, nameLen)).Trim('\0');
+                : ((flags & 0x0020) != 0 ? Latin1.GetString(p, 0x4C, nameLen) : Encoding.Unicode.GetString(p, 0x4C, nameLen)).Trim('\0');
             return new Key
             {
                 CellOffset = cellOffset, Name = name, KeyLastWriteUtc = Bin.FileTimeUtc(p, 4),
@@ -108,7 +111,7 @@ namespace Foton.Parse
             int vflags = BitConverter.ToUInt16(p, 0x10);
             if (0x14 + nameLen > p.Length) return null;
             var name = nameLen == 0 ? "(default)"
-                : ((vflags & 0x0001) != 0 ? Encoding.ASCII.GetString(p, 0x14, nameLen) : Encoding.Unicode.GetString(p, 0x14, nameLen)).Trim('\0');
+                : ((vflags & 0x0001) != 0 ? Latin1.GetString(p, 0x14, nameLen) : Encoding.Unicode.GetString(p, 0x14, nameLen)).Trim('\0');
             int dlen = (int)(sizeField & 0x7FFFFFFF);
             byte[] data;
             if ((sizeField & 0x80000000) != 0)
@@ -160,16 +163,20 @@ namespace Foton.Parse
         public static Key? Find(byte[] b, Key? start, string name, int maxDepth = 4)
         {
             if (start == null || name.Length == 0) return null;
-            // Each key cell is queued once, so a key that lists itself (or a cycle) cannot grow the queue.
+            // Each key cell is queued once, so a key that lists itself (or a cycle) cannot grow the queue, and the
+            // total number of child keys read is budgeted so a hostile hive cannot force millions of reads.
             var queued = new HashSet<int> { start.CellOffset };
             var queue = new Queue<KeyValuePair<Key, int>>();
             queue.Enqueue(new KeyValuePair<Key, int>(start, 0));
-            for (int seen = 0; queue.Count > 0 && seen < 8000; seen++)
+            long budget = 500000;
+            for (int seen = 0; queue.Count > 0 && seen < 8000 && budget > 0; seen++)
             {
                 var item = queue.Dequeue();
                 if (item.Key.Name.Length > 0 && string.Equals(item.Key.Name.ToLowerInvariant(), name.ToLowerInvariant(), StringComparison.Ordinal)) return item.Key;
                 if (item.Value >= maxDepth) continue;
-                foreach (var ch in Subkeys(b, item.Key))
+                var children = Subkeys(b, item.Key);
+                budget -= Math.Max(1, children.Count);
+                foreach (var ch in children)
                     if (queued.Add(ch.CellOffset)) queue.Enqueue(new KeyValuePair<Key, int>(ch, item.Value + 1));
             }
             return null;

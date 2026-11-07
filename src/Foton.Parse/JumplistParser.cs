@@ -90,9 +90,14 @@ namespace Foton.Parse
                 if (i + 20 <= bytes.Length && BitConverter.ToUInt32(bytes, i + 16) == 0x4C) lnkStart = i + 16;
                 else if (i >= 4 && BitConverter.ToUInt32(bytes, i - 4) == 0x4C) lnkStart = i - 4;
                 if (lnkStart < 0) { i++; continue; }
+                // An entry ends at the category footer or at the next entry (Shell Link CLSID + 0x4C header).
+                // 1.38.x stopped only at the footer, so every LNK after the first in a category was skipped.
                 int end = bytes.Length;
                 for (int j = lnkStart + 4; j <= bytes.Length - 4; j++)
+                {
                     if (bytes[j] == 0xAB && bytes[j + 1] == 0xFB && bytes[j + 2] == 0xBF && bytes[j + 3] == 0xBA) { end = j; break; }
+                    if (j >= lnkStart + 0x4C && j + 20 <= bytes.Length && IsEntryStart(bytes, j)) { end = j; break; }
+                }
                 int len = end - lnkStart;
                 if (len < 0x4C) { i++; continue; }
                 var slice = new byte[len];
@@ -108,6 +113,13 @@ namespace Foton.Parse
             if (rows.Count == 0)
                 rows.Add(Row("Unsupported-NotJumplist", false, "", "Not an OLE automatic destinations file and no Shell Link CLSID+LNK header was found. Paths were not guessed."));
             return rows;
+        }
+
+        static bool IsEntryStart(byte[] b, int at)
+        {
+            for (int c = 0; c < 16; c++)
+                if (b[at + c] != ShellLinkClsid[c]) return false;
+            return BitConverter.ToUInt32(b, at + 16) == 0x4C;
         }
 
         /// <summary>DestList stream (libyal dtformats): versions 1 (Win7) and 2/3/4. FILETIME only at offset 100.</summary>

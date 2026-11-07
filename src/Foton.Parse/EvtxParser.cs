@@ -76,7 +76,11 @@ namespace Foton.Parse
             }
             catch (EventLogException ex)
             {
-                return One(Row("Unsupported-EvtxRead", false, "ElfFile header present but Windows could not read the log: " + TextFile.OneLine(ex.Message) + ". Event IDs were not guessed."));
+                if (output.Count == 0)
+                    return One(Row("Unsupported-EvtxRead", false, "ElfFile header present but Windows could not read the log: " + TextFile.OneLine(ex.Message) + ". Event IDs were not guessed."));
+                // Keep what was read; say where reading stopped instead of implying the rest of the log was empty.
+                output.Add(Row("Unsupported-EvtxRead", false, $"Reading stopped after {output.Count} selected event(s): " + TextFile.OneLine(ex.Message) + ". Older events in this file were not read."));
+                return output;
             }
             if (output.Count == 0)
                 return One(Row("EVTX", true, "ElfFile opened. No selected-ID events within the cap. Other Event IDs in this file were not dumped. Absence here is a filter, not an empty log."));
