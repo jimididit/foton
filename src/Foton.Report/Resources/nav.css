@@ -1,0 +1,19 @@
+<style>
+.foton-bar{position:sticky;top:0;z-index:50;background:rgba(11,16,22,.94);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:16px 0 8px}
+.foton-bar-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.foton-bar input[type=search]{flex:1;min-width:200px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;color:var(--text);padding:8px 14px;font-size:13px}
+.foton-bar .foton-stat{color:#7f93a8;font-size:12px;white-space:nowrap}
+.foton-bar a.foton-top{color:var(--beam);font-size:12px;text-decoration:none;border:1px solid var(--line);border-radius:20px;padding:6px 12px}
+.foton-bar a.foton-top:hover{border-color:var(--beam)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.btn{background:var(--panel);border:1px solid var(--line);color:#b9cadb;border-radius:20px;padding:6px 15px;font-size:12.5px;cursor:pointer}
+.btn:hover{border-color:var(--beam);color:#fff}
+.btn.on{background:rgba(55,214,255,.14);border-color:var(--beam);color:#fff}
+.foton-toc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:5.6em;overflow:auto}
+.foton-toc a{font-size:11px;color:#8fa3b8;border:1px solid var(--line);border-radius:999px;padding:3px 10px;text-decoration:none;white-space:nowrap}
+.foton-toc a:hover,.foton-toc a:focus{color:var(--beam);border-color:var(--beam)}
+.foton-sec.foton-hidden,.foton-hide{display:none!important}
+a.card{text-decoration:none;color:inherit;display:block}
+a.card:hover{border-color:var(--beam)}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+</style>

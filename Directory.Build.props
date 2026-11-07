@@ -7,6 +7,8 @@
   <PropertyGroup>
     <FotonVersion>2.0.0</FotonVersion>
     <FotonPrerelease>alpha.0</FotonPrerelease>
+    <!-- UTC date of the change that set FotonVersion; the banner shows it as Updated. -->
+    <FotonReleaseDate>2026-11-07</FotonReleaseDate>
     <FotonCollectSchemaVersion>1.13.0</FotonCollectSchemaVersion>
     <FotonBaselineSchemaVersion>1.14.0</FotonBaselineSchemaVersion>
     <FotonFindingsSchemaVersion>1.0.0</FotonFindingsSchemaVersion>
@@ -44,6 +46,7 @@
     <AssemblyMetadata Include="FotonCollectSchemaVersion" Value="$(FotonCollectSchemaVersion)" />
     <AssemblyMetadata Include="FotonBaselineSchemaVersion" Value="$(FotonBaselineSchemaVersion)" />
     <AssemblyMetadata Include="FotonFindingsSchemaVersion" Value="$(FotonFindingsSchemaVersion)" />
+    <AssemblyMetadata Include="FotonReleaseDate" Value="$(FotonReleaseDate)" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
   </ItemGroup>
 </Project>

@@ -1,3 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Shared by all three executables: session, manifest, hashing, writers, versions. No live-host access (that is Foton.Win). -->
+  <!--
+    Shared by all three executables: session, task runner, manifest, writers, hashing, package files.
+    No live-host access here (that is Foton.Win): facts about the host arrive as plain values.
+  -->
+  <ItemGroup>
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
 </Project>
