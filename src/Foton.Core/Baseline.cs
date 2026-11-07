@@ -38,14 +38,14 @@ namespace Foton.Core
     {
         public BaselineHeader Header { get; set; } = new BaselineHeader();
         public List<ProviderMeta> Providers { get; set; } = new List<ProviderMeta>();
-        /// <summary>RecordType (case-insensitive, as 1.38.x property lookup was) to records in capture order.</summary>
-        public Dictionary<string, List<Dictionary<string, object?>>> Records { get; set; } =
+        /// <summary>
+        /// RecordType to records in capture order. Type and field names are case-insensitive, as 1.38.x
+        /// property lookup was. Read-only so it cannot be swapped for a case-sensitive map.
+        /// </summary>
+        public Dictionary<string, List<Dictionary<string, object?>>> Records { get; } =
             new Dictionary<string, List<Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>
-        /// The "Records" value exactly as parsed from the file. The payload hash of a loaded baseline is
-        /// computed from this, so it verifies the file's own bytes whatever shape each type was stored in.
-        /// </summary>
+        /// <summary>The "Records" value exactly as parsed from a file (null for a document built in code).</summary>
         object? _parsedRecords;
 
         public const string HeaderNote =
@@ -55,23 +55,27 @@ namespace Foton.Core
         /// SHA-256 of the records serialized compactly by JavaScriptSerializer: the same bytes Windows
         /// PowerShell 5.1 "ConvertTo-Json -Compress" produced, so 1.14.0 hashes stay comparable.
         /// </summary>
+        /// <remarks>Always hashes <see cref="Records"/> (what capture writes into the header).</remarks>
         public string ComputePayloadSha256()
         {
-            object payload;
-            if (_parsedRecords != null) payload = _parsedRecords;
-            else
-            {
-                var d = new Dictionary<string, object?>();
-                foreach (var kv in Records) d[kv.Key] = kv.Value;
-                payload = d;
-            }
+            var d = new Dictionary<string, object?>();
+            foreach (var kv in Records) d[kv.Key] = kv.Value;
+            return HashPayload(d);
+        }
+
+        static string HashPayload(object payload)
+        {
             var json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 256 }.Serialize(payload);
             return Hashing.Sha256Hex(Encoding.UTF8.GetBytes(json));
         }
 
-        /// <summary>False when the file's records were edited after capture (or the header hash is a placeholder).</summary>
+        /// <summary>
+        /// Whether the header's PayloadSha256 matches the records. For a loaded baseline the check runs on
+        /// the Records value exactly as it was in the file, so it verifies the file's own bytes whatever
+        /// shape a type was stored in; false means edited after capture, or a placeholder hash.
+        /// </summary>
         public bool PayloadMatches() =>
-            string.Equals(ComputePayloadSha256(), Header.PayloadSha256, StringComparison.OrdinalIgnoreCase);
+            string.Equals(_parsedRecords != null ? HashPayload(_parsedRecords) : ComputePayloadSha256(), Header.PayloadSha256, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>A folder package holds baseline.json; a .json path is used as is.</summary>
         public static string ResolveJsonPath(string path)
@@ -114,7 +118,12 @@ namespace Foton.Core
             if (r is Dictionary<string, object> rd)
                 foreach (var kv in rd)
                     doc.Records[kv.Key] = Items(kv.Value).OfType<Dictionary<string, object>>()
-                        .Select(x => x.ToDictionary(f => f.Key, f => (object?)f.Value)).ToList();
+                        .Select(x =>
+                        {
+                            var rec = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var f in x) rec[f.Key] = f.Value;
+                            return rec;
+                        }).ToList();
             return doc;
         }
 
@@ -146,6 +155,10 @@ namespace Foton.Core
             }
         }
 
+        /// <summary>
+        /// baseline.json for a document built at capture time (header hash = ComputePayloadSha256()).
+        /// Not a re-save path for loaded files: records are written in normalized list form.
+        /// </summary>
         public string ToJson() => Json.Indented(new Dictionary<string, object?>
         {
             ["Header"] = Header,

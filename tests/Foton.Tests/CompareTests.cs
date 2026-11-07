@@ -101,6 +101,35 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Identity_values_containing_the_separator_do_not_collide()
+        {
+            var meta = new ProviderMeta { RecordType = "Autorun", IdentityFields = new[] { "Key", "ValueName" }, ComparedFields = new[] { "Command" } };
+            Dictionary<string, object?> Run(string key, string name, string cmd) => new Dictionary<string, object?> { ["Key"] = key, ["ValueName"] = name, ["Command"] = cmd };
+            var reference = new BaselineDocument { Header = { BaselineSchemaVersion = "1.14.0", Hostname = "H" }, Providers = { meta } };
+            reference.Records["Autorun"] = new List<Dictionary<string, object?>> { Run("a|b", "c", "one") };
+            var difference = new BaselineDocument { Header = { BaselineSchemaVersion = "1.14.0", Hostname = "H" }, Providers = { meta } };
+            difference.Records["Autorun"] = new List<Dictionary<string, object?>> { Run("a", "b|c", "two") };
+            var r = BaselineComparer.Compare(reference, difference, "dif.json");
+            // Both display as "a|b|c", but they are different records: one Added, one Removed (1.38.x reported a Modified Command).
+            Assert.Equal(new[] { "Added a|b|c", "Removed a|b|c" }, r.Changes.Select(c => c.ChangeType + " " + c.Identity));
+        }
+
+        [Fact]
+        public void A_loaded_baseline_verifies_its_file_while_capture_hashes_its_records()
+        {
+            using (var t = new TempDir())
+            {
+                const string records = "{\"Service\":[{\"Name\":\"a\"}]}";
+                File.WriteAllText(t.File("b.json"), "{\"Header\":{\"PayloadSha256\":\"" + Hashing.Sha256Hex(System.Text.Encoding.UTF8.GetBytes(records)) + "\"},\"Records\":" + records + "}");
+                var doc = BaselineDocument.Load(t.File("b.json"));
+                Assert.True(doc.PayloadMatches());
+                doc.Records["Service"][0]["Name"] = "edited";
+                Assert.True(doc.PayloadMatches()); // the file is what is verified
+                Assert.NotEqual(doc.Header.PayloadSha256, doc.ComputePayloadSha256()); // records are what capture hashes
+            }
+        }
+
+        [Fact]
         public void Schema_mismatch_is_refused_except_the_1_14_to_1_15_value_only_change()
         {
             var a = new BaselineDocument { Header = { BaselineSchemaVersion = "1.13.0" } };

@@ -77,26 +77,25 @@ namespace Foton.Baseline.Compare
                 var refMap = Keyed(reference, type, m.IdentityFields);
                 var difMap = Keyed(difference, type, m.IdentityFields);
 
-                foreach (var id in difMap.Keys.OrderBy(k => k, Order))
+                foreach (var key in difMap.Keys.OrderBy(k => difMap[k].Identity, Order))
                 {
-                    if (!refMap.ContainsKey(id))
+                    var b = difMap[key];
+                    if (!refMap.TryGetValue(key, out var a))
                     {
-                        result.Changes.Add(new BaselineChange { RecordType = type, Identity = id, ChangeType = "Added" });
+                        result.Changes.Add(new BaselineChange { RecordType = type, Identity = b.Identity, ChangeType = "Added" });
                         continue;
                     }
-                    var a = refMap[id];
-                    var b = difMap[id];
                     foreach (var f in m.ComparedFields)
                     {
-                        var ov = Field(a, f);
-                        var nv = Field(b, f);
+                        var ov = Field(a.Record, f);
+                        var nv = Field(b.Record, f);
                         if (!string.Equals(ov, nv, StringComparison.Ordinal))
-                            result.Changes.Add(new BaselineChange { RecordType = type, Identity = id, ChangeType = "Modified", Field = f, OldValue = ov, NewValue = nv });
+                            result.Changes.Add(new BaselineChange { RecordType = type, Identity = b.Identity, ChangeType = "Modified", Field = f, OldValue = ov, NewValue = nv });
                     }
                 }
-                foreach (var id in refMap.Keys.OrderBy(k => k, Order))
-                    if (!difMap.ContainsKey(id))
-                        result.Changes.Add(new BaselineChange { RecordType = type, Identity = id, ChangeType = "Removed" });
+                foreach (var key in refMap.Keys.OrderBy(k => refMap[k].Identity, Order))
+                    if (!difMap.ContainsKey(key))
+                        result.Changes.Add(new BaselineChange { RecordType = type, Identity = refMap[key].Identity, ChangeType = "Removed" });
             }
 
             foreach (var c in result.Changes)
@@ -104,13 +103,26 @@ namespace Foton.Baseline.Compare
             return result;
         }
 
-        /// <summary>Identity -> record. Keys compare case-insensitively and a repeated identity keeps the last record, as a PowerShell hashtable did.</summary>
-        static Dictionary<string, Dictionary<string, object?>> Keyed(BaselineDocument doc, string type, string[] identityFields)
+        sealed class KeyedRecord { public string Identity = ""; public Dictionary<string, object?> Record = null!; }
+
+        /// <summary>
+        /// Records by identity. Identities compare case-insensitively and a repeated identity keeps the last
+        /// record, as a PowerShell hashtable did. The map key length-prefixes each field, so values that
+        /// contain "|" cannot collide ("a|b"+"c" vs "a"+"b|c", which 1.38.x merged); the displayed and
+        /// written identity is still the 1.38.x "|"-joined form that severity rules and Analyze match on.
+        /// </summary>
+        static Dictionary<string, KeyedRecord> Keyed(BaselineDocument doc, string type, string[] identityFields)
         {
-            var map = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+            var map = new Dictionary<string, KeyedRecord>(StringComparer.OrdinalIgnoreCase);
             if (!doc.Records.TryGetValue(type, out var rows)) return map;
             foreach (var r in rows)
-                map[string.Join("|", identityFields.Select(f => Field(r, f)))] = r;
+            {
+                var parts = identityFields.Select(f => Field(r, f)).ToArray();
+                var key = string.Concat(parts.Select(p => p.Length + ":" + p + ";"));
+                // Hashtable semantics: the first spelling of a key stays, the last record wins.
+                if (map.TryGetValue(key, out var existing)) existing.Record = r;
+                else map[key] = new KeyedRecord { Identity = string.Join("|", parts), Record = r };
+            }
             return map;
         }
 
