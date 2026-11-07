@@ -49,7 +49,8 @@ namespace Foton.Baseline.Capture
                 {
                     store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
                     foreach (var c in store.Certificates)
-                        rows.Add(Row("Store", s.Key, "Thumbprint", c.Thumbprint ?? "", "Subject", c.Subject, "Issuer", c.Issuer, "NotAfter", FotonTime.Format(c.NotAfter.ToUniversalTime())));
+                        using (c)
+                            rows.Add(Row("Store", s.Key, "Thumbprint", c.Thumbprint ?? "", "Subject", c.Subject, "Issuer", c.Issuer, "NotAfter", FotonTime.Format(c.NotAfter.ToUniversalTime())));
                 }
                 return rows;
             })),
