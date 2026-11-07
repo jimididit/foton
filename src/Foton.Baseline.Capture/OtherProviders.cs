@@ -128,7 +128,8 @@ namespace Foton.Baseline.Capture
             Collect = ctx =>
             {
                 var root = Path.Combine(HostInfo.WindowsDir, "System32");
-                return SystemBinaries.Select(n => Path.Combine(root, n)).Where(File.Exists).Select(p =>
+                // explorer.exe lives in the Windows directory; 1.38.x probed System32 for it and never recorded it.
+                return SystemBinaries.Select(n => Path.Combine(n == "explorer.exe" ? HostInfo.WindowsDir : root, n)).Where(File.Exists).Select(p =>
                 {
                     string len;
                     try { len = new FileInfo(p).Length.ToString(System.Globalization.CultureInfo.InvariantCulture); } catch (Exception) { len = ""; }
