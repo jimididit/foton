@@ -43,6 +43,27 @@ Describe 'Build-Release' {
         }
     }
 
+    It 'refuses a -DocsRoot that is missing the operator docs' {
+        $empty = Join-Path $env:TEMP ('foton-docs-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $empty | Out-Null
+        try {
+            { & (Join-Path $script:RepoRoot 'build\Build-Release.ps1') -RepoRoot $script:RepoRoot -DocsRoot $empty -OutputPath (Join-Path $empty 'out') -SkipFlattenBuild *> $null } |
+                Should -Throw '*must contain*'
+        }
+        finally { Remove-Item -LiteralPath $empty -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+
+    It 'refuses a module copy with no operator docs nearby instead of assuming a layout' {
+        $lone = Join-Path $env:TEMP ('foton-lone-' + [guid]::NewGuid().ToString('N'))
+        $module = Join-Path $lone 'a\b\module'
+        New-Item -ItemType Directory -Path $module -Force | Out-Null
+        try {
+            { & (Join-Path $script:RepoRoot 'build\Build-Release.ps1') -RepoRoot $module -OutputPath (Join-Path $lone 'out') -SkipFlattenBuild *> $null } |
+                Should -Throw '*Pass -DocsRoot*'
+        }
+        finally { Remove-Item -LiteralPath $lone -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+
     It 'stages a Gallery module whose manifest validates' {
         $psd1 = Join-Path $script:Out 'gallery\Foton\Foton.psd1'
         $m = Test-ModuleManifest -Path $psd1 -ErrorAction Stop
