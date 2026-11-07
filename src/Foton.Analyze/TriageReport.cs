@@ -39,13 +39,14 @@ namespace Foton.Analyze
         /// <summary>
         /// A link to a path inside the package, or plain text. Paths come from package files, so only a relative path
         /// is clickable: no colon (a scheme, even one split by a tab or newline the browser strips, or a drive), no
-        /// control characters, no leading slash (root or UNC) even after whitespace the browser trims.
+        /// control characters, no leading slash (root or UNC) even after whitespace the browser trims, and no ".."
+        /// segment climbing out of the case folder.
         /// </summary>
         static string Link(string target, string text)
         {
             string lead = target.TrimStart();
             bool relative = lead.Length > 0 && target.IndexOf(':') < 0 && !target.Any(ch => ch < 0x20 || ch == 0x7F)
-                && lead[0] != '/' && lead[0] != '\\';
+                && lead[0] != '/' && lead[0] != '\\' && !target.Split('/', '\\').Any(s => s.Trim() == "..");
             return relative ? $"<a href=\"{Html.Encode(target)}\">{Html.Encode(text)}</a>" : Html.Encode(text);
         }
 

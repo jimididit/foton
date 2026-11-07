@@ -109,6 +109,14 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Triage_report_renders_a_package_with_no_optional_artifacts()
+        {
+            var html = TriageReport.Render(new TriageReportInput());
+            Assert.Contains("(unknown host)", html);
+            Assert.Contains("(not recorded)", html);
+        }
+
+        [Fact]
         public void Package_values_cannot_inject_markup_or_script_links_into_the_report()
         {
             var html = TriageReport.Render(new TriageReportInput
@@ -120,6 +128,7 @@ namespace Foton.Tests
                     new Finding { Severity = "Low", Category = "X", Title = "T3", Observation = "o", Artifact = "java\nscript&#58;alert(3)" },
                     new Finding { Severity = "Low", Category = "X", Title = "T4", Observation = "o", Artifact = "  //evil.example/x" },
                     new Finding { Severity = "Low", Category = "X", Title = "T5", Observation = "o", Artifact = " \\\\evil\\share" },
+                    new Finding { Severity = "Low", Category = "X", Title = "T6", Observation = "o", Artifact = "06_x/../../evil/x.html" },
                 },
                 Manifest = new[]
                 {
