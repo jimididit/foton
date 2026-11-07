@@ -220,6 +220,9 @@ namespace Foton.Tests
                 Assert.Equal(new DateTime(2026, 1, 15, 12, 0, 5, DateTimeKind.Utc), w.StartUtc);
                 Assert.Equal(new DateTime(2026, 1, 15, 12, 3, 0, DateTimeKind.Utc), w.EndUtc);
                 Assert.True(w.Contains(new DateTime(2026, 1, 15, 12, 1, 0, DateTimeKind.Utc)));
+                Assert.True(w.Contains(new DateTime(2026, 1, 15, 12, 3, 0, 700, DateTimeKind.Utc)));  // within the last logged second
+                Assert.False(w.Contains(new DateTime(2026, 1, 15, 12, 3, 1, DateTimeKind.Utc)));
+                Assert.False(w.Contains(new DateTime(2026, 1, 15, 12, 0, 4, 900, DateTimeKind.Utc)));
             }
         }
     }

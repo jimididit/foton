@@ -44,6 +44,11 @@ namespace Foton.Cli
             }
 
             try { return Report(log, p); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                log.Write("Cannot verify package: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
             finally { p.DeleteExtraction(); }
         }
 

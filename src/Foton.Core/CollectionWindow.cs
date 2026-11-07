@@ -40,6 +40,10 @@ namespace Foton.Core
             return min.HasValue && max.HasValue ? new CollectionWindow(min.Value, max.Value) : null;
         }
 
-        public bool Contains(DateTime utc) => utc >= StartUtc && utc <= EndUtc;
+        /// <summary>
+        /// Log stamps have one-second resolution, so the last logged second is covered in full: an event at
+        /// 12:03:00.7 is inside a window whose last stamp is 12:03:00 (1.38.x dropped it).
+        /// </summary>
+        public bool Contains(DateTime utc) => utc >= StartUtc && utc < EndUtc.AddSeconds(1);
     }
 }
