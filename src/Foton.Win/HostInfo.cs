@@ -25,6 +25,21 @@ namespace Foton.Win
     /// <summary>Process and host facts (Test-FotonElevated, Get-FotonUserProfile, Get-FotonUserHiveRoot).</summary>
     public static class HostInfo
     {
+        /// <summary>
+        /// The Windows directory from the known-folder API, not %SystemRoot%: the launching process controls the
+        /// environment, and a redirected path would make an integrity baseline hash the wrong files.
+        /// </summary>
+        public static string WindowsDir => Known(Environment.SpecialFolder.Windows, @"C:\Windows");
+
+        /// <summary>%ProgramData% from the known-folder API (same reason as WindowsDir).</summary>
+        public static string ProgramDataDir => Known(Environment.SpecialFolder.CommonApplicationData, @"C:\ProgramData");
+
+        static string Known(Environment.SpecialFolder folder, string fallback)
+        {
+            var p = Environment.GetFolderPath(folder);
+            return string.IsNullOrEmpty(p) ? fallback : p;
+        }
+
         /// <summary>True only for a token in the local Administrators role; any failure reads as not elevated.</summary>
         public static bool IsElevated()
         {

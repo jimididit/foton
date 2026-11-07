@@ -58,7 +58,7 @@ namespace Foton.Baseline.Cli
                 return 0;
             }
 
-            var parent = outputPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "");
+            var parent = outputPath ?? DefaultOutputPath();
             BaselineLayout.Create(session, parent);
             log.Write("Baseline folder: " + session.CaseRoot, StatusLevel.Good);
             var result = BaselineCapture.Capture(session);
@@ -68,6 +68,18 @@ namespace Foton.Baseline.Cli
             var pkg = BaselineCapture.WritePackage(session, result, zip: !noZip);
             Summary(log, result, pkg.JsonPath, pkg.Root, pkg.ZipPath);
             return 0;
+        }
+
+        /// <summary>
+        /// The Desktop, as in 1.38.x. RMM sessions running as SYSTEM or a service account may have no Desktop folder,
+        /// so fall back to Desktop under the profile (created on write), then the working directory.
+        /// </summary>
+        static string DefaultOutputPath()
+        {
+            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            if (!string.IsNullOrEmpty(desktop)) return desktop;
+            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return string.IsNullOrEmpty(profile) ? Directory.GetCurrentDirectory() : Path.Combine(profile, "Desktop");
         }
 
         static void Summary(StatusLog log, CaptureResult r, string json, string? root, string? zip)

@@ -65,7 +65,7 @@ namespace Foton.Baseline.Capture
             Collect = ctx => ctx.Safe(() =>
             {
                 var rows = new List<Dictionary<string, object?>>();
-                var path = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", @"System32\drivers\etc\hosts");
+                var path = Path.Combine(HostInfo.WindowsDir, @"System32\drivers\etc\hosts");
                 if (!File.Exists(path)) return rows;
                 // Windows PowerShell 5.1 Get-Content read a BOM-less file as the ANSI code page.
                 using (var r = new StreamReader(path, Encoding.Default, detectEncodingFromByteOrderMarks: true))
@@ -100,7 +100,7 @@ namespace Foton.Baseline.Capture
             {
                 var dirs = new List<KeyValuePair<string, string>>
                 {
-                    new KeyValuePair<string, string>("Common", Path.Combine(Environment.GetEnvironmentVariable("ProgramData") ?? @"C:\ProgramData", @"Microsoft\Windows\Start Menu\Programs\StartUp")),
+                    new KeyValuePair<string, string>("Common", Path.Combine(HostInfo.ProgramDataDir, @"Microsoft\Windows\Start Menu\Programs\StartUp")),
                 };
                 dirs.AddRange(ctx.Profiles.Where(p => p.Exists).Select(p => new KeyValuePair<string, string>(p.Sid, Path.Combine(p.ProfilePath, @"AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"))));
                 return dirs.SelectMany(d => ctx.Safe(() =>
@@ -127,7 +127,7 @@ namespace Foton.Baseline.Capture
             SortKeys = new[] { "Name" },
             Collect = ctx =>
             {
-                var root = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "System32");
+                var root = Path.Combine(HostInfo.WindowsDir, "System32");
                 return SystemBinaries.Select(n => Path.Combine(root, n)).Where(File.Exists).Select(p =>
                 {
                     string len;
@@ -144,7 +144,7 @@ namespace Foton.Baseline.Capture
             SortKeys = new[] { "Kind", "Name" },
             Collect = ctx =>
             {
-                var ci = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", @"System32\CodeIntegrity");
+                var ci = Path.Combine(HostInfo.WindowsDir, @"System32\CodeIntegrity");
                 var si = Path.Combine(ci, "SiPolicy.p7b");
                 var rows = new List<Dictionary<string, object?>>
                 {
@@ -153,10 +153,16 @@ namespace Foton.Baseline.Capture
                 rows.AddRange(ctx.Safe(() => Directory.Exists(ci)
                     ? Directory.GetFiles(ci, "*.cip").Select(f => Row("Kind", "WdacCip", "Name", Path.GetFileName(f), "Path", f, "PolicyHash", Hashing.SafeHash(f, false)))
                     : Enumerable.Empty<Dictionary<string, object?>>()));
-                var xml = AppLocker.EffectiveXml();
-                // Path names the source 1.38.x read; it is a compared field, so the label stays the same.
-                rows.Add(Row("Kind", "AppLocker", "Name", "EffectiveXml", "Path", "Get-AppLockerPolicy -Effective -Xml",
-                    "PolicyHash", string.IsNullOrEmpty(xml) ? "(not present)" : Hashing.Sha256Hex(Encoding.UTF8.GetBytes(xml))));
+                rows.AddRange(ctx.Safe(() =>
+                {
+                    var xml = AppLocker.EffectiveXml();
+                    // Path names the source 1.38.x read; it is a compared field, so the label stays the same.
+                    return new[]
+                    {
+                        Row("Kind", "AppLocker", "Name", "EffectiveXml", "Path", "Get-AppLockerPolicy -Effective -Xml",
+                            "PolicyHash", string.IsNullOrEmpty(xml) ? "(not present)" : Hashing.Sha256Hex(Encoding.UTF8.GetBytes(xml))),
+                    };
+                }));
                 return rows;
             },
         };
