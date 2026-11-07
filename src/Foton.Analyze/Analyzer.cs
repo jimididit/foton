@@ -33,9 +33,14 @@ namespace Foton.Analyze
             Guard(c, "Accounts", () => UserProcessRules.Accounts(c));
             Guard(c, "Processes", () => UserProcessRules.Processes(c));
 
-            var os = c.Data["os_info"];
-            var svcIndex = EventHelpers.ServiceIndex(c.Data["services"]);
-            var hostSys32 = os is PsRow osRow && osRow.Has("SystemDirectory") ? Str(osRow["SystemDirectory"]) : "";
+            var svcIndex = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            var hostSys32 = "";
+            Guard(c, "Service index", () =>
+            {
+                svcIndex = EventHelpers.ServiceIndex(c.Data["services"]);
+                var os = c.Data["os_info"];
+                hostSys32 = os is PsRow osRow && osRow.Has("SystemDirectory") ? Str(osRow["SystemDirectory"]) : "";
+            });
 
             Guard(c, "Persistence", () => PersistenceRules.Persistence(c));
             Guard(c, "Network", () => PersistenceRules.Network(c));
