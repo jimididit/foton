@@ -66,6 +66,9 @@ jobs:
       - name: Vulnerable packages
         shell: pwsh
         run: |
+          # Merged stderr is deliberate (one log), but a failed listing must not read as "no vulnerabilities".
           $out = dotnet list Foton.sln package --vulnerable --include-transitive 2>&1 | Out-String
+          $code = $LASTEXITCODE
           Write-Host $out
+          if ($code -ne 0) { throw "dotnet list package --vulnerable failed (exit $code)." }
           if ($out -match 'has the following vulnerable packages') { throw 'A vulnerable NuGet package is referenced.' }

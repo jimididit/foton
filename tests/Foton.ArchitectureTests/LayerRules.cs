@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Xunit;
 
 namespace Foton.ArchitectureTests
@@ -38,7 +39,7 @@ namespace Foton.ArchitectureTests
             {
                 var closure = Repo.Closure(name);
                 Assert.False(closure.Contains("Foton.Win"), name + " must not reference Foton.Win (live-host access).");
-                var fx = Repo.FrameworkRefsOf(closure).ToList();
+                var fx = Repo.AssemblyRefsOf(closure).ToList();
                 Assert.False(fx.Any(r => r.StartsWith("System.Management", StringComparison.OrdinalIgnoreCase)), name + " must not reference System.Management (WMI).");
                 Assert.False(fx.Any(r => r.StartsWith("System.Net.Http", StringComparison.OrdinalIgnoreCase)), name + " must not reference System.Net.Http.");
             }
@@ -59,29 +60,69 @@ namespace Foton.ArchitectureTests
         public void Only_Foton_Tools_uses_HTTP()
         {
             foreach (var p in Repo.Projects.Values.Where(p => p.Name != "Foton.Tools"))
-                Assert.False(p.FrameworkRefs.Any(r => r.StartsWith("System.Net.Http", StringComparison.OrdinalIgnoreCase)),
+                Assert.False(p.AssemblyRefs.Any(r => r.StartsWith("System.Net.Http", StringComparison.OrdinalIgnoreCase)),
                     p.Name + " references System.Net.Http; only Foton.Tools (pinned tool install) may.");
         }
 
         [Fact]
-        public void PInvoke_lives_only_in_Foton_Win()
+        public void Product_projects_have_no_package_references()
         {
-            var win = Path.Combine(Repo.Root, "src", "Foton.Win") + Path.DirectorySeparatorChar;
-            var offenders = Repo.SourceFiles()
-                .Where(f => !f.StartsWith(win, StringComparison.OrdinalIgnoreCase))
-                // Any extern method, or the attribute in any spelling (aliased, namespace-qualified, ...Attribute).
-                .Where(f => Regex.IsMatch(File.ReadAllText(f),
-                    @"\bstatic\s+extern\b|\bextern\s+static\b|\[\s*(?:[\w.]+\.)?(?:DllImport|LibraryImport)(?:Attribute)?\b"))
-                .ToList();
-            Assert.True(offenders.Count == 0, "P/Invoke outside Foton.Win: " + string.Join(", ", offenders));
+            // Runtime dependencies must be in-box .NET Framework assemblies. Build-time packages
+            // (reference assemblies, ILRepack) come from Directory.Build.props / cli\Directory.Build.targets.
+            foreach (var p in Repo.Projects.Values)
+                Assert.True(p.PackageRefs.Count == 0, p.Name + " has PackageReference " + string.Join(", ", p.PackageRefs) + "; executables ship no NuGet DLLs.");
         }
 
         [Fact]
-        public void Nothing_loads_assemblies_from_memory()
+        public void Product_projects_reference_framework_assemblies_by_name_only()
         {
-            // Assembly.Load(byte[]) is AMSI-scanned on .NET 4.8 and is the classic in-memory loader pattern.
-            // Load by name (string literal) is allowed; AssemblyResolve hooks are the embedding pattern.
-            var bad = new Regex(@"Assembly\s*\.\s*Load\s*\(\s*[^""\s)]|AssemblyResolve\s*\+=");
+            // A <Reference> with a HintPath is a third-party DLL that ILRepack would quietly merge into the exe.
+            foreach (var p in Repo.Projects.Values)
+            {
+                var hinted = XDocument.Load(p.Path).Descendants("Reference")
+                    .Where(r => r.Elements("HintPath").Any() || r.Attribute("HintPath") != null)
+                    .Select(r => (string)r.Attribute("Include")!).ToList();
+                Assert.True(hinted.Count == 0, p.Name + " references a DLL by path: " + string.Join(", ", hinted) + "; only in-box framework assemblies are allowed.");
+            }
+        }
+
+        [Fact]
+        public void Central_packages_are_build_or_test_time_only()
+        {
+            // Adding a package means editing this allowlist on purpose, in review.
+            var allowed = new[]
+            {
+                "Microsoft.NETFramework.ReferenceAssemblies", "ILRepack.Lib.MSBuild.Task",
+                "Microsoft.NET.Test.Sdk", "xunit", "xunit.runner.visualstudio",
+            };
+            var doc = XDocument.Load(Path.Combine(Repo.Root, "Directory.Packages.props"));
+            var names = doc.Descendants("PackageVersion").Select(e => (string)e.Attribute("Include")!).ToList();
+            var extra = names.Where(n => !allowed.Contains(n, StringComparer.OrdinalIgnoreCase)).ToList();
+            Assert.True(extra.Count == 0, "Unreviewed central package(s): " + string.Join(", ", extra));
+        }
+
+        [Fact]
+        public void PInvoke_and_COM_imports_are_written_only_in_Foton_Win()
+        {
+            // Fast source check. BinaryRules checks the compiled IL, which catches any spelling.
+            var win = Path.Combine(Repo.Root, "src", "Foton.Win") + Path.DirectorySeparatorChar;
+            var pattern = new Regex(
+                @"\bextern\b(?!\s+alias\b)|\[\s*(?:[\w.]+\.)?(?:DllImport|LibraryImport|ComImport)(?:Attribute)?\b");
+            var offenders = Repo.SourceFiles()
+                .Where(f => !f.StartsWith(win, StringComparison.OrdinalIgnoreCase))
+                .Where(f => pattern.IsMatch(File.ReadAllText(f)))
+                .ToList();
+            Assert.True(offenders.Count == 0, "P/Invoke or COM import outside Foton.Win: " + string.Join(", ", offenders));
+        }
+
+        [Fact]
+        public void Nothing_is_written_to_load_assemblies_from_memory()
+        {
+            // Fast source check; BinaryRules scans the IL for the byte[] overloads.
+            // Assembly/AppDomain Load or ReflectionOnlyLoad with anything but a string literal, or an
+            // AssemblyResolve hook (the embed-and-load pattern).
+            var bad = new Regex(
+                @"\b(?:Assembly|AppDomain(?:\s*\.\s*CurrentDomain)?)\s*\.\s*(?:Load|ReflectionOnlyLoad)\s*\(\s*[^""\s)]|AssemblyResolve\s*\+=");
             var offenders = Repo.SourceFiles().Where(f => bad.IsMatch(File.ReadAllText(f))).ToList();
             Assert.True(offenders.Count == 0, "In-memory assembly loading: " + string.Join(", ", offenders));
         }
