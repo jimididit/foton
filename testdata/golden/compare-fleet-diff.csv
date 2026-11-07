@@ -1,0 +1,5 @@
+﻿"RecordType","Identity","ChangeType","Field","OldValue","NewValue"
+"HardeningRegistry","UseLogonCredential","Modified","Value","0","1"
+"InstalledSoftware","Foton Lab App|JDI","Modified","DisplayVersion","1.0","1.1"
+"LocalGroupMember","Administrators|S-1-5-21-1-2-3-1001","Added","","",""
+"Service","Spooler","Modified","PathName","C:\Windows\System32\spoolsv.exe","C:\Temp\evil-spoolsv.exe"

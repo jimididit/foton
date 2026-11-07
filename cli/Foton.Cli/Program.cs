@@ -17,14 +17,27 @@ namespace Foton.Cli
             }
             if (args.Length == 2 && string.Equals(args[0], "package", StringComparison.OrdinalIgnoreCase))
                 return PackageCommand(args[1]);
+            if ((args.Length == 3 || args.Length == 4) && string.Equals(args[0], "compare", StringComparison.OrdinalIgnoreCase))
+            {
+                bool noCsv = args.Length == 4 && string.Equals(args[3], "-NoCsv", StringComparison.OrdinalIgnoreCase);
+                if (args.Length == 4 && !noCsv) return Usage();
+                return CompareCommand(args[1], args[2], noCsv);
+            }
+            return Usage();
+        }
 
+        static int Usage()
+        {
             foreach (var line in FotonVersion.Describe("foton")) Console.WriteLine(line);
             Console.WriteLine();
             Console.WriteLine("Usage:");
             Console.WriteLine("  foton -Version");
             Console.WriteLine("  foton package <case-folder-or-zip>   open a package and verify hashes.csv");
+            Console.WriteLine("  foton compare <reference> <difference> [-NoCsv]");
+            Console.WriteLine("                                        diff two baselines (baseline.json or package folder);");
+            Console.WriteLine("                                        writes baseline_diff.csv beside the difference baseline");
             Console.WriteLine();
-            Console.WriteLine("Parse, compose, analyze, and compare are not implemented in this v2 pre-release.");
+            Console.WriteLine("Parse, compose, and analyze are not implemented in this v2 pre-release.");
             Console.WriteLine("For casework use Foton 1.38.x (the Foton-Workstation_v1.38.1.zip module) from https://github.com/jimididit/foton/releases.");
             return 1;
         }
@@ -78,6 +91,31 @@ namespace Foton.Cli
             if (p.Manifest.Count > 0 && v.Mismatched.Any(f => f.EndsWith(@"00_Collection\collection.log", StringComparison.OrdinalIgnoreCase)))
                 log.Write("collection.log differs from its hash: Foton 1.38.x appended status lines after hashing, so this alone is expected for 1.38.x packages.", StatusLevel.Info);
             return v.Intact ? 0 : 2;
+        }
+
+        /// <summary>Exit 0 after a diff (changes are findings, not failures), 1 when a baseline cannot be read or compared.</summary>
+        static int CompareCommand(string reference, string difference, bool noCsv)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Compare);
+            Foton.Baseline.Compare.CompareResult r;
+            try { r = Foton.Baseline.Compare.BaselineComparer.Run(reference, difference, log, writeCsv: !noCsv); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException
+                || ex is ArgumentException || ex is InvalidOperationException)
+            {
+                log.Write("Cannot compare: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
+            foreach (var sev in new[] { "High", "Medium", "Low", "Info" })
+            {
+                var n = r.Findings.Count(f => f.Severity == sev);
+                if (n > 0) log.Write($"{sev}: {n}", sev == "High" ? StatusLevel.Warn : StatusLevel.Info);
+            }
+            foreach (var f in r.Findings.Where(x => x.Severity == "High").Take(25))
+                log.Write($"{f.Title}: {f.Observation}", StatusLevel.Warn);
+            if (r.DiffCsvPath != null) log.Write("Change table: " + r.DiffCsvPath, StatusLevel.Info);
+            log.WriteConsole("     A diff records change between two snapshots. It does not show when, who, or that the host is compromised.", ConsoleColor.DarkGray);
+            return 0;
         }
 
         static bool IsVersionSwitch(string arg) =>

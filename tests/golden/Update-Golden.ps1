@@ -62,4 +62,47 @@ $lines = foreach ($k in $cases.Keys) {
 }
 Save-Raw 'copystatus.tsv' ($lines -join "`n")
 
-Get-ChildItem $out | ForEach-Object { '{0,-22} {1,6}' -f $_.Name, $_.Length }
+# ---- Baseline -----------------------------------------------------------------------------
+# Compare inputs: the 1.38.x fixtures with each provider's FalsePositives text filled in from the
+# module (a captured baseline carries it; the fixtures predate that), plus a fleet variant.
+$fixtures = Join-Path $repo 'legacy\powershell\tests\Fixtures\Baseline'
+$fpOf = & $m { $h = @{}; foreach ($p in $script:FotonBaselineProviders) { $h[$p.RecordType] = $p.FalsePositives }; $h }
+function Save-BaselineInput([string]$Source, [string]$Name, [string]$Hostname) {
+    $doc = Get-Content -LiteralPath (Join-Path $fixtures $Source) -Raw | ConvertFrom-Json
+    foreach ($p in $doc.Providers) { $p | Add-Member -NotePropertyName FalsePositives -NotePropertyValue ([string]$fpOf[$p.RecordType]) -Force }
+    if ($Hostname) { $doc.Header.Hostname = $Hostname }
+    ($doc | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath (Join-Path $out $Name) -Encoding UTF8
+}
+Save-BaselineInput 'ref.json' 'baseline-ref.json' ''
+Save-BaselineInput 'dif.json' 'baseline-dif.json' ''
+Save-BaselineInput 'dif.json' 'baseline-dif-fleet.json' 'PC2'
+
+foreach ($case in @(@{ Dif = 'baseline-dif.json'; Tag = 'temporal' }, @{ Dif = 'baseline-dif-fleet.json'; Tag = 'fleet' })) {
+    $work = Join-Path $env:TEMP ('foton-golden-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $work | Out-Null
+    Copy-Item (Join-Path $out 'baseline-ref.json') (Join-Path $work 'ref.json')
+    Copy-Item (Join-Path $out $case.Dif) (Join-Path $work 'dif.json')
+    $null = Compare-FotonBaseline -ReferencePath (Join-Path $work 'ref.json') -DifferencePath (Join-Path $work 'dif.json') -NoHtml
+    Copy-Item (Join-Path $work 'baseline_diff.csv') (Join-Path $out ("compare-{0}-diff.csv" -f $case.Tag))
+    & $m { param($p) $script:FotonSession.Findings | Export-Csv -Path $p -NoTypeInformation -Encoding UTF8 } (Join-Path $out ("compare-{0}-findings.csv" -f $case.Tag))
+    Remove-Item -LiteralPath $work -Recurse -Force
+}
+
+# PayloadSha256 exactly as New-FotonBaseline computes it, over values that stress JSON escaping.
+$records = [ordered]@{
+    Service = @(
+        [PSCustomObject]@{ Name = 'a"quote'; DisplayName = 'back\slash <tag> & ''apos'''; StartMode = "tab`there"; StartName = 'ünïcödé ✓'; PathName = "ctl" + [char]1 + "end" }
+        [PSCustomObject]@{ Name = 'b'; DisplayName = ''; StartMode = $null; StartName = 'line1' + "`r`n" + 'line2'; PathName = [char]0x2028 + 'sep' }
+    )
+    LocalAccount = @(
+        [PSCustomObject]@{ SID = 'S-1-5-21-1-2-3-500'; Name = 'Administrator'; Enabled = $false; PasswordRequired = $true; PasswordExpires = '' }
+    )
+    Empty = @()
+}
+$compact = $records | ConvertTo-Json -Depth 8 -Compress
+$sha = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($compact))).Replace('-', '')
+($records | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath (Join-Path $out 'payload-records.json') -Encoding UTF8
+Save-Raw 'payload-compact.txt' $compact
+Save-Raw 'payload-sha256.txt' $sha
+
+Get-ChildItem $out | ForEach-Object { '{0,-30} {1,6}' -f $_.Name, $_.Length }
