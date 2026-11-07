@@ -41,6 +41,60 @@ namespace Foton.Tests
             }
         }
 
+        [Theory]
+        [InlineData("kitchen")]
+        [InlineData("fixture")]
+        public void Triage_report_matches_1_38_byte_for_byte(string tag)
+        {
+            using (var t = new TempDir())
+            {
+                var root = Copy(t, tag == "kitchen" ? Kitchen : TestPaths.Fixture);
+                var run = Analyzer.RunPackage(root, Quiet, WorkstationPatterns.SuspiciousCommands, reportVersion: "1.38.1");
+                // The one intended difference: 1.38.x printed "system''s" (single-quoted here-string); v2 prints "system's".
+                var expected = TestPaths.GoldenText($"analyze-{tag}-report.html").Replace("''", "'");
+                Assert.Equal(expected, File.ReadAllText(run.ReportPath!, System.Text.Encoding.UTF8));
+                Assert.Equal(0xEF, File.ReadAllBytes(run.ReportPath!)[0]);
+            }
+        }
+
+        [Theory]
+        [InlineData("WinFoton_FIXTURE_20260115-120000Z", "lab-iocs.txt", "fixture-txt")]
+        [InlineData("WinFoton_FIXTURE_20260115-120000Z", "lab-iocs.csv", "fixture-csv")]
+        [InlineData("kitchen", "kitchen-iocs.txt", "kitchen")]
+        public void Ioc_hits_match_1_38(string package, string iocFile, string tag)
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = package == "kitchen" ? Kitchen : TestPaths.Fixture;
+                var ioc = package == "kitchen" ? Path.Combine(TestPaths.Root, "testdata", "analyze", iocFile)
+                    : Path.Combine(TestPaths.Root, "legacy", "powershell", "tests", "Fixtures", "Ioc", iocFile);
+                var root = Copy(t, pkg);
+                var run = Analyzer.RunIoc(root, ioc, Quiet);
+                var sorted = run.Hits.OrderBy(h => h.Artifact, StringComparer.InvariantCultureIgnoreCase).ThenBy(h => h.Property, StringComparer.InvariantCultureIgnoreCase)
+                    .ThenBy(h => h.IocKind, StringComparer.InvariantCultureIgnoreCase).ThenBy(h => h.IocValue, StringComparer.InvariantCultureIgnoreCase)
+                    .ThenBy(h => h.Sample, StringComparer.InvariantCultureIgnoreCase).ToList();
+                Foton.Core.Csv.Write(t.File("hits.csv"), sorted);
+                Assert.Equal(File.ReadAllBytes(TestPaths.Golden($"ioc-{tag}-hits.csv")), File.ReadAllBytes(t.File("hits.csv")));
+                Assert.True(File.Exists(Path.Combine(root, "analysis", "ioc_matches.csv")));
+            }
+        }
+
+        [Fact]
+        public void Ioc_text_lines_are_matched_and_empty_indicators_are_dropped()
+        {
+            using (var t = new TempDir())
+            {
+                var list = t.File("iocs.txt");
+                File.WriteAllLines(list, new[] { "path:", "text:", "text:update.vendor.example" });
+                Assert.Single(IocMatcher.Load(list));
+                var root = Copy(t, Kitchen);
+                var hits = Analyzer.RunIoc(root, list, Quiet).Hits;
+                // 1.38.x saw only a string's Length property, so text-file artifacts like hosts_file never matched.
+                var h = Assert.Single(hits);
+                Assert.Equal(("hosts_file", "Line"), (h.Artifact, h.Property));
+            }
+        }
+
         [Fact]
         public void Without_the_pattern_list_the_gap_is_stated_and_pattern_rules_stay_quiet()
         {

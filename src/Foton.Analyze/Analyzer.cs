@@ -14,6 +14,13 @@ namespace Foton.Analyze
         public List<Finding> Findings { get; internal set; } = new List<Finding>();
         public string? FindingsPath { get; internal set; }
         public string? BesideZipPath { get; internal set; }
+        public string? ReportPath { get; internal set; }
+    }
+
+    public sealed class IocRun
+    {
+        public List<IocHit> Hits { get; internal set; } = new List<IocHit>();
+        public string? HitsPath { get; internal set; }
     }
 
     /// <summary>
@@ -79,7 +86,7 @@ namespace Foton.Analyze
         /// Loads a package (folder or ZIP), analyzes it, and writes analysis\findings.csv (beside a ZIP:
         /// &lt;name&gt;_findings.csv). Never rewrites 00_Collection\hashes.csv.
         /// </summary>
-        public static AnalysisRun RunPackage(string path, StatusLog log, IReadOnlyList<string> suspiciousPatterns)
+        public static AnalysisRun RunPackage(string path, StatusLog log, IReadOnlyList<string> suspiciousPatterns, string? reportVersion = null)
         {
             var pkg = FotonPackage.Open(path);
             try
@@ -96,10 +103,11 @@ namespace Foton.Analyze
                 if (File.Exists(Path.Combine(root, CaseTree.CollectionFolder, "findings.csv")) && !extras.Any(p => File.Exists(p) || Directory.Exists(p)))
                     log.Write(@"These heuristics already ran on the endpoint during Collect (00_Collection\findings.csv), so this run reproduces that report rather than adding detection. New findings come from parse, compose, IOC matching, or a baseline compare - then re-run analyze.", StatusLevel.Warn);
 
+                var stem = Path.Combine(Path.GetDirectoryName(pkg.SourcePath)!, Path.GetFileNameWithoutExtension(pkg.SourcePath));
                 if (pkg.Kind == PackageKind.Zip)
                 {
                     // The case root is a temporary extraction the operator never sees.
-                    run.BesideZipPath = Path.Combine(Path.GetDirectoryName(pkg.SourcePath)!, Path.GetFileNameWithoutExtension(pkg.SourcePath) + "_findings.csv");
+                    run.BesideZipPath = stem + "_findings.csv";
                     Csv.Write(run.BesideZipPath, ctx.Findings);
                 }
                 else
@@ -110,6 +118,43 @@ namespace Foton.Analyze
                     // Written even with zero findings, so an earlier run's file is never left looking current.
                     Csv.Write(run.FindingsPath, ctx.Findings);
                 }
+
+                // Foton_Report.html in the case root so relative artifact links resolve; beside a ZIP otherwise.
+                log.Write("Building HTML overview report", StatusLevel.Step);
+                run.ReportPath = pkg.Kind == PackageKind.Zip ? stem + "_Report.html" : Path.Combine(root, TriageReport.FileName);
+                TriageReport.Write(new TriageReportInput
+                {
+                    Data = ctx.Data, Findings = ctx.Findings, Manifest = pkg.Manifest, Errors = pkg.Errors, CaseRoot = root,
+                    CollectedUtc = pkg.StartTimeUtc, Version = reportVersion ?? FotonVersion.Product, EventLogDays = ctx.EventLogDays,
+                    FromZip = pkg.Kind == PackageKind.Zip,
+                }, run.ReportPath);
+                log.Write("Report written: " + run.ReportPath, StatusLevel.Good);
+                return run;
+            }
+            finally { pkg.DeleteExtraction(); }
+        }
+
+        /// <summary>
+        /// Invoke-FotonIocMatch over a package. Hits are written to analysis\ioc_matches.csv (beside a ZIP:
+        /// &lt;name&gt;_ioc_matches.csv); 1.38.x only printed them.
+        /// </summary>
+        public static IocRun RunIoc(string packagePath, string iocPath, StatusLog log)
+        {
+            var iocs = IocMatcher.Load(iocPath);
+            var pkg = FotonPackage.Open(packagePath);
+            try
+            {
+                var data = PackageData.From(pkg);
+                var run = new IocRun { Hits = IocMatcher.Match(data, data.Names.ToList(), iocs) };
+                log.Write($"IOC matches: {run.Hits.Count} ({iocs.Count} indicator(s))", StatusLevel.Good);
+                if (pkg.Kind == PackageKind.Zip)
+                    run.HitsPath = Path.Combine(Path.GetDirectoryName(pkg.SourcePath)!, Path.GetFileNameWithoutExtension(pkg.SourcePath) + "_ioc_matches.csv");
+                else
+                {
+                    Directory.CreateDirectory(Path.Combine(pkg.CaseRoot, "analysis"));
+                    run.HitsPath = Path.Combine(pkg.CaseRoot, "analysis", "ioc_matches.csv");
+                }
+                Csv.Write(run.HitsPath, run.Hits);
                 return run;
             }
             finally { pkg.DeleteExtraction(); }

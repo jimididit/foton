@@ -1,0 +1,4 @@
+﻿"Tool","Version","RulesVersion","Status","DestRelative","SHA256","Note"
+"Hayabusa","3.1.0","2026-01-01","Copied","analysis\external\hayabusa\hayabusa.csv","ABCDEF0123456789ABCDEF0123456789",""
+"PECmd","","","NotOnPath","","","Install EZ Tools"
+"EvtxECmd","1.5","","ToolError","","","exit 1"

@@ -21,6 +21,8 @@ namespace Foton.Cli
                 return ParseCommand(args[1]);
             if (args.Length == 2 && string.Equals(args[0], "analyze", StringComparison.OrdinalIgnoreCase))
                 return AnalyzeCommand(args[1]);
+            if (args.Length == 3 && string.Equals(args[0], "ioc", StringComparison.OrdinalIgnoreCase))
+                return IocCommand(args[1], args[2]);
             if (args.Length >= 3 && string.Equals(args[0], "compare", StringComparison.OrdinalIgnoreCase))
             {
                 bool noCsv = false, noHtml = false;
@@ -46,13 +48,16 @@ namespace Foton.Cli
             Console.WriteLine("  foton package <case-folder-or-zip>   open a package and verify hashes.csv");
             Console.WriteLine("  foton parse <case-folder-zip-or-file> parse copied Prefetch, LNK, jumplists, EVTX, Amcache;");
             Console.WriteLine("                                        writes analysis\\parsed_records.csv and Foton_Parse.html");
-            Console.WriteLine("  foton analyze <case-folder-or-zip>   run triage heuristics over a package; writes analysis\\findings.csv");
+            Console.WriteLine("  foton analyze <case-folder-or-zip>   run triage heuristics; writes analysis\\findings.csv and Foton_Report.html");
+            Console.WriteLine("  foton ioc <case-folder-or-zip> <ioc-file>");
+            Console.WriteLine("                                        match an IOC list (.txt sha256:/path:/text:, .csv, .json);");
+            Console.WriteLine("                                        writes analysis\\ioc_matches.csv");
             Console.WriteLine("  foton compare <reference> <difference> [-NoCsv] [-NoHtml] [-OutputPath <html>]");
             Console.WriteLine("                                        diff two baselines (baseline.json or package folder);");
             Console.WriteLine("                                        writes baseline_diff.csv and Foton_BaselineCompare.html");
             Console.WriteLine("                                        beside the difference baseline");
             Console.WriteLine();
-            Console.WriteLine("Compose, IOC matching, and the triage HTML report are not implemented in this v2 pre-release.");
+            Console.WriteLine("Compose, tool install, and carve are not implemented in this v2 pre-release.");
             Console.WriteLine("For casework use Foton 1.38.x (the Foton-Workstation_v1.38.1.zip module) from https://github.com/jimididit/foton/releases.");
             return 1;
         }
@@ -185,7 +190,28 @@ namespace Foton.Cli
                 if (n > 0) log.Write($"{sev}: {n}", sev == "High" ? StatusLevel.Warn : StatusLevel.Info);
             }
             log.Write("Findings: " + (run.FindingsPath ?? run.BesideZipPath), StatusLevel.Good);
+            log.Write("Report: " + run.ReportPath, StatusLevel.Good);
             log.WriteConsole("     Findings are observations with a tier and a benign explanation. None is a compromise verdict.", ConsoleColor.DarkGray);
+            return 0;
+        }
+
+        /// <summary>Exit 0 after matching (hits are leads, not failures), 1 when the package or IOC file cannot be read.</summary>
+        static int IocCommand(string package, string iocFile)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            Foton.Analyze.IocRun run;
+            try { run = Foton.Analyze.Analyzer.RunIoc(package, iocFile, log); }
+            catch (Exception ex)
+            {
+                log.Write("Cannot match IOCs: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
+            foreach (var h in run.Hits.Take(50))
+                log.WriteConsole($"   {h.IocKind,-7} {h.IocValue}  ->  {h.Artifact}.{h.Property}: {TextFile.OneLine(h.Sample)}", ConsoleColor.White);
+            if (run.Hits.Count > 50) log.WriteConsole($"   ... {run.Hits.Count - 50} more in {run.HitsPath}", ConsoleColor.DarkGray);
+            log.Write("Matches: " + run.HitsPath, StatusLevel.Good);
+            log.WriteConsole("     A match is a lead to verify against the cited artifact (lists match admin tools too), not a conclusion.", ConsoleColor.DarkGray);
             return 0;
         }
 

@@ -322,9 +322,15 @@ function R { param([hashtable]$H) [PSCustomObject]$H }
 
 Save-Lines '00_Collection\collection.log' @('Foton test collection log', '2026-01-15 12:00:00 UTC [Step] start', '2026-01-15 12:05:00 UTC [Good] done')
 Save-Rows '00_Collection\collection_manifest.csv' @(
-    [PSCustomObject]@{ Task = 'os_info'; Status = 'Success' }
-    [PSCustomObject]@{ Task = 'prefetch_files'; Status = 'Partial' }
-    [PSCustomObject]@{ Task = 'registry_hives'; Status = 'Failed' })
+    [PSCustomObject]@{ Category = 'System'; Task = 'os_info'; Description = 'Operating system'; File = '01_System\os_info.json'; Records = 1; Status = 'Success' }
+    [PSCustomObject]@{ Category = 'Filesystem'; Task = 'prefetch_files'; Description = 'Prefetch copies <raw>'; File = '08_Filesystem\prefetch_files.csv'; Records = 12; Status = 'Partial' }
+    [PSCustomObject]@{ Category = 'Filesystem'; Task = 'registry_hives'; Description = 'Hive saves'; File = '08_Filesystem\registry_hives.csv'; Records = 0; Status = 'Failed' }
+    [PSCustomObject]@{ Category = 'Processes'; Task = 'sru'; Description = 'SRUM'; File = '03_Processes_and_Volatile\sru.txt'; Records = 0; Status = 'NoData' })
+Save-Rows '00_Collection\collection_errors.csv' @([PSCustomObject]@{ Task = 'registry_hives'; Error = 'Access is denied & locked' })
+Save-Rows 'analysis\external\external_parse_inventory.csv' @(
+    [PSCustomObject]@{ Tool = 'Hayabusa'; Version = '3.1.0'; RulesVersion = '2026-01-01'; Status = 'Copied'; DestRelative = 'analysis\external\hayabusa\hayabusa.csv'; SHA256 = 'ABCDEF0123456789ABCDEF0123456789'; Note = '' }
+    [PSCustomObject]@{ Tool = 'PECmd'; Version = ''; RulesVersion = ''; Status = 'NotOnPath'; DestRelative = ''; SHA256 = ''; Note = 'Install EZ Tools' }
+    [PSCustomObject]@{ Tool = 'EvtxECmd'; Version = '1.5'; RulesVersion = ''; Status = 'ToolError'; DestRelative = ''; SHA256 = ''; Note = 'exit 1' })
 Save-Obj '00_Collection\collection_coverage.json' ([ordered]@{ Elevated = $false; CoverageProfile = 'StandardUser'; CollectionAccount = 'HOST\analyst'; SkippedTaskCount = 7; ExcludedEarlierPackages = @('C:\Users\analyst\Desktop\Foton_HOST_20260101-000000Z') })
 Save-Obj '01_System\os_info.json' ([ordered]@{ Hostname = 'KITCHEN'; Caption = 'Microsoft Windows 11 Pro'; BuildNumber = '26100'; UptimeDays = 3.5; TimeZone = 'Eastern Standard Time'; UtcOffset = '-05:00'; SystemDirectory = 'D:\Win\System32' })
 Save-Obj '06_Security_Posture\defender_status.json' ([ordered]@{ RealTimeProtectionEnabled = $false; AntivirusEnabled = $true; AMServiceEnabled = $false; IsTamperProtected = $false; AntivirusSignatureAgeDays = 12; AntivirusSignatureVersion = '1.401.0.0' })
@@ -333,15 +339,16 @@ Save-Rows '06_Security_Posture\defender_detections.csv' @(
     [PSCustomObject]@{ ThreatName = 'HackTool:Win32/Mimikatz'; Resources = 'file:_C:\Users\Public\m.exe' }
     [PSCustomObject]@{ ThreatName = 'Trojan:Win32/Test'; Resources = 'file:_C:\Temp\t.exe' })
 Save-Rows '06_Security_Posture\hardening_registry_settings.csv' @(
-    foreach ($kv in @(@('UseLogonCredential', '1'), @('EnableLUA', '0'), @('AlwaysInstallElevated', '1'), @('AutoAdminLogon', '1'), @('DefaultUserName', 'kiosk'),
-            @('LocalAccountTokenFilterPolicy', '1'), @('SMB1', '1'), @('EnableScriptBlockLogging', '0'))) { [PSCustomObject]@{ Setting = $kv[0]; Value = $kv[1] } })
+    foreach ($kv in @(@('UseLogonCredential', '1', '0'), @('EnableLUA', '0', '1'), @('AlwaysInstallElevated', '1', '0'), @('AutoAdminLogon', '1', ''), @('DefaultUserName', 'kiosk', ''),
+            @('LocalAccountTokenFilterPolicy', '1', '0'), @('SMB1', '1', '0'), @('EnableScriptBlockLogging', '0', '1'))) {
+        [PSCustomObject]@{ Setting = $kv[0]; Value = $kv[1]; RecommendedValue = $kv[2]; MatchesRecommended = ($kv[1] -eq $kv[2]); Meaning = ('{0} <meaning>' -f $kv[0]) } })
 Save-Rows '04_Network\firewall_profiles.csv' @([PSCustomObject]@{ Name = 'Domain'; Enabled = $true }, [PSCustomObject]@{ Name = 'Public'; Enabled = $false }, [PSCustomObject]@{ Name = 'Private'; Enabled = 'No' })
 Save-Obj '02_Users_and_Access\rdp_configuration.json' ([ordered]@{ RdpEnabled = $true; UserAuthentication = 0; PortNumber = 3389; RemoteDesktopUsers = @('HOST\a', 'HOST\b') })
 Save-Rows '02_Users_and_Access\local_users.csv' @(
     [PSCustomObject]@{ Name = 'Guest'; Enabled = $true; PasswordRequired = $false; SID = 'S-1-5-21-1-2-3-501' }
     [PSCustomObject]@{ Name = 'kiosk'; Enabled = $true; PasswordRequired = $false; SID = 'S-1-5-21-1-2-3-1003' }
     [PSCustomObject]@{ Name = 'old'; Enabled = $false; PasswordRequired = $false; SID = 'S-1-5-21-1-2-3-1004' })
-Save-Rows '02_Users_and_Access\local_group_membership.csv' @(foreach ($m in 'HOST\Administrator', 'HOST\a', 'HOST\b', 'HOST\c', 'HOST\d', 'DOMAIN\Domain Admins') { [PSCustomObject]@{ Group = 'Administrators'; Member = $m } }; [PSCustomObject]@{ Group = 'Users'; Member = 'HOST\e' })
+Save-Rows '02_Users_and_Access\local_group_membership.csv' @(foreach ($member in 'HOST\Administrator', 'HOST\a', 'HOST\b', 'HOST\c', 'HOST\d', 'DOMAIN\Domain Admins') { [PSCustomObject]@{ Group = 'Administrators'; Member = $member; ObjectClass = 'User'; PrincipalSource = 'Local'; SID = 'S-1-5-21-1-2-3-' + $member.Length } }; [PSCustomObject]@{ Group = 'Users'; Member = 'HOST\e'; ObjectClass = 'User'; PrincipalSource = 'Local'; SID = 'S-1-5-21-1-2-3-9' })
 Save-Rows '03_Processes_and_Volatile\running_processes.csv' @(
     [PSCustomObject]@{ Name = 'evil.exe'; PID = 4100; ParentName = 'explorer.exe'; Path = 'C:\Users\Public\evil.exe'; CommandLine = 'evil.exe'; SignatureStatus = 'NotSigned'; UserWritablePath = $true; SuspiciousCmdHits = '' }
     [PSCustomObject]@{ Name = 'powershell.exe'; PID = 4200; ParentName = 'WINWORD.EXE'; Path = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'; CommandLine = 'powershell -encodedcommand ZQBjAGgAbwA='; SignatureStatus = 'Valid'; UserWritablePath = $false; SuspiciousCmdHits = '' }
@@ -373,9 +380,9 @@ Save-Rows '05_Persistence\com_hijack_candidates.csv' @([PSCustomObject]@{ User =
 Save-Rows '05_Persistence\startup_folder_items.csv' @([PSCustomObject]@{ FullName = 'C:\Users\analyst\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\run.lnk'; SignatureStatus = 'NotSigned' })
 Save-Lines '05_Persistence\wmi_event_subscriptions.txt' @('=== __EventFilter ===', 'Name: Evil', 'Query: SELECT * FROM __InstanceModificationEvent', '=== CommandLineEventConsumer ===', 'Name: Evil')
 Save-Rows '04_Network\active_connections.csv' @(
-    [PSCustomObject]@{ ProcessName = 'evil.exe'; RemoteAddress = '203.0.113.5'; RemotePort = 443; State = 'Established'; RemoteIsExternal = $true; UserWritablePath = $true }
-    [PSCustomObject]@{ ProcessName = 'chrome.exe'; RemoteAddress = '198.51.100.7'; RemotePort = 443; State = 'Established'; RemoteIsExternal = $true; UserWritablePath = $false }
-    [PSCustomObject]@{ ProcessName = 'svchost.exe'; RemoteAddress = '10.0.0.2'; RemotePort = 135; State = 'Established'; RemoteIsExternal = $false; UserWritablePath = $false })
+    [PSCustomObject]@{ ProcessName = 'evil.exe'; OwningPID = 4100; ProcessPath = 'C:\Users\Public\evil.exe'; RemoteAddress = '203.0.113.5'; RemotePort = 443; State = 'Established'; RemoteIsExternal = $true; UserWritablePath = $true }
+    [PSCustomObject]@{ ProcessName = 'chrome.exe'; OwningPID = 5100; ProcessPath = 'C:\Program Files\Google\Chrome\chrome.exe'; RemoteAddress = '198.51.100.7'; RemotePort = 443; State = 'Established'; RemoteIsExternal = $true; UserWritablePath = $false }
+    [PSCustomObject]@{ ProcessName = 'svchost.exe'; OwningPID = 900; ProcessPath = 'C:\Windows\System32\svchost.exe'; RemoteAddress = '10.0.0.2'; RemotePort = 135; State = 'Established'; RemoteIsExternal = $false; UserWritablePath = $false })
 Save-Lines '04_Network\hosts_file.txt' @('# hosts', '127.0.0.1 localhost', '', '10.0.0.9 update.vendor.example')
 Save-Rows '07_Event_Logs\security_policy_and_log_changes.csv' @([PSCustomObject]@{ EventId = 1102; TimeCreatedUtc = '2026-01-14 03:00:00'; Message = 'The audit log was cleared.' })
 Save-Rows '07_Event_Logs\system_log_and_boot.csv' @([PSCustomObject]@{ EventId = 104; TimeCreatedUtc = '2026-01-14 03:00:05'; Message = 'The System log file was cleared.' }, [PSCustomObject]@{ EventId = 6005; TimeCreatedUtc = '2026-01-13 08:00:00'; Message = 'started' })
@@ -449,12 +456,31 @@ Save-Rows 'analysis\external\EvtxECmd\evtxecmd.csv' @(
     @([PSCustomObject]@{ EventId = '1102'; TimeCreated = '2026-01-14 03:00:00.0000000'; PayloadData1 = ''; PayloadData2 = ''; ExecutableInfo = '' }))
 
 foreach ($case in @(@{ Src = (Join-Path $anIn 'Foton_KITCHEN_20260115-120000Z'); Tag = 'kitchen' }, @{ Src = (Join-Path $repo 'testdata\packages\WinFoton_FIXTURE_20260115-120000Z'); Tag = 'fixture' })) {
-    $work = Join-Path $env:TEMP ('foton-golden-' + [guid]::NewGuid().ToString('N'))
+    # Keep the case folder name: the report reads the collection time from its stamp.
+    $tmp = Join-Path $env:TEMP ('foton-golden-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tmp | Out-Null
+    $work = Join-Path $tmp (Split-Path -Leaf $case.Src)
     Copy-Item -LiteralPath $case.Src -Destination $work -Recurse
     Get-FotonPackage -Path $work | Out-Null
+    # 1.38.x defect, corrected for these goldens only: the folder stamp is UTC but was parsed as local time and
+    # converted again, so "Collected (UTC)" was off by the workstation's UTC offset.
+    & $m { param($leaf) if ($leaf -match '_(20\d{6}-\d{6})Z$') { $script:FotonSession.StartTimeUtc = [datetime]::ParseExact($Matches[1], 'yyyyMMdd-HHmmss', [cultureinfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal) } } (Split-Path -Leaf $work)
     Invoke-FotonAnalysis
     Copy-Item (Join-Path $work 'analysis\findings.csv') (Join-Path $out ("analyze-{0}-findings.csv" -f $case.Tag))
-    Remove-Item -LiteralPath $work -Recurse -Force
+    $null = New-FotonReport -Path (Join-Path $out ("analyze-{0}-report.html" -f $case.Tag))
+    Remove-Item -LiteralPath $tmp -Recurse -Force
+}
+
+# IOC hits (sorted: 1.38.x visited artifacts in hashtable order).
+$iocFx = Join-Path $repo 'legacy\powershell\tests\Fixtures\Ioc'
+$iocTxt = Join-Path $anIn 'kitchen-iocs.txt'
+@('# kitchen IOC list (synthetic)', 'text:evil.exe', 'path:\Users\Public\', 'sha256:a1b2', 'TEXT:203.0.113.5') | Out-File -FilePath $iocTxt -Encoding utf8
+foreach ($case in @(
+        @{ Pkg = (Join-Path $repo 'testdata\packages\WinFoton_FIXTURE_20260115-120000Z'); Ioc = (Join-Path $iocFx 'lab-iocs.txt'); Tag = 'fixture-txt' }
+        @{ Pkg = (Join-Path $repo 'testdata\packages\WinFoton_FIXTURE_20260115-120000Z'); Ioc = (Join-Path $iocFx 'lab-iocs.csv'); Tag = 'fixture-csv' }
+        @{ Pkg = (Join-Path $anIn 'Foton_KITCHEN_20260115-120000Z'); Ioc = $iocTxt; Tag = 'kitchen' })) {
+    $hits = @(Invoke-FotonIocMatch -Path $case.Pkg -IocPath $case.Ioc)
+    $hits | Sort-Object Artifact, Property, IocKind, IocValue, Sample | Export-Csv -Path (Join-Path $out ("ioc-{0}-hits.csv" -f $case.Tag)) -NoTypeInformation -Encoding UTF8
 }
 
 # PayloadSha256 exactly as New-FotonBaseline computes it, over values that stress JSON escaping.

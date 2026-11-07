@@ -1,0 +1,393 @@
+﻿<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Foton Triage Report - FIXTURE-PC</title>
+<style>
+:root{
+  --bg:#0b1016; --panel:#121a24; --panel2:#0f1720; --line:#22303f;
+  --text:#dfe8f1; --muted:#8da0b4; --beam:#37d6ff; --beam2:#7cf5c4;
+  --high:#ff5c6c; --med:#ffb340; --low:#7cc4ff; --info:#8fa3b8;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 "Segoe UI",system-ui,-apple-system,sans-serif}
+a{color:var(--beam);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 22px 80px}
+header.hero{border:1px solid var(--line);border-radius:14px;padding:26px 28px;background:
+  radial-gradient(1100px 200px at 12% -40%,rgba(55,214,255,.20),transparent 60%),
+  linear-gradient(180deg,#121b26,#0e151e)}
+.brand{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.mark{flex:0 0 auto;display:block;color:var(--beam)}
+.brand-text h1{margin:0;font-size:32px;letter-spacing:4px;font-weight:700;color:var(--beam);text-transform:uppercase}
+.tagline{color:#93a7bb;font-size:13px;font-style:italic;margin-top:4px}
+.credits{color:#6f8399;font-size:12px;margin-top:6px;letter-spacing:.2px}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px 26px;margin-top:20px}
+.meta div{font-size:13px;color:#a9bccf}
+.meta b{display:block;color:#6f8399;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.9px;margin-bottom:2px}
+.notice{margin-top:18px;border-left:3px solid var(--med);background:rgba(255,179,64,.08);padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px;color:#e8d4b4}
+h2{font-size:17px;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);letter-spacing:.3px}
+h2 small{color:#6f8399;font-weight:400;font-size:12px;margin-left:8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+.card .n{font-size:26px;font-weight:600;line-height:1.1}
+.card .l{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:#7f93a8;margin-top:4px}
+.c-high .n{color:var(--high)} .c-med .n{color:var(--med)} .c-low .n{color:var(--low)} .c-info .n{color:var(--info)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0 18px}
+.btn{background:var(--panel);border:1px solid var(--line);color:#b9cadb;border-radius:20px;padding:6px 15px;font-size:12.5px;cursor:pointer}
+.btn:hover{border-color:var(--beam);color:#fff}
+.btn.on{background:rgba(55,214,255,.14);border-color:var(--beam);color:#fff}
+input[type=search]{flex:1;min-width:230px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;color:var(--text);padding:7px 15px;font-size:13px}
+.finding{background:var(--panel);border:1px solid var(--line);border-left-width:4px;border-radius:10px;margin-bottom:11px;overflow:hidden}
+.f-high{border-left-color:var(--high)} .f-med{border-left-color:var(--med)}
+.f-low{border-left-color:var(--low)} .f-info{border-left-color:var(--info)}
+.f-head{display:flex;gap:12px;align-items:center;padding:13px 16px;cursor:pointer}
+.f-head:hover{background:rgba(255,255,255,.02)}
+.chip{font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.chip-high{background:rgba(255,92,108,.16);color:var(--high)}
+.chip-med{background:rgba(255,179,64,.16);color:var(--med)}
+.chip-low{background:rgba(124,196,255,.14);color:var(--low)}
+.chip-info{background:rgba(143,163,184,.16);color:var(--info)}
+.chip-cat{background:rgba(124,245,196,.10);color:var(--beam2)}
+.chip-tier{background:rgba(255,255,255,.06);color:#9db1c5}
+.f-title{flex:1;font-weight:600}
+.f-body{display:none;padding:2px 18px 18px;border-top:1px solid var(--line)}
+.finding.open .f-body{display:block}
+.f-body p{margin:12px 0 0;line-height:1.55}
+.f-body .obs-block{margin:12px 0 0}
+.f-body .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:#6f8399;display:block;margin-bottom:6px}
+.f-body .obs{display:block;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.55;word-break:break-word}
+.obs-lead{margin:0;color:var(--text);font-family:inherit;line-height:1.55}
+.obs-list{margin:8px 0 0;padding:0 0 0 18px;line-height:1.55}
+.obs-list li{margin:0 0 8px;padding:0;line-height:1.55}
+.obs-list li:last-child{margin-bottom:0}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12.5px}
+th{background:var(--panel2);text-align:left;padding:9px 12px;color:#8fa3b8;font-size:11px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--line)}
+td{padding:8px 12px;border-bottom:1px solid rgba(34,48,63,.6);vertical-align:top;word-break:break-word}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.ok{color:var(--beam2)} .bad{color:var(--high)} .warn{color:var(--med)} .dim{color:#7f93a8}
+details.method{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-top:12px}
+details.method summary{cursor:pointer;font-weight:600}
+details.method p,details.method li{color:#b6c7d8;font-size:13px}
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#6f8399;font-size:12px}
+.hidden{display:none!important}
+</style><style>
+.foton-bar{position:sticky;top:0;z-index:50;background:rgba(11,16,22,.94);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:16px 0 8px}
+.foton-bar-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.foton-bar input[type=search]{flex:1;min-width:200px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;color:var(--text);padding:8px 14px;font-size:13px}
+.foton-bar .foton-stat{color:#7f93a8;font-size:12px;white-space:nowrap}
+.foton-bar a.foton-top{color:var(--beam);font-size:12px;text-decoration:none;border:1px solid var(--line);border-radius:20px;padding:6px 12px}
+.foton-bar a.foton-top:hover{border-color:var(--beam)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.btn{background:var(--panel);border:1px solid var(--line);color:#b9cadb;border-radius:20px;padding:6px 15px;font-size:12.5px;cursor:pointer}
+.btn:hover{border-color:var(--beam);color:#fff}
+.btn.on{background:rgba(55,214,255,.14);border-color:var(--beam);color:#fff}
+.foton-toc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:5.6em;overflow:auto}
+.foton-toc a{font-size:11px;color:#8fa3b8;border:1px solid var(--line);border-radius:999px;padding:3px 10px;text-decoration:none;white-space:nowrap}
+.foton-toc a:hover,.foton-toc a:focus{color:var(--beam);border-color:var(--beam)}
+.foton-sec.foton-hidden,.foton-hide{display:none!important}
+a.card{text-decoration:none;color:inherit;display:block}
+a.card:hover{border-color:var(--beam)}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+</style>
+</head><body><div class="wrap" id="top">
+<header class="hero">
+<div class="brand">
+<svg class="mark" width="56" height="56" viewBox="0 0 48 48" aria-hidden="true">
+<polygon points="1.2,24 8,19.6 8,28.4" fill="currentColor"/>
+<path fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" d="M 8.0,23.5 L 8.7,23.0 L 9.3,23.0 L 10.0,23.5 L 10.7,24.3 L 11.4,25.3 L 12.0,26.0 L 12.7,25.7 L 13.4,24.1 L 14.0,21.6 L 14.7,19.5 L 15.4,19.4 L 16.1,22.1 L 16.7,26.9 L 17.4,31.5 L 18.1,33.0 L 18.7,29.7 L 19.4,22.4 L 20.1,14.6 L 20.8,10.7 L 21.4,13.5 L 22.1,22.2 L 22.8,32.4 L 23.4,38.8 L 24.1,37.8 L 24.8,29.9 L 25.5,19.3 L 26.1,11.5 L 26.8,10.5 L 27.5,16.0 L 28.1,24.6 L 28.8,31.7 L 29.5,34.0 L 30.2,31.2 L 30.8,25.7 L 31.5,20.7 L 32.2,18.4 L 32.8,19.3 L 33.5,22.0 L 34.2,24.8 L 34.9,26.4 L 35.5,26.3 L 36.2,25.3 L 36.9,24.1 L 37.5,23.3 L 38.2,22.9 L 38.9,23.1 L 39.6,23.7 L 40.2,24.4 L 40.9,25.0 L 41.6,25.0 L 42.2,24.6 L 42.9,23.8 L 43.6,23.2 L 44.3,22.9 L 44.9,23.2 L 45.6,23.9"/>
+</svg>
+<div class="brand-text">
+<h1>Foton</h1>
+<div class="tagline">Windows DFIR triage report - Opening a window...closes a door</div>
+<div class="credits">v1.38.1</div>
+</div></div>
+<div class="meta">
+<div><b>Hostname</b>FIXTURE-PC</div>
+<div><b>Operating System</b>Windows 11 Pro (build 26100)</div>
+<div><b>Domain</b>WORKGROUP</div>
+<div><b>Last Boot (UTC)</b>2026-01-12 10:00:00 &middot; up 3.2d</div>
+<div><b>Case</b>(not supplied)</div>
+<div><b>Examiner</b>(not supplied)</div>
+<div><b>Collected (UTC)</b>2026-01-15 12:00:00</div>
+<div><b>Event Window</b>Last 14 days (analysis default if not stored in package)</div>
+<div><b>Privilege</b>Standard user - reduced coverage</div>
+</div>
+<div class="notice"><b>Read this first.</b> Every item below is an automated observation produced by pattern matching, not a conclusion. Nothing here establishes that this host is compromised. Each finding cites the artifact file it came from - verify against that artifact, and against the host owner's expectations, before it goes anywhere near a report or a remediation decision.</div>
+</header>
+<div class="foton-bar" id="foton-bar">
+  <div class="foton-bar-row">
+    <input id="foton-q" type="search" placeholder="Filter this report (tables, findings, section titles)" autocomplete="off">
+    <span class="foton-stat" id="foton-stat"></span>
+    <a class="foton-top" href="#top">Top</a>
+  </div>
+  <nav class="foton-toc" id="foton-toc" aria-label="Jump to section"></nav>
+</div>
+<h2 id="sec-summary">Triage Summary</h2>
+<div class="cards">
+<div class="card c-high"><div class="n">3</div><div class="l">High attention</div></div>
+<div class="card c-med"><div class="n">0</div><div class="l">Medium</div></div>
+<div class="card c-low"><div class="n">2</div><div class="l">Low</div></div>
+<div class="card c-info"><div class="n">3</div><div class="l">Informational</div></div>
+</div>
+<div class="cards">
+<div class="card"><div class="n">2</div><div class="l">Processes</div></div>
+<div class="card"><div class="n">0</div><div class="l">Services</div></div>
+<div class="card"><div class="n">0</div><div class="l">Scheduled tasks</div></div>
+<div class="card"><div class="n">0</div><div class="l">Connections</div></div>
+</div>
+<h2 id="sec-observations">Observations<small>click any row to expand</small></h2>
+<div class="controls">
+<button class="btn on" data-sev="all">All</button><button class="btn" data-sev="High">High</button><button class="btn" data-sev="Medium">Medium</button><button class="btn" data-sev="Low">Low</button><button class="btn" data-sev="Info">Info</button>
+</div>
+<div class="finding f-high" data-sev="High">
+<div class="f-head">
+<span class="chip chip-high">High</span>
+<span class="chip chip-cat">Processes</span>
+<span class="f-title">Unsigned processes running from user-writable paths</span>
+<span class="chip chip-tier">Tier 2</span>
+</div><div class="f-body">
+<div class="obs-block"><span class="lbl">What was observed</span>
+<div class="obs"><p class="obs-lead">1 process(es): payload.exe [PID 200] C:\Users\a\AppData\Local\payload.exe.</p></div>
+</div>
+<p><span class="lbl">Why it matters</span>Legitimate software is normally installed under Program Files and signed. Unsigned executables running from AppData, Temp, or ProgramData match common malware staging behavior, but also match some legitimate updaters and developer tooling.</p>
+<p><span class="lbl">Suggested next step</span>Submit the SHA-256 values in the artifact to threat intelligence, and check parent process and creation time for each.</p>
+<p><span class="lbl">Source artifact</span><a href="03_Processes_and_Volatile/running_processes.csv">03_Processes_and_Volatile/running_processes.csv</a></p>
+</div></div>
+<div class="finding f-high" data-sev="High">
+<div class="f-head">
+<span class="chip chip-high">High</span>
+<span class="chip chip-cat">Security</span>
+<span class="f-title">Defender real-time protection is disabled</span>
+<span class="chip chip-tier">Tier 1</span>
+</div><div class="f-body">
+<div class="obs-block"><span class="lbl">What was observed</span>
+<div class="obs"><p class="obs-lead">Get-MpComputerStatus reports RealTimeProtectionEnabled = False.</p></div>
+</div>
+<p><span class="lbl">Why it matters</span>Real-time protection off is both a common attacker action after gaining privilege and a common administrator misconfiguration. Correlate with Defender event IDs 5001/5007 to establish when and by what it was changed.</p>
+<p><span class="lbl">Suggested next step</span>Check defender_operational.csv for configuration-change events around the disable time, and confirm whether a third-party AV legitimately took over.</p>
+<p><span class="lbl">Source artifact</span><a href="06_Security_Posture/defender_status.json">06_Security_Posture/defender_status.json</a></p>
+</div></div>
+<div class="finding f-high" data-sev="High">
+<div class="f-head">
+<span class="chip chip-high">High</span>
+<span class="chip chip-cat">Security</span>
+<span class="f-title">WDigest cleartext credential storage is enabled</span>
+<span class="chip chip-tier">Tier 1</span>
+</div><div class="f-body">
+<div class="obs-block"><span class="lbl">What was observed</span>
+<div class="obs"><p class="obs-lead">HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest\UseLogonCredential = 1.</p></div>
+</div>
+<p><span class="lbl">Why it matters</span>This forces plaintext credentials into LSASS memory. It is not a default setting and is a well-documented pre-credential-theft modification.</p>
+<p><span class="lbl">Suggested next step</span>Establish when this value was set and by which account. Treat credentials used on this host as potentially exposed.</p>
+<p><span class="lbl">Source artifact</span><a href="06_Security_Posture/hardening_registry_settings.csv">06_Security_Posture/hardening_registry_settings.csv</a></p>
+</div></div>
+<div class="finding f-low" data-sev="Low">
+<div class="f-head">
+<span class="chip chip-low">Low</span>
+<span class="chip chip-cat">Security</span>
+<span class="f-title">PowerShell script block logging is not enabled</span>
+<span class="chip chip-tier">Tier 1</span>
+</div><div class="f-body">
+<div class="obs-block"><span class="lbl">What was observed</span>
+<div class="obs"><p class="obs-lead">EnableScriptBlockLogging is not set to 1.</p></div>
+</div>
+<p><span class="lbl">Why it matters</span>This is a visibility gap rather than a compromise indicator: PowerShell activity prior to collection may not be recoverable from logs. Absence of PowerShell events in this package cannot be read as absence of PowerShell activity.</p>
+<p><span class="lbl">Source artifact</span><a href="06_Security_Posture/powershell_environment.json">06_Security_Posture/powershell_environment.json</a></p>
+</div></div>
+<div class="finding f-low" data-sev="Low">
+<div class="f-head">
+<span class="chip chip-low">Low</span>
+<span class="chip chip-cat">Security</span>
+<span class="f-title">LSASS is not running as a protected process</span>
+<span class="chip chip-tier">Tier 1</span>
+</div><div class="f-body">
+<div class="obs-block"><span class="lbl">What was observed</span>
+<div class="obs"><p class="obs-lead">RunAsPPL is not set to 1.</p></div>
+</div>
+<p><span class="lbl">Why it matters</span>Without PPL, LSASS memory can be read by any process with debug privilege, which is the standard credential-dumping path.</p>
+<p><span class="lbl">Source artifact</span><a href="06_Security_Posture/hardening_registry_settings.csv">06_Security_Posture/hardening_registry_settings.csv</a></p>
+</div></div>
+<div class="finding f-info" data-sev="Info">
+<div class="f-head">
+<span class="chip chip-info">Info</span>
+<span class="chip chip-cat">Collection</span>
+<span class="f-title">Collection ran without Administrator rights</span>
+<span class="chip chip-tier">Tier 1</span>
+</div><div class="f-body">
+<div class="obs-block"><span class="lbl">What was observed</span>
+<div class="obs"><p class="obs-lead">Coverage profile StandardUser as FIXTURE\user. 4 task(s) were skipped because they require an elevated token (see collection_coverage.json).</p></div>
+</div>
+<p><span class="lbl">Why it matters</span>Standard-user collection still captures the current user&#39;s process list, readable network state, HKCU persistence, and profile artifacts. It does not capture the Security log, Prefetch copies, Amcache, SRUM, VSS, audit policy export, or other users&#39; files. Missing those artifacts is a visibility gap, not evidence they were empty. Re-run elevated when the host owner can grant it.</p>
+<p><span class="lbl">Suggested next step</span>If this is an incident, obtain an elevated collection or a disk/memory image. If this is a self-audit on a locked-down work PC, treat skipped tasks as out of scope and verify remaining artifacts against that user&#39;s activity only.</p>
+<p><span class="lbl">Source artifact</span><a href="00_Collection/collection_coverage.json">00_Collection/collection_coverage.json</a></p>
+</div></div>
+<div class="finding f-info" data-sev="Info">
+<div class="f-head">
+<span class="chip chip-info">Info</span>
+<span class="chip chip-cat">EventLogs</span>
+<span class="f-title">No process creation events (4688) were collected</span>
+<span class="chip chip-tier">Tier 1</span>
+</div><div class="f-body">
+<div class="obs-block"><span class="lbl">What was observed</span>
+<div class="obs"><p class="obs-lead">The Security log returned no 4688 events for the collection window.</p></div>
+</div>
+<p><span class="lbl">Why it matters</span>Process creation auditing is off by default. The absence of these events is a logging gap, not evidence that no processes were created.</p>
+<p><span class="lbl">Source artifact</span><a href="06_Security_Posture/audit_policy.txt">06_Security_Posture/audit_policy.txt</a></p>
+</div></div>
+<div class="finding f-info" data-sev="Info">
+<div class="f-head">
+<span class="chip chip-info">Info</span>
+<span class="chip chip-cat">System</span>
+<span class="f-title">Host and collection baseline</span>
+<span class="chip chip-tier">Tier 1</span>
+</div><div class="f-body">
+<div class="obs-block"><span class="lbl">What was observed</span>
+<div class="obs"><p class="obs-lead">FIXTURE-PC running Windows 11 Pro (build 26100), 3.2 days since last boot (includes sleep and hibernation, so not necessarily time powered on), time zone Eastern Standard Time (offset -05:00:00).</p></div>
+</div>
+<p><span class="lbl">Why it matters</span>All timestamps in this package are recorded in UTC. Confirm the host clock was accurate before building any timeline (see time_sync.txt).</p>
+<p><span class="lbl">Source artifact</span><a href="01_System/os_info.json">01_System/os_info.json</a></p>
+</div></div>
+<div id="nores" style="display:none;color:#7f93a8;padding:14px">No observations match the current filter.</div>
+<h2 id="sec-hardening">Hardening Settings Not At Recommended Value<small>configuration review, not compromise indicators</small></h2><table><tr><th>Setting</th><th>Current</th><th>Recommended</th><th>Meaning</th></tr>
+<tr><td>UseLogonCredential</td><td class="warn">1</td><td class="dim">0</td><td>1 stores cleartext credentials in memory</td></tr>
+</table>
+<h2 id="sec-manifest">Collection Manifest<small>every artifact in this package</small></h2><table><tr><th>Category</th><th>Artifact</th><th>What it contains</th><th>Records</th><th>Status</th></tr>
+<tr><td class="dim">System</td><td><a href="01_System/os_info.json">os_info.json</a></td><td>Operating system</td><td>1</td><td class="ok">Success</td></tr>
+</table>
+<h2 id="sec-method">Methodology, Tiers, and Limitations</h2>
+<details class="method" open><summary>How to read the tiers</summary>
+<p><b>Tier 1 - Observed artifact.</b> Directly present in the collected data, no interpretation applied. A registry value, an event ID, a signature status. State these as fact.</p>
+<p><b>Tier 2 - Supported inference.</b> A reasonable reading of one or more Tier 1 artifacts where other readings remain possible. An unsigned binary in AppData holding an outbound connection is consistent with C2 and equally consistent with a portable application. Cite the artifact and name the assumption.</p>
+<p><b>Tier 3 - Unverified hypothesis.</b> Not stated as findings by this tool. If you form one during analysis, record what evidence would move it to Tier 2.</p>
+</details>
+<details class="method"><summary>Limitations of this collection</summary>
+<ul>
+<li><b>Live collection.</b> Running this tool altered the host: a process was created, files were written, event log entries were generated, and prefetch and AmCache were updated. No memory image and no disk image were produced.</li>
+<li><b>Point-in-time volatile data.</b> Process, connection, and session data reflect the moment of collection only. Activity that ended before collection is absent from those artifacts.</li>
+<li><b>Log retention bounds the window.</b> Event data is limited to the configured window and to what retention preserved. Where a log was cleared, everything before that point is unavailable from this host.</li>
+<li><b>Heuristics are not detections.</b> The pattern lists used here match on common attacker tradecraft and also match legitimate administrative tooling. Expect false positives, and treat an empty findings list as an absence of matched patterns, not an absence of compromise.</li>
+<li><b>Signature status is not integrity.</b> A valid signature does not mean the binary is benign, and an invalid one does not mean it is malicious. Catalog-signed system files frequently return non-Valid status.</li>
+<li><b>No anti-rootkit capability.</b> All data is gathered through the operating system''s own APIs. Kernel-level tampering could render any of it unreliable.</li>
+<li><b>Standard-user coverage.</b> If this package was collected without Administrator rights, the Security log, Prefetch copies, Amcache, SRUM, VSS, secedit/auditpol, and other users'' artifacts were skipped by design. See 00_Collection/collection_coverage.json. Do not read those gaps as a clean host.</li>
+<li><b>Timestamps.</b> All times are UTC as reported by this host. Verify the host clock against the time source data before building a timeline, and note that file MACB times are trivially modifiable.</li>
+</ul>
+</details>
+<footer>Foton v1.38.1 &middot; collected 2026-01-15 12:00:00 UTC on FIXTURE-PC by (not supplied) &middot; verify artifact hashes in 00_Collection/hashes.csv before analysis</footer>
+</div>
+<script>
+(function(){
+  document.addEventListener("click",function(e){
+    var h=e.target.closest(".f-head");
+    if(h){h.parentElement.classList.toggle("open");return;}
+    var b=e.target.closest(".btn[data-sev]");
+    if(b){
+      document.querySelectorAll(".btn[data-sev]").forEach(function(x){x.classList.remove("on")});
+      b.classList.add("on");
+      applyFilters();
+    }
+  });
+  var box=document.getElementById("foton-q");
+  if(box){box.addEventListener("input",applyFilters);}
+  function applyFilters(){
+    var active=document.querySelector(".btn[data-sev].on");
+    var sev=active?active.getAttribute("data-sev"):"all";
+    var q=(box&&box.value||"").toLowerCase();
+    var shown=0;
+    document.querySelectorAll(".finding").forEach(function(f){
+      var okSev=(sev==="all"||f.getAttribute("data-sev")===sev);
+      var okQ=(q===""||f.textContent.toLowerCase().indexOf(q)>-1);
+      if(okSev&&okQ){f.classList.remove("hidden");shown++;}else{f.classList.add("hidden");}
+    });
+    var none=document.getElementById("nores");
+    if(none){none.style.display=shown?"none":"block";}
+  }
+  document.querySelectorAll(".finding").forEach(function(f){
+    if(f.getAttribute("data-sev")==="High"){f.classList.add("open");}
+  });
+})();
+</script>
+<script>
+(function(){
+  var qBox=document.getElementById("foton-q");
+  var toc=document.getElementById("foton-toc");
+  var stat=document.getElementById("foton-stat");
+  var heads=[].slice.call(document.querySelectorAll("h2"));
+  function slug(t,i){
+    var s=(t||"").replace(/<[^>]+>/g," ").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"");
+    return "sec-"+(s||("n"+i));
+  }
+  function titleOf(h){
+    var n=h.cloneNode(true);
+    var sm=n.querySelector("small");
+    if(sm) sm.parentNode.removeChild(sm);
+    return (n.textContent||"").replace(/\s+/g," ").trim();
+  }
+  if(toc){
+    heads.forEach(function(h,i){
+      if(!h.id) h.id=slug(titleOf(h),i);
+      var a=document.createElement("a");
+      a.href="#"+h.id;
+      a.textContent=titleOf(h)||("Section "+(i+1));
+      toc.appendChild(a);
+    });
+  }
+  function sectionBits(h){
+    var n=h.nextElementSibling, bits=[];
+    while(n && n.tagName!=="H2" && !n.classList.contains("foton-bar")){
+      bits.push(n);
+      n=n.nextElementSibling;
+    }
+    return bits;
+  }
+  function apply(){
+    var needle=((qBox&&qBox.value)||"").toLowerCase();
+    var chBtn=document.querySelector(".btn[data-change].on");
+    var ch=chBtn?chBtn.getAttribute("data-change"):"all";
+    var rows=0, shown=0;
+    document.querySelectorAll("table tbody tr").forEach(function(tr){
+      rows++;
+      var okQ=!needle||(tr.textContent||"").toLowerCase().indexOf(needle)>-1;
+      var okC=true;
+      if(ch!=="all" && tr.getAttribute("data-change")) okC=tr.getAttribute("data-change")===ch;
+      if(okQ&&okC){tr.classList.remove("foton-hide");shown++;}else{tr.classList.add("foton-hide");}
+    });
+    heads.forEach(function(h){
+      var bits=sectionBits(h);
+      var hit=!needle||titleOf(h).toLowerCase().indexOf(needle)>-1;
+      if(!hit){
+        bits.forEach(function(el){
+          if(/table|p|div|details/i.test(el.tagName) && (el.textContent||"").toLowerCase().indexOf(needle)>-1) hit=true;
+          el.querySelectorAll("tbody tr").forEach(function(tr){
+            if(!tr.classList.contains("foton-hide")) hit=true;
+          });
+          el.querySelectorAll(".finding").forEach(function(f){
+            if(!f.classList.contains("hidden") && !f.classList.contains("foton-hide")) hit=true;
+          });
+        });
+      }
+      if(needle && !hit){
+        h.classList.add("foton-hide");
+        bits.forEach(function(el){el.classList.add("foton-hide");});
+      }else{
+        h.classList.remove("foton-hide");
+        bits.forEach(function(el){el.classList.remove("foton-hide");});
+      }
+    });
+    if(stat){
+      if(needle||(ch && ch!=="all")) stat.textContent=shown+" / "+rows+" rows";
+      else stat.textContent=heads.length+" sections";
+    }
+  }
+  if(qBox) qBox.addEventListener("input",apply);
+  document.addEventListener("click",function(e){
+    var b=e.target.closest(".btn[data-change]");
+    if(!b) return;
+    document.querySelectorAll(".btn[data-change]").forEach(function(x){x.classList.remove("on");});
+    b.classList.add("on");
+    apply();
+  });
+  apply();
+})();
+</script>
+</body></html>
+
