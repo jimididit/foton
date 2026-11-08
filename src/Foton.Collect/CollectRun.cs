@@ -48,21 +48,14 @@ namespace Foton.Collect
                     {
                         s.Status.Write("Mounting offline user registry hives", StatusLevel.Step);
                         s.LoadUserHivesActive = true;
-                        UserHives.Load(s, mounted);
+                        Guard(s, "LoadUserHives", () => UserHives.Load(s, mounted));
                         s.Status.Write($"Mounted {mounted.Count} offline hive(s)", StatusLevel.Info);
                     }
                 }
+                // Tasks catch their own failures; a guard catches a category that breaks between tasks.
                 foreach (var c in Categories.InOrder.Where(c => only == null || only.Contains(c.Key, StringComparer.OrdinalIgnoreCase)))
-                {
-                    try { c.Run(s); }
-                    catch (Exception ex)
-                    {
-                        // Tasks catch their own failures; this is a category that broke between tasks.
-                        s.Errors.Add(new ErrorRow { Task = c.Key, Error = "Category stopped: " + ex.Message });
-                        s.Status.Write($"{c.Key} collection stopped: {ex.Message}", StatusLevel.Warn);
-                    }
-                }
-                Coverage.Write(s);
+                    Guard(s, c.Key, () => c.Run(s));
+                Guard(s, "collection_coverage", () => Coverage.Write(s));
             }
             finally
             {
@@ -95,6 +88,17 @@ namespace Foton.Collect
                 if (result.ZipPath != null) result.ZipSha256 = PackageFiles.WritePackageHashRecord(s, result.ZipPath);
             }
             return result;
+        }
+
+        /// <summary>Nothing is fatal: a step that throws is recorded in collection_errors.csv and the run continues.</summary>
+        static void Guard(FotonSession s, string step, Action run)
+        {
+            try { run(); }
+            catch (Exception ex)
+            {
+                s.Errors.Add(new ErrorRow { Task = step, Error = "Stopped: " + ex.Message });
+                try { s.Status.Write($"{step} stopped: {ex.Message}", StatusLevel.Warn); } catch (Exception) { }
+            }
         }
 
         /// <summary>A session for this host and token.</summary>

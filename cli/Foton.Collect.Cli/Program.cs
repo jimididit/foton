@@ -24,7 +24,8 @@ namespace Foton.Collect.Cli
             {
                 var a = args[i];
                 bool Is(string name) => string.Equals(a, name, StringComparison.OrdinalIgnoreCase);
-                string? Next() => i + 1 < args.Length ? args[++i] : null;
+                // A following switch is never taken as a value ("-OutputPath -NoZip" is a missing folder, not a folder named -NoZip).
+                string? Next() => i + 1 < args.Length && !args[i + 1].StartsWith("-", StringComparison.Ordinal) ? args[++i] : null;
                 if (Is("-Version") || Is("--version") || Is("version"))
                 {
                     foreach (var line in FotonVersion.Describe("foton-collect")) Console.WriteLine(line);
