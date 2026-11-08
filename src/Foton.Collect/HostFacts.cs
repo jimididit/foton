@@ -23,7 +23,7 @@ namespace Foton.Collect
                     if (boot.Length > 0) f.LastBootUtc = ManagementDateTimeConverter.ToDateTime(boot).ToUniversalTime();
                 }
             }
-            catch (Exception ex) when (ex is ManagementException || ex is UnauthorizedAccessException || ex is System.Runtime.InteropServices.COMException || ex is ArgumentException) { }
+            catch (Exception ex) when (CollectText.WmiFailed(ex) || ex is ArgumentException) { }
             try
             {
                 foreach (var cs in Wmi.Query(@"root\cimv2", "SELECT Domain, Manufacturer, Model FROM Win32_ComputerSystem"))
@@ -33,7 +33,7 @@ namespace Foton.Collect
                     f.Model = Wmi.Str(cs, "Model");
                 }
             }
-            catch (Exception ex) when (ex is ManagementException || ex is UnauthorizedAccessException || ex is System.Runtime.InteropServices.COMException) { }
+            catch (Exception ex) when (CollectText.WmiFailed(ex)) { }
             var exe = Assembly.GetEntryAssembly()?.Location;
             if (!string.IsNullOrEmpty(exe))
             {

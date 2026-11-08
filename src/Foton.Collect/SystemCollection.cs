@@ -128,7 +128,7 @@ namespace Foton.Collect
                 tpm = First(@"root\cimv2\security\microsofttpm", "SELECT IsEnabled_InitialValue, IsActivated_InitialValue, SpecVersion FROM Win32_Tpm");
                 tpmPresent = tpm != null;
             }
-            catch (Exception ex) when (ex is ManagementException || ex is UnauthorizedAccessException || ex is System.Runtime.InteropServices.COMException) { }
+            catch (Exception ex) when (WmiFailed(ex)) { }
 
             List<Dictionary<string, object?>>? bde = null;
             try
@@ -140,7 +140,7 @@ namespace Foton.Collect
                         ["ConversionStatus"] = Raw(v, "ConversionStatus"), ["EncryptionMethod"] = Raw(v, "EncryptionMethod"),
                     }).ToList();
             }
-            catch (Exception ex) when (ex is ManagementException || ex is UnauthorizedAccessException || ex is System.Runtime.InteropServices.COMException) { }
+            catch (Exception ex) when (WmiFailed(ex)) { }
 
             // Windows Update ships UEFI capsules as Firmware-class devices. A device whose name carries a newer version
             // than SMBIOS, in an error state, is a staged update waiting for the next reboot.
@@ -164,7 +164,7 @@ namespace Foton.Collect
                     });
                 }
             }
-            catch (Exception ex) when (ex is ManagementException || ex is UnauthorizedAccessException || ex is System.Runtime.InteropServices.COMException) { }
+            catch (Exception ex) when (WmiFailed(ex)) { }
 
             return new Dictionary<string, object?>
             {

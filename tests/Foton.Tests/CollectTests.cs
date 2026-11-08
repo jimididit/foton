@@ -76,6 +76,8 @@ namespace Foton.Tests
             Assert.True(CloudJoin.IsJoinKeyName("0123456789ABCDEF0123456789abcdef01234567"));
             Assert.True(CloudJoin.IsJoinKeyName("{8F3A1B2C-0000-4D5E-9F10-123456789ABC}"));
             Assert.False(CloudJoin.IsJoinKeyName("Status"));
+            var table = CollectText.Table(new[] { "A", "B" }, new[] { new[] { "1", "2", "extra" }, new[] { "only" } }).ToList();
+            Assert.Equal(new[] { "", "A    B", "---- -", "1    2", "only", "" }, table);
             Assert.Null(CollectText.DmtfTime("2026-not-a-dmtf"));
             Assert.Equal("", CollectText.Dmtf("99999999999999.999999+999"));
             Assert.Equal(new[] { "User", "Group", "Group", "Group", "" }, new[] { 1, 2, 4, 5, 6 }.Select(UserCollection.ObjectClass));

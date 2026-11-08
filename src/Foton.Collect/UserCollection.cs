@@ -145,7 +145,7 @@ namespace Foton.Collect
                     Wmi.Query(Cimv2, "SELECT LogonId, LogonType, AuthenticationPackage, StartTime FROM Win32_LogonSession")
                         .Select(l => new[] { Wmi.Str(l, "LogonId"), Wmi.Str(l, "LogonType"), Wmi.Str(l, "AuthenticationPackage"), Dmtf(Raw(l, "StartTime")) })));
             }
-            catch (Exception ex) when (ex is System.Management.ManagementException || ex is UnauthorizedAccessException) { lines.Add("Error: " + ex.Message); }
+            catch (Exception ex) when (WmiFailed(ex)) { lines.Add("Error: " + ex.Message); }
             lines.Add("--- Logged on users (Win32_LoggedOnUser) ---");
             try
             {
@@ -155,7 +155,7 @@ namespace Foton.Collect
                     .GroupBy(a => a[0] + "\\" + a[1], StringComparer.OrdinalIgnoreCase).Select(g => g.First());
                 lines.AddRange(Table(new[] { "Domain", "Name" }, accounts));
             }
-            catch (Exception ex) when (ex is System.Management.ManagementException || ex is UnauthorizedAccessException) { }
+            catch (Exception ex) when (WmiFailed(ex)) { lines.Add("Error: " + ex.Message); }
             return lines;
         }
 
