@@ -124,15 +124,19 @@ namespace Foton.Tests
             Assert.Equal(@"C:\Windows\z.sys", Foton.Win.Authenticode.Openable(@"C:\Windows\z.sys"));
             Assert.Equal(@"C:\Program Files\q.sys", Foton.Win.Authenticode.Openable(@"""\??\C:\Program Files\q.sys"""));
             Assert.Equal(@"\\server\share\d.sys", Foton.Win.Authenticode.Openable(@"\??\UNC\server\share\d.sys"));
-            // Host-supplied UNC paths are never opened: no SMB connection, no credential offer.
-            foreach (var remote in new[] { @"\\server\share\d.sys", @"\\?\UNC\server\share\d.sys", @"\??\UNC\server\share\d.sys", @"""\\10.0.0.5\c$\x.sys""", "//server/share/x.sys" })
+            // Host-supplied paths that are not plainly local are never opened: no SMB connection, no credential offer.
+            foreach (var other in new[]
             {
-                Assert.True(Hashing.IsRemotePath(remote), remote);
-                Assert.Equal("SkippedRemotePath", Hashing.SafeHash(remote, false));
-                Assert.Equal("RemotePathNotChecked", Foton.Win.Authenticode.Check(remote).Status);
+                @"\\server\share\d.sys", @"\\?\UNC\server\share\d.sys", @"\??\UNC\server\share\d.sys", @"""\\10.0.0.5\c$\x.sys""", "//server/share/x.sys",
+                @"\??\GLOBALROOT\Device\Mup\server\share\x.sys", @"\\?\GLOBALROOT\Device\Mup\server\share\x.sys", @"\\.\PhysicalDrive0",
+            })
+            {
+                Assert.False(Hashing.IsLocalPath(other), other);
+                Assert.Equal("SkippedNonLocalPath", Hashing.SafeHash(other, false));
+                Assert.Equal("NonLocalPathNotChecked", Foton.Win.Authenticode.Check(other).Status);
             }
-            foreach (var local in new[] { @"C:\Windows\x.sys", @"\\?\C:\Windows\x.sys", @"\\.\C:\x.sys", @"\??\C:\x.sys" })
-                Assert.False(Hashing.IsRemotePath(local), local);
+            foreach (var local in new[] { @"C:\Windows\x.sys", @"\\?\C:\Windows\x.sys", @"\\.\C:\x.sys", @"\??\C:\x.sys", @"\\?\Volume{0a1b2c3d-0000-0000-0000-000000000000}\x.sys", @"System32\drivers\x.sys", @"\Windows\x.sys" })
+                Assert.True(Hashing.IsLocalPath(local), local);
         }
 
         [Fact]
