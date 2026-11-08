@@ -27,6 +27,7 @@ namespace Foton.Collect
             new CollectCategory("Network", NetworkCollection.Run),
             new CollectCategory("Users", UserCollection.Run),
             new CollectCategory("System", SystemCollection.Run),
+            new CollectCategory("Security", SecurityCollection.Run),
             new CollectCategory("Software", SoftwareCollection.Run),
         };
     }

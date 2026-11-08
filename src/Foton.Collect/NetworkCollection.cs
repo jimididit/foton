@@ -192,9 +192,6 @@ namespace Foton.Collect
             return rows;
         }
 
-        /// <summary>A value for a single-quoted WQL string literal (backslash and quote escaped).</summary>
-        internal static string WqlString(string v) => v.Replace("\\", "\\\\").Replace("'", "\\'");
-
         static readonly Dictionary<int, string> AccessControlType = new Dictionary<int, string> { [0] = "Allow", [1] = "Deny" };
         static readonly Dictionary<int, string> AccessRight = new Dictionary<int, string> { [0] = "Full", [1] = "Change", [2] = "Read", [3] = "Custom" };
 

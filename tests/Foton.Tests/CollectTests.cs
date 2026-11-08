@@ -149,6 +149,24 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Security_runs_every_task_and_reads_the_hardening_table()
+        {
+            using (var t = new TempDir())
+            {
+                var s = CollectRun.NewSession(new SessionOptions { OutputPath = t.Path, NoZip = true }, Quiet());
+                CollectRun.Run(s, only: new[] { "Security" });
+                foreach (var name in new[] { "defender_status", "defender_preferences_and_exclusions", "defender_detections", "installed_av_products", "hardening_registry_settings",
+                    "audit_policy", "smb_and_winrm_config", "powershell_environment", "non_microsoft_root_certificates", "applocker_wdac_and_policy" })
+                    Assert.Contains(s.Manifest, m => m.Task == name);
+                // Defender and Security Center are absent on some SKUs (a recorded task error); everything else must run.
+                var optional = new[] { "defender_status", "defender_preferences_and_exclusions", "defender_detections", "installed_av_products" };
+                Assert.DoesNotContain(s.Manifest, m => m.Status == TaskStatus.WriteError || (m.Status == TaskStatus.Error && !optional.Contains(m.Task)));
+                Assert.Equal(HardeningChecks.All.Count, s.Manifest.Single(m => m.Task == "hardening_registry_settings").Records);
+                Assert.Contains(s.Manifest, m => m.Task == "non_microsoft_root_certificates" && m.Records > 0);
+            }
+        }
+
+        [Fact]
         public void Standard_modules_and_internal_addresses_are_anchored()
         {
             var win = Foton.Win.HostInfo.WindowsDir.TrimEnd('\\');
@@ -160,6 +178,7 @@ namespace Foton.Tests
                 Assert.False(NetworkCollection.IsExternal(internalAddress), internalAddress);
             foreach (var external in new[] { "8.8.8.8", "172.32.0.1", "2001:4860:4860::8888", "::1:5" })
                 Assert.True(NetworkCollection.IsExternal(external), external);
+            Assert.Equal(@"a\\b\'c", CollectText.WqlString(@"a\b'c"));
         }
 
         [Fact]
