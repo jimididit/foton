@@ -214,6 +214,35 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Cloud_placeholders_are_recognised_only_by_bits_user_mode_cannot_set()
+        {
+            const FileAttributes recallOnDataAccess = (FileAttributes)0x400000, recallOnOpen = (FileAttributes)0x40000;
+            Assert.True(Hashing.IsCloudPlaceholder(FileAttributes.Archive | recallOnDataAccess));
+            Assert.True(Hashing.IsCloudPlaceholder(recallOnOpen));
+            Assert.True(Hashing.IsCloudPlaceholder(FileAttributes.Offline | FileAttributes.ReparsePoint | recallOnDataAccess));
+            Assert.False(Hashing.IsCloudPlaceholder(FileAttributes.Offline | FileAttributes.ReparsePoint));
+            Assert.False(Hashing.IsCloudPlaceholder(FileAttributes.Offline));
+            Assert.False(Hashing.IsCloudPlaceholder(FileAttributes.ReparsePoint));
+
+            // A file that marks itself Offline (any user can) is still hashed, signature-checked, and copied.
+            using (var t = new TempDir())
+            {
+                var f = Path.Combine(t.Path, "evasive.exe");
+                File.WriteAllText(f, "MZ");
+                File.SetAttributes(f, FileAttributes.Offline);
+                try
+                {
+                    Assert.False(Hashing.IsCloudPlaceholder(f));
+                    Assert.Equal(64, Hashing.SafeHash(f, false).Length);
+                    Assert.NotEqual("CloudPlaceholderNotChecked", Authenticode.Check(f).Status);
+                    Assert.Equal("Copied", HostCopy.CopyFile(f, Path.Combine(t.Path, @"out\evasive.exe"), false).Status);
+                }
+                finally { File.SetAttributes(f, FileAttributes.Normal); }
+            }
+            Assert.Equal(TaskStatus.Success, CopyTaskStatus.Evaluate(new[] { new CopyRow { SourcePath = "x", Status = "SkippedCloudPlaceholder" } }).Status);
+        }
+
+        [Fact]
         public void Capped_list_copies_newest_first_and_refuses_escapes_and_remote_sources()
         {
             using (var t = new TempDir())

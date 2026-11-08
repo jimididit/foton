@@ -355,7 +355,8 @@ namespace Foton.Collect
                     foreach (var st in FileStreams.List(f.FullName).Where(x => x.Stream != ":$DATA"))
                         rows.Add(new Dictionary<string, object?>
                         {
-                            ["File"] = f.FullName, ["Stream"] = st.Stream, ["LengthBytes"] = st.Length, ["Content"] = st.Length < 4096 ? StreamText(f.FullName, st.Stream) : "",
+                            ["File"] = f.FullName, ["Stream"] = st.Stream, ["LengthBytes"] = st.Length,
+                            ["Content"] = st.Length < 4096 && !Hashing.IsCloudPlaceholder(f.Attributes) ? StreamText(f.FullName, st.Stream) : "",
                         });
                 }
             return rows;
