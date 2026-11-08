@@ -171,20 +171,27 @@ namespace Foton.Core
     public static class BaselineSchema
     {
         /// <summary>
-        /// 1.15.0 changed record values and coverage, not identity keys or compared fields, so a 1.14.0 day0
-        /// stays usable: unreported Defender properties become "(not reported)", BitsJob NotifyCmdLine
-        /// "(not set)", WinHttpSettings hex, a standard-user capture now reads loaded user hives that
-        /// 1.14.0 skipped, and active WDAC policies (CiPolicies\Active) and explorer.exe (Windows directory)
-        /// are captured. Those show once as Modified or Added.
+        /// Schemas that changed record values and coverage, never identity keys or compared fields, so an older day0
+        /// stays usable; each change shows once as Modified or Added. To add a schema, append it to Versions and its
+        /// change to Changes.
         /// </summary>
-        static readonly string[][] Compatible = { new[] { "1.14.0", "1.15.0" } };
+        static readonly string[] Versions = { "1.14.0", "1.15.0", "1.16.0" };
 
-        public static bool CanCompare(string a, string b) =>
-            a == b || Compatible.Any(p => p.Contains(a) && p.Contains(b));
+        static readonly Dictionary<string, string> Changes = new Dictionary<string, string>
+        {
+            ["1.15.0"] = "1.15.0 records Defender properties the platform no longer reports as \"(not reported)\" (1.14.0 wrote an empty value) and an unset BitsJob NotifyCmdLine as \"(not set)\" (1.14.0 wrote a single space), and writes the WinHttpSettings proxy blob as hex (1.14.0 wrote decimals). A 1.14.0 standard-user capture also skipped every loaded user hive, so per-user UserAutorun, StartupApproved and ProxyConfig rows can show as Added, and 1.15.0 adds active WDAC policies (WdacActiveCip, from CiPolicies\\Active) and the SystemBinary row for explorer.exe, which 1.14.0 looked for in System32.",
+            ["1.16.0"] = "1.16.0 adds the 64-bit Winsock namespace catalog (WinsockLsp Kind Namespace64, from NameSpace_Catalog5\\Catalog_Entries64), so those rows show as Added against an older baseline.",
+        };
+
+        public static bool CanCompare(string a, string b) => a == b || (Versions.Contains(a) && Versions.Contains(b));
 
         /// <summary>Explanation to show when two different but compatible schemas are compared; null when equal.</summary>
-        public static string? CrossVersionNote(string a, string b) =>
-            a == b ? null
-            : $"Reference schema {a} and difference schema {b} differ. 1.15.0 records Defender properties the platform no longer reports as \"(not reported)\" (1.14.0 wrote an empty value) and an unset BitsJob NotifyCmdLine as \"(not set)\" (1.14.0 wrote a single space), and writes the WinHttpSettings proxy blob as hex (1.14.0 wrote decimals). A 1.14.0 standard-user capture also skipped every loaded user hive, so per-user UserAutorun, StartupApproved and ProxyConfig rows can show as Added, and 1.15.0 adds active WDAC policies (WdacActiveCip, from CiPolicies\\Active) and the SystemBinary row for explorer.exe, which 1.14.0 looked for in System32. That is a format and coverage change, not a host change.";
+        public static string? CrossVersionNote(string a, string b)
+        {
+            if (a == b) return null;
+            int ia = Array.IndexOf(Versions, a), ib = Array.IndexOf(Versions, b);
+            var crossed = Versions.Skip(Math.Min(ia, ib) + 1).Take(Math.Abs(ia - ib)).Where(Changes.ContainsKey).Select(v => Changes[v]);
+            return $"Reference schema {a} and difference schema {b} differ. {string.Join(" ", crossed)} That is a format and coverage change, not a host change.";
+        }
     }
 }
