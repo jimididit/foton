@@ -133,7 +133,7 @@ jobs:
 
           Collect schema 1.14.0 (same files and columns as 1.38.x, with UTC timestamps and explicit statuses). Baseline schema 1.17.0: Compare accepts 1.14.0 (Foton 1.38.x), 1.15.0 (v2.0.0-alpha.1), and 1.16.0 (v2.0.0) baselines and explains the one-time format and coverage differences.
 
-          Hosts older than Windows 10 / Server 2016: use [Foton 1.38.1](https://github.com/jimididit/foton/releases/tag/v1.38.1) (PowerShell; security fixes only). Operator guide: [docs/USAGE.md](https://github.com/jimididit/foton/blob/$tag/docs/USAGE.md).
+          Hosts older than Windows 10 / Server 2016: use [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) (PowerShell; security fixes only). Operator guide: [docs/USAGE.md](https://github.com/jimididit/foton/blob/$tag/docs/USAGE.md).
 
           ## Verify before use
           The executables are not Authenticode-signed yet, so Windows SmartScreen may warn on first run. Check the hash and the build provenance, then unblock:
