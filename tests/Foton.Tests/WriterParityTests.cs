@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Foton.Tests
 {
-    /// <summary>Bytes on disk match what 1.38.x wrote (golden files from tests\golden\Update-Golden.ps1).</summary>
+    /// <summary>Bytes on disk match what 1.38.x wrote (golden files in testdata\golden, captured from the 1.38.x module).</summary>
     public class WriterParityTests
     {
         public sealed class GoldenRow
