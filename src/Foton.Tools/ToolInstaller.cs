@@ -80,6 +80,11 @@ namespace Foton.Tools
         /// </summary>
         public static Dictionary<string, object?> Install(CatalogTool entry, string? archivePath, string? toolRoot, StatusLog log)
         {
+            // Support folders are deleted and replaced beside the tool, so each must be one plain folder name other than
+            // the version folder; checked before anything is downloaded, extracted, or deleted.
+            foreach (var leaf in entry.SupportFolders)
+                if (!SupportFolderName.IsMatch(leaf ?? "") || string.Equals(leaf, entry.Version, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Catalog support folder must be one plain folder name other than the version: '" + leaf + "'");
             var root = ToolManifest.Root(toolRoot);
             Directory.CreateDirectory(root);
             var logPath = Path.Combine(root, "install.log");
@@ -131,11 +136,17 @@ namespace Foton.Tools
                 var exeDir = Path.GetDirectoryName(exe)!;
                 foreach (var leaf in entry.SupportFolders.Count > 0 ? entry.SupportFolders : new[] { "config", "rules" })
                 {
-                    if (leaf.IndexOfAny(new[] { '\\', '/', ':' }) >= 0 || leaf.Contains("..")) throw new InvalidDataException("Catalog support folder must be one folder name: " + leaf);
-                    var src = Path.Combine(exeDir, leaf);
-                    var dst = Path.Combine(stableDir, leaf);
+                    var src = Path.Combine(exeDir, leaf!);
+                    var dst = Path.GetFullPath(Path.Combine(stableDir, leaf!));
+                    if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
                     if (!Directory.Exists(src) || File.Exists(dst)) continue;
-                    if (Directory.Exists(dst)) Directory.Delete(dst, true);
+                    if (Directory.Exists(dst))
+                    {
+                        Directory.Delete(dst, true);
+                        Log($"Replaced {leaf}\\ beside the tool with the pinned release's copy.");
+                    }
                     CopyDirectory(src, dst);
                 }
                 exe = stable;
@@ -174,6 +185,8 @@ namespace Foton.Tools
                 if (download != null) try { File.Delete(download); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
         }
+
+        static readonly Regex SupportFolderName = new Regex(@"^[A-Za-z0-9_-][A-Za-z0-9._-]*$");
 
         static void Download(string url, string path)
         {

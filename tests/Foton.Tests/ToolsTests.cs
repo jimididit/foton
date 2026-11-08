@@ -96,6 +96,18 @@ namespace Foton.Tests
                 Assert.EndsWith("sigma-event-logs-all.yml", rules.MappingPath);
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\9.9.9-test\chainsaw\sigma\regression_data")));
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\sigma\regression_data")));
+
+                // A support folder name that is empty, ".", nested, or the version folder is refused, and the install survives.
+                foreach (var bad in new[] { "", ".", "..", @"rules\x", "9.9.9-test" })
+                {
+                    var badEntry = new CatalogTool
+                    {
+                        Name = entry.Name, Version = entry.Version, AssetName = entry.AssetName, DownloadUrl = entry.DownloadUrl, ExpectedSha256 = entry.ExpectedSha256,
+                        ExecutableNames = entry.ExecutableNames, SupportFolders = new[] { bad },
+                    };
+                    Assert.Throws<InvalidDataException>(() => ToolInstaller.Install(badEntry, zip, t.File("tools"), new StatusLog(new StringWriter())));
+                    Assert.True(Directory.Exists(t.File(@"tools\chainsaw")), bad);
+                }
             }
         }
 
