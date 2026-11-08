@@ -76,8 +76,10 @@ namespace Foton.Cli
             Console.WriteLine("  foton compose <case-folder>          run EZ Tools / Hayabusa / Chainsaw on copied files;");
             Console.WriteLine("                                        writes analysis\\external\\ and external_parse_inventory.csv");
             Console.WriteLine("  foton tools                          list pinned and registered tools");
-            Console.WriteLine("  foton tools Hayabusa [-Force]        download and install the pinned release (hash-verified)");
-            Console.WriteLine("  foton tools Hayabusa <release.zip>   install from a downloaded archive (hash-verified)");
+            Console.WriteLine("  foton tools <Hayabusa|Chainsaw> [-Force]");
+            Console.WriteLine("                                        download and install the pinned release (hash-verified)");
+            Console.WriteLine("  foton tools <Hayabusa|Chainsaw> <release.zip>");
+            Console.WriteLine("                                        install from a downloaded archive (hash-verified)");
             Console.WriteLine("  foton tools <EZTools|Chainsaw|...> <folder-or-exe>");
             Console.WriteLine("                                        register an existing install in tools.json");
             Console.WriteLine("  foton compare <reference> <difference> [-NoCsv] [-NoHtml] [-OutputPath <html>]");
@@ -88,7 +90,7 @@ namespace Foton.Cli
             Console.WriteLine("                                        MZ/PE signature scan of a copied blob (Tier 3; not NTFS carving);");
             Console.WriteLine("                                        defaults 8 MiB and 50 hits");
             Console.WriteLine();
-            Console.WriteLine("For casework use Foton 1.38.x (the Foton-Workstation_v1.38.1.zip module) from https://github.com/jimididit/foton/releases.");
+            Console.WriteLine("Operator guide: https://github.com/jimididit/foton/blob/main/docs/USAGE.md");
             return 1;
         }
 
@@ -261,7 +263,7 @@ namespace Foton.Cli
                 log.WriteConsole($"   {r.Tool,-14} {(r.Version.Length > 0 ? r.Version : "-"),-12} {r.Status,-14} {(r.DestRelative.Length > 0 ? r.DestRelative : r.Note)}",
                     r.Status == "Copied" ? ConsoleColor.White : ConsoleColor.DarkGray);
             log.Write(@"Inventory: analysis\external\external_parse_inventory.csv. Native foton parse if tools are missing.", StatusLevel.Good);
-            log.WriteConsole("     Missing Hayabusa: foton tools Hayabusa. Existing EZ Tools / Chainsaw folder: foton tools EZTools <dir>", ConsoleColor.DarkGray);
+            log.WriteConsole("     Missing Hayabusa or Chainsaw: foton tools Hayabusa | Chainsaw. Existing EZ Tools folder: foton tools EZTools <dir>", ConsoleColor.DarkGray);
             return 0;
         }
 

@@ -80,6 +80,11 @@ namespace Foton.Tools
         /// </summary>
         public static Dictionary<string, object?> Install(CatalogTool entry, string? archivePath, string? toolRoot, StatusLog log)
         {
+            // Support folders are deleted and replaced beside the tool, so each must be one plain folder name other than
+            // the version folder; checked before anything is downloaded, extracted, or deleted.
+            foreach (var leaf in entry.SupportFolders)
+                if (!SupportFolderName.IsMatch(leaf ?? "") || string.Equals(leaf, entry.Version, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Catalog support folder must be one plain folder name other than the version: '" + leaf + "'");
             var root = ToolManifest.Root(toolRoot);
             Directory.CreateDirectory(root);
             var logPath = Path.Combine(root, "install.log");
@@ -115,23 +120,37 @@ namespace Foton.Tools
 
                 var destVer = Destination(entry, root);
                 if (Directory.Exists(destVer)) Directory.Delete(destVer, true);
-                SafeZip.Extract(zip, destVer);
+                SafeZip.Extract(zip, destVer, entry.SkipArchivePrefixes);
                 Log("Expanded to " + destVer);
 
                 var exe = entry.ExecutableNames.Select(n => FileSearch.Find(destVer, n, int.MaxValue).FirstOrDefault()).FirstOrDefault(f => f != null)
                     ?? throw new InvalidDataException($"Archive extracted but no executable named {string.Join("/", entry.ExecutableNames)} was found under {destVer}.");
 
-                // A stable copy at tool root\name\<exe> with config\ and rules\ beside it, so the path in tools.json
-                // does not change shape between releases that nest the binary differently.
+                // A stable copy at tool root\name\<exe> with its support folders beside it (catalog SupportFolders;
+                // config\ and rules\ when the entry names none), so the path in tools.json does not change shape between
+                // releases that nest the binary differently. Folders from an earlier version are replaced: rules are
+                // part of the pinned release.
                 var stableDir = Path.GetDirectoryName(destVer)!;
                 var stable = Path.Combine(stableDir, Path.GetFileName(exe));
                 File.Copy(exe, stable, true);
                 var exeDir = Path.GetDirectoryName(exe)!;
-                foreach (var leaf in new[] { "config", "rules" })
+                foreach (var leaf in entry.SupportFolders.Count > 0 ? entry.SupportFolders : new[] { "config", "rules" })
                 {
-                    var src = Path.Combine(exeDir, leaf);
-                    var dst = Path.Combine(stableDir, leaf);
-                    if (Directory.Exists(src) && !Directory.Exists(dst) && !File.Exists(dst)) CopyDirectory(src, dst);
+                    var src = Path.Combine(exeDir, leaf!);
+                    var dst = Path.GetFullPath(Path.Combine(stableDir, leaf!));
+                    if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
+                    if (!Directory.Exists(src) || File.Exists(dst)) continue;
+                    if (Directory.Exists(dst))
+                    {
+                        // Kept, not deleted: local edits (a tuned config, extra rules) stay recoverable beside the tool.
+                        var kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
+                        for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
+                        Directory.Move(dst, kept);
+                        Log($"Moved the existing {leaf}\\ to {Path.GetFileName(kept)}\\ and installed the pinned release's copy.");
+                    }
+                    CopyDirectory(src, dst);
                 }
                 exe = stable;
 
@@ -169,6 +188,8 @@ namespace Foton.Tools
                 if (download != null) try { File.Delete(download); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
         }
+
+        static readonly Regex SupportFolderName = new Regex(@"^[A-Za-z0-9_-][A-Za-z0-9._-]*$");
 
         static void Download(string url, string path)
         {

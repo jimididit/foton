@@ -21,6 +21,10 @@ namespace Foton.Tools
         public string ProjectUrl { get; set; } = "";
         public IReadOnlyList<string> ExecutableNames { get; set; } = new string[0];
         public string RulesRelativePath { get; set; } = "";
+        /// <summary>Folders beside the binary that the tool reads at run time (config, rules, sigma, mappings), copied next to the stable executable.</summary>
+        public IReadOnlyList<string> SupportFolders { get; set; } = new string[0];
+        /// <summary>Archive path prefixes (forward slashes) not extracted: test data and repository extras the tool never reads.</summary>
+        public IReadOnlyList<string> SkipArchivePrefixes { get; set; } = new string[0];
         public string Notes { get; set; } = "";
     }
 
@@ -61,6 +65,8 @@ namespace Foton.Tools
                 ProjectUrl = Str(d, "ProjectUrl"),
                 ExecutableNames = Strings(d, "ExecutableNames"),
                 RulesRelativePath = Str(d, "RulesRelativePath"),
+                SupportFolders = Strings(d, "SupportFolders"),
+                SkipArchivePrefixes = Strings(d, "SkipArchivePrefixes"),
                 Notes = Str(d, "Notes"),
             }).ToList();
         }
