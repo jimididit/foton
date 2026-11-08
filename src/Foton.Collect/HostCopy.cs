@@ -48,6 +48,12 @@ namespace Foton.Collect
                 row.Note = "Source leaf not found. Visibility gap, not proof the artifact never existed on the host.";
                 return row;
             }
+            if (Hashing.IsCloudPlaceholder(source))
+            {
+                row.Status = "SkippedCloudPlaceholder";
+                row.Note = "Cloud-only placeholder (for example OneDrive Files On-Demand). Not copied: reading it would download it to the host.";
+                return row;
+            }
             try
             {
                 var dir = Path.GetDirectoryName(destination);

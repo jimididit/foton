@@ -26,8 +26,8 @@ namespace Foton.Core
         /// <summary>
         /// The hash, or a sentinel recording why there is none: NotHashed (hashing was skipped),
         /// "" (no path), SkippedNonLocalPath (not a local file path, never opened), FileNotFound,
-        /// SkippedTooLarge (over 200 MB), HashError. Sentinels are facts about the attempt, never hash
-        /// values; do not match them as IOCs.
+        /// SkippedTooLarge (over 200 MB), SkippedCloudPlaceholder (cloud-only file, never read), HashError.
+        /// Sentinels are facts about the attempt, never hash values; do not match them as IOCs.
         /// </summary>
         public static string SafeHash(string? path, bool skipHashing)
         {
@@ -38,10 +38,30 @@ namespace Foton.Core
             {
                 var fi = new FileInfo(path);
                 if (!fi.Exists) return "FileNotFound";
+                if (IsCloudPlaceholder(fi.Attributes)) return "SkippedCloudPlaceholder";
                 if (fi.Length > SafeHashLimitBytes) return "SkippedTooLarge";
                 return Sha256Hex(fi.FullName);
             }
             catch (Exception) { return "HashError"; }
+        }
+
+        // FILE_ATTRIBUTE_RECALL_ON_OPEN, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: set only by kernel-mode file system filters.
+        const FileAttributes Recall = (FileAttributes)0x40000 | (FileAttributes)0x400000;
+
+        /// <summary>
+        /// True for a cloud-only placeholder (OneDrive Files On-Demand and other cloud-file providers). Reading its
+        /// content makes the sync client download it: a network transfer and a host change the collector must not cause.
+        /// Reading attributes does not. Only the recall bits count: Files On-Demand placeholders (Windows 10 1709+) carry
+        /// them, and user mode cannot set them. Offline and reparse points can be set by any user (a file or symlink
+        /// could mark itself Offline to escape hashing), so neither is trusted.
+        /// </summary>
+        public static bool IsCloudPlaceholder(FileAttributes attributes) => (attributes & Recall) != 0;
+
+        /// <summary>IsCloudPlaceholder for a path; false when the attributes cannot be read.</summary>
+        public static bool IsCloudPlaceholder(string path)
+        {
+            try { return IsCloudPlaceholder(File.GetAttributes(path)); }
+            catch (Exception) { return false; }
         }
 
         /// <summary>
