@@ -257,7 +257,8 @@ namespace Foton.Collect
         /// <summary>The key as a full registry path (HKEY_LOCAL_MACHINE\..., HKEY_USERS\...).</summary>
         static string Display(string key) => key.Replace("Registry::", "").Replace(@"HKLM:\", @"HKEY_LOCAL_MACHINE\");
 
-        static string V(string key, string name)
+        /// <summary>Get-FotonCloudJoinDisplayValue: a value as text, binary as its size, and secret-named values never read.</summary>
+        internal static string V(string key, string name)
         {
             if (Secret.IsMatch(name)) return "";
             var raw = Reg.Value(key, name);

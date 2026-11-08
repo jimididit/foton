@@ -90,8 +90,6 @@ namespace Foton.Collect.Cli
             log.WriteConsole("  ============================================================", ConsoleColor.Cyan);
             log.WriteConsole($"   Artifacts collected : {r.ArtifactCount} files across {CaseCategories.All.Count} categories", ConsoleColor.White);
             log.WriteConsole($"   Collection errors   : {s.Errors.Count}", ConsoleColor.White);
-            if (r.NotCollected.Count > 0)
-                log.WriteConsole($"   NOT COLLECTED       : {string.Join(", ", r.NotCollected)} (not ported to v2 yet; incomplete package - use 1.38.x for casework)", ConsoleColor.Yellow);
             log.WriteConsole($"   Observations        : {Sev("High")} high, {Sev("Medium")} medium, {Sev("Low")} low, {Sev("Info")} info", ConsoleColor.White);
             log.WriteConsole("   Duration            : " + Math.Round((DateTime.UtcNow - s.StartTimeUtc).TotalMinutes, 1).ToString(CultureInfo.InvariantCulture) + " min", ConsoleColor.White);
             log.WriteConsole("");

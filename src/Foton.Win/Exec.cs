@@ -14,8 +14,12 @@ namespace Foton.Win
     /// </summary>
     public static class Exec
     {
-        public static string System32(string exe, string arguments, int timeoutMs = 120000)
+        public static string System32(string exe, string arguments, int timeoutMs = 120000) => System32(exe, arguments, out _, timeoutMs);
+
+        /// <summary>As System32, with the tool's exit code (-1 when it did not start or timed out).</summary>
+        public static string System32(string exe, string arguments, out int exitCode, int timeoutMs = 120000)
         {
+            exitCode = -1;
             var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), exe);
             if (!File.Exists(path)) return $"{exe} not found at {path}.";
             // Redirected console tools write the OEM code page, which is how PowerShell decoded them.
@@ -39,6 +43,7 @@ namespace Foton.Win
                         return $"{exe} {arguments}: timed out after {timeoutMs / 1000} s.";
                     }
                     p.WaitForExit();
+                    exitCode = p.ExitCode;
                     var text = stdout.Result + stderr.Result;
                     return text.EndsWith("\n", StringComparison.Ordinal) ? text : text + "\r\n";
                 }
