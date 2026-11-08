@@ -100,8 +100,10 @@ namespace Foton.Win
         }
 
         /// <summary>
-        /// A driver or service image path as WMI reports it, made openable: the NT prefix \??\ is dropped and
-        /// \SystemRoot\ becomes the Windows folder. The reported path is still what gets recorded.
+        /// A driver image path as WMI reports it, made openable: surrounding quotes are dropped, \??\ and \??\UNC\
+        /// become DOS and UNC paths, and \SystemRoot\ becomes the Windows folder. The reported path is still what gets
+        /// recorded. Takes a path, not a command line: a service ImagePath with arguments must have its executable
+        /// extracted first.
         /// </summary>
         public static string Openable(string path)
         {
