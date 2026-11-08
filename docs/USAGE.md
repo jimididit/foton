@@ -26,7 +26,7 @@ Each [GitHub Release](https://github.com/jimididit/foton/releases) tagged `v2.*`
 | `foton.exe` | Analyst workstation |
 | `SHA256SUMS.txt` | Hashes of the three executables |
 
-They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is installed, and nothing is fetched at run time except by `foton tools`, which downloads a pinned, hash-checked Hayabusa release only when you ask.
+They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is installed, and nothing is fetched at run time except by `foton tools`, which downloads a pinned, hash-checked Hayabusa or Chainsaw release only when you ask.
 
 **Verify before use.** The executables are not Authenticode-signed yet, so Windows SmartScreen may warn on first run. Trust comes from the hash and the build provenance, not a publisher certificate:
 
@@ -158,21 +158,24 @@ To feed High-attention rows into a triage report, copy `baseline_diff.csv` into 
 
 ### Compose (EZ Tools / Hayabusa / Chainsaw, optional)
 
-Install the pinned Hayabusa release once, or register tools you already have. Tools live under `%LOCALAPPDATA%\Foton\tools` and are recorded in `tools.json` (the same file 1.38.x uses, so registrations carry over). PATH is never changed.
+Install the pinned Hayabusa and Chainsaw releases once, and register EZ Tools you already have. Tools live under `%LOCALAPPDATA%\Foton\tools` and are recorded in `tools.json` (the same file 1.38.x uses, so registrations carry over). PATH is never changed.
 
 ```powershell
 .\foton.exe tools                                                # what is pinned, registered, and found
 .\foton.exe tools Hayabusa                                       # download the pinned release, verify SHA-256, install (asks first; -Force skips)
-.\foton.exe tools Hayabusa D:\Offline\hayabusa-4.0.0-win-x64.zip  # air-gapped install, same hash check
-.\foton.exe tools EZTools C:\Tools\EZTools                       # register an existing folder (also Chainsaw <dir>); nothing downloaded
+.\foton.exe tools Chainsaw                                       # same for Chainsaw: the release that bundles rules, Sigma rules, and mappings
+.\foton.exe tools Hayabusa D:\Offline\hayabusa-4.0.0-win-x64.zip  # air-gapped install, same hash check (also Chainsaw <zip>)
+.\foton.exe tools EZTools C:\Tools\EZTools                       # register an existing folder; nothing downloaded
 ```
+
+Pinned versions: Hayabusa 4.0.0 and Chainsaw 2.17.1 (`chainsaw_all_platforms+rules.zip`; Sigma test data and repository extras in the archive are not extracted). EZ Tools are not pinned: they are published at unversioned URLs whose contents change with each update, so a hash pin would go stale. Download them with Eric Zimmerman's `Get-ZimmermanTools.ps1` and register the folder.
 
 EZ Tools unpacks several tools into subfolders (`EvtxeCmd\`, `RECmd\`, `AmcacheParser\`) that a single PATH entry does not cover; registration records each executable's full path. The SHA-256 written to `tools.json` is what Foton observed on disk, not a verification against upstream. Compose looks in `tools.json` first, then PATH.
 
 | Tool | What compose runs | Status when it cannot |
 |------|-------------------|-----------------------|
 | RECmd | `-d <hives> --bn BatchExamples\DFIRBatch.reb` (falls back to `Kroll_Batch.reb`) | `NoBatch` (RECmd exports nothing without a batch) |
-| Chainsaw | `hunt` with `rules\` and/or `sigma\` + `mappings\sigma-event-logs-all.yml` beside the binary | `NoRules` |
+| Chainsaw | `hunt` with `rules\` and/or `sigma\` + `mappings\sigma-event-logs-all.yml` beside the binary | `NoRules` (install the pinned release: `foton tools Chainsaw`) |
 | Hayabusa | `dfir-timeline` (or `csv-timeline`) with `-w` and `-U`, so there is no wizard and timestamps are UTC | `NotOnPath` points at `foton tools Hayabusa` |
 | Any | stdout/stderr captured as `tool_stdout.txt` / `tool_stderr.txt` | `MissingRuntime` when the tool reports a missing .NET runtime (AmcacheParser is .NET 10 only) |
 

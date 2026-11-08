@@ -10,7 +10,22 @@
       "ProjectUrl": "https://github.com/Yamato-Security/hayabusa",
       "ExecutableNames": [ "hayabusa.exe", "hayabusa", "hayabusa-*.exe" ],
       "RulesRelativePath": "rules",
+      "SupportFolders": [ "config", "rules" ],
       "Notes": "Rules ship inside the release zip. Do not run hayabusa update-rules mid-case; that changes detections without a new Foton pin."
+    },
+    {
+      "Name": "Chainsaw",
+      "Version": "2.17.1",
+      "AssetName": "chainsaw_all_platforms+rules.zip",
+      "DownloadUrl": "https://github.com/WithSecureLabs/chainsaw/releases/download/v2.17.1/chainsaw_all_platforms+rules.zip",
+      "ExpectedSha256": "74B9EA341E31C0A704A79C0E779C2F6E31670F1F43CAD3B450B21A91639DBEC3",
+      "License": "GPL-3.0",
+      "ProjectUrl": "https://github.com/WithSecureLabs/chainsaw",
+      "ExecutableNames": [ "chainsaw_x86_64-pc-windows-msvc.exe", "chainsaw.exe" ],
+      "RulesRelativePath": "rules",
+      "SupportFolders": [ "rules", "sigma", "mappings" ],
+      "SkipArchivePrefixes": [ "chainsaw/sigma/regression_data/", "chainsaw/sigma/.git/", "chainsaw/sigma/.github/", "chainsaw/sigma/tests/", "chainsaw/sigma/images/", "chainsaw/sigma/documentation/" ],
+      "Notes": "The rules release bundles Chainsaw rules, Sigma rules, and the Sigma mappings compose passes to chainsaw hunt. Binaries for other platforms in the zip are not used."
     }
   ]
 }

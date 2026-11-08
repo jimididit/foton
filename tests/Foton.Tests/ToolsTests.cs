@@ -47,15 +47,68 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Catalog_pins_the_Chainsaw_rules_release_with_its_support_folders()
+        {
+            var c = ToolCatalog.Entry("chainsaw");
+            Assert.Equal("chainsaw_all_platforms+rules.zip", c.AssetName);
+            Assert.Equal(64, c.ExpectedSha256.Length);
+            Assert.StartsWith("https://github.com/WithSecureLabs/chainsaw/releases/download/v" + c.Version + "/", c.DownloadUrl);
+            Assert.Equal(new[] { "rules", "sigma", "mappings" }, c.SupportFolders);
+            Assert.Contains("chainsaw_x86_64-pc-windows-msvc.exe", c.ExecutableNames);
+        }
+
+        [Fact]
+        public void A_Chainsaw_archive_installs_with_rules_sigma_and_mappings_beside_the_binary()
+        {
+            using (var t = new TempDir())
+            {
+                // The chainsaw_all_platforms+rules.zip layout: chainsaw\<per-platform binaries> with rules\, sigma\, mappings\.
+                Write(t.File(@"payload\chainsaw\chainsaw_x86_64-pc-windows-msvc.exe"), "fake-chainsaw");
+                Write(t.File(@"payload\chainsaw\chainsaw_x86_64-unknown-linux-gnu"), "other platform");
+                Write(t.File(@"payload\chainsaw\rules\evtx\log_tampering.yml"), "title: test");
+                Write(t.File(@"payload\chainsaw\sigma\rules\windows\x.yml"), "title: test");
+                Write(t.File(@"payload\chainsaw\mappings\sigma-event-logs-all.yml"), "name: test");
+                Write(t.File(@"payload\chainsaw\sigma\regression_data\rules\windows\deep\x.json"), "{}");
+                var zip = t.File("chainsaw-fake.zip");
+                ZipFile.CreateFromDirectory(t.File("payload"), zip);
+                File.WriteAllText(t.File("catalog.json"), Json.Indented(new Dictionary<string, object?>
+                {
+                    ["Tools"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["Name"] = "Chainsaw", ["Version"] = "9.9.9-test", ["AssetName"] = "chainsaw-fake.zip",
+                            ["DownloadUrl"] = "https://example.invalid/chainsaw-fake.zip", ["ExpectedSha256"] = Hashing.Sha256Hex(zip),
+                            ["License"] = "GPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                            ["ExecutableNames"] = new[] { "chainsaw_x86_64-pc-windows-msvc.exe", "chainsaw.exe" }, ["RulesRelativePath"] = "rules",
+                            ["SupportFolders"] = new[] { "rules", "sigma", "mappings" }, ["SkipArchivePrefixes"] = new[] { "chainsaw/sigma/regression_data/" },
+                            ["Notes"] = "test pin",
+                        },
+                    },
+                }));
+                var entry = ToolCatalog.Entry("Chainsaw", t.File("catalog.json"));
+                var record = ToolInstaller.Install(entry, zip, t.File("tools"), new StatusLog(new StringWriter()));
+                var exe = (string)record["ExecutablePath"]!;
+                Assert.Equal(t.File(@"tools\chainsaw\chainsaw_x86_64-pc-windows-msvc.exe"), exe);
+                var rules = ComposeSupport.ChainsawRulesFor(exe);
+                Assert.NotNull(rules.RulesPath);
+                Assert.NotNull(rules.SigmaPath);
+                Assert.EndsWith("sigma-event-logs-all.yml", rules.MappingPath);
+                Assert.False(Directory.Exists(t.File(@"tools\chainsaw\9.9.9-test\chainsaw\sigma\regression_data")));
+                Assert.False(Directory.Exists(t.File(@"tools\chainsaw\sigma\regression_data")));
+            }
+        }
+
+        [Fact]
         public void List_shows_catalog_and_registered_tools_once_each()
         {
             using (var t = new TempDir())
             {
                 var root = t.File("tools");
                 var rows = ToolInstaller.List(root);
-                var only = Assert.Single(rows);
-                Assert.Equal("Catalog", only.Source);
-                Assert.EndsWith("hayabusa-4.0.0-win-x64.zip", only.Location);
+                Assert.Equal(new[] { "Hayabusa", "Chainsaw" }, rows.Select(r => r.Name).ToArray());
+                Assert.All(rows, r => Assert.Equal("Catalog", r.Source));
+                Assert.EndsWith("hayabusa-4.0.0-win-x64.zip", rows[0].Location);
 
                 Write(t.File(@"ez\PECmd.exe"), "x");
                 ToolRegistry.Register("PECmd", t.File(@"ez\PECmd.exe"), root);

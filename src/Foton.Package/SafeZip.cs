@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 
 namespace Foton.Package
 {
@@ -11,7 +13,13 @@ namespace Foton.Package
     /// </summary>
     public static class SafeZip
     {
-        public static void Extract(string zipPath, string destination)
+        public static void Extract(string zipPath, string destination) => Extract(zipPath, destination, null);
+
+        /// <summary>
+        /// As Extract, skipping entries whose stored path (forward slashes) starts with one of <paramref name="skipPrefixes"/>.
+        /// Every entry is still checked for an unsafe path first.
+        /// </summary>
+        public static void Extract(string zipPath, string destination, IReadOnlyCollection<string>? skipPrefixes)
         {
             var root = Path.GetFullPath(destination).TrimEnd('\\') + "\\";
             Directory.CreateDirectory(root);
@@ -23,6 +31,9 @@ namespace Foton.Package
                     if (name.Length == 0) continue;
                     if (Path.IsPathRooted(name) || name.IndexOf(':') >= 0)
                         throw new InvalidDataException("Unsafe ZIP entry (rooted path): " + entry.FullName);
+                    // Skipped entries are never written, so they skip the containment check (and any over-long path).
+                    var stored = entry.FullName.Replace('\\', '/');
+                    if (skipPrefixes != null && skipPrefixes.Any(p => stored.StartsWith(p, StringComparison.OrdinalIgnoreCase))) continue;
                     var target = Path.GetFullPath(Path.Combine(root, name));
                     if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + entry.FullName);
