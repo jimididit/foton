@@ -1,149 +1,110 @@
 # Contributing to Foton
 
-Thank you for contributing. Foton is structured so you can add a **collector**, **baseline provider**, **parser**, or **analysis rule** without rewriting the core.
+Thank you for contributing. Foton is structured so you can add a **collection task**, **baseline provider**, **parser**, or **analysis rule** without rewriting the core.
 
-## Status: PowerShell line frozen, v2 in C#
+Foton 2 is C#: three single-file executables on the .NET Framework that ships with Windows (4.6.2+). The PowerShell 1.38.x line takes security fixes only (see [SECURITY.md](../SECURITY.md)); new work targets v2. Open an issue before starting a large feature.
 
-- **1.38.x (PowerShell, `legacy/powershell/`) is frozen.** Only security fixes are accepted (see [SECURITY.md](../SECURITY.md)). It also serves as the parity reference for the port, so do not refactor it.
-- **New features target Foton v2**, single-file C# executables on in-box .NET Framework 4.6.2+ (Windows 10 / Server 2016+). The port goes layer by layer with parity against 1.38.x, so open an issue before starting feature work.
+## Development setup
 
-## v2 (C#) development
-
-Prerequisites: Windows, the .NET SDK pinned in [`global.json`](../global.json) (10.0.x). The SDK only builds; the executables target `net462` and need nothing installed on endpoints.
+Prerequisites: Windows and the .NET SDK pinned in [`global.json`](../global.json). The SDK only builds; the executables target `net462` and need nothing installed on endpoints.
 
 ```powershell
+git clone https://github.com/jimididit/foton.git
+Set-Location foton
 dotnet build Foton.sln -c Release -warnaserror
 dotnet test Foton.sln -c Release --no-build
 .\cli\Foton.Collect.Cli\bin\Release\net462\foton-collect.exe -Version
 ```
 
+Use a throwaway Windows VM for live Collect and Baseline runs. Collection changes the host.
+
+## Layout
+
+| Project | Layer | Touches the live host? |
+|---------|-------|------------------------|
+| `src/Foton.Core` | Session, task runner, CSV/JSON/text writers, hashing, custody, coverage | No (callers supply host facts) |
+| `src/Foton.Win` | The only place for P/Invoke, WMI, COM, registry, and System32 tool helpers | Yes |
+| `src/Foton.Collect` | Collect categories (`<Category>Collection.cs`) and the orchestrator | Yes |
+| `src/Foton.Baseline.Capture` / `.Compare` | Baseline providers / offline diff | Capture yes, Compare no |
+| `src/Foton.Analyze`, `Foton.Report` | Rules (`Rules/*.cs`), findings, HTML reports | No |
+| `src/Foton.Parse`, `Foton.Carve`, `Foton.Package` | Parsers, carve, package open/verify | No |
+| `src/Foton.Tools`, `Foton.Patterns` | Tool catalog / compose, workstation pattern lists | No (only `foton tools` downloads, on request) |
+| `cli/*` | `foton-collect.exe`, `foton-baseline.exe`, `foton.exe` | |
+
 | Rule | Enforced by |
 |------|-------------|
-| One `.exe` per role, no loose DLLs (project DLLs merged by ILRepack in every configuration, `cli/ILRepack.targets`) | `tests/Foton.ArchitectureTests` (SingleFileRules) |
-| Offline layers (Core, Report, Package, Baseline.Compare, Analyze, Patterns, Parse, Carve) never reference `Foton.Win`, WMI, or HTTP | LayerRules |
+| One `.exe` per role, no loose DLLs (project DLLs merged by ILRepack, `cli/ILRepack.targets`) | `tests/Foton.ArchitectureTests` (SingleFileRules) |
+| Offline layers never reference `Foton.Win`, WMI, or HTTP | LayerRules |
 | Endpoint executables never reference Parse, Carve, Tools, or Patterns | LayerRules |
-| P/Invoke only in `src/Foton.Win`; no `Assembly.Load(byte[])` or `AssemblyResolve` embedding | LayerRules |
+| P/Invoke only in `src/Foton.Win`, with a size test per struct; no `Assembly.Load(byte[])` | LayerRules, struct size tests |
 | Runtime dependencies are in-box .NET Framework assemblies only; NuGet packages are build- or test-time | `Directory.Packages.props` review + vulnerable-package CI step |
 
-Version and schema numbers live once in [`Directory.Build.props`](../Directory.Build.props) and are read at runtime (`FotonVersion`). CI job `dotnet` must pass alongside `Pester`.
-
-**Parity with 1.38.x.** Formats that must match the PowerShell line byte for byte (Export-Csv and Out-File output, HTML escaping, report chrome, copy-task status) are checked against golden files in `testdata/golden/`. These files are generated from the frozen module by `tests/golden/Update-Golden.ps1` and committed, so tests never call PowerShell. Regenerate them only when a deliberate difference is agreed, and say why in the PR. `.gitattributes` keeps those bytes free of line-ending conversion.
-
-`foton package <case-folder-or-zip>` opens a package (folder or ZIP; unsafe ZIP paths are refused) and re-checks every file against `00_Collection\hashes.csv`. Use it to try changes on real packages.
-
-Everything below describes the 1.38.x PowerShell tree. **Paths are relative to `legacy/powershell/`.**
+Version and schema numbers live once in [`Directory.Build.props`](../Directory.Build.props) and are read at runtime (`FotonVersion`).
 
 ## Ground rules
 
-1. Read [USAGE.md](USAGE.md) so operator-facing behavior stays consistent.
-2. Prefer **composing** specialist tools (EZ Tools, Hayabusa, KAPE/ORC) over reimplementing them in PowerShell. Native parsers only when PowerShell can emit *correct* fields.
-3. Propose large new capabilities (especially NTFS carve) before building.
-4. Update [USAGE.md](USAGE.md) in the same change when you add or change a public command, flatten switch, or `Foton.cmd` verb.
+1. Read [USAGE.md](USAGE.md) so operator-facing behavior stays consistent, and update it in the same PR when you add or change an executable switch, verb, or output.
+2. Collect and Baseline capture may touch a live host. Parse, Carve, and Analyze read only the package: no live state, no network, identical input gives identical output.
+3. Collectors record facts; analyzers interpret. Never assign severity in Collect.
+4. Nothing is fatal: a task fails into the manifest and error list, never out of the run.
+5. Read-only against the target. The only writes are the output package and the optional `-LoadUserHives` mount, always unloaded in `finally`.
+6. A path read from the host is opened only when it is plainly local (`Hashing.IsLocalPath`), and a cloud-only placeholder is never read (`Hashing.IsCloudPlaceholder`).
+7. UTC everywhere (`yyyy-MM-dd HH:mm:ss`, invariant culture), and SHA-256 on everything collected.
+8. Prefer **composing** specialist tools (EZ Tools, Hayabusa, KAPE/ORC) over reimplementing them. Propose large capabilities (especially NTFS carving) before building.
+9. Public docs use placeholders (`CASE-0001`, `D:\Cases`, `HOSTNAME`), never personal host names.
 
-## Development setup
+## Add a collection task
 
-```powershell
-git clone https://github.com/jimididit/foton.git
-Set-Location foton\legacy\powershell
-Set-ExecutionPolicy -Scope Process Bypass -Force
-Import-Module .\Foton.psd1 -Force
-Get-FotonVersion
-.\tests\Invoke-FotonTests.ps1
-```
+Add a `Task(s, Cat, "<name>", "<description>", TaskFormat.Csv, () => ...)` call in the right `src/Foton.Collect/<Category>Collection.cs`, in the category's task order. Return rows (dictionaries or a row class). Use `elevated: true` for Administrator-only work, so a standard-user run records `SkippedNotElevated` instead of an empty success. Copy tasks return `CopyRow`s through `HostCopy`, so their manifest status reflects per-file failures. Add a unit or integration test in `tests/Foton.Tests/CollectTests.cs`.
 
-Rebuild endpoint scripts after Collect/Baseline source changes:
-
-```powershell
-.\build\Build-Standalone.ps1
-.\build\Build-BaselineStandalone.ps1
-```
-
-Use a throwaway Windows VM for live Collect/Baseline. Collection changes the host.
-
-## Naming and layout
-
-| Rule | Detail |
-|------|--------|
-| One public function per file | Filename = function name (`New-FotonBaseline.ps1`) |
-| Export allow-list | Add the name to `FunctionsToExport` in `Foton.psd1` |
-| Comment-based help | `.SYNOPSIS`, `.DESCRIPTION`, and at least one realistic `.EXAMPLE` |
-| Placeholders in docs | `CASE-0001`, `D:\Cases`, `HOSTNAME` - no personal host names |
-| Layer split | Collect/Baseline may touch a live host. Parse, Carve, and Analyze stay offline |
-
-## Add a live collection task
-
-1. Prefer a new `Invoke-FotonCollection` call in the right category under `src/Public/Collect/`.
-2. Emit facts (paths, hashes, registry values). Do not assign severity in Collect.
-3. Fail into the manifest; never throw out of the orchestrator. Admin-only work uses `RequiresElevation`.
-4. PowerShell **5.1** only in Collect/Baseline (no ternaries, `??`, `-Parallel`, or runtime internet).
-
-Do not embed long LOLBin / credential-theft string lists in Core or the Collect flatten - AMSI will block the script. Keep raw command text in the package; derive hits in Analyze on the workstation.
+Do not ship long LOLBin or credential-theft string lists in an endpoint executable. Keep raw command text in the package and derive hits in Analyze on the workstation (`Foton.Patterns`).
 
 ## Add a baseline provider
 
-Place a provider under `src/Private/Baseline/Providers/`. Document:
+Add a `Provider` to the matching `src/Foton.Baseline.Capture/*Providers.cs` file and list it in `Providers.All`. Document:
 
-- Record type and **stable identity key**
-- Compared fields vs ignored (volatile) fields
-- Likely false positives
+- Record type and **stable identity key** (`IdentityFields`)
+- Compared fields (`ComparedFields`) versus volatile fields left out
+- Likely false positives (`FalsePositives`)
 
-Bump `BaselineSchemaVersion` in `Foton.psd1` when identity keys or compared fields change. Recapture golden/day0 baselines after a schema bump.
+Bump `FotonBaselineSchemaVersion` when records change. If identity keys and compared fields stay the same, add the version and its change note to `BaselineSchema` in `src/Foton.Core/Baseline.cs` so Compare keeps accepting older baselines; otherwise Compare must refuse the old schema.
 
 ## Add an analysis rule
 
-- Input: package data (or a test mock)-never live WMI or the network
-- Output: `Add-FotonFinding` with Tier, Artifact, WhyItMatters (include a benign reading), optional NextStep
-- Tests: one record that must fire, one that must not
-- Never assert compromise, attribution, intent, or causation
-- Shared rule helpers go under `src/Private/Analyze/`. Collect runs analysis at the end of a triage, so the Collect flatten includes those helpers: keep them PowerShell **5.1**-compatible and free of long attack-string lists (AMSI). `tests/Unit/Build.Tests.ps1` fails if a flatten calls a Foton function it does not define
+- Input: package data (or a test fixture), never live state or the network.
+- Output: a finding with Tier, Artifact, WhyItMatters (name a benign reading), and an optional NextStep. Tier 1 is an observed fact, Tier 2 an inference, Tier 3 a hypothesis.
+- Never assert compromise, attribution, intent, or causation. Absence of telemetry is an Info visibility-gap finding, not evidence.
+- Tests: one package that must fire, one that must not.
 
 ## Add a parser
 
-If EZ Tools or Hayabusa already parse the format correctly, prefer copying the artifact into the package and composing that tool on the workstation.
+If EZ Tools or Hayabusa already parse the format correctly, prefer copying the artifact into the package and composing that tool on the workstation. A native parser in `src/Foton.Parse` is a pure function over bytes, wired into `ParseRunner`. Commit a small fixture under `testdata/` (no client data). Unsupported formats get an explicit record, not guessed columns.
 
-A native `ConvertFrom-Foton*` is appropriate only when PowerShell can be correct. Pure function over a path or bytes. Commit a small fixture under `tests/Fixtures/` (no client data). Unsupported formats get an explicit record-not guessed columns.
+## Reports
 
-## Verification
+HTML goes through `Foton.Report`: escape every host value, and include the offline search and section navigation from `ReportChrome`. No CDN, no remote assets.
 
-```powershell
-# Parse check a changed file
-$e = $null; $t = $null
-[System.Management.Automation.Language.Parser]::ParseFile('.\src\Public\Get-FotonVersion.ps1', [ref]$t, [ref]$e) | Out-Null
-if ($e) { $e } else { 'PARSE OK' }
+## Golden files
 
-# Pester 5+
-.\tests\Invoke-FotonTests.ps1
-
-# After Collect/Baseline changes: rebuild + AMSI load check
-.\build\Build-Standalone.ps1
-.\build\Test-FotonAmsiLoad.ps1 -Path .\dist\Foton-Collect.ps1
-```
-
-Accepted ScriptAnalyzer exceptions in this repo include `PSAvoidUsingWriteHost`, empty catch on best-effort collect paths, and a few naming rules. HTML reports must include the offline search/nav chrome (`Get-FotonReportNavCss` and friends)-no CDN.
+`testdata/golden/` holds expected outputs for fixture packages (findings, reports, IOC hits), compared byte for byte. Change them only for a deliberate difference, make the change exactly as large as the behavior change, and say why in the PR. `.gitattributes` keeps those bytes free of line-ending conversion.
 
 ## Branches and pull requests
 
-- Branch from current `main` (`feature/...`, `fix/...`, `chore/...`), push, and open a PR into `main`. Do not commit to `main` directly.
-- The `Pester` and `dotnet` CI checks must pass before merge; `main` is protected. Merged branches are deleted automatically.
-- Keep a PR to one change when practical. Bump `ModuleVersion`, `ReleaseDate`, and the schema version you changed in `Foton.psd1` for behavior or format changes, and add a `ReleaseNotes` entry.
+- Branch from current `main` (`feat/...`, `fix/...`, `docs/...`), push, and open a PR into `main`. `main` is protected; do not commit to it directly.
+- CI must pass before merge. Keep a PR to one change when practical.
+- Behavior or format changes bump the version and schema numbers in `Directory.Build.props` and set `FotonReleaseDate`.
 
 ## Releases
 
-Maintainers release a 1.38.x security fix from `main` after the version PR merges:
-
-1. `legacy/powershell/Foton.psd1` has the new `ModuleVersion`, `ReleaseDate`, and a `ReleaseNotes` entry at the front (the release page shows that entry).
-2. `git tag v<ModuleVersion>` (a `v1.*` tag; `v2` tags belong to the C# release) on the merge commit and push the tag. `.github/workflows/release.yml` refuses a tag that does not match `ModuleVersion`, runs the tests, builds the assets (`build/Build-Release.ps1`), attests provenance, creates the GitHub release, and publishes to the PowerShell Gallery when the `PSGALLERY_API_KEY` repository secret is set.
-3. Run the workflow manually (Actions, Release, Run workflow) for a dry run: same build and tests, assets uploaded as a workflow artifact, nothing published.
-
-`build/Build-Release.ps1` produces the same assets locally in `dist\release`, taking operator docs and `LICENSE` from the repository root (`-DocsRoot`, default two levels up). The workstation zip and Gallery module ship an allow-list (module, `src`, `Foton.cmd` + wrapper, flattens, operator docs); `tests/Unit/Release.Tests.ps1` fails if anything else gets in.
+Maintainers release v2 from `main` after the version PR merges: set `FotonVersion` (and `FotonPrerelease` for a prerelease) and `FotonReleaseDate` in `Directory.Build.props`, then push a `v2.*` tag that matches. `.github/workflows/release-v2.yml` refuses a mismatched tag, builds and tests, writes `SHA256SUMS.txt`, attests build provenance, and creates the GitHub release (a prerelease when the tag has a suffix). Run the workflow manually for a dry run: the executables are uploaded as a workflow artifact and nothing is published.
 
 ## What we will not accept
 
-- Remediation, process kill, quarantine, or “repair” switches
-- Analyze/Parse/Carve that reads the live registry, filesystem state outside the package, or the network
+- Remediation, process kill, quarantine, or "repair" switches
+- Parse, Carve, or Analyze code that reads the live registry, filesystem state outside the package, or the network
 - Findings that assert compromise, attribution, or intent
 - Expanding LOLBin/RAT lists without noting false-positive sources
-- Obfuscating the Collect flatten to evade antivirus
+- Obfuscating or packing an executable to evade antivirus
 
 ## License
 

@@ -64,26 +64,12 @@ Describe 'Foton module scaffold' {
         }
     }
 
-    It 'keeps public docs and the banner on the current version' {
+    It 'keeps the banner on the current version' {
         $man = Import-PowerShellDataFile -LiteralPath $script:FotonPsd1
-        $ver = [string]$man.ModuleVersion
-        $collect = [string]$man.PrivateData.Foton.CollectSchemaVersion
-        $baseline = [string]$man.PrivateData.Foton.BaselineSchemaVersion
         $root = Split-Path $script:FotonPsd1 -Parent
-        # The module lives in legacy\powershell; public docs and LICENSE stay at the repository root.
+        # The module lives in legacy\powershell; LICENSE stays at the repository root. README.md and docs\USAGE.md
+        # describe Foton v2 since Phase 5; the 1.38.x operator docs are the ones at the v1.38.1 tag.
         $repo = [IO.Path]::GetFullPath((Join-Path $root '..\..'))
-        $readme = Get-Content -LiteralPath (Join-Path $repo 'README.md') -Raw
-        $usage = Get-Content -LiteralPath (Join-Path $repo 'docs\USAGE.md') -Raw
-        $readme | Should -Match ([regex]::Escape("badge/module-$ver-"))
-        $usage | Should -Match ([regex]::Escape("module **$ver**, collect schema **$collect**, baseline schema **$baseline**"))
-        foreach ($doc in @($readme, $usage)) {
-            foreach ($m in [regex]::Matches($doc, 'Foton-(Collect|Baseline)_v(?<v>[\d.]+)_schema(?<s>[\d.]+)\.ps1')) {
-                $m.Groups['v'].Value | Should -Be $ver
-                $expectSchema = $collect
-                if ($m.Value -like 'Foton-Baseline*') { $expectSchema = $baseline }
-                $m.Groups['s'].Value | Should -Be $expectSchema
-            }
-        }
         $banner = Get-Content -LiteralPath (Join-Path $root 'src\Private\Core\Write-FotonBanner.ps1') -Raw
         $banner | Should -Not -Match "Updated\s+\d"
         # The Gallery shows the manifest Author; the banner must name the same author.
