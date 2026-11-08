@@ -28,10 +28,12 @@ namespace Foton.Tests
             return dst;
         }
 
+        // Goldens are 1.38.x output with deliberate v2 changes only: the collector-footprint finding names the v2
+        // collector as well as the PowerShell one (Phase 5a).
         [Theory]
         [InlineData("kitchen")]
         [InlineData("fixture")]
-        public void Findings_are_byte_identical_to_1_38(string tag)
+        public void Findings_are_byte_identical_to_the_golden_output(string tag)
         {
             using (var t = new TempDir())
             {
@@ -44,7 +46,7 @@ namespace Foton.Tests
         [Theory]
         [InlineData("kitchen")]
         [InlineData("fixture")]
-        public void Triage_report_matches_1_38_byte_for_byte(string tag)
+        public void Triage_report_matches_the_golden_output_byte_for_byte(string tag)
         {
             using (var t = new TempDir())
             {

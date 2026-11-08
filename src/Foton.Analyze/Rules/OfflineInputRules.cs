@@ -222,9 +222,9 @@ namespace Foton.Analyze.Rules
                     ? F("collection window {0} to {1} UTC", FotonTime.Format(window.StartUtc), FotonTime.Format(window.EndUtc))
                     : @"no collection window could be read from 00_Collection\collection.log";
                 c.Add("Info", "Methodology", 2, "Hayabusa hits caused by the Foton collection itself",
-                    F("{0} Hayabusa row(s) are attributed to the collection and excluded from the severity bands above: {1} fell inside the {2}, and {3} named a Foton function outside it. By level - {4}.",
+                    F("{0} Hayabusa row(s) are attributed to the collection and excluded from the severity bands above: {1} fell inside the {2}, and {3} named the Foton collector outside it. By level - {4}.",
                         selfTotal, selfByWindow, winText, selfByName, string.Join(" | ", selfSamples)),
-                    "Script block logging records the collector's own PowerShell, so Sigma rules for suspicious scripting and for registry or credential access fire on Foton. Left in the counts, that footprint is reported as host activity and can dominate a severity band. Attribution is inference, not process identity: rows are matched by time and by name, so genuine host activity that happened during the collection window is excluded here too, and an earlier Foton run on this host is included.",
+                    "The collector's own activity is logged like any other: script blocks of the 1.38.x PowerShell collector, and process creation for foton-collect.exe and the System32 tools it starts (reg, wevtutil, auditpol, secedit, and others). Sigma rules for suspicious scripting, registry export, and credential or policy access fire on that footprint. Left in the counts, that footprint is reported as host activity and can dominate a severity band. Attribution is inference, not process identity: rows are matched by time and by name, so genuine host activity that happened during the collection window is excluded here too, and an earlier Foton run on this host is included.",
                     "analysis/external/hayabusa",
                     "If a real event could have coincided with the collection, filter the Hayabusa CSV to that window and read the Details column directly rather than relying on this exclusion.");
             }
