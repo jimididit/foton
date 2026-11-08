@@ -15,8 +15,6 @@ namespace Foton.Collect
         public int ArtifactCount { get; internal set; }
         public string? ZipPath { get; internal set; }
         public string? ZipSha256 { get; internal set; }
-        /// <summary>Categories this build does not collect yet (empty once every category is ported).</summary>
-        public IReadOnlyList<string> NotCollected { get; internal set; } = new string[0];
     }
 
     /// <summary>
@@ -35,10 +33,6 @@ namespace Foton.Collect
             s.Status.Write($"Examiner: {TextFile.OneLine(o.Examiner)} | Case: {(string.IsNullOrWhiteSpace(o.CaseNumber) ? "not supplied" : TextFile.OneLine(o.CaseNumber))} | Coverage: {Coverage.Profile(s.IsElevated)}", StatusLevel.Info);
             // From here on nothing ends the run: only creating the case folder above can.
             Guard(s, "chain_of_custody", () => ChainOfCustody.Write(s, HostFacts.Custody()));
-
-            var missing = CaseCategories.All.Select(kv => kv.Key).Where(k => k != "Collection" && !Categories.InOrder.Any(c => c.Key == k)).ToList();
-            if (missing.Count > 0)
-                s.Status.Write($"This v2 pre-release does not collect yet: {string.Join(", ", missing)}. The package is incomplete; use the 1.38.x Collect flatten for casework.", StatusLevel.Warn);
 
             // Every mounted hive is in this list the moment it loads, so the finally block unloads it whatever fails.
             var mounted = new List<string>();
@@ -72,7 +66,7 @@ namespace Foton.Collect
 
             // The manifest and errors are on disk before analysis, which reads the case the way a workstation would.
             Guard(s, "collection_manifest", () => PackageFiles.WriteManifestFiles(s));
-            var result = new CollectResult { Session = s, CaseRoot = root, NotCollected = missing };
+            var result = new CollectResult { Session = s, CaseRoot = root };
             Guard(s, "analysis", () =>
             {
                 s.Findings.AddRange(Analyzer.RunCollected(root, s.StartTimeUtc, o.EventLogDays, s.Status));

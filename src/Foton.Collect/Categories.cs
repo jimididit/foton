@@ -31,6 +31,7 @@ namespace Foton.Collect
             new CollectCategory("Security", SecurityCollection.Run),
             new CollectCategory("Software", SoftwareCollection.Run),
             new CollectCategory("EventLogs", EventLogCollection.Run),
+            new CollectCategory("Filesystem", FilesystemCollection.Run),
         };
     }
 }

@@ -138,6 +138,7 @@ namespace Foton.Tests
             Assert.Equal(ptr == 8 ? 16 : 8, ProcessOwner.StructSize());
             // BG_JOB_TIMES: three FILETIMEs.
             Assert.Equal(24, Bits.StructSize());
+            Assert.Equal(600, FileStreams.StructSize());
         }
 
         [Fact]

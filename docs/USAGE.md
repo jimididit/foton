@@ -15,11 +15,11 @@ You do **not** copy the module tree to a target. You do **not** `Import-Module` 
 
 ### Foton v2 (in development)
 
-There is no public v2 release until `foton-collect.exe` is ported; use 1.38.x for casework. Test builds of the single-file executables (Windows 10 / Server 2016 and newer, in-box .NET Framework 4.6.2+, nothing to install) come from the **Release v2** workflow run manually: it uploads them as a workflow artifact without publishing anything.
+There is no public v2 release until `foton-collect.exe` passes parity testing against 1.38.x; use 1.38.x for casework. Test builds of the single-file executables (Windows 10 / Server 2016 and newer, in-box .NET Framework 4.6.2+, nothing to install) come from the **Release v2** workflow run manually: it uploads them as a workflow artifact without publishing anything.
 
 | Executable | Runs on | Purpose |
 |------------|---------|---------|
-| `foton-collect.exe` | Endpoint | In development. Same switches as the Collect flatten and the same package layout (custody, coverage, manifest, findings, report, hashes, ZIP), but collection categories are still being ported, so its packages are incomplete. Use the 1.38.x Collect flatten |
+| `foton-collect.exe` | Endpoint | In development. Same switches as the Collect flatten and the same package layout (custody, coverage, manifest, findings, report, hashes, ZIP), with every collection category. Administrator-run parity testing against 1.38.x is not finished, so use the 1.38.x Collect flatten for casework |
 | `foton-baseline.exe` | Endpoint | Capture a baseline package (`baseline.json`, `coverage.json`, `Foton_Baseline.html`, hashes, ZIP). Same switches as the Baseline flatten |
 | `foton.exe` | Workstation | `compare` two baselines (`baseline_diff.csv`, `Foton_BaselineCompare.html`); `parse` copied Prefetch, LNK, jumplists, EVTX and Amcache in a package (`analysis\parsed_records.csv`, `Foton_Parse.html`); `analyze` a package with the triage heuristics (`analysis\findings.csv` and `Foton_Report.html`); `ioc` matches an indicator list (`analysis\ioc_matches.csv`); `compose` runs EZ Tools / Hayabusa / Chainsaw on copied package files (`analysis\external\`, `external_parse_inventory.csv`); `tools` lists, installs (pinned, hash-verified) or registers those tools; `carve` signature-scans a copied blob for MZ/PE headers (Tier 3, not NTFS carving); `package` verifies hashes |
 

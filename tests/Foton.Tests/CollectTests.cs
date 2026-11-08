@@ -4,6 +4,7 @@ using System.Linq;
 using Foton.Analyze;
 using Foton.Collect;
 using Foton.Core;
+using Foton.Win;
 using Xunit;
 
 namespace Foton.Tests
@@ -26,11 +27,7 @@ namespace Foton.Tests
                     Assert.True(File.Exists(Path.Combine(col, f)), f);
                 Assert.True(File.Exists(r.ReportPath));
                 Assert.Contains("CASE-0001", File.ReadAllText(Path.Combine(col, "chain_of_custody.txt")));
-                if (Categories.InOrder.Count < CaseCategories.All.Count - 1)
-                {
-                    Assert.Contains("does not collect yet", File.ReadAllText(Path.Combine(col, "collection.log")));
-                    Assert.NotEmpty(r.NotCollected);
-                }
+                Assert.Equal(CaseCategories.All.Select(kv => kv.Key).Where(k => k != "Collection").OrderBy(k => k), Categories.InOrder.Select(c => c.Key).OrderBy(k => k));
                 Assert.Contains(Csv.Read(Path.Combine(col, "hashes.csv")), h => h["RelativePath"] == "Foton_Report.html");
                 Assert.Equal(r.ZipPath, r.CaseRoot + ".zip");
                 Assert.True(File.Exists(r.CaseRoot + "_PACKAGE_HASH.txt"));
@@ -213,6 +210,98 @@ namespace Foton.Tests
                 Assert.Equal(9, events.Single(m => m.Task == "event_log_configuration").Records);
                 Assert.True(File.Exists(Path.Combine(s.Dirs["EventLogs"], "evtx", "System.evtx")));
                 Assert.Equal(s.IsElevated, File.Exists(Path.Combine(s.Dirs["EventLogs"], "evtx", "Security.evtx")));
+            }
+        }
+
+        [Fact]
+        public void Capped_list_copies_newest_first_and_refuses_escapes_and_remote_sources()
+        {
+            using (var t = new TempDir())
+            {
+                var src = Directory.CreateDirectory(Path.Combine(t.Path, "src")).FullName;
+                var older = Path.Combine(src, "older.lnk");
+                var newer = Path.Combine(src, "newer.lnk");
+                File.WriteAllText(older, "aaaa");
+                File.WriteAllText(newer, "bbbbbb");
+                File.SetLastWriteTimeUtc(older, new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+                var dest = Path.Combine(t.Path, "dest");
+                var rows = HostCopy.CappedList(new[]
+                {
+                    new CopyItem(older, @"u\older.lnk"), new CopyItem(newer, @"u\newer.lnk"), new CopyItem(@"\\server\share\x.lnk", "x.lnk"),
+                    new CopyItem(newer, @"..\escape.lnk"), new CopyItem(Path.Combine(src, "gone.lnk"), "gone.lnk"),
+                }, dest, @"08_Filesystem\lnk", skipHashing: false, maxFiles: 1);
+                Assert.Equal(new[] { "CappedSkip", "Copied", "CopyError", "Missing", "SkippedUnc" }, rows.Select(r => r.Status).OrderBy(x => x, StringComparer.Ordinal).ToArray());
+                var copied = rows.Single(r => r.Status == "Copied");
+                Assert.Equal(newer, copied.SourcePath);
+                Assert.Equal(@"08_Filesystem\lnk\u\newer.lnk", copied.DestRelative);
+                Assert.Equal(64, copied.SHA256.Length);
+                Assert.True(File.Exists(Path.Combine(dest, @"u\newer.lnk")));
+                Assert.False(File.Exists(Path.Combine(t.Path, "escape.lnk")));
+                Assert.Equal(TaskStatus.Partial, CopyTaskStatus.Evaluate(rows).Status);
+                Assert.Equal("NoData", HostCopy.CappedList(new CopyItem[0], dest, "", false).Single().Status);
+            }
+        }
+
+        [Fact]
+        public void Family_copy_takes_the_primary_first_and_respects_the_budget()
+        {
+            using (var t = new TempDir())
+            {
+                var src = Directory.CreateDirectory(Path.Combine(t.Path, "src")).FullName;
+                File.WriteAllText(Path.Combine(src, "NTUSER.DAT"), "hive");
+                File.WriteAllText(Path.Combine(src, "NTUSER.DAT.LOG1"), new string('x', 50));
+                File.WriteAllText(Path.Combine(src, "ntuser.ini"), "not family");
+                var rows = HostCopy.Family(Path.Combine(src, "NTUSER.DAT"), Path.Combine(t.Path, "dest"), "rel", false, maxTotalBytes: 10);
+                Assert.Equal(new[] { "NTUSER.DAT", "NTUSER.DAT.LOG1" }, rows.Select(r => Path.GetFileName(r.SourcePath)).ToArray());
+                Assert.Equal(new[] { "Copied", "CappedSkip" }, rows.Select(r => r.Status).ToArray());
+                Assert.Equal(@"rel\NTUSER.DAT", rows[0].DestRelative);
+                Assert.Equal("Missing", HostCopy.Family(Path.Combine(src, "none.hve"), t.Path, "", false).Single().Status);
+                Assert.Equal("Missing", HostCopy.CappedDirectory(Path.Combine(src, "nodir"), "*.pf", t.Path, "", false).Single().Status);
+                Assert.Equal("NoData", HostCopy.CappedDirectory(src, "*.pf", t.Path, "", false).Single().Status);
+                Assert.Equal("a_b_c", HostCopy.SafeSegment("a:b?c"));
+                Assert.Equal("unknown", HostCopy.SafeSegment(" "));
+                Assert.Equal("__", HostCopy.SafeSegment(".."));
+                Assert.True(HostCopy.IsSid("S-1-5-21-1-2-3-1001"));
+                Assert.False(HostCopy.IsSid("S-1-5-21-1\" \"C:\\x"));
+            }
+        }
+
+        [Fact]
+        public void Streams_bam_times_and_task_scripts_decode_like_1_38()
+        {
+            using (var t = new TempDir())
+            {
+                var f = Path.Combine(t.Path, "dl.exe");
+                File.WriteAllText(f, "x");
+                File.WriteAllText(@"\\?\" + f + ":Zone.Identifier", "[ZoneTransfer]\r\nZoneId=3\r\n");
+                var streams = FileStreams.List(f);
+                Assert.Contains(streams, x => x.Stream == ":$DATA");
+                Assert.Contains(streams, x => x.Stream == "Zone.Identifier" && x.Length > 0);
+                using (var r = new StreamReader(FileStreams.Open(f, "Zone.Identifier"))) Assert.StartsWith("[ZoneTransfer]", r.ReadToEnd());
+                Assert.Empty(FileStreams.List(@"\\server\share\x.exe"));
+            }
+            Assert.Equal("(not set)", FilesystemCollection.FileTimeText(null));
+            Assert.Equal("(not set)", FilesystemCollection.FileTimeText(new byte[4]));
+            Assert.Equal("(unparsed)", FilesystemCollection.FileTimeText("text"));
+            Assert.Equal("2026-01-02 03:04:05", FilesystemCollection.FileTimeText(BitConverter.GetBytes(new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc).ToFileTimeUtc())));
+            Assert.Equal(new[] { @"C:\Scripts\run.ps1", @"\\srv\share\x.bat" },
+                FilesystemCollection.TaskActionScriptPaths("powershell.exe", @"-File ""C:\Scripts\run.ps1"" \\srv\share\x.bat").ToArray());
+            Assert.Equal(new[] { @"C:\Tools\job.cmd" }, FilesystemCollection.TaskActionScriptPaths(@"C:\Tools\job.cmd", "").ToArray());
+            Assert.Empty(FilesystemCollection.TaskActionScriptPaths("notepad.exe", "readme.txt"));
+        }
+
+        [Fact]
+        public void Filesystem_runs_every_task()
+        {
+            using (var t = new TempDir())
+            {
+                var s = CollectRun.NewSession(new SessionOptions { OutputPath = t.Path, NoZip = true, SkipHashing = true }, Quiet());
+                CollectRun.Run(s, only: new[] { "Filesystem" });
+                var fs = s.Manifest.Where(m => m.Category == "Filesystem").ToList();
+                Assert.Equal(21, fs.Count);
+                Assert.DoesNotContain(fs, m => m.Status == TaskStatus.WriteError || m.Status == TaskStatus.Error);
+                foreach (var name in new[] { "prefetch_files", "registry_hives_machine", "browser_databases", "host_text_logs" })
+                    Assert.Equal(s.IsElevated, fs.Single(m => m.Task == name).Status != TaskStatus.SkippedNotElevated);
             }
         }
 
