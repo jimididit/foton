@@ -25,6 +25,17 @@ namespace Foton.Cli
                 return IocCommand(args[1], args[2]);
             if (args.Length == 2 && string.Equals(args[0], "compose", StringComparison.OrdinalIgnoreCase))
                 return ComposeCommand(args[1]);
+            if (args.Length >= 2 && string.Equals(args[0], "carve", StringComparison.OrdinalIgnoreCase))
+            {
+                int maxBytes = Foton.Carve.Carver.DefaultMaxBytes, maxHits = Foton.Carve.Carver.DefaultMaxHits;
+                for (int i = 2; i < args.Length; i++)
+                {
+                    if (i + 1 < args.Length && string.Equals(args[i], "-MaxBytes", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out maxBytes) && maxBytes >= 0) i++;
+                    else if (i + 1 < args.Length && string.Equals(args[i], "-MaxHits", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out maxHits) && maxHits >= 0) i++;
+                    else return Usage();
+                }
+                return CarveCommand(args[1], maxBytes, maxHits);
+            }
             if (args.Length >= 1 && args.Length <= 4 && string.Equals(args[0], "tools", StringComparison.OrdinalIgnoreCase))
             {
                 var rest = args.Skip(1).ToList();
@@ -73,8 +84,10 @@ namespace Foton.Cli
             Console.WriteLine("                                        diff two baselines (baseline.json or package folder);");
             Console.WriteLine("                                        writes baseline_diff.csv and Foton_BaselineCompare.html");
             Console.WriteLine("                                        beside the difference baseline");
+            Console.WriteLine("  foton carve <blob> [-MaxBytes <n>] [-MaxHits <n>]");
+            Console.WriteLine("                                        MZ/PE signature scan of a copied blob (Tier 3; not NTFS carving);");
+            Console.WriteLine("                                        defaults 8 MiB and 50 hits");
             Console.WriteLine();
-            Console.WriteLine("Carve is not implemented in this v2 pre-release.");
             Console.WriteLine("For casework use Foton 1.38.x (the Foton-Workstation_v1.38.1.zip module) from https://github.com/jimididit/foton/releases.");
             return 1;
         }
@@ -249,6 +262,26 @@ namespace Foton.Cli
                     r.Status == "Copied" ? ConsoleColor.White : ConsoleColor.DarkGray);
             log.Write(@"Inventory: analysis\external\external_parse_inventory.csv. Native foton parse if tools are missing.", StatusLevel.Good);
             log.WriteConsole("     Missing Hayabusa: foton tools Hayabusa. Existing EZ Tools / Chainsaw folder: foton tools EZTools <dir>", ConsoleColor.DarkGray);
+            return 0;
+        }
+
+        /// <summary>Exit 0 after a scan (hits are Tier 3 leads, not failures), 1 when the blob cannot be read.</summary>
+        static int CarveCommand(string path, int maxBytes, int maxHits)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Carve);
+            Foton.Carve.CarveRun run;
+            try { run = Foton.Carve.Carver.Scan(path, maxBytes, maxHits); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+            {
+                log.Write("Cannot carve: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
+            foreach (var h in run.Hits)
+                log.WriteConsole($"   {h.Offset,12}  {h.Kind,-3}  {h.WindowSha256}", ConsoleColor.White);
+            log.Write($"Carve signature hits: {run.Hits.Count} (scanned {run.BytesScanned} bytes, NTFS unallocated parser not used)", StatusLevel.Good);
+            if (run.Hits.Count >= maxHits) log.Write($"Stopped at the {maxHits}-hit cap; raise -MaxHits to see more.", StatusLevel.Warn);
+            log.WriteConsole("     " + Foton.Carve.Carver.HitNote + " Packed installers, memory dumps, and coincidence also match; this is not evidence the file ran.", ConsoleColor.DarkGray);
             return 0;
         }
 
