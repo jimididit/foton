@@ -1,0 +1,5 @@
+ApplicationName,ProgramId,FileKeyLastWriteTimestamp,SHA1,IsOsComponent,FullPath,Name,FileExtension,LinkDate,ProductName,Size,Version,ProductVersion,LongPathHash,BinaryType,IsPeFile,BinFileVersion,BinProductVersion,Usn,Language,Description,OriginalFileName,Publisher,Sha256,KeyName,AppxPackageFullName,AppxPackageRelativeId
+Unassociated,,,,True,c:\windows\notepad.exe,,.exe,,,,,,,,,,,,,,,,,aa01,,
+Unassociated,,,,False,c:\users\user1\appdata\local\temp\x1\update.exe,,.exe,,,,,,,,,,,,,,,,,aa02,,
+Unassociated,,,,False,c:\users\user1\downloads\readme.txt,,.txt,,,,,,,,,,,,,,,,,aa03,,
+Unassociated,,,,True,c:\windows\temp\cab1\dismhost.exe,,.exe,,,,,,,,,,,,,,,,,aa04,,

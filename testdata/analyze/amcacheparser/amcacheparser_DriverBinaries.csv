@@ -1,0 +1,4 @@
+KeyName,KeyLastWriteTimestamp,DriverTimeStamp,DriverLastWriteTime,DriverName,DriverInBox,DriverIsKernelMode,DriverSigned,DriverCheckSum,DriverCompany,DriverId,DriverPackageStrongName,DriverType,DriverVersion,ImageSize,Inf,Product,ProductVersion,Service,WdfVersion
+c:/windows/system32/drivers/disk.sys,,,,disk.sys,True,,True,,,,,,,,,,,,
+c:/windows/system32/drivers/vulnkit.sys,,,,vulnkit.sys,False,,False,,,,,,,,,,,,
+c:/windows/system32/drivers/oldinbox.sys,,,,oldinbox.sys,True,,False,,,,,,,,,,,,
