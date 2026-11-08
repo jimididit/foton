@@ -191,7 +191,7 @@ namespace Foton.Tests
                 // Partial is legitimate on a standard-user CI runner; an escaped exception is not.
                 Assert.All(r.Coverage, c => Assert.NotEqual("Error", c.Status));
                 Assert.All(r.Coverage.Where(c => c.Status == "Partial"), c => Assert.NotEqual("", c.Error));
-                Assert.Equal("1.15.0", r.Document.Header.BaselineSchemaVersion);
+                Assert.Equal(FotonVersion.BaselineSchema, r.Document.Header.BaselineSchemaVersion);
                 var json = BaselineCapture.WriteJson(r, t.File("snap.json"));
                 var reloaded = BaselineDocument.Load(json);
                 Assert.True(reloaded.PayloadMatches());

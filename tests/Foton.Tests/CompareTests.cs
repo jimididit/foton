@@ -130,14 +130,23 @@ namespace Foton.Tests
         }
 
         [Fact]
-        public void Schema_mismatch_is_refused_except_the_1_14_to_1_15_value_only_change()
+        public void Schema_mismatch_is_refused_except_the_value_only_changes_since_1_14()
         {
             var a = new BaselineDocument { Header = { BaselineSchemaVersion = "1.13.0" } };
             var b = new BaselineDocument { Header = { BaselineSchemaVersion = "1.14.0" } };
             var c = new BaselineDocument { Header = { BaselineSchemaVersion = "1.15.0" } };
+            var d = new BaselineDocument { Header = { BaselineSchemaVersion = "1.16.0" } };
             Assert.Throws<InvalidDataException>(() => BaselineComparer.Compare(a, b, "x.json"));
-            var r = BaselineComparer.Compare(b, c, "x.json");
-            Assert.Contains("(not reported)", r.SchemaNote);
+            Assert.Throws<InvalidDataException>(() => BaselineComparer.Compare(a, d, "x.json"));
+            var bc = BaselineComparer.Compare(b, c, "x.json").SchemaNote!;
+            Assert.Contains("(not reported)", bc);
+            Assert.DoesNotContain("Namespace64", bc);
+            var cd = BaselineComparer.Compare(c, d, "x.json").SchemaNote!;
+            Assert.Contains("Namespace64", cd);
+            Assert.DoesNotContain("(not reported)", cd);
+            var db = BaselineComparer.Compare(d, b, "x.json").SchemaNote!;
+            Assert.Contains("(not reported)", db);
+            Assert.Contains("Namespace64", db);
             Assert.Null(BaselineComparer.Compare(b, b, "x.json").SchemaNote);
         }
 
