@@ -129,6 +129,9 @@ namespace Foton.Tests
             int ptr = IntPtr.Size;
             // LOCALGROUP_INFO_0 { LPWSTR }; LOCALGROUP_MEMBERS_INFO_2 { PSID; SID_NAME_USE; LPWSTR } (padded on x64).
             Assert.Equal(new[] { ptr, ptr == 8 ? 24 : 12 }, LocalGroups.StructSizes());
+            // USER_INFO_0 { LPWSTR }; USER_INFO_4 (29 fields: 15 pointers, 14 DWORDs, padded on x64);
+            // USER_INFO_24 { BOOL; DWORD; LPWSTR; LPWSTR; PSID }; USER_MODALS_INFO_0 (5 DWORDs).
+            Assert.Equal(new[] { ptr, ptr == 8 ? 192 : 116, ptr == 8 ? 32 : 20, 20 }, LocalUsers.StructSizes());
         }
 
         [Fact]

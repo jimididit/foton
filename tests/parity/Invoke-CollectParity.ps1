@@ -23,20 +23,24 @@ param(
     [ValidateSet('Processes', 'Network', 'Users', 'System', 'Persistence', 'Security', 'Software', 'EventLogs', 'Filesystem')]
     [string[]]$Category = @(),
     [string]$OutputPath = (Join-Path $env:TEMP 'foton-collect-parity'),
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    # Re-compare the case folders already under -OutputPath without collecting again.
+    [switch]$CompareOnly
 )
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-if (-not $NoBuild) {
+if (-not $NoBuild -and -not $CompareOnly) {
     & dotnet build (Join-Path $root 'Foton.sln') -c Release --nologo -v q | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'dotnet build failed.' }
 }
 $probe = Join-Path $root 'tests\Foton.CollectProbe\bin\Release\net472\Foton.CollectProbe.exe'
 $legacy = Join-Path $root 'legacy\powershell\Foton.psd1'
-if (Test-Path -LiteralPath $OutputPath) { Remove-Item -LiteralPath $OutputPath -Recurse -Force }
 $psOut = Join-Path $OutputPath 'ps'
 $csOut = Join-Path $OutputPath 'cs'
-New-Item -ItemType Directory -Path $psOut, $csOut | Out-Null
+if (-not $CompareOnly) {
+    if (Test-Path -LiteralPath $OutputPath) { Remove-Item -LiteralPath $OutputPath -Recurse -Force }
+    New-Item -ItemType Directory -Path $psOut, $csOut | Out-Null
+}
 
 $functions = @{
     Processes = 'Invoke-FotonProcessCollection'; Network = 'Invoke-FotonNetworkCollection'; Users = 'Invoke-FotonUserCollection'
@@ -67,20 +71,24 @@ $legacyRun = @"
     `$null = Write-FotonArtifactHashes
 }
 "@
-Write-Host "1.38.x: $($Category -join ', ')" -ForegroundColor Cyan
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -Command $legacyRun *> (Join-Path $OutputPath 'ps.log')
-Write-Host "v2:     $($Category -join ', ')" -ForegroundColor Cyan
-& $probe -OutputPath $csOut -Category ($Category -join ',') *> (Join-Path $OutputPath 'cs.log')
+if (-not $CompareOnly) {
+    Write-Host "1.38.x: $($Category -join ', ')" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command $legacyRun *> (Join-Path $OutputPath 'ps.log')
+    Write-Host "v2:     $($Category -join ', ')" -ForegroundColor Cyan
+    & $probe -OutputPath $csOut -Category ($Category -join ',') *> (Join-Path $OutputPath 'cs.log')
+}
 
 $psCase = (Get-ChildItem -LiteralPath $psOut -Directory | Select-Object -First 1).FullName
 $csCase = (Get-ChildItem -LiteralPath $csOut -Directory | Select-Object -First 1).FullName
 if (-not $psCase -or -not $csCase) { throw "A run produced no case folder (ps: $psCase, cs: $csCase)." }
 
-function Show([string]$Title, $Rows) {
+function Show([string]$Title, $Rows, [switch]$List) {
     Write-Host ''
     Write-Host "== $Title" -ForegroundColor Yellow
     $Rows = @($Rows | Where-Object { $null -ne $_ })
-    if ($Rows.Count -eq 0) { Write-Host '   (no differences)' -ForegroundColor Green } else { $Rows | Format-Table -AutoSize -Wrap | Out-String -Width 220 | Write-Host }
+    if ($Rows.Count -eq 0) { Write-Host '   (no differences)' -ForegroundColor Green }
+    elseif ($List) { $Rows | Format-List | Out-String -Width 220 | Write-Host }
+    else { $Rows | Format-Table -AutoSize -Wrap | Out-String -Width 220 | Write-Host }
 }
 
 # 00_Collection file set (hashes and the report are compared by presence only).
@@ -124,8 +132,30 @@ function Shape([string]$Path) {
             $items = @($j); $keys = if ($items.Count -and $items[0] -is [psobject]) { ($items[0].PSObject.Properties.Name | Sort-Object) -join ',' } else { '' }
             return "items=$($items.Count) keys=$keys"
         }
-        default { return 'lines=' + @(Get-Content -LiteralPath $Path).Count }
+        # Text artifacts differ in table layout (PowerShell formatter vs v2), so compare their section headers.
+        default { return 'sections=' + ((Get-Content -LiteralPath $Path | Where-Object { $_ -match '^--- .* ---$' }) -join ' ') }
     }
+}
+
+# Per-column count of differing values between two CSV/JSON artifacts, without printing any value (host data).
+function ValueDiff([string]$A, [string]$B) {
+    $ext = [IO.Path]::GetExtension($A).ToLowerInvariant()
+    if ($ext -notin '.csv', '.json' -or -not (Test-Path -LiteralPath $A) -or -not (Test-Path -LiteralPath $B)) { return '' }
+    try {
+        if ($ext -eq '.csv') { $ra = @(Import-Csv -LiteralPath $A); $rb = @(Import-Csv -LiteralPath $B) }
+        else { $ra = @(Get-Content -LiteralPath $A -Raw | ConvertFrom-Json); $rb = @(Get-Content -LiteralPath $B -Raw | ConvertFrom-Json) }
+    }
+    catch { return '' }
+    if ($ra.Count -eq 0 -or $ra.Count -ne $rb.Count -or -not ($ra[0] -is [psobject])) { return '' }
+    $cols = $ra[0].PSObject.Properties.Name
+    $out = foreach ($c in $cols) {
+        $n = 0
+        for ($i = 0; $i -lt $ra.Count; $i++) {
+            if ((ConvertTo-Json -Compress -Depth 4 $ra[$i].$c) -cne (ConvertTo-Json -Compress -Depth 4 $rb[$i].$c)) { $n++ }
+        }
+        if ($n) { "$c($n)" }
+    }
+    return ($out -join ' ')
 }
 $psMan = @(Import-Csv -LiteralPath (Join-Path $psCase '00_Collection\collection_manifest.csv'))
 $csMan = @(Import-Csv -LiteralPath (Join-Path $csCase '00_Collection\collection_manifest.csv'))
@@ -135,11 +165,12 @@ $taskDiff = foreach ($t in $tasks) {
     $b = $csMan | Where-Object Task -eq $t | Select-Object -First 1
     $sa = if ($a) { Shape (Join-Path $psCase $a.File) } else { 'not run' }
     $sb = if ($b) { Shape (Join-Path $csCase $b.File) } else { 'not run' }
-    if (-not $a -or -not $b -or $a.File -ne $b.File -or $a.Status -ne $b.Status -or $sa -ne $sb) {
-        [PSCustomObject]@{ Task = $t; '1.38.x' = "$($a.Status) $($a.Records) | $sa"; v2 = "$($b.Status) $($b.Records) | $sb" }
+    $vd = if ($a -and $b) { ValueDiff (Join-Path $psCase $a.File) (Join-Path $csCase $b.File) } else { '' }
+    if (-not $a -or -not $b -or $a.File -ne $b.File -or $a.Status -ne $b.Status -or $sa -ne $sb -or $vd) {
+        [PSCustomObject]@{ Task = $t; '1.38.x' = "$($a.Status) $($a.Records) | $sa"; v2 = "$($b.Status) $($b.Records) | $sb"; 'Differing values' = $vd }
     }
 }
-Show "Tasks ($($tasks.Count) run; rows below differ in file, status, or shape)" @($taskDiff)
+Show "Tasks ($($tasks.Count) run; rows below differ in file, status, shape, or values)" @($taskDiff) -List
 
 $psFind = @(Import-Csv -LiteralPath (Join-Path $psCase '00_Collection\findings.csv') -ErrorAction SilentlyContinue | ForEach-Object Title)
 $csFind = @(Import-Csv -LiteralPath (Join-Path $csCase '00_Collection\findings.csv') -ErrorAction SilentlyContinue | ForEach-Object Title)
