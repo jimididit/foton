@@ -20,7 +20,7 @@ There is no public v2 release until `foton-collect.exe` is ported; use 1.38.x fo
 | Executable | Runs on | Purpose |
 |------------|---------|---------|
 | `foton-baseline.exe` | Endpoint | Capture a baseline package (`baseline.json`, `coverage.json`, `Foton_Baseline.html`, hashes, ZIP). Same switches as the Baseline flatten |
-| `foton.exe` | Workstation | `compare` two baselines (`baseline_diff.csv`, `Foton_BaselineCompare.html`); `parse` copied Prefetch, LNK, jumplists, EVTX and Amcache in a package (`analysis\parsed_records.csv`, `Foton_Parse.html`); `analyze` a package with the triage heuristics (`analysis\findings.csv` and `Foton_Report.html`); `ioc` matches an indicator list (`analysis\ioc_matches.csv`); `compose` runs EZ Tools / Hayabusa / Chainsaw on copied package files (`analysis\external\`, `external_parse_inventory.csv`); `tools` lists, installs (pinned, hash-verified) or registers those tools; `package` verifies hashes |
+| `foton.exe` | Workstation | `compare` two baselines (`baseline_diff.csv`, `Foton_BaselineCompare.html`); `parse` copied Prefetch, LNK, jumplists, EVTX and Amcache in a package (`analysis\parsed_records.csv`, `Foton_Parse.html`); `analyze` a package with the triage heuristics (`analysis\findings.csv` and `Foton_Report.html`); `ioc` matches an indicator list (`analysis\ioc_matches.csv`); `compose` runs EZ Tools / Hayabusa / Chainsaw on copied package files (`analysis\external\`, `external_parse_inventory.csv`); `tools` lists, installs (pinned, hash-verified) or registers those tools; `carve` signature-scans a copied blob for MZ/PE headers (Tier 3, not NTFS carving); `package` verifies hashes |
 
 ```powershell
 .\foton-baseline.exe -OutputPath D:\Baselines -NoZip        # package folder (Desktop by default)
@@ -35,6 +35,7 @@ There is no public v2 release until `foton-collect.exe` is ported; use 1.38.x fo
 .\foton.exe tools Hayabusa D:\Offline\hayabusa-4.0.0-win-x64.zip  # air-gapped install, same hash check
 .\foton.exe tools EZTools C:\Tools\EZTools                 # register an existing folder (also Chainsaw <dir>); nothing downloaded
 .\foton.exe compose D:\Cases\Foton_HOSTNAME_20260823-011150Z # extracted case folder only; then analyze again
+.\foton.exe carve D:\evidence\unalloc-sample.bin -MaxBytes 67108864 -MaxHits 200  # defaults 8 MiB / 50 hits
 ```
 
 Tools live under `%LOCALAPPDATA%\Foton\tools` and are recorded in `tools.json`, the same file 1.38.x uses, so registrations carry over in both directions. PATH is never changed. `compose` refuses a ZIP: its output belongs in the case folder, so extract the ZIP first.

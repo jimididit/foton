@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Offline signature scans over blobs already copied to the workstation. Never reads a live volume. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+  </ItemGroup>
+</Project>
