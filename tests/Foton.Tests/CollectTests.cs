@@ -208,6 +208,7 @@ namespace Foton.Tests
             Assert.Equal(Environment.GetFolderPath(Environment.SpecialFolder.Windows) + @"\system32\svchost.exe",
                 PersistenceCollection.ServiceExe(@"%SystemRoot%\system32\svchost.exe -k netsvcs -p"), StringComparer.OrdinalIgnoreCase);
             Assert.Equal(@"C:\tool\run", PersistenceCollection.ServiceExe(@"C:\tool\run --flag"));
+            Assert.Equal(@"C:\Apps\x.exeutil\svc.exe", PersistenceCollection.ServiceExe(@"C:\Apps\x.exeutil\svc.exe /run"));
             Assert.Equal("", PersistenceCollection.ServiceExe(""));
         }
 

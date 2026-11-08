@@ -242,7 +242,7 @@ namespace Foton.Collect
             return rows.OrderByDescending(r => (string)r["ModifiedUtc"]!, StringComparer.Ordinal).ThenBy(r => (string)r["FullName"]!, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        static readonly Regex ExeInPath = new Regex(@"^(.*?\.exe)", RegexOptions.IgnoreCase);
+        static readonly Regex ExeInPath = new Regex(@"^(.*?\.exe)(?=\s|$)", RegexOptions.IgnoreCase);
         static readonly Regex PerUserInstance = new Regex("^(?<base>.+)_[0-9a-fA-F]{4,8}$");
         const string ServicesKey = @"HKLM:\SYSTEM\CurrentControlSet\Services\";
 
@@ -360,7 +360,10 @@ namespace Foton.Collect
             foreach (var v in Reg.ValueList(SessionManager + @"\AppCertDlls")) Add("AppCertDlls", v.Key, v.Name, v.Value);
             var smNames = new[] { "BootExecute", "SetupExecute", "Execute", "S0InitialCommand", "PendingFileRenameOperations" };
             foreach (var v in Reg.ValueList(SessionManager).Where(v => smNames.Contains(v.Name, StringComparer.OrdinalIgnoreCase))) Add("SessionManager", v.Key, v.Name, v.Value);
-            foreach (var v in Reg.ValueList(@"HKLM:\SYSTEM\CurrentControlSet\Control\Print\Monitors")) Add("PrintMonitor", v.Key, v.Name, v.Value);
+            // Each monitor is a subkey whose Driver DLL the spooler loads as SYSTEM.
+            const string monitors = @"HKLM:\SYSTEM\CurrentControlSet\Control\Print\Monitors";
+            foreach (var sub in Reg.SubKeyNames(monitors))
+                Add("PrintMonitor", Reg.Join(monitors, sub), sub, Reg.Value(Reg.Join(monitors, sub), "Driver") is object d ? BaselineDocument.PsString(d) : "");
             foreach (var v in Reg.ValueList(@"HKLM:\SOFTWARE\Microsoft\Netsh")) Add("NetshHelper", v.Key, v.Name, v.Value);
             foreach (var h in hives)
             {
@@ -422,7 +425,7 @@ namespace Foton.Collect
         static object WinsockLsp()
         {
             const string proto = @"HKLM:\SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\Protocol_Catalog9";
-            const string ns = @"HKLM:\SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\NameSpace_Catalog5\Catalog_Entries";
+            const string ns = @"HKLM:\SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\NameSpace_Catalog5";
             var rows = new List<Dictionary<string, object?>>();
             foreach (var leaf in new[] { "Catalog_Entries", "Catalog_Entries64" })
             {
@@ -434,10 +437,15 @@ namespace Foton.Collect
                     ["Kind"] = kind, ["Entry"] = e, ["LibraryPath"] = RegDecode.WinsockPackedPath(Reg.Value(Reg.Join(root, e), "PackedCatalogItem")),
                 }));
             }
-            rows.AddRange(Reg.SubKeyNames(ns).Select(e => new Dictionary<string, object?>
+            foreach (var leaf in new[] { "Catalog_Entries", "Catalog_Entries64" })
             {
-                ["Kind"] = "Namespace", ["Entry"] = e, ["LibraryPath"] = NotSet(Reg.Value(Reg.Join(ns, e), "LibraryPath")),
-            }));
+                var root = Reg.Join(ns, leaf);
+                var kind = leaf == "Catalog_Entries64" ? "Namespace64" : "Namespace";
+                rows.AddRange(Reg.SubKeyNames(root).Select(e => new Dictionary<string, object?>
+                {
+                    ["Kind"] = kind, ["Entry"] = e, ["LibraryPath"] = NotSet(Reg.Value(Reg.Join(root, e), "LibraryPath")),
+                }));
+            }
             return rows;
         }
 
