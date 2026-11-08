@@ -20,7 +20,7 @@ There is no public v2 release until `foton-collect.exe` is ported; use 1.38.x fo
 | Executable | Runs on | Purpose |
 |------------|---------|---------|
 | `foton-baseline.exe` | Endpoint | Capture a baseline package (`baseline.json`, `coverage.json`, `Foton_Baseline.html`, hashes, ZIP). Same switches as the Baseline flatten |
-| `foton.exe` | Workstation | `compare` two baselines (`baseline_diff.csv`, `Foton_BaselineCompare.html`); `parse` copied Prefetch, LNK, jumplists, EVTX and Amcache in a package (`analysis\parsed_records.csv`, `Foton_Parse.html`); `analyze` a package with the triage heuristics (`analysis\findings.csv` and `Foton_Report.html`); `ioc` matches an indicator list (`analysis\ioc_matches.csv`); `package` verifies hashes |
+| `foton.exe` | Workstation | `compare` two baselines (`baseline_diff.csv`, `Foton_BaselineCompare.html`); `parse` copied Prefetch, LNK, jumplists, EVTX and Amcache in a package (`analysis\parsed_records.csv`, `Foton_Parse.html`); `analyze` a package with the triage heuristics (`analysis\findings.csv` and `Foton_Report.html`); `ioc` matches an indicator list (`analysis\ioc_matches.csv`); `compose` runs EZ Tools / Hayabusa / Chainsaw on copied package files (`analysis\external\`, `external_parse_inventory.csv`); `tools` lists, installs (pinned, hash-verified) or registers those tools; `package` verifies hashes |
 
 ```powershell
 .\foton-baseline.exe -OutputPath D:\Baselines -NoZip        # package folder (Desktop by default)
@@ -30,7 +30,14 @@ There is no public v2 release until `foton-collect.exe` is ported; use 1.38.x fo
 .\foton.exe parse D:\Cases\Foton_HOSTNAME_20260823-011150Z  # case folder or ZIP; a single file prints its rows
 .\foton.exe analyze D:\Cases\Foton_HOSTNAME_20260823-011150Z # re-run after parse / compose / compare to include their output
 .\foton.exe ioc D:\Cases\Foton_HOSTNAME_20260823-011150Z D:\intel\iocs.txt  # sha256: / path: / text: lines, or .csv / .json
+.\foton.exe tools                                          # pinned and registered tools, and where compose finds them
+.\foton.exe tools Hayabusa                                 # download the pinned release, verify SHA-256, install (asks first; -Force skips)
+.\foton.exe tools Hayabusa D:\Offline\hayabusa-4.0.0-win-x64.zip  # air-gapped install, same hash check
+.\foton.exe tools EZTools C:\Tools\EZTools                 # register an existing folder (also Chainsaw <dir>); nothing downloaded
+.\foton.exe compose D:\Cases\Foton_HOSTNAME_20260823-011150Z # extracted case folder only; then analyze again
 ```
+
+Tools live under `%LOCALAPPDATA%\Foton\tools` and are recorded in `tools.json`, the same file 1.38.x uses, so registrations carry over in both directions. PATH is never changed. `compose` refuses a ZIP: its output belongs in the case folder, so extract the ZIP first.
 
 The executables are not Authenticode-signed yet, so SmartScreen may warn on first run. Compare the hash with `SHA256SUMS.txt`, run `gh attestation verify .\foton-baseline.exe --repo jimididit/foton`, then `Unblock-File`. v2 writes baseline schema **1.15.0**; `foton compare` accepts a 1.14.0 baseline from 1.38.x and prints which one-time format and coverage differences to expect. v2 `parse` also returns EVTX events and automatic-destinations jumplist entries that 1.38.x `Invoke-FotonParse` silently missed.
 
