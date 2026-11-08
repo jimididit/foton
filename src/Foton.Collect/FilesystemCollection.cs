@@ -88,6 +88,7 @@ namespace Foton.Collect
         internal static bool IsCaseOutputPath(FotonSession s, string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;
+            if (!string.IsNullOrEmpty(s.CaseRoot) && path.StartsWith(s.CaseRoot!.TrimEnd('\\', '/') + "\\", StringComparison.OrdinalIgnoreCase)) return true;
             var m = PackageFolder.Match(path);
             if (!m.Success) return false;
             var root = m.Groups["root"].Value;

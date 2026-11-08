@@ -291,6 +291,23 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Profile_scans_skip_this_case_and_marked_earlier_packages_only()
+        {
+            using (var t = new TempDir())
+            {
+                var s = CollectRun.NewSession(new SessionOptions { OutputPath = t.Path }, Quiet());
+                CaseLayout.Create(s, Path.Combine(t.Path, "out"));
+                var earlier = Directory.CreateDirectory(Path.Combine(t.Path, @"old\Foton_HOST_20260101-000000Z\00_Collection")).Parent!.FullName;
+                File.WriteAllText(Path.Combine(earlier, @"00_Collection\collection.log"), "log");
+                var lookalike = Directory.CreateDirectory(Path.Combine(t.Path, @"fake\Foton_HOST_20260101-000000Z")).FullName;
+                Assert.True(FilesystemCollection.IsCaseOutputPath(s, Path.Combine(s.CaseRoot!, @"08_Filesystem\x.exe")));
+                Assert.True(FilesystemCollection.IsCaseOutputPath(s, Path.Combine(earlier, "a.lnk")));
+                Assert.False(FilesystemCollection.IsCaseOutputPath(s, Path.Combine(lookalike, "payload.exe")));
+                Assert.Equal(new[] { earlier }, s.ExcludedEarlierPackages.ToArray());
+            }
+        }
+
+        [Fact]
         public void Filesystem_runs_every_task()
         {
             using (var t = new TempDir())
