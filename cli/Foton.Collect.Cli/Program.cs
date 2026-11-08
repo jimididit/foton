@@ -68,10 +68,11 @@ namespace Foton.Collect.Cli
 
             CollectResult r;
             try { r = CollectRun.Run(s); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+            catch (Exception ex)
             {
-                // Only creating the case folder can end a run (no writable output path).
-                log.Write("Cannot create the case folder: " + ex.Message, StatusLevel.Error);
+                // Tasks and categories record their own failures; this is the output path or package writing failing.
+                log.Write("Collection stopped: " + ex.Message, StatusLevel.Error);
+                if (s.CaseRoot != null) log.Write("Partial case folder (not hashed): " + s.CaseRoot, StatusLevel.Warn);
                 return 1;
             }
             Summary(log, r);

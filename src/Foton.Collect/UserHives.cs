@@ -19,9 +19,9 @@ namespace Foton.Collect
         public const string MountPrefix = "Foton";
         static readonly System.Text.RegularExpressions.Regex UserSid = new System.Text.RegularExpressions.Regex(@"^S-1-5-21(-\d+)+$");
 
-        public static List<string> Load(FotonSession s)
+        /// <summary>Mounts offline hives, adding each to <paramref name="mounted"/> the moment it loads, so a failure part way still unloads every one.</summary>
+        public static void Load(FotonSession s, List<string> mounted)
         {
-            var mounted = new List<string>();
             foreach (var p in HostInfo.Profiles(s.IsElevated))
             {
                 // ProfileList is host data: only a well-formed domain/local user SID becomes part of a reg.exe argument.
@@ -37,7 +37,6 @@ namespace Foton.Collect
                 }
                 else s.Status.Write("Could not load hive for " + p.UserName, StatusLevel.Warn);
             }
-            return mounted;
         }
 
         /// <summary>Unloads what Load mounted. A failure is a warning: the key needs a manual reg unload.</summary>
@@ -48,8 +47,13 @@ namespace Foton.Collect
                 // Release any registry handles this process still holds into the hive.
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-                if (RegExe(new[] { "unload", @"HKU\" + name }) == 0) s.Status.Write("Unloaded hive " + name, StatusLevel.Info);
-                else s.Status.Write($"Failed to unload hive {name} - manual cleanup required (reg unload HKU\\{name})", StatusLevel.Warn);
+                bool ok = RegExe(new[] { "unload", @"HKU\" + name }) == 0;
+                try
+                {
+                    if (ok) s.Status.Write("Unloaded hive " + name, StatusLevel.Info);
+                    else s.Status.Write($"Failed to unload hive {name} - manual cleanup required (reg unload HKU\\{name})", StatusLevel.Warn);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
         }
 

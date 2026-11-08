@@ -33,20 +33,25 @@ namespace Foton.Collect
             s.Status.Write($"Examiner: {TextFile.OneLine(o.Examiner)} | Case: {(string.IsNullOrWhiteSpace(o.CaseNumber) ? "not supplied" : TextFile.OneLine(o.CaseNumber))} | Coverage: {Coverage.Profile(s.IsElevated)}", StatusLevel.Info);
             ChainOfCustody.Write(s, HostFacts.Custody());
 
+            var missing = CaseCategories.All.Select(kv => kv.Key).Where(k => k != "Collection" && !Categories.InOrder.Any(c => c.Key == k)).ToList();
+            if (missing.Count > 0)
+                s.Status.Write($"This v2 pre-release does not collect yet: {string.Join(", ", missing)}. The package is incomplete; use the 1.38.x Collect flatten for casework.", StatusLevel.Warn);
+
+            // Every mounted hive is in this list the moment it loads, so the finally block unloads it whatever fails.
             var mounted = new List<string>();
-            if (o.LoadUserHives)
-            {
-                if (!s.IsElevated) s.Status.Write("LoadUserHives ignored: mounting NTUSER.DAT requires elevation", StatusLevel.Warn);
-                else
-                {
-                    s.Status.Write("Mounting offline user registry hives", StatusLevel.Step);
-                    mounted = UserHives.Load(s);
-                    s.LoadUserHivesActive = true;
-                    s.Status.Write($"Mounted {mounted.Count} offline hive(s)", StatusLevel.Info);
-                }
-            }
             try
             {
+                if (o.LoadUserHives)
+                {
+                    if (!s.IsElevated) s.Status.Write("LoadUserHives ignored: mounting NTUSER.DAT requires elevation", StatusLevel.Warn);
+                    else
+                    {
+                        s.Status.Write("Mounting offline user registry hives", StatusLevel.Step);
+                        s.LoadUserHivesActive = true;
+                        UserHives.Load(s, mounted);
+                        s.Status.Write($"Mounted {mounted.Count} offline hive(s)", StatusLevel.Info);
+                    }
+                }
                 foreach (var c in Categories.InOrder.Where(c => only == null || only.Contains(c.Key, StringComparer.OrdinalIgnoreCase)))
                 {
                     try { c.Run(s); }
