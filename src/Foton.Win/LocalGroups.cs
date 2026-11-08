@@ -11,6 +11,8 @@ namespace Foton.Win
         public string Sid { get; set; } = "";
         /// <summary>DOMAIN\name, as Get-LocalGroupMember named members.</summary>
         public string Member { get; set; } = "";
+        /// <summary>SID_NAME_USE: 1 user, 2 group, 4 alias, 5 well-known group, 6 deleted, 8 unknown.</summary>
+        public int SidUsage { get; set; }
     }
 
     /// <summary>
@@ -77,7 +79,7 @@ namespace Foton.Win
                     {
                         var m = (LocalGroupMembersInfo2)Marshal.PtrToStructure(buf + i * size, typeof(LocalGroupMembersInfo2))!;
                         var sid = m.Sid == IntPtr.Zero ? "" : new SecurityIdentifier(m.Sid).Value;
-                        list.Add(new GroupMember { Group = group, Sid = sid, Member = Marshal.PtrToStringUni(m.DomainAndName) ?? "" });
+                        list.Add(new GroupMember { Group = group, Sid = sid, Member = Marshal.PtrToStringUni(m.DomainAndName) ?? "", SidUsage = m.SidUsage });
                     }
                 }
                 finally { if (buf != IntPtr.Zero) NetApiBufferFree(buf); }

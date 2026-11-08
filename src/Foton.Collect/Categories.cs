@@ -21,6 +21,10 @@ namespace Foton.Collect
     /// </summary>
     public static class Categories
     {
-        public static readonly IReadOnlyList<CollectCategory> InOrder = new CollectCategory[0];
+        public static readonly IReadOnlyList<CollectCategory> InOrder = new[]
+        {
+            new CollectCategory("Users", UserCollection.Run),
+            new CollectCategory("System", SystemCollection.Run),
+        };
     }
 }
