@@ -9,7 +9,7 @@ namespace Foton.Win
     /// <summary>A file's Authenticode state as Get-AuthenticodeSignature reported it.</summary>
     public sealed class SignatureInfo
     {
-        /// <summary>Valid, NotSigned, HashMismatch, NotTrusted, UnknownError; or Unknown / FileNotFound / SignatureCheckError.</summary>
+        /// <summary>Valid, NotSigned, HashMismatch, NotTrusted, UnknownError; or Unknown / FileNotFound / RemotePathNotChecked / SignatureCheckError.</summary>
         public string Status { get; set; } = "Unknown";
         public string Signer { get; set; } = "";
         public bool IsOSBinary { get; set; }
@@ -61,6 +61,8 @@ namespace Foton.Win
         {
             var result = new SignatureInfo();
             if (string.IsNullOrWhiteSpace(path)) return result;
+            // A UNC path from host data is never opened (no SMB connection, no credential offer).
+            if (Foton.Core.Hashing.IsRemotePath(path!)) { result.Status = "RemotePathNotChecked"; return result; }
             try
             {
                 if (!File.Exists(path)) { result.Status = "FileNotFound"; return result; }

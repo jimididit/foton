@@ -180,9 +180,12 @@ namespace Foton.Collect
             }
         }
 
+        // Real extension manifests are a few KB; the file is user-writable, so a huge one is not read.
+        const long MaxManifestBytes = 1024 * 1024;
+
         static object? Read(string manifest)
         {
-            try { return Json.Parse(File.ReadAllText(manifest)); }
+            try { return new FileInfo(manifest).Length > MaxManifestBytes ? null : Json.Parse(File.ReadAllText(manifest)); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException) { return null; }
         }
 
