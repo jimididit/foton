@@ -165,12 +165,16 @@ namespace Foton.Baseline.Capture
 
         public static Provider Service => new Provider
         {
-            RecordType = "Service", IdentityFields = new[] { "Name" }, ComparedFields = new[] { "DisplayName", "StartMode", "StartName", "PathName" },
+            RecordType = "Service", IdentityFields = new[] { "Name" }, ComparedFields = new[] { "DisplayName", "StartMode", "StartName", "PathName", "ServiceDll" },
             FalsePositives = "Patch Tuesday can replace PathName for the same service. Third-party updaters change StartMode. Compare against a provisioning snapshot, not a post-compromise one.",
             SortKeys = new[] { "Name" },
-            Collect = ctx => ctx.Safe(() => Wmi.Query(@"root\cimv2", "SELECT Name, DisplayName, StartMode, StartName, PathName FROM Win32_Service").Select(s => Row(
-                "Name", Wmi.Str(s, "Name"), "DisplayName", Wmi.Str(s, "DisplayName"), "StartMode", Wmi.Str(s, "StartMode"),
-                "StartName", Wmi.Str(s, "StartName"), "PathName", Wmi.Str(s, "PathName")))),
+            // 1.17.0: ServiceDll, the code a svchost-hosted service actually runs (its PathName is the shared svchost.exe).
+            Collect = ctx => ctx.Safe(() => Wmi.Query(@"root\cimv2", "SELECT Name, DisplayName, StartMode, StartName, PathName FROM Win32_Service").Select(s =>
+            {
+                var name = Wmi.Str(s, "Name");
+                return Row("Name", name, "DisplayName", Wmi.Str(s, "DisplayName"), "StartMode", Wmi.Str(s, "StartMode"),
+                    "StartName", Wmi.Str(s, "StartName"), "PathName", Wmi.Str(s, "PathName"), "ServiceDll", ServiceDll.Resolve(name, out _));
+            })),
         };
 
         public static Provider WmiPermanentEvent => new Provider

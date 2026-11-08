@@ -387,7 +387,8 @@
                                "DisplayName",
                                "StartMode",
                                "StartName",
-                               "PathName"
+                               "PathName",
+                               "ServiceDll"
                            ],
         "SortKeys":  [
                          "Name"

@@ -74,6 +74,7 @@ namespace Foton.Baseline.Compare
             foreach (var type in types.OrderBy(t => t, Order))
             {
                 var m = meta.TryGetValue(type, out var found) ? found : new ProviderMeta { IdentityFields = new[] { "Name" } };
+                var notComparable = BaselineSchema.FieldsNotComparable(rv, dv, type);
                 var refMap = Keyed(reference, type, m.IdentityFields);
                 var difMap = Keyed(difference, type, m.IdentityFields);
 
@@ -85,7 +86,7 @@ namespace Foton.Baseline.Compare
                         result.Changes.Add(new BaselineChange { RecordType = type, Identity = b.Identity, ChangeType = "Added" });
                         continue;
                     }
-                    foreach (var f in m.ComparedFields)
+                    foreach (var f in m.ComparedFields.Where(f => !notComparable.Contains(f)))
                     {
                         var ov = Field(a.Record, f);
                         var nv = Field(b.Record, f);

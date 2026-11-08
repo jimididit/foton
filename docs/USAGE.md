@@ -9,7 +9,7 @@ Foton has **two machines**. Mixing them is what usually causes confusion.
 
 Copy only the endpoint executable to a target. Parse, compose, and analyze read the copied package on the workstation and never touch the live host.
 
-**Versions.** Every executable prints its version, collect schema, and baseline schema with `-Version`. Foton 2.0 writes collect schema **1.14.0** and baseline schema **1.16.0** (see [Formats](#formats-and-compatibility)).
+**Versions.** Every executable prints its version, collect schema, and baseline schema with `-Version`. Foton 2.1 writes collect schema **1.14.0** and baseline schema **1.17.0** (see [Formats](#formats-and-compatibility)).
 
 **Older hosts.** The executables need Windows 10 / Server 2016 or newer. For Windows 7, 8.1, or Server 2012 R2, use the PowerShell line: [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) and its [1.38.x usage guide](https://github.com/jimididit/foton/blob/v1.38.2/legacy/powershell/release-docs/docs/USAGE.md). 1.38.2 is the final PowerShell release and is no longer maintained ([SECURITY.md](../SECURITY.md)).
 
@@ -196,7 +196,8 @@ Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are
 ## Formats and compatibility
 
 - **Collect schema 1.14.0.** The same files, tasks, and columns as 1.38.x (1.13.0), with timestamps in UTC, explicit statuses where 1.38.x wrote empty or misleading values (for example `AccessDenied` instead of `NotPresent` for an unreadable event log), and rows 1.38.x missed. `foton analyze` reads both.
-- **Baseline schema 1.16.0.** `foton compare` accepts 1.14.0 (1.38.x), 1.15.0 (v2.0.0-alpha.1), and 1.16.0 against each other and prints which one-time format and coverage differences to expect. Older baselines are refused; recapture day 0 and goldens.
+- **Baseline schema 1.17.0.** `foton compare` accepts 1.14.0 (1.38.x), 1.15.0 (v2.0.0-alpha.1), 1.16.0 (v2.0.0), and 1.17.0 against each other and prints which one-time format and coverage differences to expect. Older baselines are refused; recapture day 0 and goldens.
+- **Service `ServiceDll` (1.17.0).** A svchost-hosted service's `PathName` is the shared `svchost.exe`; the code it runs is its `ServiceDll`, so 1.17.0 records and compares that too, and a change is High attention. Against a baseline older than 1.17.0 the field is not compared (that side never captured it); recapture day 0 to compare it.
 - **Cloud-only files.** Collect never reads a cloud-only file (OneDrive Files On-Demand and similar), because reading it would download it to the host: its hash reads `SkippedCloudPlaceholder`, its signature `CloudPlaceholderNotChecked`, and a copy task records `SkippedCloudPlaceholder`.
 - `foton parse` also returns EVTX events and automatic-destinations jumplist entries that 1.38.x `Invoke-FotonParse` silently missed.
 

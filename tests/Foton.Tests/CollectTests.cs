@@ -367,6 +367,16 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void ServiceDll_resolves_from_Parameters_and_is_empty_for_unknown_services()
+        {
+            // Task Scheduler is svchost-hosted on every supported Windows; its code is schedsvc.dll.
+            Assert.EndsWith(@"\schedsvc.dll", ServiceDll.Resolve("Schedule", out var source), StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("Parameters", source);
+            Assert.Equal("", ServiceDll.Resolve("NoSuchService_Foton", out source));
+            Assert.Equal("", source);
+        }
+
+        [Fact]
         public void Service_image_paths_resolve_like_1_38()
         {
             Assert.Equal(@"C:\Program Files\App\svc.exe", PersistenceCollection.ServiceExe(@"""C:\Program Files\App\svc.exe"" -run"));

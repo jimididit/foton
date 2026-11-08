@@ -24,7 +24,7 @@ namespace Foton.Baseline.Compare
             if (T("Listener") && C("Added")) sev = "Low";
             if (T("FirewallRule") && C("Added")) sev = "Medium";
             if (T("LocalAccount") && C("Added")) sev = "Medium";
-            if (T("Service") && F("PathName")) sev = "High";
+            if (T("Service") && (F("PathName") || F("ServiceDll"))) sev = "High";
             if (T("Driver") && F("PathName")) sev = "High";
             if (T("Autorun") && F("Command")) sev = "High";
             if (T("ScheduledTask") && F("Actions")) sev = "High";
