@@ -248,6 +248,27 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Chainsaw_hunt_output_becomes_an_overview_without_the_collectors_own_rows()
+        {
+            using (var t = new TempDir())
+            {
+                var dest = Directory.CreateDirectory(Path.Combine(t.Path, "analysis", "external", "Chainsaw")).FullName;
+                File.Copy(Path.Combine(TestPaths.Root, "testdata", "analyze", "chainsaw", "sigma.csv"), Path.Combine(dest, "sigma.csv"));
+                File.WriteAllText(Path.Combine(dest, "notes.csv"), "a,b\r\n1,2\r\n");   // not a hunt CSV: ignored
+                var c = Context(new PackageData(), t.Path);
+                Analyzer.Run(c);
+
+                var f = c.Findings.Single(x => x.Title == "Chainsaw hunt detections present in compose output");
+                Assert.Equal("Info", f.Severity);
+                Assert.Contains("2 detection row(s)", f.Observation);
+                Assert.Contains("sigma.csv (2)", f.Observation);
+                Assert.Contains("Suspicious Service Installation (1)", f.Observation);   // the collector's own install row is not counted
+                Assert.Contains("Windows Update Error (1)", f.Observation);               // two titles in one cell are both counted
+                Assert.Contains("Excludes 1 row(s) attributable to the Foton collection", f.Observation);
+            }
+        }
+
+        [Fact]
         public void A_bare_Foton_case_path_is_not_collector_noise()
         {
             using (var t = new TempDir())
