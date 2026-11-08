@@ -592,11 +592,15 @@ namespace Foton.Collect
             else if (tx.Length > 0 && Directory.Exists(tx))
                 items.AddRange(FileWalk.Files(tx, int.MaxValue).Where(f => f.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)).Take(40)
                     .Select(f => new CopyItem(f.FullName, Path.Combine("powershell_transcript", f.Name))));
+            // Every top-level CodeIntegrity file (policies, driver.stl trust lists), as 1.38.x copied them, plus the
+            // multiple-policy-format files under CiPolicies\Active.
             var ci = Path.Combine(win, @"System32\CodeIntegrity");
-            foreach (var dr in new[] { new[] { ci, "codeintegrity" }, new[] { Path.Combine(ci, @"CiPolicies\Active"), @"codeintegrity\Active" } })
-                if (Directory.Exists(dr[0]))
-                    items.AddRange(FileWalk.Files(dr[0], 0).Where(f => f.Extension.Equals(".cip", StringComparison.OrdinalIgnoreCase) || f.Extension.Equals(".p7b", StringComparison.OrdinalIgnoreCase))
-                        .Select(f => new CopyItem(f.FullName, Path.Combine(dr[1], f.Name))));
+            if (Directory.Exists(ci))
+                items.AddRange(FileWalk.Files(ci, 0).Select(f => new CopyItem(f.FullName, Path.Combine("codeintegrity", f.Name))));
+            var active = Path.Combine(ci, @"CiPolicies\Active");
+            if (Directory.Exists(active))
+                items.AddRange(FileWalk.Files(active, 0).Where(f => f.Extension.Equals(".cip", StringComparison.OrdinalIgnoreCase))
+                    .Select(f => new CopyItem(f.FullName, Path.Combine(@"codeintegrity\Active", f.Name))));
             return items;
         }
 
