@@ -41,7 +41,7 @@ There is no public v2 release until `foton-collect.exe` passes parity testing ag
 
 Tools live under `%LOCALAPPDATA%\Foton\tools` and are recorded in `tools.json`, the same file 1.38.x uses, so registrations carry over in both directions. PATH is never changed. `compose` refuses a ZIP: its output belongs in the case folder, so extract the ZIP first.
 
-The executables are not Authenticode-signed yet, so SmartScreen may warn on first run. Compare the hash with `SHA256SUMS.txt`, run `gh attestation verify .\foton-baseline.exe --repo jimididit/foton`, then `Unblock-File`. v2 writes baseline schema **1.15.0**; `foton compare` accepts a 1.14.0 baseline from 1.38.x and prints which one-time format and coverage differences to expect. v2 `parse` also returns EVTX events and automatic-destinations jumplist entries that 1.38.x `Invoke-FotonParse` silently missed.
+The executables are not Authenticode-signed yet, so SmartScreen may warn on first run. Compare the hash with `SHA256SUMS.txt`, run `gh attestation verify .\foton-baseline.exe --repo jimididit/foton`, then `Unblock-File`. v2 writes baseline schema **1.15.0**; `foton compare` accepts a 1.14.0 baseline from 1.38.x and prints which one-time format and coverage differences to expect. `foton-collect.exe` writes collect schema **1.14.0**: the same files, tasks, and columns as 1.38.x (1.13.0), with timestamps in UTC, explicit statuses where 1.38.x wrote empty or misleading values (for example `AccessDenied` instead of `NotPresent` for an unreadable event log), and rows 1.38.x missed. `foton analyze` reads both. v2 `parse` also returns EVTX events and automatic-destinations jumplist entries that 1.38.x `Invoke-FotonParse` silently missed.
 
 ---
 

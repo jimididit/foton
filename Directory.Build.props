@@ -10,7 +10,9 @@
     <FotonPrerelease>alpha.1</FotonPrerelease>
     <!-- UTC date of the change that set FotonVersion; the banner shows it as Updated. -->
     <FotonReleaseDate>2026-11-07</FotonReleaseDate>
-    <FotonCollectSchemaVersion>1.13.0</FotonCollectSchemaVersion>
+    <!-- 1.14.0: same files, tasks, and columns as 1.13.0; values change (UTC timestamps, AccessDenied / SkippedUnc /
+         SupersededBySave statuses, rows 1.38.x missed such as user-hive autoruns and Active WDAC policies). -->
+    <FotonCollectSchemaVersion>1.14.0</FotonCollectSchemaVersion>
     <!-- 1.15.0: values and coverage, not identity keys or compared fields, so Compare accepts 1.14.0 against it (BaselineSchema.CrossVersionNote). -->
     <FotonBaselineSchemaVersion>1.15.0</FotonBaselineSchemaVersion>
     <FotonFindingsSchemaVersion>1.0.0</FotonFindingsSchemaVersion>
