@@ -214,27 +214,31 @@ namespace Foton.Tests
         }
 
         [Fact]
-        public void Cloud_placeholders_are_never_read()
+        public void Cloud_placeholders_are_recognised_only_by_bits_user_mode_cannot_set()
         {
+            const FileAttributes recallOnDataAccess = (FileAttributes)0x400000, recallOnOpen = (FileAttributes)0x40000;
+            Assert.True(Hashing.IsCloudPlaceholder(FileAttributes.Archive | recallOnDataAccess));
+            Assert.True(Hashing.IsCloudPlaceholder(recallOnOpen));
+            Assert.True(Hashing.IsCloudPlaceholder(FileAttributes.Offline | FileAttributes.ReparsePoint));
+            Assert.False(Hashing.IsCloudPlaceholder(FileAttributes.Offline));
+            Assert.False(Hashing.IsCloudPlaceholder(FileAttributes.ReparsePoint));
+
+            // A file that marks itself Offline (any user can) is still hashed, signature-checked, and copied.
             using (var t = new TempDir())
             {
-                var f = Path.Combine(t.Path, "cloud.exe");
+                var f = Path.Combine(t.Path, "evasive.exe");
                 File.WriteAllText(f, "MZ");
                 File.SetAttributes(f, FileAttributes.Offline);
                 try
                 {
-                    Assert.True(Hashing.IsCloudPlaceholder(f));
-                    Assert.Equal("SkippedCloudPlaceholder", Hashing.SafeHash(f, false));
-                    Assert.Equal("CloudPlaceholderNotChecked", Authenticode.Check(f).Status);
-                    var copy = HostCopy.CopyFile(f, Path.Combine(t.Path, @"out\cloud.exe"), false);
-                    Assert.Equal("SkippedCloudPlaceholder", copy.Status);
-                    Assert.False(File.Exists(Path.Combine(t.Path, @"out\cloud.exe")));
-                    Assert.Equal(TaskStatus.Success, CopyTaskStatus.Evaluate(new[] { copy }).Status);
+                    Assert.False(Hashing.IsCloudPlaceholder(f));
+                    Assert.Equal(64, Hashing.SafeHash(f, false).Length);
+                    Assert.NotEqual("CloudPlaceholderNotChecked", Authenticode.Check(f).Status);
+                    Assert.Equal("Copied", HostCopy.CopyFile(f, Path.Combine(t.Path, @"out\evasive.exe"), false).Status);
                 }
                 finally { File.SetAttributes(f, FileAttributes.Normal); }
-                Assert.False(Hashing.IsCloudPlaceholder(f));
-                Assert.Equal(64, Hashing.SafeHash(f, false).Length);
             }
+            Assert.Equal(TaskStatus.Success, CopyTaskStatus.Evaluate(new[] { new CopyRow { SourcePath = "x", Status = "SkippedCloudPlaceholder" } }).Status);
         }
 
         [Fact]

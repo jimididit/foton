@@ -45,15 +45,18 @@ namespace Foton.Core
             catch (Exception) { return "HashError"; }
         }
 
-        // FILE_ATTRIBUTE_OFFLINE, FILE_ATTRIBUTE_RECALL_ON_OPEN, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS.
-        const FileAttributes CloudOnly = (FileAttributes)0x1000 | (FileAttributes)0x40000 | (FileAttributes)0x400000;
+        // FILE_ATTRIBUTE_RECALL_ON_OPEN, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: set only by kernel-mode file system filters.
+        const FileAttributes Recall = (FileAttributes)0x40000 | (FileAttributes)0x400000;
 
         /// <summary>
         /// True for a cloud-only placeholder (OneDrive Files On-Demand and other cloud-file providers). Reading its
         /// content makes the sync client download it: a network transfer and a host change the collector must not cause.
-        /// Reading attributes does not.
+        /// Reading attributes does not. Offline alone does not count: any user-mode process can set it, so a file could
+        /// mark itself Offline to escape hashing; a cloud placeholder that is Offline is also a reparse point.
         /// </summary>
-        public static bool IsCloudPlaceholder(FileAttributes attributes) => (attributes & CloudOnly) != 0;
+        public static bool IsCloudPlaceholder(FileAttributes attributes) =>
+            (attributes & Recall) != 0
+            || ((attributes & FileAttributes.Offline) != 0 && (attributes & FileAttributes.ReparsePoint) != 0);
 
         /// <summary>IsCloudPlaceholder for a path; false when the attributes cannot be read.</summary>
         public static bool IsCloudPlaceholder(string path)
