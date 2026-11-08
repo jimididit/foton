@@ -49,6 +49,7 @@ namespace Foton.Analyze.Rules
             Hayabusa(c, root);
             PeCmd(c, root);
             EvtxECmd(c, root, svcIndex, hostSys32);
+            ReCmd(c, root);
         }
 
         static void ParsedRecords(AnalysisContext c, string root)
@@ -228,6 +229,80 @@ namespace Foton.Analyze.Rules
                     "analysis/external/hayabusa",
                     "If a real event could have coincided with the collection, filter the Hayabusa CSV to that window and read the Details column directly rather than relying on this exclusion.");
             }
+        }
+
+        // DFIRBatch categories whose values name code that runs (persistence and hunting surfaces). "Program Execution"
+        // is left out: UserAssist/BAM rows for per-user installs under AppData are mostly benign and PECmd covers execution.
+        static readonly string[] RecmdPathCategories = { "Autoruns", "Services", "Threat Hunting" };
+
+        /// <summary>
+        /// RECmd batch CSV (recmd.csv at the top of analysis\external\RECmd; plugin detail files sit in a subfolder):
+        /// HivePath, HiveType, Description, Category, KeyPath, ValueName, ValueType, ValueData, ValueData2, ValueData3,
+        /// Comment, Recursive, Deleted, LastWriteTimestamp, PluginDetailFile. RECmd reads the copied hives, including
+        /// users whose hives were not loaded at collection time, so this can see what Collect's live reads could not.
+        /// </summary>
+        static void ReCmd(AnalysisContext c, string root)
+        {
+            var dir = Path.Combine(root, "analysis", "external", "RECmd");
+            if (!Directory.Exists(dir)) return;
+            const int max = 200000;
+            int rows = 0;
+            bool capped = false;
+            var categories = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var hiveTypes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var hunting = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var deleted = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            int deletedRows = 0;
+            var writable = new List<string>();
+            foreach (var file in SafeFiles(dir, "*.csv"))
+            {
+                var data = ReadCsv(file);
+                if (data == null || data.Count == 0 || !data[0].Keys.Any(k => string.Equals(k, "HivePath", StringComparison.OrdinalIgnoreCase))) continue;
+                foreach (var row in data)
+                {
+                    if (++rows > max) { capped = true; break; }
+                    var category = V(row, "Category");
+                    var description = V(row, "Description");
+                    if (category.Length > 0) Bump(categories, category);
+                    if (V(row, "HiveType").Length > 0) Bump(hiveTypes, V(row, "HiveType"));
+                    if (string.Equals(category, "Threat Hunting", StringComparison.OrdinalIgnoreCase) && description.Length > 0) Bump(hunting, description);
+                    if (string.Equals(V(row, "Deleted"), "True", StringComparison.OrdinalIgnoreCase))
+                    {
+                        deletedRows++;
+                        Bump(deleted, description.Length > 0 ? description : category);
+                    }
+                    if (!RecmdPathCategories.Contains(category, StringComparer.OrdinalIgnoreCase)) continue;
+                    // ValueName too: some entries (Defender exclusion paths) carry the path as the value's name.
+                    foreach (var data1 in new[] { V(row, "ValueName"), V(row, "ValueData"), V(row, "ValueData2"), V(row, "ValueData3") })
+                        foreach (Match m in EmbeddedPath.Matches(data1))
+                        {
+                            var p = m.Value.TrimEnd(',', ';', ')');
+                            if (c.UserWritablePath(p) && !writable.Contains(p, StringComparer.OrdinalIgnoreCase)) writable.Add(p);
+                        }
+                }
+                if (capped) break;
+            }
+            if (rows == 0) return;
+            const string art = "analysis/external/RECmd";
+            c.Add("Info", "Persistence", 1, "RECmd batch rows present in compose output",
+                F("RECmd wrote {0} row(s) under analysis/external/RECmd from hive types {1}. Top categories: {2}.{3}{4}", rows, TopText(hiveTypes, 6), TopText(categories, 8),
+                    hunting.Count > 0 ? F(" Threat Hunting entries: {0}.", TopText(hunting, 8)) : "",
+                    capped ? F(" Row scan capped at {0}; counts are a floor.", max) : ""),
+                "These are Eric Zimmerman RECmd batch results over the registry hives copied into the package, including users whose hives were not loaded when Collect ran. A batch entry is a place worth reading, not a verdict: most rows describe ordinary configuration.",
+                art,
+                "Open recmd.csv, filter by Category (Autoruns, Threat Hunting, Program Execution), and corroborate entries against Collect's persistence tables and baseline diffs.");
+            if (writable.Count > 0)
+                c.Add("Medium", "Persistence", 2, "RECmd persistence entries reference user-writable paths",
+                    F("RECmd Autoruns/Services/Threat Hunting values name {0} distinct path(s) under user-writable locations. Sample: {1}", writable.Count, string.Join("; ", writable.Take(8))),
+                    "Code that starts from a user-writable location is a common persistence pattern, and so are per-user installers and updaters (Teams, OneDrive, browser updaters). RECmd reported the registry value; this finding does not establish that the file is malicious.",
+                    art,
+                    "Hash the file if it is in the package, check its signature, and compare against software inventory and a baseline from provisioning.");
+            if (deletedRows > 0)
+                c.Add("Info", "Persistence", 1, "RECmd recovered deleted registry keys or values",
+                    F("RECmd marked {0} row(s) as deleted (recovered from free space in the copied hives). Top entries: {1}.", deletedRows, TopText(deleted, 8)),
+                    "Deleted keys and values are routine after uninstalls and updates, and are also what cleanup of persistence leaves behind. Hives exported with reg save are compacted and carry little free space, so absence here is not evidence that nothing was deleted.",
+                    art,
+                    "Read the deleted rows' KeyPath and LastWriteTimestamp, and place them on the timeline next to installs and service changes.");
         }
 
         static IEnumerable<string> SafeFiles(string dir, string pattern)

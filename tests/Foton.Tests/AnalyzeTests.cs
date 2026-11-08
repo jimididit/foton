@@ -212,6 +212,42 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void RECmd_batch_output_becomes_overview_writable_path_and_deleted_findings()
+        {
+            using (var t = new TempDir())
+            {
+                var dest = Path.Combine(t.Path, "analysis", "external", "RECmd");
+                var src = Path.Combine(TestPaths.Root, "testdata", "analyze", "recmd");
+                foreach (var f in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+                {
+                    var to = Path.Combine(dest, f.Substring(src.Length + 1));
+                    Directory.CreateDirectory(Path.GetDirectoryName(to)!);
+                    File.Copy(f, to);
+                }
+                var c = Context(new PackageData(), t.Path);
+                Analyzer.Run(c);
+
+                var overview = c.Findings.Single(f => f.Title == "RECmd batch rows present in compose output");
+                Assert.Equal("Info", overview.Severity);
+                Assert.Contains("RECmd wrote 5 row(s)", overview.Observation);   // the plugin detail CSV in the subfolder is not counted
+                Assert.Contains("Autoruns (3)", overview.Observation);
+                Assert.Contains("Windows Defender Exclusions (1)", overview.Observation);
+
+                var writable = c.Findings.Single(f => f.Title == "RECmd persistence entries reference user-writable paths");
+                Assert.Equal("Medium", writable.Severity);
+                Assert.Contains("2 distinct path(s)", writable.Observation);
+                Assert.Contains(@"C:\Users\Public\Downloads\updater.exe", writable.Observation);
+                Assert.Contains(@"C:\Users\user1\AppData\Roaming\svc", writable.Observation);
+                Assert.DoesNotContain("tool.exe", writable.Observation);   // Program Execution is not a persistence category
+                Assert.DoesNotContain("OneDriveSetup", writable.Observation);
+
+                var deleted = c.Findings.Single(f => f.Title == "RECmd recovered deleted registry keys or values");
+                Assert.Contains("1 row(s)", deleted.Observation);
+                Assert.Contains("Run (NTUSER) (1)", deleted.Observation);
+            }
+        }
+
+        [Fact]
         public void A_bare_Foton_case_path_is_not_collector_noise()
         {
             using (var t = new TempDir())
