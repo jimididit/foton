@@ -219,7 +219,8 @@ namespace Foton.Tests
             const FileAttributes recallOnDataAccess = (FileAttributes)0x400000, recallOnOpen = (FileAttributes)0x40000;
             Assert.True(Hashing.IsCloudPlaceholder(FileAttributes.Archive | recallOnDataAccess));
             Assert.True(Hashing.IsCloudPlaceholder(recallOnOpen));
-            Assert.True(Hashing.IsCloudPlaceholder(FileAttributes.Offline | FileAttributes.ReparsePoint));
+            Assert.True(Hashing.IsCloudPlaceholder(FileAttributes.Offline | FileAttributes.ReparsePoint | recallOnDataAccess));
+            Assert.False(Hashing.IsCloudPlaceholder(FileAttributes.Offline | FileAttributes.ReparsePoint));
             Assert.False(Hashing.IsCloudPlaceholder(FileAttributes.Offline));
             Assert.False(Hashing.IsCloudPlaceholder(FileAttributes.ReparsePoint));
 

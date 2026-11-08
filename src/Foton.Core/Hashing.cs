@@ -51,12 +51,11 @@ namespace Foton.Core
         /// <summary>
         /// True for a cloud-only placeholder (OneDrive Files On-Demand and other cloud-file providers). Reading its
         /// content makes the sync client download it: a network transfer and a host change the collector must not cause.
-        /// Reading attributes does not. Offline alone does not count: any user-mode process can set it, so a file could
-        /// mark itself Offline to escape hashing; a cloud placeholder that is Offline is also a reparse point.
+        /// Reading attributes does not. Only the recall bits count: Files On-Demand placeholders (Windows 10 1709+) carry
+        /// them, and user mode cannot set them. Offline and reparse points can be set by any user (a file or symlink
+        /// could mark itself Offline to escape hashing), so neither is trusted.
         /// </summary>
-        public static bool IsCloudPlaceholder(FileAttributes attributes) =>
-            (attributes & Recall) != 0
-            || ((attributes & FileAttributes.Offline) != 0 && (attributes & FileAttributes.ReparsePoint) != 0);
+        public static bool IsCloudPlaceholder(FileAttributes attributes) => (attributes & Recall) != 0;
 
         /// <summary>IsCloudPlaceholder for a path; false when the attributes cannot be read.</summary>
         public static bool IsCloudPlaceholder(string path)
