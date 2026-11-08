@@ -91,7 +91,8 @@ namespace Foton.Win
         /// <summary>Test-Path that reads access-denied as false (Test-FotonPathAccessible).</summary>
         public static bool Accessible(string path)
         {
-            if (string.IsNullOrWhiteSpace(path)) return false;
+            // Profile and artifact paths come from host data; one that is not plainly local is never probed (no SMB connection).
+            if (string.IsNullOrWhiteSpace(path) || !Foton.Core.Hashing.IsLocalPath(path)) return false;
             try { return Directory.Exists(path) || File.Exists(path); }
             catch (Exception) { return false; }
         }

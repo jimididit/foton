@@ -25,6 +25,7 @@ namespace Foton.Collect
         {
             new CollectCategory("Users", UserCollection.Run),
             new CollectCategory("System", SystemCollection.Run),
+            new CollectCategory("Software", SoftwareCollection.Run),
         };
     }
 }

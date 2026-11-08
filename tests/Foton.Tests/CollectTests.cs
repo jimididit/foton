@@ -84,6 +84,71 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Software_runs_every_task_on_this_host_without_task_errors()
+        {
+            using (var t = new TempDir())
+            {
+                var s = CollectRun.NewSession(new SessionOptions { OutputPath = t.Path, NoZip = true, SkipHashing = true }, Quiet());
+                CollectRun.Run(s, only: new[] { "Software" });
+                foreach (var name in new[] { "installed_software", "drivers", "browser_extensions", "remote_access_tool_indicators", "appx_packages" })
+                    Assert.Contains(s.Manifest, m => m.Task == name);
+                Assert.DoesNotContain(s.Manifest, m => m.Status == TaskStatus.Error || m.Status == TaskStatus.WriteError);
+                Assert.Contains(s.Manifest, m => m.Task == "drivers" && m.Records > 0);
+                Assert.Contains(s.Manifest, m => m.Task == "appx_packages" && m.Records > 0);
+            }
+        }
+
+        [Fact]
+        public void Authenticode_reads_catalog_and_embedded_signatures_like_Get_AuthenticodeSignature()
+        {
+            var sys = Environment.GetFolderPath(Environment.SpecialFolder.System);
+            var notepad = Foton.Win.Authenticode.Check(Path.Combine(sys, "notepad.exe"));
+            Assert.Equal("Valid", notepad.Status);
+            Assert.Contains("Microsoft", notepad.Signer);
+            Assert.True(notepad.IsOSBinary);
+            using (var t = new TempDir())
+            {
+                // Reference values from Get-AuthenticodeSignature: a script with no signature, and a type with no signature format.
+                File.WriteAllText(t.File("plain.ps1"), "Write-Output 1");
+                File.WriteAllText(t.File("plain.txt"), "not signed");
+                Assert.Equal("NotSigned", Foton.Win.Authenticode.Check(t.File("plain.ps1")).Status);
+                Assert.Equal("UnknownError", Foton.Win.Authenticode.Check(t.File("plain.txt")).Status);
+                Assert.Equal("FileNotFound", Foton.Win.Authenticode.Check(t.File("missing.sys")).Status);
+            }
+            Assert.Equal("Unknown", Foton.Win.Authenticode.Check("").Status);
+            Assert.Equal(new[] { "NotSigned", "UnknownError", "NotSigned", "HashMismatch", "HashMismatch", "Valid", "Valid", "NotTrusted", "UnknownError" },
+                Enumerable.Range(0, 9).Select(i => Foton.Win.Authenticode.StatusOf((uint)i)));
+            Assert.Equal(@"C:\Program Files\x.sys", Foton.Win.Authenticode.Openable(@"\??\C:\Program Files\x.sys"));
+            Assert.Equal(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\drivers\y.sys"),
+                Foton.Win.Authenticode.Openable(@"\SystemRoot\System32\drivers\y.sys"));
+            Assert.Equal(@"C:\Windows\z.sys", Foton.Win.Authenticode.Openable(@"C:\Windows\z.sys"));
+            Assert.Equal(@"C:\Program Files\q.sys", Foton.Win.Authenticode.Openable(@"""\??\C:\Program Files\q.sys"""));
+            Assert.Equal(@"\\server\share\d.sys", Foton.Win.Authenticode.Openable(@"\??\UNC\server\share\d.sys"));
+            // Host-supplied paths that are not plainly local are never opened: no SMB connection, no credential offer.
+            foreach (var other in new[]
+            {
+                @"\\server\share\d.sys", @"\\?\UNC\server\share\d.sys", @"\??\UNC\server\share\d.sys", @"""\\10.0.0.5\c$\x.sys""", "//server/share/x.sys",
+                @"\??\GLOBALROOT\Device\Mup\server\share\x.sys", @"\\?\GLOBALROOT\Device\Mup\server\share\x.sys", @"\\.\PhysicalDrive0",
+            })
+            {
+                Assert.False(Hashing.IsLocalPath(other), other);
+                Assert.Equal("SkippedNonLocalPath", Hashing.SafeHash(other, false));
+                Assert.Equal("NonLocalPathNotChecked", Foton.Win.Authenticode.Check(other).Status);
+            }
+            foreach (var local in new[] { @"C:\Windows\x.sys", @"\\?\C:\Windows\x.sys", @"\\.\C:\x.sys", @"\??\C:\x.sys", @"\\?\Volume{0a1b2c3d-0000-0000-0000-000000000000}\x.sys", @"System32\drivers\x.sys", @"\Windows\x.sys" })
+                Assert.True(Hashing.IsLocalPath(local), local);
+        }
+
+        [Fact]
+        public void Remote_access_matching_reads_dictionary_and_object_rows()
+        {
+            Assert.Equal("AnyDesk", SoftwareCollection.Field(new System.Collections.Generic.Dictionary<string, object?> { ["DisplayName"] = "AnyDesk" }, "DisplayName"));
+            Assert.Equal("", SoftwareCollection.Field(new System.Collections.Generic.Dictionary<string, object?>(), "DisplayName"));
+            Assert.Equal("svc", SoftwareCollection.Field(new { Name = "svc" }, "Name"));
+            Assert.Equal("x", SoftwareCollection.Field(new System.Collections.Generic.Dictionary<string, string> { ["Path"] = "x" }, "Path"));
+        }
+
+        [Fact]
         public void A_password_never_set_reads_as_never()
         {
             var now = new DateTime(2026, 11, 8, 0, 0, 0, DateTimeKind.Utc);
