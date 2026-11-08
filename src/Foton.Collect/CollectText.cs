@@ -37,6 +37,12 @@ namespace Foton.Collect
 
         public static ManagementBaseObject? First(string ns, string wql) => Wmi.Query(ns, wql).FirstOrDefault();
 
+        static readonly System.Text.RegularExpressions.Regex[] UserWritablePatterns = PatternLists.UserWritable
+            .Select(p => new System.Text.RegularExpressions.Regex(p, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant)).ToArray();
+
+        /// <summary>Test-FotonUserWritablePath: a location where system binaries rarely live. A lead, not proof of a dropper.</summary>
+        public static bool UserWritable(string? path) => !string.IsNullOrWhiteSpace(path) && UserWritablePatterns.Any(r => r.IsMatch(path!));
+
         /// <summary>How a WMI read fails: provider errors, access denied, or a COM failure in the WMI service.</summary>
         public static bool WmiFailed(Exception ex) => ex is ManagementException || ex is UnauthorizedAccessException || ex is System.Runtime.InteropServices.COMException;
 

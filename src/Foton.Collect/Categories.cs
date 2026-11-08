@@ -23,6 +23,8 @@ namespace Foton.Collect
     {
         public static readonly IReadOnlyList<CollectCategory> InOrder = new[]
         {
+            new CollectCategory("Processes", ProcessCollection.Run),
+            new CollectCategory("Network", NetworkCollection.Run),
             new CollectCategory("Users", UserCollection.Run),
             new CollectCategory("System", SystemCollection.Run),
             new CollectCategory("Software", SoftwareCollection.Run),

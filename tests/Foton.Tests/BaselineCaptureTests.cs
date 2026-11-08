@@ -134,6 +134,8 @@ namespace Foton.Tests
             Assert.Equal(new[] { ptr, ptr == 8 ? 192 : 116, ptr == 8 ? 32 : 20, 20 }, LocalUsers.StructSizes());
             // SIGNATURE_INFO: five DWORDs, then three (LPWSTR, DWORD) pairs, a hash pointer, cbHash, and fOSBinary.
             Assert.Equal(ptr == 8 ? 88 : 56, Authenticode.StructSize());
+            // SID_AND_ATTRIBUTES { PSID; DWORD } (padded on x64).
+            Assert.Equal(ptr == 8 ? 16 : 8, ProcessOwner.StructSize());
         }
 
         [Fact]
