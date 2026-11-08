@@ -28,13 +28,36 @@ namespace Foton.Win
         void Skip(); void Reset(); void Clone(); void GetCount();
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct BgJobTimes { public long CreationTime, ModificationTime, TransferCompletionTime; }
+
+    [ComImport, Guid("ca51e165-c365-424c-8d41-24aaa4ff3c40"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IEnumBackgroundCopyFiles
+    {
+        [PreserveSig] int Next(uint celt, out IBackgroundCopyFile file, out uint fetched);
+        void Skip(); void Reset(); void Clone(); void GetCount();
+    }
+
+    [ComImport, Guid("01b7bd23-fb88-4a77-8490-5891d3e4653a"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IBackgroundCopyFile
+    {
+        void GetRemoteName([MarshalAs(UnmanagedType.LPWStr)] out string name);
+        void GetLocalName([MarshalAs(UnmanagedType.LPWStr)] out string name);
+        void GetProgress();
+    }
+
     [ComImport, Guid("54b50739-686f-45eb-9dff-d6a9a0faa9af"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface IBackgroundCopyJob2
     {
-        void AddFileSet(); void AddFile(); void EnumFiles(); void Suspend(); void Resume(); void Cancel(); void Complete();
+        void AddFileSet(); void AddFile();
+        void EnumFiles(out IEnumBackgroundCopyFiles files);
+        void Suspend(); void Resume(); void Cancel(); void Complete();
         void GetId(out Guid id);
         void GetJobType(out uint type);
-        void GetProgress(); void GetTimes(); void GetState(); void GetError();
+        void GetProgress();
+        void GetTimes(out BgJobTimes times);
+        void GetState(out uint state);
+        void GetError();
         void GetOwner([MarshalAs(UnmanagedType.LPWStr)] out string owner);
         void SetDisplayName();
         void GetDisplayName([MarshalAs(UnmanagedType.LPWStr)] out string name);
@@ -59,6 +82,10 @@ namespace Foton.Win
         /// <summary>Program and parameters, both empty when no notify command is set.</summary>
         public string NotifyProgram { get; set; } = "";
         public string NotifyParameters { get; set; } = "";
+        /// <summary>Volatile (Collect only, never baseline): job state, creation time, and "remote -> local" per file.</summary>
+        public string JobState { get; set; } = "";
+        public DateTime? CreationTimeUtc { get; set; }
+        public List<string> Files { get; } = new List<string>();
     }
 
     /// <summary>BITS jobs (all users when the token allows it, else the caller's own), never bytes or state.</summary>
@@ -67,6 +94,7 @@ namespace Foton.Win
         static readonly string[] Types = { "Download", "Upload", "UploadReply" };
         static readonly string[] Priorities = { "Foreground", "High", "Normal", "Low" };
         static readonly string[] Proxies = { "SystemDefault", "NoProxy", "Override", "AutoDetect" };
+        static readonly string[] States = { "Queued", "Connecting", "Transferring", "Suspended", "Error", "TransientError", "Transferred", "Acknowledged", "Cancelled" };
         static string Name(string[] names, uint v) => v < names.Length ? names[v] : v.ToString();
 
         public static List<BitsJobInfo> Jobs()
@@ -102,7 +130,37 @@ namespace Foton.Win
             try { job.GetPriority(out var p); r.Priority = Name(Priorities, p); } catch (COMException) { }
             try { job.GetProxySettings(out var u, out _, out _); r.ProxyUsage = Name(Proxies, u); } catch (COMException) { }
             try { job.GetNotifyCmdLine(out var prog, out var args); r.NotifyProgram = prog ?? ""; r.NotifyParameters = args ?? ""; } catch (COMException) { }
+            try { job.GetState(out var st); r.JobState = Name(States, st); } catch (COMException) { }
+            try
+            {
+                job.GetTimes(out var times);
+                if (times.CreationTime > 0) r.CreationTimeUtc = DateTime.FromFileTimeUtc(times.CreationTime);
+            }
+            catch (Exception ex) when (ex is COMException || ex is ArgumentOutOfRangeException) { }
+            try
+            {
+                job.EnumFiles(out var files);
+                try
+                {
+                    while (files.Next(1, out var f, out var got) == 0 && got == 1)
+                    {
+                        try
+                        {
+                            f.GetRemoteName(out var remote);
+                            f.GetLocalName(out var local);
+                            r.Files.Add(remote + " -> " + local);
+                        }
+                        catch (COMException) { }
+                        finally { Marshal.ReleaseComObject(f); }
+                    }
+                }
+                finally { Marshal.ReleaseComObject(files); }
+            }
+            catch (COMException) { }
             return r;
         }
+
+        /// <summary>For struct-size tests: BG_JOB_TIMES (three FILETIMEs).</summary>
+        internal static int StructSize() => Marshal.SizeOf(typeof(BgJobTimes));
     }
 }

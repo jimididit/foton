@@ -167,6 +167,25 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Persistence_runs_every_task_and_reads_tasks_and_services()
+        {
+            using (var t = new TempDir())
+            {
+                var s = CollectRun.NewSession(new SessionOptions { OutputPath = t.Path, NoZip = true }, Quiet());
+                CollectRun.Run(s, only: new[] { "Persistence" });
+                foreach (var name in new[] { "autorun_registry_keys", "startup_folder_items", "startup_approved", "scheduled_tasks", "scheduled_task_files", "services",
+                    "wmi_event_subscriptions", "winlogon_lsa_and_dll_hijacks", "accessibility_binary_integrity", "cmd_autorun", "session_manager_boot", "known_dlls",
+                    "winsock_lsp", "active_setup", "silent_process_exit", "netsh_helpers", "time_providers", "screensaver", "com_hijack_candidates", "bits_jobs",
+                    "office_addins_and_templates" })
+                    Assert.Contains(s.Manifest, m => m.Task == name);
+                Assert.DoesNotContain(s.Manifest, m => m.Status == TaskStatus.WriteError || m.Status == TaskStatus.Error);
+                foreach (var name in new[] { "scheduled_tasks", "services", "known_dlls", "winsock_lsp" })
+                    Assert.Contains(s.Manifest, m => m.Task == name && m.Records > 0);
+                Assert.Equal(7, s.Manifest.Single(m => m.Task == "accessibility_binary_integrity").Records);
+            }
+        }
+
+        [Fact]
         public void Standard_modules_and_internal_addresses_are_anchored()
         {
             var win = Foton.Win.HostInfo.WindowsDir.TrimEnd('\\');
@@ -179,6 +198,32 @@ namespace Foton.Tests
             foreach (var external in new[] { "8.8.8.8", "172.32.0.1", "2001:4860:4860::8888", "::1:5" })
                 Assert.True(NetworkCollection.IsExternal(external), external);
             Assert.Equal(@"a\\b\'c", CollectText.WqlString(@"a\b'c"));
+        }
+
+        [Fact]
+        public void Service_image_paths_resolve_like_1_38()
+        {
+            Assert.Equal(@"C:\Program Files\App\svc.exe", PersistenceCollection.ServiceExe(@"""C:\Program Files\App\svc.exe"" -run"));
+            Assert.Equal(@"C:\Program Files\App\svc.exe", PersistenceCollection.ServiceExe(@"C:\Program Files\App\svc.exe -run"));
+            Assert.Equal(Environment.GetFolderPath(Environment.SpecialFolder.Windows) + @"\system32\svchost.exe",
+                PersistenceCollection.ServiceExe(@"%SystemRoot%\system32\svchost.exe -k netsvcs -p"), StringComparer.OrdinalIgnoreCase);
+            Assert.Equal(@"C:\tool\run", PersistenceCollection.ServiceExe(@"C:\tool\run --flag"));
+            Assert.Equal("", PersistenceCollection.ServiceExe(""));
+        }
+
+        [Fact]
+        public void Registry_values_use_PowerShell_truthiness()
+        {
+            Assert.False(CollectText.Truthy(null));
+            Assert.False(CollectText.Truthy(""));
+            Assert.False(CollectText.Truthy(0));
+            Assert.False(CollectText.Truthy(new string[0]));
+            Assert.False(CollectText.Truthy(new[] { "" }));
+            Assert.True(CollectText.Truthy("x"));
+            Assert.True(CollectText.Truthy(1));
+            Assert.True(CollectText.Truthy(new[] { "", "" }));
+            Assert.False(CollectText.Truthy(new byte[] { 0 }));
+            Assert.True(CollectText.Truthy(new byte[] { 0, 0 }));
         }
 
         [Fact]

@@ -288,18 +288,6 @@ namespace Foton.Baseline.Capture
             },
         };
 
-        /// <summary>Settings / Task Manager "Startup apps" state from the StartupApproved REG_BINARY (byte 0).</summary>
-        static string ApprovedState(object? v)
-        {
-            if (!(v is byte[] b) || b.Length < 1) return "Unknown";
-            switch (b[0])
-            {
-                case 2: case 6: return "Enabled";
-                case 3: case 7: return "Disabled";
-                default: return "Other:" + b[0];
-            }
-        }
-
         public static Provider StartupApproved => new Provider
         {
             RecordType = "StartupApproved", IdentityFields = new[] { "Scope", "Store", "ValueName" }, ComparedFields = new[] { "State" },
@@ -319,7 +307,7 @@ namespace Foton.Baseline.Capture
                         try
                         {
                             foreach (var n in key.GetValueNames().Where(n => !string.IsNullOrWhiteSpace(n)))
-                                rows.Add(Row("Scope", k.Scope, "Store", k.Store, "ValueName", n, "State", ApprovedState(key.GetValue(n))));
+                                rows.Add(Row("Scope", k.Scope, "Store", k.Store, "ValueName", n, "State", RegDecode.StartupApprovedState(key.GetValue(n))));
                         }
                         catch (Exception) { }
                     }
@@ -370,31 +358,6 @@ namespace Foton.Baseline.Capture
                 .Select(n => Row("Name", n, "Value", NotSet(Reg.Value(@"HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", n)))),
         };
 
-        /// <summary>DLL path from a Winsock PackedCatalogItem: ANSI MAX_PATH on current Windows, UTF-16 on older layouts.</summary>
-        internal static string WinsockPackedPath(object? v)
-        {
-            if (!(v is byte[] b) || b.Length < 4) return "(not set)";
-            int lim = Math.Min(260, b.Length);
-            bool ascii = true;
-            for (int i = 0; i < lim; i++)
-            {
-                if (b[i] == 0) break;
-                if (b[i] < 32 || b[i] > 126) { ascii = false; break; }
-            }
-            string s;
-            if (ascii) s = Encoding.ASCII.GetString(b, 0, lim);
-            else
-            {
-                int n = Math.Min(520, b.Length);
-                if (n % 2 == 1) n--;
-                s = Encoding.Unicode.GetString(b, 0, n);
-            }
-            int z = s.IndexOf('\0');
-            if (z >= 0) s = s.Substring(0, z);
-            s = s.Trim();
-            return s.Length == 0 ? "(not set)" : s;
-        }
-
         public static Provider WinsockLsp => new Provider
         {
             RecordType = "WinsockLsp", IdentityFields = new[] { "Kind", "Entry" }, ComparedFields = new[] { "LibraryPath" },
@@ -409,7 +372,7 @@ namespace Foton.Baseline.Capture
                 {
                     var root = Reg.Join(proto, leaf);
                     var kind = leaf == "Catalog_Entries64" ? "Protocol64" : "Protocol";
-                    rows.AddRange(Reg.SubKeyNames(root).Select(e => Row("Kind", kind, "Entry", e, "LibraryPath", WinsockPackedPath(Reg.Value(Reg.Join(root, e), "PackedCatalogItem")))));
+                    rows.AddRange(Reg.SubKeyNames(root).Select(e => Row("Kind", kind, "Entry", e, "LibraryPath", RegDecode.WinsockPackedPath(Reg.Value(Reg.Join(root, e), "PackedCatalogItem")))));
                 }
                 rows.AddRange(Reg.SubKeyNames(ns).Select(e => Row("Kind", "Namespace", "Entry", e, "LibraryPath", NotSet(Reg.Value(Reg.Join(ns, e), "LibraryPath")))));
                 return rows;

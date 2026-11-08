@@ -192,22 +192,6 @@ namespace Foton.Collect
             catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) { return ""; }
         }
 
-        /// <summary>Every property of an instance as "Name : Value" lines (Format-List); arrays as {a, b}.</summary>
-        static IEnumerable<string> PropertyList(ManagementBaseObject o)
-        {
-            var props = o.Properties.Cast<PropertyData>().ToList();
-            int width = props.Count == 0 ? 0 : props.Max(p => p.Name.Length);
-            yield return "";
-            foreach (var p in props)
-            {
-                var v = p.Value;
-                var text = v is Array a && !(v is string) ? "{" + string.Join(", ", a.Cast<object?>().Select(x => Convert.ToString(x, CultureInfo.InvariantCulture))) + "}"
-                    : Convert.ToString(v, CultureInfo.InvariantCulture) ?? "";
-                yield return p.Name.PadRight(width) + " : " + TextFile.OneLine(text);
-            }
-            yield return "";
-        }
-
         static object SmbAndWinRm()
         {
             var lines = new List<string> { "--- Get-SmbServerConfiguration ---" };
