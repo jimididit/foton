@@ -9,7 +9,7 @@
     <!-- A tag v$(FotonVersion)-$(FotonPrerelease) publishes a prerelease (release-v2.yml). -->
     <FotonPrerelease>alpha.1</FotonPrerelease>
     <!-- UTC date of the change that set FotonVersion; the banner shows it as Updated. -->
-    <FotonReleaseDate>2026-11-07</FotonReleaseDate>
+    <FotonReleaseDate>2026-11-08</FotonReleaseDate>
     <!-- 1.14.0: same files, tasks, and columns as 1.13.0; values change (UTC timestamps, AccessDenied / SkippedUnc /
          SupersededBySave statuses, rows 1.38.x missed such as user-hive autoruns and Active WDAC policies). -->
     <FotonCollectSchemaVersion>1.14.0</FotonCollectSchemaVersion>
