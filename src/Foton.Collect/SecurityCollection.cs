@@ -37,7 +37,7 @@ namespace Foton.Collect
             s.Status.Write("Collecting security posture, AV state, logging and hardening configuration", StatusLevel.Step);
             Task(s, Cat, "defender_status", "Microsoft Defender engine, signature, and protection state", TaskFormat.Json, DefenderStatus);
             Task(s, Cat, "defender_preferences_and_exclusions", "Defender preferences, including exclusion paths/processes/extensions", TaskFormat.Json, DefenderPreferences);
-            Task(s, Cat, "defender_detections", "Defender threat detection history", TaskFormat.Csv, DefenderDetections);
+            Task(s, Cat, "defender_detections", "Defender threat detection history", TaskFormat.Csv, () => DefenderDetections(s));
             Task(s, Cat, "installed_av_products", "Registered AV products from Security Center", TaskFormat.Csv, () =>
                 Wmi.Query(@"root\SecurityCenter2", "SELECT displayName, productState, pathToSignedProductExe, pathToSignedReportingExe, timestamp FROM AntiVirusProduct")
                     .Select(a => new Dictionary<string, object?>
@@ -116,9 +116,14 @@ namespace Foton.Collect
             };
         }
 
-        static object DefenderDetections()
+        /// <summary>
+        /// Detection history. A query that fails is never an empty "no detections" table: with nothing read the task
+        /// fails with the reasons; with some rows read the failure is recorded in collection_errors.csv.
+        /// </summary>
+        static object DefenderDetections(FotonSession s)
         {
             var rows = new List<Dictionary<string, object?>>();
+            var errors = new List<string>();
             string Resources(ManagementBaseObject o) => Raw(o, "Resources") is string[] r ? string.Join(" | ", r) : "";
             string Text(ManagementBaseObject o, string n) => Raw(o, n) is object v ? Convert.ToString(v, CultureInfo.InvariantCulture) ?? "" : "";
             try
@@ -132,7 +137,7 @@ namespace Foton.Collect
                         ["ProcessName"] = Raw(t, "ProcessName"), ["DomainUser"] = Raw(t, "DomainUser"),
                     });
             }
-            catch (Exception ex) when (WmiFailed(ex)) { }
+            catch (Exception ex) when (WmiFailed(ex)) { errors.Add("MSFT_MpThreatDetection: " + ex.Message); }
             try
             {
                 foreach (var t in Wmi.Query(Defender, "SELECT * FROM MSFT_MpThreat"))
@@ -142,7 +147,12 @@ namespace Foton.Collect
                         ["ThreatStatus"] = Raw(t, "ThreatName"), ["CleaningAction"] = Text(t, "SeverityID"), ["Resources"] = Resources(t), ["ProcessName"] = "", ["DomainUser"] = "",
                     });
             }
-            catch (Exception ex) when (WmiFailed(ex)) { }
+            catch (Exception ex) when (WmiFailed(ex)) { errors.Add("MSFT_MpThreat: " + ex.Message); }
+            if (errors.Count > 0)
+            {
+                if (rows.Count == 0) throw new InvalidOperationException("Detection history could not be read (not the same as no detections): " + string.Join("; ", errors));
+                s.Errors.Add(new ErrorRow { Task = "defender_detections", Error = "Partial: " + string.Join("; ", errors) });
+            }
             return rows;
         }
 

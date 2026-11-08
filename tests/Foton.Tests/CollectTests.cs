@@ -159,7 +159,7 @@ namespace Foton.Tests
                     "audit_policy", "smb_and_winrm_config", "powershell_environment", "non_microsoft_root_certificates", "applocker_wdac_and_policy" })
                     Assert.Contains(s.Manifest, m => m.Task == name);
                 // Defender and Security Center are absent on some SKUs (a recorded task error); everything else must run.
-                var optional = new[] { "defender_status", "defender_preferences_and_exclusions", "installed_av_products" };
+                var optional = new[] { "defender_status", "defender_preferences_and_exclusions", "defender_detections", "installed_av_products" };
                 Assert.DoesNotContain(s.Manifest, m => m.Status == TaskStatus.WriteError || (m.Status == TaskStatus.Error && !optional.Contains(m.Task)));
                 Assert.Equal(HardeningChecks.All.Count, s.Manifest.Single(m => m.Task == "hardening_registry_settings").Records);
                 Assert.Contains(s.Manifest, m => m.Task == "non_microsoft_root_certificates" && m.Records > 0);
