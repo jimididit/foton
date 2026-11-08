@@ -80,6 +80,16 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Collector_names_cover_both_the_powershell_and_v2_collectors()
+        {
+            Assert.True(Foton.Analyze.Rules.EventLogRules.NamesCollector("ScriptBlock: Get-FotonRegValue -Path HKLM:\\x"));
+            Assert.True(Foton.Analyze.Rules.EventLogRules.NamesCollector(@"Parent Process Name: C:\Tools\foton-collect.exe New Process Name: C:\Windows\System32\reg.exe"));
+            Assert.True(Foton.Analyze.Rules.EventLogRules.NamesCollector("ParentImage=foton-baseline.exe"));
+            Assert.False(Foton.Analyze.Rules.EventLogRules.NamesCollector(@"C:\Cases\Foton_HOST_20260101-000000Z\analysis\x.csv"));
+            Assert.False(Foton.Analyze.Rules.EventLogRules.NamesCollector(@"C:\Users\x\notfoton-collect.exe"));
+        }
+
+        [Fact]
         public void Ioc_json_list_loads_as_an_array_or_one_object()
         {
             using (var t = new TempDir())

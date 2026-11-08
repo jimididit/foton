@@ -170,6 +170,7 @@ namespace Foton.Tests
                 Assert.Contains("The -LoadUserHives option was requested but ignored: mounting NTUSER.DAT", user);
                 Assert.Contains("Operating System     : unknown", user);
                 Assert.Contains("Case Number          : (not supplied)", user);
+                Assert.Contains(user, l => l.Contains("nltest, query, reg, route, secedit, vssadmin, w32tm, and wevtutil."));
 
                 var admin = ChainOfCustody.Lines(Sessions.New(t.File("b"), elevated: true), new CustodyFacts { OsCaption = "Windows 11 Pro", OsVersion = "10.0.26100", OsBuild = "26100", ExecutableSha256 = "AB" });
                 Assert.Contains("SAM and SECURITY are not collected by design (credential material).", admin);

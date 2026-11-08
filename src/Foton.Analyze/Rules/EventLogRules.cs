@@ -13,10 +13,15 @@ namespace Foton.Analyze.Rules
     {
         static readonly Regex NamesCollector1 = new Regex(@"(?i)\b[A-Za-z]+-Foton[A-Za-z0-9]*\b");
         static readonly Regex NamesCollector2 = new Regex(@"(?i)\bFotonSession\b");
+        // v2 endpoint executables: process-creation events carry them as the image or the parent of the System32 tools they start.
+        static readonly Regex NamesCollector3 = new Regex(@"(?i)(^|[\\/\s""'=:])foton-(collect|baseline)\.exe\b");
 
-        /// <summary>Test-FotonMessageNamesCollector: text naming a Verb-Foton* function or FotonSession (a bare "Foton" path is not enough).</summary>
+        /// <summary>
+        /// Test-FotonMessageNamesCollector: text naming a Verb-Foton* function, FotonSession, or a v2 endpoint executable
+        /// (a bare "Foton" path is not enough). Names can be forged; attribution is inference, and findings say so.
+        /// </summary>
         internal static bool NamesCollector(string? text) =>
-            !string.IsNullOrWhiteSpace(text) && (NamesCollector1.IsMatch(text) || NamesCollector2.IsMatch(text));
+            !string.IsNullOrWhiteSpace(text) && (NamesCollector1.IsMatch(text) || NamesCollector2.IsMatch(text) || NamesCollector3.IsMatch(text));
 
         /// <summary>Test-FotonCollectorAttributedEvent: names the collector, or falls inside the collection window.</summary>
         internal static bool CollectorAttributed(string timeCreatedUtc, string message, CollectionWindow? window)

@@ -137,6 +137,8 @@ function Shape([string]$Path) {
     }
 }
 
+$script:KeySets = @(@('RecordId'), @('File', 'Stream'), @('SourcePath', 'DestRelative'), @('FullName'), @('Path'))
+
 # Per-column count of differing values between two CSV/JSON artifacts, without printing any value (host data).
 function ValueDiff([string]$A, [string]$B) {
     $ext = [IO.Path]::GetExtension($A).ToLowerInvariant()
@@ -146,8 +148,27 @@ function ValueDiff([string]$A, [string]$B) {
         else { $ra = @(Get-Content -LiteralPath $A -Raw | ConvertFrom-Json); $rb = @(Get-Content -LiteralPath $B -Raw | ConvertFrom-Json) }
     }
     catch { return '' }
-    if ($ra.Count -eq 0 -or $ra.Count -ne $rb.Count -or -not ($ra[0] -is [psobject])) { return '' }
+    if ($ra.Count -eq 0 -or $rb.Count -eq 0 -or -not ($ra[0] -is [psobject])) { return '' }
     $cols = $ra[0].PSObject.Properties.Name
+    # Rows move between the two runs (new events, files, ties in a sort), so match on an identity column when one
+    # is unique on both sides; position is the fallback. Hashtable keys are case-insensitive, like Windows paths.
+    foreach ($keySet in $script:KeySets) {
+        if (@($keySet | Where-Object { $cols -notcontains $_ }).Count) { continue }
+        $ia = @{}; $ib = @{}; $unique = $true
+        foreach ($r in $ra) { $k = ($keySet | ForEach-Object { [string]$r.$_ }) -join '|'; if ($ia.ContainsKey($k)) { $unique = $false; break }; $ia[$k] = $r }
+        foreach ($r in $rb) { $k = ($keySet | ForEach-Object { [string]$r.$_ }) -join '|'; if ($ib.ContainsKey($k)) { $unique = $false; break }; $ib[$k] = $r }
+        if (-not $unique) { continue }
+        $onlyA = @($ia.Keys | Where-Object { -not $ib.ContainsKey($_) }).Count
+        $onlyB = @($ib.Keys | Where-Object { -not $ia.ContainsKey($_) }).Count
+        $diff = foreach ($c in $cols) {
+            $n = 0
+            foreach ($k in $ia.Keys) { if ($ib.ContainsKey($k) -and (ConvertTo-Json -Compress -Depth 4 $ia[$k].$c) -cne (ConvertTo-Json -Compress -Depth 4 $ib[$k].$c)) { $n++ } }
+            if ($n) { "$c($n)" }
+        }
+        if (-not $onlyA -and -not $onlyB -and -not $diff) { return '' }
+        return ("keyed on {0}: only 1.38.x {1}, only v2 {2}; {3}" -f ($keySet -join '+'), $onlyA, $onlyB, ($diff -join ' '))
+    }
+    if ($ra.Count -ne $rb.Count) { return '' }
     $out = foreach ($c in $cols) {
         $n = 0
         for ($i = 0; $i -lt $ra.Count; $i++) {

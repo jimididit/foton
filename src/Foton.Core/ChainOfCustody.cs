@@ -93,6 +93,12 @@ namespace Foton.Core
                 "were produced. If either is required, capture them before or",
                 "independently of this collection.",
                 "",
+                "The tool also started in-box utilities from System32 (never through",
+                "PATH), each a process-creation event on the host: arp, auditpol,",
+                "bcdedit, bitsadmin, cmdkey, fsutil, gpresult, ipconfig, net, netsh,",
+                "nltest, query, reg, route, secedit, vssadmin, w32tm, and wevtutil.",
+                "Which ones ran depends on the token and options (collection.log).",
+                "",
             };
             if (s.IsElevated)
             {
