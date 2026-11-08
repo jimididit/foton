@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Development only, never shipped: runs the collect orchestrator for chosen categories so the parity harness can
+       compare one slice against 1.38.x without adding a switch to foton-collect.exe. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Foton.Core\Foton.Core.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Collect\Foton.Collect.csproj" />
+  </ItemGroup>
+</Project>

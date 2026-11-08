@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Live triage collection (Invoke-FotonTriage and Public/Collect): the only layer besides baseline capture that reads
+    the live host. One file per category; tasks never interpret, and analysis runs afterwards over the written case.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+    <ProjectReference Include="..\Foton.Win\Foton.Win.csproj" />
+    <ProjectReference Include="..\Foton.Analyze\Foton.Analyze.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Foton.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,25 +1,134 @@
 using System;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using Foton.Collect;
 using Foton.Core;
 
 namespace Foton.Collect.Cli
 {
+    /// <summary>
+    /// foton-collect.exe: live triage collection into a hashed case package (the 1.38.x Collect flatten). Same switches
+    /// as the flatten. Administrator preferred; a standard token collects what it can read and records the gaps.
+    /// </summary>
     static class Program
     {
         static int Main(string[] args)
         {
-            foreach (var line in FotonVersion.Describe("foton-collect"))
-                Console.WriteLine(line);
-            if (args.Length == 1 && IsVersionSwitch(args[0]))
-                return 0;
-            Console.WriteLine();
-            Console.WriteLine("Live triage collection is not implemented in this v2 pre-release.");
-            Console.WriteLine("For casework use Foton 1.38.x (Foton-Collect_v1.38.1_schema1.13.0.ps1) from https://github.com/jimididit/foton/releases.");
-            return 1;
+            var o = new SessionOptions
+            {
+                OutputPath = DefaultOutputPath(),
+                Examiner = Environment.UserName,
+            };
+            for (int i = 0; i < args.Length; i++)
+            {
+                var a = args[i];
+                bool Is(string name) => string.Equals(a, name, StringComparison.OrdinalIgnoreCase);
+                string? Next() => i + 1 < args.Length ? args[++i] : null;
+                if (Is("-Version") || Is("--version") || Is("version"))
+                {
+                    foreach (var line in FotonVersion.Describe("foton-collect")) Console.WriteLine(line);
+                    return 0;
+                }
+                if (Is("-OutputPath")) { var v = Next(); if (v == null) return Usage("-OutputPath needs a folder."); o.OutputPath = v; }
+                else if (Is("-CaseNumber")) { var v = Next(); if (v == null) return Usage("-CaseNumber needs a value."); o.CaseNumber = v; }
+                else if (Is("-Examiner")) { var v = Next(); if (v == null) return Usage("-Examiner needs a value."); o.Examiner = v; }
+                else if (Is("-EventLogDays")) { if (!Int(Next(), out var n)) return Usage("-EventLogDays needs a whole number of days."); o.EventLogDays = n; }
+                else if (Is("-MaxEventsPerLog")) { if (!Int(Next(), out var n)) return Usage("-MaxEventsPerLog needs a whole number."); o.MaxEventsPerLog = n; }
+                else if (Is("-SkipEvtxExport")) o.SkipEvtxExport = true;
+                else if (Is("-SkipHashing")) o.SkipHashing = true;
+                else if (Is("-LoadUserHives")) o.LoadUserHives = true;
+                else if (Is("-IncludeFileTimeline")) o.IncludeFileTimeline = true;
+                else if (Is("-IncludeUsnJournal")) o.IncludeUsnJournal = true;
+                else if (Is("-Deep")) o.Deep = true;
+                else if (Is("-NoZip")) o.NoZip = true;
+                else if (Is("-RequireAdministrator")) o.RequireAdministrator = true;
+                else return Usage("Unknown argument: " + a);
+            }
+            // -Deep turns on the depth switches; they still work alone without it.
+            if (o.Deep) { o.IncludeFileTimeline = true; o.IncludeUsnJournal = true; }
+
+            var log = new StatusLog();
+            var s = CollectRun.NewSession(o, log);
+            Banner.Write(log, Banner.Kind.Collect);
+            if (o.RequireAdministrator && !s.IsElevated)
+            {
+                log.Write("-RequireAdministrator was set, but this process is not elevated.", StatusLevel.Error);
+                log.WriteConsole("      Re-run from an elevated prompt, or omit -RequireAdministrator to collect with standard-user coverage.", ConsoleColor.Red);
+                return 1;
+            }
+            if (!s.IsElevated)
+            {
+                log.WriteConsole("  [!] Standard-user coverage (not Administrator).", ConsoleColor.Yellow);
+                log.WriteConsole("      Still collected: this user's processes, readable network state,", ConsoleColor.Yellow);
+                log.WriteConsole("      HKCU persistence, profile files, and any logs the token can read.", ConsoleColor.Yellow);
+                log.WriteConsole("      Skipped: Security log, Prefetch copies, Amcache, SRUM, VSS, auditpol/secedit, other users.", ConsoleColor.Yellow);
+                log.WriteConsole("");
+            }
+
+            CollectResult r;
+            try { r = CollectRun.Run(s); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+            {
+                // Only creating the case folder can end a run (no writable output path).
+                log.Write("Cannot create the case folder: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
+            Summary(log, r);
+            return 0;
         }
 
-        static bool IsVersionSwitch(string arg) =>
-            string.Equals(arg, "-Version", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(arg, "--version", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(arg, "version", StringComparison.OrdinalIgnoreCase);
+        static void Summary(StatusLog log, CollectResult r)
+        {
+            var s = r.Session;
+            int Sev(string sev) => s.Findings.Count(f => f.Severity == sev);
+            log.WriteConsole("");
+            log.WriteConsole("  ============================================================", ConsoleColor.Cyan);
+            log.WriteConsole("   COLLECTION COMPLETE", ConsoleColor.Cyan);
+            log.WriteConsole("  ============================================================", ConsoleColor.Cyan);
+            log.WriteConsole($"   Artifacts collected : {r.ArtifactCount} files across {CaseCategories.All.Count} categories", ConsoleColor.White);
+            log.WriteConsole($"   Collection errors   : {s.Errors.Count}", ConsoleColor.White);
+            log.WriteConsole($"   Observations        : {Sev("High")} high, {Sev("Medium")} medium, {Sev("Low")} low, {Sev("Info")} info", ConsoleColor.White);
+            log.WriteConsole("   Duration            : " + Math.Round((DateTime.UtcNow - s.StartTimeUtc).TotalMinutes, 1).ToString(CultureInfo.InvariantCulture) + " min", ConsoleColor.White);
+            log.WriteConsole("");
+            log.WriteConsole("   Case folder : " + r.CaseRoot, ConsoleColor.White);
+            if (r.ReportPath.Length > 0) log.WriteConsole("   Report      : " + r.ReportPath, ConsoleColor.White);
+            if (r.ZipPath != null)
+            {
+                var mb = Math.Round(new FileInfo(r.ZipPath).Length / 1048576.0, 2).ToString(CultureInfo.InvariantCulture);
+                log.WriteConsole($"   Package     : {r.ZipPath} ({mb} MB)", ConsoleColor.White);
+                log.WriteConsole("   SHA-256     : " + r.ZipSha256, ConsoleColor.Green);
+            }
+            log.WriteConsole("");
+            log.WriteConsole("   Open Foton_Report.html from inside the extracted folder so", ConsoleColor.DarkGray);
+            log.WriteConsole("   the artifact links resolve. Findings are automated observations,", ConsoleColor.DarkGray);
+            log.WriteConsole("   not conclusions - verify each one against its source artifact.", ConsoleColor.DarkGray);
+            log.WriteConsole("");
+        }
+
+        static bool Int(string? v, out int n) => int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out n) && n >= 0;
+
+        /// <summary>
+        /// The Desktop, as in 1.38.x. RMM sessions running as SYSTEM or a service account may have no Desktop folder,
+        /// so fall back to Desktop under the profile (created on write), then the working directory.
+        /// </summary>
+        static string DefaultOutputPath()
+        {
+            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            if (!string.IsNullOrEmpty(desktop)) return desktop;
+            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return string.IsNullOrEmpty(profile) ? Directory.GetCurrentDirectory() : Path.Combine(profile, "Desktop");
+        }
+
+        static int Usage(string error)
+        {
+            Console.Error.WriteLine(error);
+            Console.Error.WriteLine("Usage: foton-collect [-OutputPath <folder>] [-CaseNumber <id>] [-Examiner <name>]");
+            Console.Error.WriteLine("                     [-EventLogDays <n>] [-MaxEventsPerLog <n>] [-SkipEvtxExport] [-SkipHashing]");
+            Console.Error.WriteLine("                     [-LoadUserHives] [-IncludeFileTimeline] [-IncludeUsnJournal] [-Deep] [-NoZip]");
+            Console.Error.WriteLine("                     [-RequireAdministrator]");
+            Console.Error.WriteLine("       foton-collect -Version");
+            return 1;
+        }
     }
 }

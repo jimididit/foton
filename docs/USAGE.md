@@ -19,6 +19,7 @@ There is no public v2 release until `foton-collect.exe` is ported; use 1.38.x fo
 
 | Executable | Runs on | Purpose |
 |------------|---------|---------|
+| `foton-collect.exe` | Endpoint | In development. Same switches as the Collect flatten and the same package layout (custody, coverage, manifest, findings, report, hashes, ZIP), but collection categories are still being ported, so its packages are incomplete. Use the 1.38.x Collect flatten |
 | `foton-baseline.exe` | Endpoint | Capture a baseline package (`baseline.json`, `coverage.json`, `Foton_Baseline.html`, hashes, ZIP). Same switches as the Baseline flatten |
 | `foton.exe` | Workstation | `compare` two baselines (`baseline_diff.csv`, `Foton_BaselineCompare.html`); `parse` copied Prefetch, LNK, jumplists, EVTX and Amcache in a package (`analysis\parsed_records.csv`, `Foton_Parse.html`); `analyze` a package with the triage heuristics (`analysis\findings.csv` and `Foton_Report.html`); `ioc` matches an indicator list (`analysis\ioc_matches.csv`); `compose` runs EZ Tools / Hayabusa / Chainsaw on copied package files (`analysis\external\`, `external_parse_inventory.csv`); `tools` lists, installs (pinned, hash-verified) or registers those tools; `carve` signature-scans a copied blob for MZ/PE headers (Tier 3, not NTFS carving); `package` verifies hashes |
 
