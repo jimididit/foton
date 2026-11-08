@@ -21,9 +21,11 @@ namespace Foton.Collect
         public static void Run(FotonSession s)
         {
             s.Status.Write("Collecting accounts, groups, sessions, and access configuration", StatusLevel.Step);
-            List<LocalUser>? users = null;
-            Task(s, Cat, "local_users", "Local user accounts and password state", TaskFormat.Csv, () => Users(out users));
-            Task(s, Cat, "local_group_membership", "Members of every local group (privilege mapping)", TaskFormat.Csv, () => GroupMembership(users));
+            // Local account SIDs from whichever read worked: they give this machine's account domain for PrincipalSource.
+            var sids = new List<string>();
+            var msa = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            Task(s, Cat, "local_users", "Local user accounts and password state", TaskFormat.Csv, () => Users(sids, msa));
+            Task(s, Cat, "local_group_membership", "Members of every local group (privilege mapping)", TaskFormat.Csv, () => GroupMembership(sids, msa));
             Task(s, Cat, "user_profiles", "Profiles present on disk with SID mapping", TaskFormat.Csv, () => HostInfo.Profiles(s.IsElevated).Select(p => new Dictionary<string, object?>
             {
                 ["SID"] = p.Sid, ["UserName"] = p.UserName, ["ProfilePath"] = p.ProfilePath, ["Exists"] = p.Exists,
@@ -36,22 +38,26 @@ namespace Foton.Collect
             Task(s, Cat, "stored_credentials_and_trusts", "Credential manager entries and domain trust state", TaskFormat.Txt, Credentials);
         }
 
-        static object Users(out List<LocalUser>? read)
+        static object Users(List<string> sids, ISet<string> msa)
         {
-            read = null;
             string When(DateTime? t) => t.HasValue ? FotonTime.Format(t.Value) : "Never";
+            List<LocalUser> read;
             try { read = LocalUsers.All(); }
             catch (InvalidOperationException)
             {
                 // The SAM read failed: fall back to WMI, which has no logon or password times.
-                return Wmi.Query(Cimv2, "SELECT Name, Disabled, SID, Description, PasswordRequired, PasswordExpires, PasswordChangeable FROM Win32_UserAccount WHERE LocalAccount=True")
+                var rows = Wmi.Query(Cimv2, "SELECT Name, Disabled, SID, Description, PasswordRequired, PasswordExpires, PasswordChangeable FROM Win32_UserAccount WHERE LocalAccount=True")
                     .Select(u => new Dictionary<string, object?>
                     {
                         ["Name"] = Raw(u, "Name"), ["Enabled"] = !(Raw(u, "Disabled") as bool? ?? false), ["SID"] = Raw(u, "SID"), ["Description"] = Raw(u, "Description"),
                         ["LastLogon"] = "", ["PasswordLastSet"] = "", ["PasswordRequired"] = Raw(u, "PasswordRequired"), ["PasswordExpires"] = Raw(u, "PasswordExpires"),
                         ["UserMayChangePassword"] = Raw(u, "PasswordChangeable"), ["AccountExpires"] = "",
                     }).ToList();
+                sids.AddRange(rows.Select(r => r["SID"] as string ?? "").Where(v => v.Length > 0));
+                return rows;
             }
+            sids.AddRange(read.Select(u => u.Sid));
+            foreach (var u in read.Where(u => u.MicrosoftAccount)) msa.Add(u.Sid);
             return read.Select(u => new Dictionary<string, object?>
             {
                 ["Name"] = u.Name, ["Enabled"] = u.Enabled, ["SID"] = u.Sid, ["Description"] = u.Description,
@@ -66,14 +72,12 @@ namespace Foton.Collect
         /// Every local group's members. A member SID that cannot be resolved stays a row (Get-LocalGroupMember failed the
         /// whole group with error 1789 and lost it, Administrators included); a group that cannot be read is an error row.
         /// </summary>
-        static object GroupMembership(List<LocalUser>? users)
+        static object GroupMembership(IReadOnlyList<string> localSids, ISet<string> msa)
         {
             var rows = new List<Dictionary<string, object?>>();
             Dictionary<string, object?> Row(string g, string m, string cls, string src, string sid) =>
                 new Dictionary<string, object?> { ["Group"] = g, ["Member"] = m, ["ObjectClass"] = cls, ["PrincipalSource"] = src, ["SID"] = sid };
-            var known = users ?? new List<LocalUser>();
-            var machine = known.Select(u => Sid(u.Sid)?.AccountDomainSid).FirstOrDefault(d => d != null);
-            var msa = new HashSet<string>(known.Where(u => u.MicrosoftAccount).Select(u => u.Sid), StringComparer.OrdinalIgnoreCase);
+            var machine = localSids.Select(v => Sid(v)?.AccountDomainSid).FirstOrDefault(d => d != null);
             List<string> groups;
             try { groups = LocalGroups.Groups(); }
             catch (InvalidOperationException ex)
@@ -112,8 +116,9 @@ namespace Foton.Collect
         {
             if (sid.StartsWith("S-1-12-1-", StringComparison.OrdinalIgnoreCase)) return "AzureAD";
             var domain = Sid(sid)?.AccountDomainSid;
-            if (domain == null) return "Unknown";
-            if (machine != null && domain.Equals(machine)) return msa.Contains(sid) ? "MicrosoftAccount" : "Local";
+            // Without this machine's account domain, local and domain accounts cannot be told apart: say so, never guess.
+            if (domain == null || machine == null) return "Unknown";
+            if (domain.Equals(machine)) return msa.Contains(sid) ? "MicrosoftAccount" : "Local";
             return "ActiveDirectory";
         }
 

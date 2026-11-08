@@ -72,6 +72,9 @@ namespace Foton.Tests
             Assert.Equal("AzureAD", UserCollection.PrincipalSource("S-1-12-1-111-222-333-444", machine, msa));
             Assert.Equal("Unknown", UserCollection.PrincipalSource("S-1-5-4", machine, msa));
             Assert.Equal("Unknown", UserCollection.PrincipalSource("not a sid", machine, msa));
+            Assert.Equal("Unknown", UserCollection.PrincipalSource("S-1-5-21-1-2-3-1001", null, msa));
+            Assert.Null(CollectText.DmtfTime("2026-not-a-dmtf"));
+            Assert.Equal("", CollectText.Dmtf("99999999999999.999999+999"));
             Assert.Equal(new[] { "User", "Group", "Group", "Group", "" }, new[] { 1, 2, 4, 5, 6 }.Select(UserCollection.ObjectClass));
         }
 

@@ -42,9 +42,10 @@ namespace Foton.Collect
 
         static object OsInfo(FotonSession s)
         {
-            var os = First(Cimv2, "SELECT * FROM Win32_OperatingSystem") ?? throw new InvalidOperationException("Win32_OperatingSystem returned no instance.");
-            var cs = TryFirst(Cimv2, "SELECT * FROM Win32_ComputerSystem");
-            var bios = TryFirst(Cimv2, "SELECT * FROM Win32_BIOS");
+            var os = First(Cimv2, "SELECT Caption, Version, BuildNumber, OSArchitecture, InstallDate, LastBootUpTime, SerialNumber, RegisteredUser, SystemDirectory FROM Win32_OperatingSystem")
+                ?? throw new InvalidOperationException("Win32_OperatingSystem returned no instance.");
+            var cs = TryFirst(Cimv2, "SELECT Domain, PartOfDomain, Manufacturer, Model, TotalPhysicalMemory FROM Win32_ComputerSystem");
+            var bios = TryFirst(Cimv2, "SELECT BIOSVersion, SMBIOSBIOSVersion, ReleaseDate, EmbeddedControllerMajorVersion, EmbeddedControllerMinorVersion, SerialNumber FROM Win32_BIOS");
             var boot = DmtfTime(Raw(os, "LastBootUpTime"));
             object? ec = null;
             if (bios != null) ec = Raw(bios, "EmbeddedControllerMajorVersion");
@@ -124,7 +125,7 @@ namespace Foton.Collect
             ManagementBaseObject? tpm = null;
             try
             {
-                tpm = First(@"root\cimv2\security\microsofttpm", "SELECT * FROM Win32_Tpm");
+                tpm = First(@"root\cimv2\security\microsofttpm", "SELECT IsEnabled_InitialValue, IsActivated_InitialValue, SpecVersion FROM Win32_Tpm");
                 tpmPresent = tpm != null;
             }
             catch (Exception ex) when (ex is ManagementException || ex is UnauthorizedAccessException || ex is System.Runtime.InteropServices.COMException) { }

@@ -16,16 +16,16 @@ namespace Foton.Collect
         /// <summary>A WMI DMTF datetime as UTC yyyy-MM-dd HH:mm:ss; "" when absent or unparseable.</summary>
         public static string Dmtf(object? v)
         {
-            if (!(v is string d) || d.Length == 0) return "";
-            try { return FotonTime.Format(ManagementDateTimeConverter.ToDateTime(d).ToUniversalTime()); }
-            catch (ArgumentOutOfRangeException) { return ""; }
+            var t = DmtfTime(v);
+            return t.HasValue ? FotonTime.Format(t.Value) : "";
         }
 
+        /// <summary>A WMI DMTF datetime in UTC; null when absent or malformed (host data is never trusted to parse).</summary>
         public static DateTime? DmtfTime(object? v)
         {
             if (!(v is string d) || d.Length == 0) return null;
             try { return ManagementDateTimeConverter.ToDateTime(d).ToUniversalTime(); }
-            catch (ArgumentOutOfRangeException) { return null; }
+            catch (Exception ex) when (ex is ArgumentException || ex is FormatException || ex is OverflowException) { return null; }
         }
 
         /// <summary>A WMI value, or null when the class does not define the property.</summary>
