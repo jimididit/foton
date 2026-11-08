@@ -30,6 +30,7 @@ namespace Foton.Collect
             new CollectCategory("Persistence", PersistenceCollection.Run),
             new CollectCategory("Security", SecurityCollection.Run),
             new CollectCategory("Software", SoftwareCollection.Run),
+            new CollectCategory("EventLogs", EventLogCollection.Run),
         };
     }
 }
