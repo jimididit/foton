@@ -56,6 +56,37 @@ namespace Foton.Collect
             catch (Exception ex) when (WmiFailed(ex)) { return null; }
         }
 
+        /// <summary>Every property of a WMI instance as "Name : Value" lines (Format-List); arrays as {a, b}.</summary>
+        public static IEnumerable<string> PropertyList(ManagementBaseObject o)
+        {
+            var props = o.Properties.Cast<PropertyData>().ToList();
+            int width = props.Count == 0 ? 0 : props.Max(p => p.Name.Length);
+            yield return "";
+            foreach (var p in props)
+            {
+                var v = p.Value;
+                var text = v is Array a && !(v is string)
+                    ? "{" + string.Join(", ", a.Cast<object?>().Select(x => Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture))) + "}"
+                    : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture) ?? "";
+                yield return p.Name.PadRight(width) + " : " + TextFile.OneLine(text);
+            }
+            yield return "";
+        }
+
+        /// <summary>PowerShell truthiness for a registry value: null, "", 0, and empty arrays are false.</summary>
+        public static bool Truthy(object? v)
+        {
+            switch (v)
+            {
+                case null: return false;
+                case string s: return s.Length > 0;
+                case Array a: return a.Length > 1 || (a.Length == 1 && Truthy(a.GetValue(0)));
+                case byte _: case sbyte _: case short _: case ushort _: case int _: case uint _: case long _: case ulong _: case double _: case float _:
+                    return Convert.ToDouble(v, System.Globalization.CultureInfo.InvariantCulture) != 0;
+                default: return true;
+            }
+        }
+
         /// <summary>A left-aligned text table (header, dashes, rows), in place of the PowerShell formatter's tables in TXT artifacts.</summary>
         public static IEnumerable<string> Table(IReadOnlyList<string> columns, IEnumerable<IReadOnlyList<string>> rows)
         {

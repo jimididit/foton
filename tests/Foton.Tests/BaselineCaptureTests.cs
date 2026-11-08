@@ -136,6 +136,8 @@ namespace Foton.Tests
             Assert.Equal(ptr == 8 ? 88 : 56, Authenticode.StructSize());
             // SID_AND_ATTRIBUTES { PSID; DWORD } (padded on x64).
             Assert.Equal(ptr == 8 ? 16 : 8, ProcessOwner.StructSize());
+            // BG_JOB_TIMES: three FILETIMEs.
+            Assert.Equal(24, Bits.StructSize());
         }
 
         [Fact]
