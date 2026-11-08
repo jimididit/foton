@@ -214,6 +214,30 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Cloud_placeholders_are_never_read()
+        {
+            using (var t = new TempDir())
+            {
+                var f = Path.Combine(t.Path, "cloud.exe");
+                File.WriteAllText(f, "MZ");
+                File.SetAttributes(f, FileAttributes.Offline);
+                try
+                {
+                    Assert.True(Hashing.IsCloudPlaceholder(f));
+                    Assert.Equal("SkippedCloudPlaceholder", Hashing.SafeHash(f, false));
+                    Assert.Equal("CloudPlaceholderNotChecked", Authenticode.Check(f).Status);
+                    var copy = HostCopy.CopyFile(f, Path.Combine(t.Path, @"out\cloud.exe"), false);
+                    Assert.Equal("SkippedCloudPlaceholder", copy.Status);
+                    Assert.False(File.Exists(Path.Combine(t.Path, @"out\cloud.exe")));
+                    Assert.Equal(TaskStatus.Success, CopyTaskStatus.Evaluate(new[] { copy }).Status);
+                }
+                finally { File.SetAttributes(f, FileAttributes.Normal); }
+                Assert.False(Hashing.IsCloudPlaceholder(f));
+                Assert.Equal(64, Hashing.SafeHash(f, false).Length);
+            }
+        }
+
+        [Fact]
         public void Capped_list_copies_newest_first_and_refuses_escapes_and_remote_sources()
         {
             using (var t = new TempDir())

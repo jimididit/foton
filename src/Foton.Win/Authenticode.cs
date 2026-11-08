@@ -9,7 +9,7 @@ namespace Foton.Win
     /// <summary>A file's Authenticode state as Get-AuthenticodeSignature reported it.</summary>
     public sealed class SignatureInfo
     {
-        /// <summary>Valid, NotSigned, HashMismatch, NotTrusted, UnknownError; or Unknown / FileNotFound / NonLocalPathNotChecked / SignatureCheckError.</summary>
+        /// <summary>Valid, NotSigned, HashMismatch, NotTrusted, UnknownError; or Unknown / FileNotFound / NonLocalPathNotChecked / CloudPlaceholderNotChecked / SignatureCheckError.</summary>
         public string Status { get; set; } = "Unknown";
         public string Signer { get; set; } = "";
         public bool IsOSBinary { get; set; }
@@ -66,6 +66,7 @@ namespace Foton.Win
             try
             {
                 if (!File.Exists(path)) { result.Status = "FileNotFound"; return result; }
+                if (Foton.Core.Hashing.IsCloudPlaceholder(path!)) { result.Status = "CloudPlaceholderNotChecked"; return result; }
                 result = Query(path!, CatalogFirst);
                 if (result.Status != "Valid")
                 {
