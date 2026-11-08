@@ -186,6 +186,37 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Event_queries_and_messages_follow_1_38()
+        {
+            Assert.Equal("*[System[(EventID=104 or EventID=6005) and TimeCreated[@SystemTime>='2026-01-02T03:04:05.000Z']]]",
+                EventLogCollection.XPath(new[] { 104, 6005 }, new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc)));
+            Assert.Equal("a b c", EventLogCollection.Collapse("a\r\n\tb   c"));
+            var capped = EventLogCollection.Collapse(new string('x', 2500));
+            Assert.Equal(2000 + "...[truncated]".Length, capped.Length);
+            Assert.EndsWith("...[truncated]", capped);
+        }
+
+        [Fact]
+        public void EventLogs_runs_every_query_and_exports_evtx()
+        {
+            using (var t = new TempDir())
+            {
+                var s = CollectRun.NewSession(new SessionOptions { OutputPath = t.Path, NoZip = true, EventLogDays = 1, MaxEventsPerLog = 50 }, Quiet());
+                CollectRun.Run(s, only: new[] { "EventLogs" });
+                var events = s.Manifest.Where(m => m.Category == "EventLogs").ToList();
+                Assert.Equal(21, events.Count);
+                Assert.All(events.Where(m => m.Task.StartsWith("security_", StringComparison.Ordinal)),
+                    m => Assert.True(s.IsElevated ? m.Status != TaskStatus.SkippedNotElevated : m.Status == TaskStatus.SkippedNotElevated, m.Task));
+                Assert.All(events, m => Assert.True(m.Records <= 50, m.Task));
+                Assert.DoesNotContain(events, m => m.Status == TaskStatus.WriteError);
+                Assert.Contains(events, m => m.Task == "system_log_and_boot" && m.Status != TaskStatus.Error);
+                Assert.Equal(9, events.Single(m => m.Task == "event_log_configuration").Records);
+                Assert.True(File.Exists(Path.Combine(s.Dirs["EventLogs"], "evtx", "System.evtx")));
+                Assert.Equal(s.IsElevated, File.Exists(Path.Combine(s.Dirs["EventLogs"], "evtx", "Security.evtx")));
+            }
+        }
+
+        [Fact]
         public void Standard_modules_and_internal_addresses_are_anchored()
         {
             var win = Foton.Win.HostInfo.WindowsDir.TrimEnd('\\');
