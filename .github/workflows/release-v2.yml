@@ -2,6 +2,7 @@ name: Release v2
 
 # Foton v2 (C#). Tag v2.Y.Z or v2.Y.Z-<prerelease> (matching FotonVersion / FotonPrerelease in
 # Directory.Build.props) to publish. A tag with a prerelease suffix publishes a GitHub prerelease.
+# The release's "What's new" is the CHANGELOG.md section for that version; the build fails without one.
 # Run manually (workflow_dispatch) for a dry run: builds, tests, and uploads the executables as a
 # workflow artifact without creating a release.
 #
@@ -47,6 +48,25 @@ jobs:
             throw "Tag $env:GITHUB_REF_NAME does not match version $ver in Directory.Build.props."
           }
 
+      - name: Extract release notes from CHANGELOG.md
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $p = ([xml](Get-Content -Raw .\Directory.Build.props)).Project.PropertyGroup | Where-Object { $_.FotonVersion } | Select-Object -First 1
+          $ver = [string]$p.FotonVersion
+          if ([string]$p.FotonPrerelease) { $ver = "$ver-$($p.FotonPrerelease)" }
+          $lines = Get-Content .\CHANGELOG.md -Encoding UTF8
+          $start = [array]::FindIndex([string[]]$lines, [Predicate[string]]{ param($l) $l.StartsWith("## [$ver] - ") })
+          if ($start -lt 0) { throw "CHANGELOG.md has no '## [$ver]' section." }
+          $end = [array]::FindIndex([string[]]$lines, $start + 1, [Predicate[string]]{ param($l) $l.StartsWith('## ') })
+          if ($end -lt 0) { $end = $lines.Count }
+          if ($end -le $start + 1) { throw "CHANGELOG.md section $ver is empty." }
+          # Demote the changelog's ### headings under the release's "What's new" heading.
+          $body = $lines[($start + 1)..($end - 1)] | ForEach-Object { $_ -replace '^### ', '#### ' }
+          if (-not ($body -join '').Trim()) { throw "CHANGELOG.md section $ver is empty." }
+          $out = New-Item -ItemType Directory -Force -Path 'dist\release-v2-notes'
+          [IO.File]::WriteAllText((Join-Path $out 'changes.md'), (($body -join "`n").Trim() + "`n"))
+
       - name: Build (Release, warnings as errors)
         run: dotnet build Foton.sln -c Release -warnaserror
 
@@ -76,6 +96,13 @@ jobs:
             dist/release-v2/*.exe
             dist/release-v2/SHA256SUMS.txt
 
+      - name: Upload release notes
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: foton-v2-notes
+          if-no-files-found: error
+          path: dist/release-v2-notes/changes.md
+
   publish:
     name: Publish release
     needs: build
@@ -91,6 +118,12 @@ jobs:
         with:
           name: foton-v2-release
           path: assets
+
+      - name: Download release notes
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: foton-v2-notes
+          path: notes
 
       - name: Verify SHA256SUMS
         shell: pwsh
@@ -122,6 +155,7 @@ jobs:
             $pre = @('--prerelease')
             $preNote = "`n`n**Prerelease** for testing; not supported. Use the latest v2 release for casework."
           }
+          $changes = (Get-Content -Raw -Encoding UTF8 'notes\changes.md').Trim()
           $notes = @"
           ## Foton $tag
 
@@ -134,6 +168,11 @@ jobs:
           Collect schema 1.14.0 (same files and columns as 1.38.x, with UTC timestamps and explicit statuses). Baseline schema 1.17.0: Compare accepts 1.14.0 (Foton 1.38.x), 1.15.0 (v2.0.0-alpha.1), and 1.16.0 (v2.0.0) baselines and explains the one-time format and coverage differences.
 
           Hosts older than Windows 10 / Server 2016: use [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) (PowerShell; security fixes only). Operator guide: [docs/USAGE.md](https://github.com/jimididit/foton/blob/$tag/docs/USAGE.md).
+
+          ## What's new in $tag
+          $changes
+
+          Full history: [CHANGELOG.md](https://github.com/jimididit/foton/blob/$tag/CHANGELOG.md).
 
           ## Verify before use
           The executables are not Authenticode-signed yet, so Windows SmartScreen may warn on first run. Check the hash and the build provenance, then unblock:

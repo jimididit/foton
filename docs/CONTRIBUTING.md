@@ -92,11 +92,11 @@ HTML goes through `Foton.Report`: escape every host value, and include the offli
 
 - Branch from current `main` (`feat/...`, `fix/...`, `docs/...`), push, and open a PR into `main`. `main` is protected; do not commit to it directly.
 - CI must pass before merge. Keep a PR to one change when practical.
-- Behavior or format changes bump the version and schema numbers in `Directory.Build.props` and set `FotonReleaseDate`.
+- Behavior or format changes bump the version and schema numbers in `Directory.Build.props`, set `FotonReleaseDate`, and add a line to that version's section in [`CHANGELOG.md`](../CHANGELOG.md) (a test fails when the section is missing or its date differs).
 
 ## Releases
 
-Maintainers release v2 from `main` after the version PR merges: set `FotonVersion` (and `FotonPrerelease` for a prerelease) and `FotonReleaseDate` in `Directory.Build.props`, then push a `v2.*` tag that matches. `.github/workflows/release-v2.yml` refuses a mismatched tag, builds and tests, writes `SHA256SUMS.txt`, attests build provenance, and creates the GitHub release (a prerelease when the tag has a suffix). Run the workflow manually for a dry run: the executables are uploaded as a workflow artifact and nothing is published.
+Maintainers release v2 from `main` after the version PR merges: set `FotonVersion` (and `FotonPrerelease` for a prerelease) and `FotonReleaseDate` in `Directory.Build.props`, then push a `v2.*` tag that matches. `.github/workflows/release-v2.yml` refuses a mismatched tag or a version with no `CHANGELOG.md` section, builds and tests, writes `SHA256SUMS.txt`, attests build provenance, and creates the GitHub release (a prerelease when the tag has a suffix). Run the workflow manually for a dry run: the executables are uploaded as a workflow artifact and nothing is published.
 
 ## What we will not accept
 
