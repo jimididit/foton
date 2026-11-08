@@ -127,7 +127,7 @@ jobs:
           - **foton-baseline.exe**: capture a baseline of stable configuration (37 record types) into a hashed package with ``Foton_Baseline.html``. Same switches as the 1.38.x flat script: ``-OutputPath``, ``-Path``, ``-NoZip``, ``-NoHtml``, ``-RequireAdministrator``.
           - **foton.exe**: workstation verbs ``compare``, ``parse``, ``analyze``, ``ioc``, ``compose``, ``tools``, ``carve``, and ``package`` (verify hashes).
 
-          Baseline schema 1.15.0. Compare accepts a 1.14.0 baseline from Foton 1.38.x and explains the one-time format and coverage differences.
+          Baseline schema 1.16.0. Compare accepts 1.14.0 (Foton 1.38.x) and 1.15.0 (v2.0.0-alpha.1) baselines and explains the one-time format and coverage differences.
 
           **Pre-release.** Collect was checked against 1.38.x on a lab VM (elevated and standard user), but has not yet been used on real cases. For casework, use Foton 1.38.x from the v1 releases.
 

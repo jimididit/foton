@@ -366,7 +366,7 @@ namespace Foton.Baseline.Capture
             Collect = ctx =>
             {
                 const string proto = @"HKLM:\SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\Protocol_Catalog9";
-                const string ns = @"HKLM:\SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\NameSpace_Catalog5\Catalog_Entries";
+                const string ns = @"HKLM:\SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\NameSpace_Catalog5";
                 var rows = new List<Dictionary<string, object?>>();
                 foreach (var leaf in new[] { "Catalog_Entries", "Catalog_Entries64" })
                 {
@@ -374,7 +374,13 @@ namespace Foton.Baseline.Capture
                     var kind = leaf == "Catalog_Entries64" ? "Protocol64" : "Protocol";
                     rows.AddRange(Reg.SubKeyNames(root).Select(e => Row("Kind", kind, "Entry", e, "LibraryPath", RegDecode.WinsockPackedPath(Reg.Value(Reg.Join(root, e), "PackedCatalogItem")))));
                 }
-                rows.AddRange(Reg.SubKeyNames(ns).Select(e => Row("Kind", "Namespace", "Entry", e, "LibraryPath", NotSet(Reg.Value(Reg.Join(ns, e), "LibraryPath")))));
+                // 1.16.0: the 64-bit namespace catalog too (1.15.0 and 1.38.x read only Catalog_Entries).
+                foreach (var leaf in new[] { "Catalog_Entries", "Catalog_Entries64" })
+                {
+                    var root = Reg.Join(ns, leaf);
+                    var kind = leaf == "Catalog_Entries64" ? "Namespace64" : "Namespace";
+                    rows.AddRange(Reg.SubKeyNames(root).Select(e => Row("Kind", kind, "Entry", e, "LibraryPath", NotSet(Reg.Value(Reg.Join(root, e), "LibraryPath")))));
+                }
                 return rows;
             },
         };
