@@ -49,7 +49,10 @@ namespace Foton.Collect
             Task(s, Cat, "audit_policy", "Advanced audit policy configuration (log coverage)", TaskFormat.Txt, () => Exec.System32("auditpol.exe", "/get /category:*"), elevated: true);
             Task(s, Cat, "smb_and_winrm_config", "SMB server config, SMBv1 feature state, WinRM listeners", TaskFormat.Txt, SmbAndWinRm);
             Task(s, Cat, "powershell_environment", "PowerShell versions, policy, and logging configuration", TaskFormat.Json, PowerShellEnvironment);
-            Task(s, Cat, "non_microsoft_root_certificates", "Root/intermediate CAs not issued by Microsoft (rogue CA check)", TaskFormat.Csv, Certificates);
+            // Every certificate in these stores, despite the task name (kept for package compatibility): an issuer name is
+            // chosen by whoever made the certificate, so filtering "not Microsoft" by name would let a rogue CA named
+            // Microsoft through. Review the rows whose issuer is not a known Microsoft root.
+            Task(s, Cat, "non_microsoft_root_certificates", "Every LocalMachine Root, intermediate CA, and TrustedPublisher certificate (rogue CA check; not filtered by issuer name)", TaskFormat.Csv, Certificates);
             Task(s, Cat, "applocker_wdac_and_policy", "Application control policy and applied group policy summary", TaskFormat.Txt, AppControl);
             if (s.Options.Deep)
                 Task(s, Cat, "gpresult_html", "Deep: gpresult /h HTML report into the package (requires elevation).", TaskFormat.Csv, () => GpResultHtml(s), elevated: true);
@@ -58,6 +61,8 @@ namespace Foton.Collect
         /// <summary>A WMI datetime as UTC text (1.38.x [string]-cast these in the machine's culture and local time).</summary>
         static string When(ManagementBaseObject o, string name) => Dmtf(Raw(o, name));
 
+        // SELECT * on the Defender classes: Defender drops properties between platform builds, and naming a property the
+        // class no longer has fails the whole query; Raw() turns a missing property into null instead.
         static object DefenderStatus()
         {
             var st = First(Defender, "SELECT * FROM MSFT_MpComputerStatus") ?? throw new InvalidOperationException("MSFT_MpComputerStatus returned no instance.");
