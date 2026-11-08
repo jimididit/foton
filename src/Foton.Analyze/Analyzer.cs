@@ -134,6 +134,33 @@ namespace Foton.Analyze
         }
 
         /// <summary>
+        /// End-of-collection analysis on the endpoint: the rules run over the case folder Collect just wrote (not over
+        /// live objects), so re-running analyze on the untouched package on a workstation gives the same findings. The
+        /// suspicious-command list is not shipped to endpoints; the pattern-gap finding says so. Writes
+        /// Foton_Report.html in the case root and returns the findings for 00_Collection\findings.csv.
+        /// </summary>
+        public static List<Finding> RunCollected(string caseRoot, DateTime collectedUtc, int eventLogDays, StatusLog log)
+        {
+            var pkg = FotonPackage.Open(caseRoot);
+            var ctx = new AnalysisContext(PackageData.From(pkg), pkg.Manifest, pkg.CaseRoot, new string[0], PatternLists.UserWritable)
+            {
+                EventLogDays = eventLogDays,
+            };
+            log.Write("Evaluating collected artifacts against triage heuristics", StatusLevel.Step);
+            Run(ctx);
+            log.Write($"Findings generated: {ctx.Findings.Count}", StatusLevel.Good);
+            log.Write("Building HTML overview report", StatusLevel.Step);
+            var report = Path.Combine(pkg.CaseRoot, TriageReport.FileName);
+            TriageReport.Write(new TriageReportInput
+            {
+                Data = ctx.Data, Findings = ctx.Findings, Manifest = pkg.Manifest, Errors = pkg.Errors, CaseRoot = pkg.CaseRoot,
+                CollectedUtc = collectedUtc, Version = FotonVersion.Product, EventLogDays = eventLogDays,
+            }, report);
+            log.Write("Report written: " + report, StatusLevel.Good);
+            return ctx.Findings;
+        }
+
+        /// <summary>
         /// Invoke-FotonIocMatch over a package. Hits are written to analysis\ioc_matches.csv (beside a ZIP:
         /// &lt;name&gt;_ioc_matches.csv); 1.38.x only printed them.
         /// </summary>
