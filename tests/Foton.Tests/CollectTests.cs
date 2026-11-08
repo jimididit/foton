@@ -123,6 +123,7 @@ namespace Foton.Tests
                 Foton.Win.Authenticode.Openable(@"\SystemRoot\System32\drivers\y.sys"));
             Assert.Equal(@"C:\Windows\z.sys", Foton.Win.Authenticode.Openable(@"C:\Windows\z.sys"));
             Assert.Equal(@"C:\Program Files\q.sys", Foton.Win.Authenticode.Openable(@"""\??\C:\Program Files\q.sys"""));
+            Assert.Equal(@"\\server\share\d.sys", Foton.Win.Authenticode.Openable(@"\??\UNC\server\share\d.sys"));
         }
 
         [Fact]

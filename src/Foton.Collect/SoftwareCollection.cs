@@ -99,14 +99,20 @@ namespace Foton.Collect
                         foreach (var ext in Dirs(Path.Combine(profile, "Extensions")))
                         {
                             string name = "", version = "", perms = "";
-                            var manifest = FirstManifest(ext);
-                            if (manifest != null && Read(manifest) is IDictionary m)
+                            // A manifest is written by whatever installed the extension: any malformed content leaves the
+                            // fields blank for this extension and never stops the task.
+                            try
                             {
-                                name = Str(m, "name");
-                                version = Str(m, "version");
-                                if (m.Contains("permissions") && m["permissions"] is IEnumerable list && !(m["permissions"] is string))
-                                    perms = string.Join(", ", list.Cast<object?>().Select(x => x is string str ? str : Json.Compact(x)));
+                                var manifest = FirstManifest(ext);
+                                if (manifest != null && Read(manifest) is IDictionary m)
+                                {
+                                    name = Str(m, "name");
+                                    version = Str(m, "version");
+                                    if (m.Contains("permissions") && m["permissions"] is IEnumerable list && !(m["permissions"] is string))
+                                        perms = string.Join(", ", list.Cast<object?>().Select(x => x is string str ? str : Json.Compact(x)));
+                                }
                             }
+                            catch (Exception ex) when (!(ex is OutOfMemoryException)) { name = version = perms = ""; }
                             rows.Add(Row(p.UserName, b[0], Path.GetFileName(profile), Path.GetFileName(ext), name, version, perms, Created(ext)));
                         }
                 }

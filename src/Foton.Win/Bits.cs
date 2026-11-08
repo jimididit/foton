@@ -5,6 +5,8 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 
 [assembly: InternalsVisibleTo("Foton.Tests")]
+// Every native library Foton.Win imports is a System32 DLL: never load one planted beside the executable or on PATH.
+[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
 
 namespace Foton.Win
 {

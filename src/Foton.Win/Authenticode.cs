@@ -53,8 +53,9 @@ namespace Foton.Win
         const uint EmbeddedOnly = 0x001 | 0x800 | 0x1000;
 
         /// <summary>
-        /// The catalog first; when that is not Valid, the embedded signature, whose result then stands (as
-        /// Get-AuthenticodeSignature did). A file signed only by an embedded signature has no catalog entry.
+        /// The catalog first; when that is not Valid, the embedded signature (a file signed only by an embedded signature
+        /// has no catalog entry). The embedded result replaces a catalog NotSigned or UnknownError, or wins when it is
+        /// Valid; a definitive catalog HashMismatch or NotTrusted is never overwritten by an embedded NotSigned.
         /// </summary>
         public static SignatureInfo Check(string? path)
         {
@@ -64,7 +65,11 @@ namespace Foton.Win
             {
                 if (!File.Exists(path)) { result.Status = "FileNotFound"; return result; }
                 result = Query(path!, CatalogFirst);
-                if (result.Status != "Valid") result = Query(path!, EmbeddedOnly);
+                if (result.Status != "Valid")
+                {
+                    var embedded = Query(path!, EmbeddedOnly);
+                    if (embedded.Status == "Valid" || result.Status == "NotSigned" || result.Status == "UnknownError") result = embedded;
+                }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is CryptographicException || ex is ArgumentException
                 || ex is NotSupportedException || ex is EntryPointNotFoundException || ex is DllNotFoundException)
@@ -101,6 +106,7 @@ namespace Foton.Win
         public static string Openable(string path)
         {
             path = path.Trim().Trim('"');
+            if (path.StartsWith(@"\??\UNC\", StringComparison.OrdinalIgnoreCase)) return @"\\" + path.Substring(@"\??\UNC\".Length);
             if (path.StartsWith(@"\??\", StringComparison.Ordinal)) return path.Substring(4);
             if (path.StartsWith(@"\SystemRoot\", StringComparison.OrdinalIgnoreCase))
                 return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), path.Substring(@"\SystemRoot\".Length));
