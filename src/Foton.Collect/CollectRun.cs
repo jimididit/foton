@@ -31,7 +31,8 @@ namespace Foton.Collect
             var root = CaseLayout.Create(s, o.OutputPath);
             s.Status.Write("Case folder: " + root, StatusLevel.Good);
             s.Status.Write($"Examiner: {TextFile.OneLine(o.Examiner)} | Case: {(string.IsNullOrWhiteSpace(o.CaseNumber) ? "not supplied" : TextFile.OneLine(o.CaseNumber))} | Coverage: {Coverage.Profile(s.IsElevated)}", StatusLevel.Info);
-            ChainOfCustody.Write(s, HostFacts.Custody());
+            // From here on nothing ends the run: only creating the case folder above can.
+            Guard(s, "chain_of_custody", () => ChainOfCustody.Write(s, HostFacts.Custody()));
 
             var missing = CaseCategories.All.Select(kv => kv.Key).Where(k => k != "Collection" && !Categories.InOrder.Any(c => c.Key == k)).ToList();
             if (missing.Count > 0)
@@ -60,32 +61,28 @@ namespace Foton.Collect
             finally
             {
                 if (mounted.Count > 0)
-                {
-                    s.Status.Write("Unmounting offline user registry hives", StatusLevel.Step);
-                    UserHives.Unload(s, mounted);
-                }
+                    Guard(s, "UnloadUserHives", () =>
+                    {
+                        s.Status.Write("Unmounting offline user registry hives", StatusLevel.Step);
+                        UserHives.Unload(s, mounted);
+                    });
             }
 
             // The manifest and errors are on disk before analysis, which reads the case the way a workstation would.
-            PackageFiles.WriteManifestFiles(s);
+            Guard(s, "collection_manifest", () => PackageFiles.WriteManifestFiles(s));
             var result = new CollectResult { Session = s, CaseRoot = root };
-            try
+            Guard(s, "analysis", () =>
             {
                 s.Findings.AddRange(Analyzer.RunCollected(root, s.StartTimeUtc, o.EventLogDays, s.Status));
                 result.ReportPath = System.IO.Path.Combine(root, TriageReport.FileName);
-            }
-            catch (Exception ex)
-            {
-                s.Errors.Add(new ErrorRow { Task = "analysis", Error = ex.Message });
-                s.Status.Write("Analysis or report failed: " + ex.Message + ". The collected artifacts are unaffected.", StatusLevel.Warn);
-            }
-            PackageFiles.WriteManifestFiles(s);
-            result.ArtifactCount = PackageFiles.WriteArtifactHashes(s);
+            });
+            Guard(s, "collection_manifest", () => PackageFiles.WriteManifestFiles(s));
+            Guard(s, "hashes", () => result.ArtifactCount = PackageFiles.WriteArtifactHashes(s));
 
             if (!o.NoZip)
             {
                 result.ZipPath = PackageFiles.CompressCase(s);
-                if (result.ZipPath != null) result.ZipSha256 = PackageFiles.WritePackageHashRecord(s, result.ZipPath);
+                if (result.ZipPath != null) Guard(s, "package_hash", () => result.ZipSha256 = PackageFiles.WritePackageHashRecord(s, result.ZipPath));
             }
             return result;
         }
