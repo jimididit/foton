@@ -27,7 +27,10 @@ namespace Foton.Tests
                 Assert.True(File.Exists(r.ReportPath));
                 Assert.Contains("CASE-0001", File.ReadAllText(Path.Combine(col, "chain_of_custody.txt")));
                 if (Categories.InOrder.Count < CaseCategories.All.Count - 1)
+                {
                     Assert.Contains("does not collect yet", File.ReadAllText(Path.Combine(col, "collection.log")));
+                    Assert.NotEmpty(r.NotCollected);
+                }
                 Assert.Contains(Csv.Read(Path.Combine(col, "hashes.csv")), h => h["RelativePath"] == "Foton_Report.html");
                 Assert.Equal(r.ZipPath, r.CaseRoot + ".zip");
                 Assert.True(File.Exists(r.CaseRoot + "_PACKAGE_HASH.txt"));

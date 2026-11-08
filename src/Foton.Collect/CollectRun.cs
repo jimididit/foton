@@ -15,6 +15,8 @@ namespace Foton.Collect
         public int ArtifactCount { get; internal set; }
         public string? ZipPath { get; internal set; }
         public string? ZipSha256 { get; internal set; }
+        /// <summary>Categories this build does not collect yet (empty once every category is ported).</summary>
+        public IReadOnlyList<string> NotCollected { get; internal set; } = new string[0];
     }
 
     /// <summary>
@@ -70,7 +72,7 @@ namespace Foton.Collect
 
             // The manifest and errors are on disk before analysis, which reads the case the way a workstation would.
             Guard(s, "collection_manifest", () => PackageFiles.WriteManifestFiles(s));
-            var result = new CollectResult { Session = s, CaseRoot = root };
+            var result = new CollectResult { Session = s, CaseRoot = root, NotCollected = missing };
             Guard(s, "analysis", () =>
             {
                 s.Findings.AddRange(Analyzer.RunCollected(root, s.StartTimeUtc, o.EventLogDays, s.Status));
