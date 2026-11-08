@@ -90,8 +90,13 @@ namespace Foton.Collect
             return map;
         }
 
-        // Loopback, unspecified, RFC 1918, link-local, and multicast are not external (1.38.x's exact test).
-        static readonly Regex Internal = new Regex(@"^(127\.|0\.0\.0\.0|::1|::$|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|169\.254\.|fe80:|ff00:)", RegexOptions.IgnoreCase);
+        // Loopback, unspecified, RFC 1918, link-local, multicast, broadcast, and IPv6 unique-local are not external.
+        // 1.38.x's test knew only ff00: for multicast.
+        static readonly Regex Internal = new Regex(
+            @"^(127\.|0\.0\.0\.0|::1$|::$|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|169\.254\.|22[4-9]\.|23[0-9]\.|255\.255\.255\.255$|fe80:|ff[0-9a-f]{2}:|f[cd][0-9a-f]{2}:)",
+            RegexOptions.IgnoreCase);
+
+        internal static bool IsExternal(string remote) => !Internal.IsMatch(remote);
 
         static object ActiveConnections()
         {
@@ -111,7 +116,7 @@ namespace Foton.Collect
                         ["State"] = Named(TcpStates, Raw(c, "State")), ["OwningPID"] = Raw(c, "OwningProcess"),
                         ["ProcessName"] = proc != null ? Wmi.Str(proc, "Name") : "", ["ProcessPath"] = path,
                         ["CommandLine"] = proc != null ? Wmi.Str(proc, "CommandLine") : "",
-                        ["RemoteIsExternal"] = !Internal.IsMatch(remote),
+                        ["RemoteIsExternal"] = IsExternal(remote),
                         ["UserWritablePath"] = proc != null && UserWritable(path),
                         ["CreationTimeUtc"] = Dmtf(Raw(c, "CreationTime")),
                     });
@@ -199,6 +204,7 @@ namespace Foton.Collect
             List<ManagementBaseObject>? shares = null;
             try
             {
+                // SELECT *: GetAccessRights needs the instance path, which a column list leaves out.
                 shares = Wmi.Query(Smb, "SELECT * FROM MSFT_SmbShare");
                 lines.AddRange(Table(new[] { "Name", "Path", "Description", "ShareType" },
                     shares.Select(s => new[] { Wmi.Str(s, "Name"), Wmi.Str(s, "Path"), Wmi.Str(s, "Description"), Wmi.Str(s, "ShareType") })));
@@ -210,13 +216,19 @@ namespace Foton.Collect
                 {
                     try
                     {
-                        var result = share.InvokeMethod("GetAccessRights", null, null);
-                        var entries = result?["ShareAccessControlEntries"] as ManagementBaseObject[] ?? new ManagementBaseObject[0];
-                        lines.AddRange(Table(new[] { "Name", "ScopeName", "AccountName", "AccessControlType", "AccessRight" }, entries.Select(e => new[]
+                        using (var result = share.InvokeMethod("GetAccessRights", null, null))
                         {
-                            Wmi.Str(e, "Name"), Wmi.Str(e, "ScopeName"), Wmi.Str(e, "AccountName"),
-                            Named(AccessControlType, Raw(e, "AccessControlType")), Named(AccessRight, Raw(e, "AccessRight")),
-                        })));
+                            var entries = result?["ShareAccessControlEntries"] as ManagementBaseObject[] ?? new ManagementBaseObject[0];
+                            try
+                            {
+                                lines.AddRange(Table(new[] { "Name", "ScopeName", "AccountName", "AccessControlType", "AccessRight" }, entries.Select(e => new[]
+                                {
+                                    Wmi.Str(e, "Name"), Wmi.Str(e, "ScopeName"), Wmi.Str(e, "AccountName"),
+                                    Named(AccessControlType, Raw(e, "AccessControlType")), Named(AccessRight, Raw(e, "AccessRight")),
+                                }).ToList()));
+                            }
+                            finally { foreach (var e in entries) e.Dispose(); }
+                        }
                     }
                     catch (Exception ex) when (WmiFailed(ex)) { }
                 }

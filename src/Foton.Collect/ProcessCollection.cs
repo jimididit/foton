@@ -103,7 +103,25 @@ namespace Foton.Collect
             return lines;
         }
 
-        static readonly Regex StandardModulePath = new Regex(@"\\Windows\\System32\\|\\Windows\\SysWOW64\\|\\Windows\\WinSxS\\|\\Program Files", RegexOptions.IgnoreCase);
+        /// <summary>
+        /// A module under the real system roots. 1.38.x matched these names anywhere in the path, so a DLL in
+        /// C:\Users\x\Windows\System32\ or "...\Program Files Fake\" was treated as standard and hidden from this list.
+        /// </summary>
+        static readonly string[] StandardRoots = StandardModuleRoots();
+
+        static string[] StandardModuleRoots()
+        {
+            var win = HostInfo.WindowsDir.TrimEnd('\\');
+            var roots = new List<string> { win + @"\System32\", win + @"\SysWOW64\", win + @"\WinSxS\" };
+            foreach (var v in new[] { "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432" })
+            {
+                var p = Environment.GetEnvironmentVariable(v);
+                if (!string.IsNullOrEmpty(p)) roots.Add(p!.TrimEnd('\\') + @"\");
+            }
+            return roots.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
+        internal static bool IsStandardModule(string path) => StandardRoots.Any(r => path.StartsWith(r, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>DLLs loaded from outside System32, SysWOW64, WinSxS, and Program Files: one row per path (first process in name order).</summary>
         static object NonStandardModules(FotonSession s)
@@ -118,7 +136,7 @@ namespace Foton.Collect
                         foreach (ProcessModule m in proc.Modules)
                         {
                             var fn = m.FileName ?? "";
-                            if (StandardModulePath.IsMatch(fn)) continue;
+                            if (IsStandardModule(fn)) continue;
                             string company = "";
                             try { company = m.FileVersionInfo.CompanyName ?? ""; } catch (Exception ex) when (ex is IOException || ex is ArgumentException) { }
                             rows.Add(new Dictionary<string, object?>

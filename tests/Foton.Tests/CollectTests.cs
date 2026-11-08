@@ -149,6 +149,20 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Standard_modules_and_internal_addresses_are_anchored()
+        {
+            var win = Foton.Win.HostInfo.WindowsDir.TrimEnd('\\');
+            Assert.True(ProcessCollection.IsStandardModule(win + @"\System32\kernel32.dll"));
+            Assert.True(ProcessCollection.IsStandardModule(Environment.GetEnvironmentVariable("ProgramFiles") + @"\App\x.dll"));
+            Assert.False(ProcessCollection.IsStandardModule(@"C:\Users\x\Windows\System32\evil.dll"));
+            Assert.False(ProcessCollection.IsStandardModule(@"C:\Users\x\Program Files Fake\evil.dll"));
+            foreach (var internalAddress in new[] { "10.1.2.3", "192.168.0.5", "172.20.0.1", "127.0.0.1", "169.254.1.1", "224.0.0.251", "239.255.255.250", "255.255.255.255", "::1", "fe80::1", "ff02::fb", "fd12:3456::1" })
+                Assert.False(NetworkCollection.IsExternal(internalAddress), internalAddress);
+            foreach (var external in new[] { "8.8.8.8", "172.32.0.1", "2001:4860:4860::8888", "::1:5" })
+                Assert.True(NetworkCollection.IsExternal(external), external);
+        }
+
+        [Fact]
         public void Process_owner_comes_from_the_token()
         {
             var me = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
