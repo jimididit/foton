@@ -96,6 +96,11 @@ namespace Foton.Collect
                 ["SuspiciousHits"] = "", ["UserWritableTarget"] = UserWritable(v.Value),
             };
             var rows = MachineRunKeys.SelectMany(k => Reg.ValueList(k)).Select(v => Row("Machine", "N/A", v)).ToList();
+            // RunOnceEx keeps its commands in numbered subkeys, and DLLs to load in <entry>\Depend.
+            const string runOnceEx = @"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnceEx";
+            foreach (var entry in Reg.SubKeyNames(runOnceEx).Select(e => Reg.Join(runOnceEx, e)))
+                foreach (var key in new[] { entry }.Concat(Reg.SubKeyNames(entry).Select(d => Reg.Join(entry, d))))
+                    rows.AddRange(Reg.ValueList(key).Select(v => Row("Machine", "N/A", v)));
             foreach (var h in hives)
                 foreach (var sub in UserRunKeys)
                     rows.AddRange(Reg.ValueList(Reg.Join(h.Root, sub)).Select(v => Row("User", h.UserName, v)));
