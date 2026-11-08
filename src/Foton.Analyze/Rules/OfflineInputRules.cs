@@ -50,6 +50,7 @@ namespace Foton.Analyze.Rules
             PeCmd(c, root);
             EvtxECmd(c, root, svcIndex, hostSys32);
             ReCmd(c, root);
+            Chainsaw(c, root);
         }
 
         static void ParsedRecords(AnalysisContext c, string root)
@@ -303,6 +304,53 @@ namespace Foton.Analyze.Rules
                     "Deleted keys and values are routine after uninstalls and updates, and are also what cleanup of persistence leaves behind. Hives exported with reg save are compacted and carry little free space, so absence here is not evidence that nothing was deleted.",
                     art,
                     "Read the deleted rows' KeyPath and LastWriteTimestamp, and place them on the timeline next to installs and service changes.");
+        }
+
+        static readonly Regex LineSplit = new Regex(@"\r?\n");
+
+        /// <summary>
+        /// Chainsaw hunt CSVs at the top of analysis\external\Chainsaw (sigma.csv for Sigma rules; one file per group for
+        /// Chainsaw's own rules). Every file starts timestamp, detections, path; detections holds one rule title per
+        /// line. The CSV carries no rule level, so this is one Info overview, not a severity band like Hayabusa's.
+        /// Rows the collection itself caused (inside the collection window, or naming the collector) are counted apart.
+        /// </summary>
+        static void Chainsaw(AnalysisContext c, string root)
+        {
+            var dir = Path.Combine(root, "analysis", "external", "Chainsaw");
+            if (!Directory.Exists(dir)) return;
+            var window = CollectionWindow.FromCase(root);
+            const int max = 200000;
+            int rows = 0, self = 0;
+            bool capped = false;
+            var titles = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var files = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in SafeFiles(dir, "*.csv"))
+            {
+                var data = ReadCsv(file);
+                if (data == null || data.Count == 0) continue;
+                var keys = data[0].Keys;
+                if (!keys.Any(k => string.Equals(k, "detections", StringComparison.OrdinalIgnoreCase)) || !keys.Any(k => string.Equals(k, "timestamp", StringComparison.OrdinalIgnoreCase))) continue;
+                foreach (var row in data)
+                {
+                    if (rows + self >= max) { capped = true; break; }
+                    var text = string.Join(" ", row.Where(kv => !string.Equals(kv.Key, "detections", StringComparison.OrdinalIgnoreCase)).Select(kv => kv.Value ?? ""));
+                    if (EventLogRules.CollectorAttributed(V(row, "timestamp"), text, window)) { self++; continue; }
+                    rows++;
+                    Bump(files, Path.GetFileName(file));
+                    foreach (var title in LineSplit.Split(V(row, "detections")).Select(x => x.Trim()).Where(x => x.Length > 0)) Bump(titles, title);
+                }
+                if (capped) break;
+            }
+            if (rows == 0 && self == 0) return;
+            c.Add("Info", "EventLogs", 1, "Chainsaw hunt detections present in compose output",
+                F("Chainsaw wrote {0} detection row(s) under analysis/external/Chainsaw ({1}). Top rules: {2}.{3}{4}", rows,
+                    files.Count > 0 ? TopText(files, 6) : "none outside the collection",
+                    titles.Count > 0 ? TopText(titles, 10) : "none",
+                    self > 0 ? F(" Excludes {0} row(s) attributable to the Foton collection itself (inside the collection window or naming the collector).", self) : "",
+                    capped ? F(" Row scan capped at {0}; counts are a floor.", max) : ""),
+                "These are Chainsaw hunt results (Sigma or Chainsaw rules) over the EVTX copied into the package: that engine's inferences, not Foton's. Chainsaw's CSV does not carry the rule level, so a title here is not a severity; many Sigma rules describe routine activity (updates, shadow copy mounts). Attribution of collector rows is by time and name, so host activity during the collection window is excluded too.",
+                "analysis/external/Chainsaw",
+                "Open the CSV for each title worth reading, check the rule's level and logic in the rule set Chainsaw used, and corroborate against Hayabusa and EvtxECmd output.");
         }
 
         static IEnumerable<string> SafeFiles(string dir, string pattern)

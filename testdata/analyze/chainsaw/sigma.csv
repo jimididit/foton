@@ -1,0 +1,9 @@
+timestamp,detections,path,count,Event.System.Provider,Event ID,Record ID,Computer,Event Data
+2026-01-01T08:00:00.000000+00:00,Volume Shadow Copy Mount,D:\Cases\Foton_HOST_20260101-120000Z\07_Event_Logs\evtx\System.evtx,1,Microsoft-Windows-Ntfs,98,100,HOST,"DeviceName: \Device\HarddiskVolumeShadowCopy1
+IsBootVolume: false"
+2026-01-01T09:00:00.000000+00:00,"Windows Update Error
+Suspicious Service Installation",D:\Cases\Foton_HOST_20260101-120000Z\07_Event_Logs\evtx\System.evtx,1,Service Control Manager,7045,101,HOST,"ServiceName: updsvc
+ImagePath: C:\Users\Public\updsvc.exe"
+2026-01-01T10:00:00.000000+00:00,Suspicious Service Installation,D:\Cases\Foton_HOST_20260101-120000Z\07_Event_Logs\evtx\System.evtx,1,Service Control Manager,7045,102,HOST,"ServiceName: probe
+ImagePath: C:\Windows\System32\reg.exe save HKLM\SYSTEM
+ParentImage: D:\Tools\foton-collect.exe"
