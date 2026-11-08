@@ -81,7 +81,7 @@ namespace Foton.Collect
 
             if (!o.NoZip)
             {
-                result.ZipPath = PackageFiles.CompressCase(s);
+                Guard(s, "package_zip", () => result.ZipPath = PackageFiles.CompressCase(s));
                 if (result.ZipPath != null) Guard(s, "package_hash", () => result.ZipSha256 = PackageFiles.WritePackageHashRecord(s, result.ZipPath));
             }
             return result;
