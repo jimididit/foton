@@ -268,6 +268,86 @@ namespace Foton.Tests
             }
         }
 
+        static void CopyFixture(string fixture, string caseRoot, string tool)
+        {
+            var dest = Directory.CreateDirectory(Path.Combine(caseRoot, "analysis", "external", tool)).FullName;
+            foreach (var f in Directory.GetFiles(Path.Combine(TestPaths.Root, "testdata", "analyze", fixture)))
+                File.Copy(f, Path.Combine(dest, Path.GetFileName(f)));
+        }
+
+        [Fact]
+        public void LECmd_output_becomes_overview_writable_code_and_argument_findings()
+        {
+            using (var t = new TempDir())
+            {
+                CopyFixture("lecmd", t.Path, "LECmd");
+                var c = Context(new PackageData(), t.Path);
+                Analyzer.Run(c);
+
+                var overview = c.Findings.Single(f => f.Title == "LECmd shortcut (LNK) rows present in compose output");
+                Assert.Equal("Info", overview.Severity);
+                Assert.Contains("6 shortcut (LNK) row(s)", overview.Observation);
+                Assert.Contains("1 on removable media, 1 on network paths", overview.Observation);
+                Assert.Contains(@"E:\payroll.xlsx (1)", overview.Observation);
+                Assert.Contains(@"\\fileserver\share (1)", overview.Observation);
+
+                var writable = c.Findings.Single(f => f.Title == "LECmd shortcut (LNK) targets are code in user-writable paths");
+                Assert.Equal("Medium", writable.Severity);
+                Assert.Contains(@"1 distinct executable or script target(s)", writable.Observation);
+                Assert.Contains(@"C:\Users\user1\Downloads\setup.exe", writable.Observation);
+                Assert.DoesNotContain("report.pdf", writable.Observation);   // a document in Downloads is not code
+
+                var args = c.Findings.Single(f => f.Title == "LECmd shortcut (LNK) arguments matched suspicious-command patterns");
+                Assert.Equal("Medium", args.Severity);
+            }
+        }
+
+        [Fact]
+        public void JLECmd_output_reads_automatic_and_custom_destinations()
+        {
+            using (var t = new TempDir())
+            {
+                CopyFixture("jlecmd", t.Path, "JLECmd");
+                var c = Context(new PackageData(), t.Path);
+                Analyzer.Run(c);
+
+                var overview = c.Findings.Single(f => f.Title == "JLECmd jump list rows present in compose output");
+                Assert.Contains("3 jump list row(s)", overview.Observation);
+                Assert.Contains("3 distinct target(s); 0 on removable media, 0 on network paths", overview.Observation);
+                var writable = c.Findings.Single(f => f.Title == "JLECmd jump list targets are code in user-writable paths");
+                Assert.Contains(@"C:\Users\user1\AppData\Roaming\tool\agent.exe", writable.Observation);
+                Assert.DoesNotContain(c.Findings, f => f.Title.StartsWith("JLECmd") && f.Title.Contains("arguments"));
+            }
+        }
+
+        [Fact]
+        public void AmcacheParser_output_becomes_overview_writable_code_and_unsigned_driver_findings()
+        {
+            using (var t = new TempDir())
+            {
+                CopyFixture("amcacheparser", t.Path, "AmcacheParser");
+                var c = Context(new PackageData(), t.Path);
+                Analyzer.Run(c);
+
+                var overview = c.Findings.Single(f => f.Title == "AmcacheParser rows present in compose output");
+                Assert.Contains("7 row(s)", overview.Observation);   // the header-only DevicePnps file adds nothing
+                Assert.Contains("UnassociatedFileEntries (4)", overview.Observation);
+                Assert.Contains("DriverBinaries (3)", overview.Observation);
+
+                var writable = c.Findings.Single(f => f.Title == "AmcacheParser inventory lists code in user-writable paths");
+                Assert.Contains("1 distinct executable or script path(s)", writable.Observation);
+                Assert.Contains(@"c:\users\user1\appdata\local\temp\x1\update.exe", writable.Observation);
+                Assert.DoesNotContain("dismhost.exe", writable.Observation);   // IsOsComponent rows are left out
+                Assert.DoesNotContain("readme.txt", writable.Observation);
+
+                var drivers = c.Findings.Single(f => f.Title == "AmcacheParser lists unsigned drivers that did not ship with Windows");
+                Assert.Equal("Software", drivers.Category);
+                Assert.Contains("1 distinct driver(s)", drivers.Observation);
+                Assert.Contains("vulnkit.sys", drivers.Observation);
+                Assert.DoesNotContain("oldinbox.sys", drivers.Observation);
+            }
+        }
+
         [Fact]
         public void A_bare_Foton_case_path_is_not_collector_noise()
         {

@@ -12,7 +12,8 @@ namespace Foton.Analyze.Rules
 {
     /// <summary>
     /// Workstation outputs written into analysis\ after collection: parsed_records.csv, baseline_diff.csv, and the
-    /// Hayabusa / PECmd / EvtxECmd compose CSVs. Thin ingest only: name the tool, never re-parse or re-hunt.
+    /// Hayabusa / Chainsaw / PECmd / EvtxECmd / RECmd / LECmd / JLECmd / AmcacheParser compose CSVs. Thin ingest only:
+    /// name the tool, never re-parse or re-hunt.
     /// </summary>
     static class OfflineInputRules
     {
@@ -51,6 +52,9 @@ namespace Foton.Analyze.Rules
             EvtxECmd(c, root, svcIndex, hostSys32);
             ReCmd(c, root);
             Chainsaw(c, root);
+            ShellLinks(c, root, "LECmd", "shortcut (LNK)");
+            ShellLinks(c, root, "JLECmd", "jump list");
+            AmcacheParser(c, root);
         }
 
         static void ParsedRecords(AnalysisContext c, string root)
@@ -351,6 +355,147 @@ namespace Foton.Analyze.Rules
                 "These are Chainsaw hunt results (Sigma or Chainsaw rules) over the EVTX copied into the package: that engine's inferences, not Foton's. Chainsaw's CSV does not carry the rule level, so a title here is not a severity; many Sigma rules describe routine activity (updates, shadow copy mounts). Attribution of collector rows is by time and name, so host activity during the collection window is excluded too.",
                 "analysis/external/Chainsaw",
                 "Open the CSV for each title worth reading, check the rule's level and logic in the rule set Chainsaw used, and corroborate against Hayabusa and EvtxECmd output.");
+        }
+
+        // Shortcuts and inventory name documents in Downloads and AppData all the time; only code is a review item.
+        static readonly string[] CodeExtensions = { ".exe", ".dll", ".scr", ".com", ".cpl", ".bat", ".cmd", ".ps1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".hta", ".msi" };
+
+        static bool IsCode(string path)
+        {
+            try { return CodeExtensions.Contains(Path.GetExtension(path.Trim().TrimEnd('\\')), StringComparer.OrdinalIgnoreCase); }
+            catch (ArgumentException) { return false; }
+        }
+
+        /// <summary>
+        /// LECmd (lecmd.csv) and JLECmd (jlecmd_AutomaticDestinations.csv, jlecmd_CustomDestinations.csv) over the copied
+        /// LNK and jump list files. Every file starts SourceFile; the target is LocalPath (or Path in an automatic
+    /// destination's DestList), else TargetIDAbsolutePath; LECmd adds NetworkPath. DriveType is a description
+    /// ("Fixed storage media (Hard drive)", "Removable storage media (Floppy, USB)", "Remote storage", "(None)").
+        /// </summary>
+        static void ShellLinks(AnalysisContext c, string root, string tool, string kind)
+        {
+            var dir = Path.Combine(root, "analysis", "external", tool);
+            if (!Directory.Exists(dir)) return;
+            const int max = 200000;
+            int rows = 0;
+            bool capped = false;
+            var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var removable = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var network = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var writable = new List<string>();
+            var susp = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in SafeFiles(dir, "*.csv"))
+            {
+                var data = ReadCsv(file);
+                if (data == null || data.Count == 0 || !data[0].Keys.Any(k => string.Equals(k, "SourceFile", StringComparison.OrdinalIgnoreCase))) continue;
+                foreach (var row in data)
+                {
+                    if (++rows > max) { capped = true; rows = max; break; }
+                    var target = new[] { V(row, "LocalPath"), V(row, "Path"), V(row, "TargetIDAbsolutePath").TrimEnd('\\'), V(row, "NetworkPath") }
+                        .FirstOrDefault(x => x.Length > 0) ?? "";
+                    if (target.Length == 0) continue;
+                    targets.Add(target);
+                    var drive = V(row, "DriveType");
+                    if (drive.IndexOf("Removable", StringComparison.OrdinalIgnoreCase) >= 0 || drive.IndexOf("Optical", StringComparison.OrdinalIgnoreCase) >= 0) Bump(removable, target);
+                    else if (drive.IndexOf("Remote", StringComparison.OrdinalIgnoreCase) >= 0 || V(row, "NetworkPath").Length > 0 || target.StartsWith(@"\\", StringComparison.Ordinal))
+                        Bump(network, target);
+                    if (IsCode(target) && c.UserWritablePath(target) && !writable.Contains(target, StringComparer.OrdinalIgnoreCase)) writable.Add(target);
+                    var args = V(row, "Arguments");
+                    if (args.Length > 0)
+                    {
+                        var hit = c.SuspiciousCommand(target + " " + args);
+                        if (hit != null) Bump(susp, hit);
+                    }
+                }
+                if (capped) break;
+            }
+            if (rows == 0) return;
+            var art = "analysis/external/" + tool;
+            c.Add("Info", "Execution", 1, F("{0} {1} rows present in compose output", tool, kind),
+                F("{0} wrote {1} {2} row(s) under {3} naming {4} distinct target(s); {5} on removable media, {6} on network paths.{7}{8}{9}",
+                    tool, rows, kind, art, targets.Count, removable.Values.Sum(), network.Values.Sum(),
+                    removable.Count > 0 ? F(" Removable targets: {0}.", TopText(removable, 6)) : "",
+                    network.Count > 0 ? F(" Network targets: {0}.", TopText(network, 6)) : "",
+                    capped ? F(" Row scan capped at {0}; counts are a floor.", max) : ""),
+                F("These are Eric Zimmerman {0} facts about {1} files copied into the package: a target was opened or pinned through the shell at some point, not when or by whom unless the timestamps are read. Removable and network targets are where file access off the fixed disk shows up, and are routine for USB and file-share users.", tool, kind),
+                art,
+                F("Open the {0} CSV, read SourceFile and the target timestamps for targets of interest, and corroborate against USB device history and the logon timeline.", tool));
+            if (writable.Count > 0)
+                c.Add("Medium", "Execution", 2, F("{0} {1} targets are code in user-writable paths", tool, kind),
+                    F("{0} names {1} distinct executable or script target(s) under user-writable locations. Sample: {2}", tool, writable.Count, string.Join("; ", writable.Take(8))),
+                    "A shortcut or jump list entry for code under AppData, Temp, Downloads, or Public is a review item: per-user installers and portable tools live there too. The entry shows the target was referenced through the shell, not that it was malicious or that it ran.",
+                    art,
+                    "Hash the target if it is in the package, check its signature, and corroborate with Prefetch/PECmd and Amcache.");
+            if (susp.Count > 0)
+                c.Add("Medium", "Execution", 2, F("{0} {1} arguments matched suspicious-command patterns", tool, kind),
+                    F("{0} target plus Arguments text matched {1} distinct suspicious-command pattern(s). Sample: {2}", tool, susp.Count, TopText(susp, 6)),
+                    "Shortcuts that carry a script interpreter and arguments are a known delivery and persistence technique; so are admin shortcuts to PowerShell and management consoles. Not a verdict.",
+                    art,
+                    F("Read the matching {0} rows in full (SourceFile, Arguments, WorkingDirectory) and corroborate against process creation events.", tool));
+        }
+
+        /// <summary>
+        /// AmcacheParser CSVs (amcacheparser_&lt;Kind&gt;.csv: UnassociatedFileEntries and AssociatedFileEntries with FullPath,
+        /// IsOsComponent, SHA1; DriverBinaries with DriverName, DriverInBox, DriverSigned; and others counted by kind).
+        /// </summary>
+        static void AmcacheParser(AnalysisContext c, string root)
+        {
+            var dir = Path.Combine(root, "analysis", "external", "AmcacheParser");
+            if (!Directory.Exists(dir)) return;
+            const int max = 200000;
+            int rows = 0;
+            bool capped = false;
+            var kinds = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var writable = new List<string>();
+            var unsigned = new List<string>();
+            foreach (var file in SafeFiles(dir, "*.csv"))
+            {
+                var data = ReadCsv(file);
+                if (data == null || data.Count == 0) continue;
+                var name = Path.GetFileNameWithoutExtension(file);
+                var cut = name.LastIndexOf('_');
+                var kindName = cut >= 0 ? name.Substring(cut + 1) : name;
+                var keys = data[0].Keys;
+                bool fileEntries = keys.Any(k => string.Equals(k, "FullPath", StringComparison.OrdinalIgnoreCase));
+                bool drivers = keys.Any(k => string.Equals(k, "DriverSigned", StringComparison.OrdinalIgnoreCase));
+                foreach (var row in data)
+                {
+                    if (++rows > max) { capped = true; rows = max; break; }
+                    Bump(kinds, kindName);
+                    if (fileEntries)
+                    {
+                        var p = V(row, "FullPath");
+                        if (!Eq(V(row, "IsOsComponent"), "True") && IsCode(p) && c.UserWritablePath(p) && !writable.Contains(p, StringComparer.OrdinalIgnoreCase)) writable.Add(p);
+                    }
+                    else if (drivers && Eq(V(row, "DriverSigned"), "False") && !Eq(V(row, "DriverInBox"), "True"))
+                    {
+                        var d = V(row, "DriverName");
+                        if (d.Length == 0) d = V(row, "KeyName");
+                        if (d.Length > 0 && !unsigned.Contains(d, StringComparer.OrdinalIgnoreCase)) unsigned.Add(d);
+                    }
+                }
+                if (capped) break;
+            }
+            if (rows == 0) return;
+            const string art = "analysis/external/AmcacheParser";
+            c.Add("Info", "Execution", 1, "AmcacheParser rows present in compose output",
+                F("AmcacheParser wrote {0} row(s) under {1}: {2}.{3}", rows, art, TopText(kinds, 10),
+                    capped ? F(" Row scan capped at {0}; counts are a floor.", max) : ""),
+                "These are Eric Zimmerman AmcacheParser facts about the Amcache.hve copied into the package. On Windows 10 and later an inventory entry shows a file was present and inventoried, not that it ran.",
+                art,
+                "Open the FileEntries CSVs for FullPath, SHA1, and FileKeyLastWriteTimestamp; corroborate execution with Prefetch/PECmd and event logs.");
+            if (writable.Count > 0)
+                c.Add("Medium", "Execution", 2, "AmcacheParser inventory lists code in user-writable paths",
+                    F("AmcacheParser file entries (not marked IsOsComponent) name {0} distinct executable or script path(s) under user-writable locations. Sample: {1}", writable.Count, string.Join("; ", writable.Take(8))),
+                    "Per-user installers, updaters, and portable tools are inventoried from AppData and Downloads routinely. Amcache presence is not proof of execution; this is a review item, not a verdict.",
+                    art,
+                    "Look up the SHA1 against known-good and threat intelligence sources, and corroborate execution with Prefetch/PECmd.");
+            if (unsigned.Count > 0)
+                c.Add("Medium", "Software", 2, "AmcacheParser lists unsigned drivers that did not ship with Windows",
+                    F("AmcacheParser DriverBinaries rows with DriverSigned=False and DriverInBox not True: {0} distinct driver(s). Sample: {1}", unsigned.Count, string.Join("; ", unsigned.Take(8))),
+                    "Old hardware vendor drivers, test-signed development drivers, and virtualization tools can show as unsigned in Amcache. A kernel driver outside Windows without a signature still deserves a look, because vulnerable or malicious drivers are a known path to kernel access.",
+                    art,
+                    "Find the driver file, check its signature and hash, and compare against drivers.csv and the loaded-driver list from Collect.");
         }
 
         static IEnumerable<string> SafeFiles(string dir, string pattern)
