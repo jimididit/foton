@@ -69,7 +69,7 @@ namespace Foton.Tests
             {
                 var pkg = package == "kitchen" ? Kitchen : TestPaths.Fixture;
                 var ioc = package == "kitchen" ? Path.Combine(TestPaths.Root, "testdata", "analyze", iocFile)
-                    : Path.Combine(TestPaths.Root, "legacy", "powershell", "tests", "Fixtures", "Ioc", iocFile);
+                    : Path.Combine(TestPaths.Root, "testdata", "ioc", iocFile);
                 var root = Copy(t, pkg);
                 var run = Analyzer.RunIoc(root, ioc, Quiet);
                 var sorted = run.Hits.OrderBy(h => h.Artifact, StringComparer.InvariantCultureIgnoreCase).ThenBy(h => h.Property, StringComparer.InvariantCultureIgnoreCase)

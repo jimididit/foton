@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,43 +12,38 @@ namespace Foton.Tests
 {
     public class BaselineCaptureTests
     {
-        static string LegacyProviders => Path.Combine(TestPaths.Root, "legacy", "powershell", "src", "Private", "Baseline", "Providers");
+        /// <summary>
+        /// testdata/baseline/provider-contract.json: identity fields, compared fields, sort keys, and false-positive text
+        /// per record type, captured from the 1.38.x providers when they were checked equal. Older baselines were written
+        /// against this contract; changing it changes what Compare reports, so a change here needs a baseline schema
+        /// decision (BaselineSchema) and an updated snapshot in the same PR.
+        /// </summary>
+        static List<Dictionary<string, object>> Contract() =>
+            ((System.Collections.IEnumerable)Json.Parse(File.ReadAllText(Path.Combine(TestPaths.Root, "testdata", "baseline", "provider-contract.json")))!)
+                .Cast<Dictionary<string, object>>().ToList();
 
-        static string[] QuotedList(string s) =>
-            Regex.Matches(s, "'((?:[^']|'')*)'").Cast<Match>().Select(m => m.Groups[1].Value.Replace("''", "'")).ToArray();
+        static string Str(object? v) => v as string ?? "";
 
-        public static IEnumerable<object[]> LegacyFiles() =>
-            Directory.GetFiles(Path.Combine(TestPaths.Root, "legacy", "powershell", "src", "Private", "Baseline", "Providers"), "*.ps1")
-                .Select(f => new object[] { Path.GetFileNameWithoutExtension(f) });
+        static string[] Strings(object? v) => ((System.Collections.IEnumerable)v!).Cast<object?>().Select(Str).ToArray();
+
+        public static IEnumerable<object[]> ContractTypes() => Contract().Select(c => new object[] { Str(c["RecordType"]) });
 
         [Fact]
-        public void Every_1_38_provider_is_ported_in_the_same_order()
+        public void Providers_match_the_contract_snapshot_in_order()
         {
-            var legacy = Directory.GetFiles(LegacyProviders, "*.ps1").Select(Path.GetFileNameWithoutExtension).ToList();
-            var ported = Providers.All.Select(p => p.RecordType).ToList();
-            Assert.Equal(legacy.OrderBy(n => n, StringComparer.OrdinalIgnoreCase), ported);
+            Assert.Equal(Contract().Select(c => Str(c["RecordType"])), Providers.All.Select(p => p.RecordType));
         }
 
-        /// <summary>
-        /// Identity, compared fields, false-positive text and Sort-Object keys are the provider contract a 1.14.0
-        /// baseline was written against. Drift here silently changes what Compare reports.
-        /// </summary>
         [Theory]
-        [MemberData(nameof(LegacyFiles))]
-        public void Provider_contract_matches_1_38(string recordType)
+        [MemberData(nameof(ContractTypes))]
+        public void Provider_contract_is_unchanged(string recordType)
         {
-            var text = File.ReadAllText(Path.Combine(LegacyProviders, recordType + ".ps1"));
+            var c = Contract().Single(x => Str(x["RecordType"]) == recordType);
             var p = Providers.All.Single(x => x.RecordType == recordType);
-            Assert.Equal(QuotedList(Regex.Match(text, @"-IdentityFields\s+@\(([^)]*)\)").Groups[1].Value), p.IdentityFields);
-            Assert.Equal(QuotedList(Regex.Match(text, @"-ComparedFields\s+@\(([^)]*)\)").Groups[1].Value), p.ComparedFields);
-            Assert.Equal(QuotedList(Regex.Match(text, @"-FalsePositives\s+('(?:[^']|'')*')").Groups[1].Value).Single(), p.FalsePositives);
-
-            var sortSource = text;
-            if (recordType == "StartupApproved")
-                sortSource = File.ReadAllText(Path.Combine(TestPaths.Root, "legacy", "powershell", "src", "Private", "Core", "Get-FotonStartupApprovedRows.ps1"));
-            var sort = Regex.Match(sortSource, @"\$rows\)?\s*\|\s*Sort-Object\s+([\w, ]+)");
-            Assert.True(sort.Success, "No Sort-Object over $rows in the 1.38.x provider.");
-            Assert.Equal(sort.Groups[1].Value.Split(',').Select(k => k.Trim()).Where(k => k.Length > 0), p.SortKeys);
+            Assert.Equal(Strings(c["IdentityFields"]), p.IdentityFields);
+            Assert.Equal(Strings(c["ComparedFields"]), p.ComparedFields);
+            Assert.Equal(Strings(c["SortKeys"]), p.SortKeys);
+            Assert.Equal(Str(c["FalsePositives"]), p.FalsePositives);
         }
 
         [Fact]

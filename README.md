@@ -47,7 +47,7 @@ Each is one file. Copy only the endpoint executable to a target; parse, compose,
 - Windows 10 / Server 2016 or newer. The executables run on the .NET Framework that ships with Windows (4.6.2+); nothing to install.
 - **Administrator recommended**, not required. A standard-user run skips the Security log, Prefetch/Amcache/SRUM copies, registry hive exports, and other users' files, and records each as a visibility gap, not a clean result.
 - Windows SmartScreen may warn on first run until the executables are signed. Trust comes from the hash and the build provenance attestation.
-- Older hosts (Windows 7, 8.1, Server 2012 R2): use the PowerShell line, [Foton 1.38.1](https://github.com/jimididit/foton/releases/tag/v1.38.1) with its [1.38.x usage guide](https://github.com/jimididit/foton/blob/v1.38.1/docs/USAGE.md). It receives security fixes only.
+- Older hosts (Windows 7, 8.1, Server 2012 R2): use the PowerShell line, [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) with its [1.38.x usage guide](https://github.com/jimididit/foton/blob/v1.38.2/legacy/powershell/release-docs/docs/USAGE.md). 1.38.2 is the final PowerShell release and is no longer maintained.
 
 ## What Foton is (and is not)
 

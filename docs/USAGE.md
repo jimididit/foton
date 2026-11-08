@@ -11,7 +11,7 @@ Copy only the endpoint executable to a target. Parse, compose, and analyze read 
 
 **Versions.** Every executable prints its version, collect schema, and baseline schema with `-Version`. Foton 2.0 writes collect schema **1.14.0** and baseline schema **1.16.0** (see [Formats](#formats-and-compatibility)).
 
-**Older hosts.** The executables need Windows 10 / Server 2016 or newer. For Windows 7, 8.1, or Server 2012 R2, use the PowerShell line: [Foton 1.38.1](https://github.com/jimididit/foton/releases/tag/v1.38.1) and its [1.38.x usage guide](https://github.com/jimididit/foton/blob/v1.38.1/docs/USAGE.md). 1.38.x receives security fixes only ([SECURITY.md](../SECURITY.md)).
+**Older hosts.** The executables need Windows 10 / Server 2016 or newer. For Windows 7, 8.1, or Server 2012 R2, use the PowerShell line: [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) and its [1.38.x usage guide](https://github.com/jimididit/foton/blob/v1.38.2/legacy/powershell/release-docs/docs/USAGE.md). 1.38.2 is the final PowerShell release and is no longer maintained ([SECURITY.md](../SECURITY.md)).
 
 ---
 

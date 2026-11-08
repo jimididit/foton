@@ -135,7 +135,7 @@ namespace Foton.Tests
             var am = AmcacheParser.Parse(Path.Combine(fs, "amcache", "Amcache.hve"), maxEntries: 0);
             Assert.StartsWith("Stopped after 0 of 1 InventoryApplicationFile entries", am.Single().Note);
 
-            var destList = File.ReadAllBytes(Path.Combine(TestPaths.Root, "legacy", "powershell", "tests", "Fixtures", "Parse", "jumplist-destlist-v1.bin"));
+            var destList = File.ReadAllBytes(Path.Combine(TestPaths.Root, "testdata", "parse", "jumplist-destlist-v1.bin"));
             var rows = JumplistParser.DestList(destList, maxEntries: 0);
             Assert.Equal("DestList lists 1 entries; stopped after 0. The rest were not parsed.", rows.Single().Note);
             Assert.Single(JumplistParser.DestList(destList));

@@ -4,11 +4,11 @@
 
 | Line | Status |
 |------|--------|
-| **1.38.x** (PowerShell, source in `legacy/powershell/`) | **Security fixes only** until Foton v2.0.0 ships. No new features. After v2.0.0 it is unsupported, but remains available on [Releases](https://github.com/jimididit/foton/releases) and the PowerShell Gallery for hosts older than Windows 10 / Server 2016. |
-| **2.x** (C# executables on `main`) | Supported from v2.0.0. Prereleases (`v2.0.0-alpha.*`) are for testing and are not supported. |
-| Older than 1.38 | Unsupported. Upgrade to the latest 1.38.x. |
+| **2.x** (C# executables on `main`) | Supported. Prereleases (`v2.0.0-alpha.*`) are for testing and are not supported. |
+| **1.38.x** (PowerShell; source at the [v1.38.2 tag](https://github.com/jimididit/foton/tree/v1.38.2/legacy/powershell)) | Unsupported since v2.0.0. 1.38.2 is the final release and stays available on [Releases](https://github.com/jimididit/foton/releases/tag/v1.38.2) and the PowerShell Gallery for hosts older than Windows 10 / Server 2016. |
+| Older than 1.38 | Unsupported. |
 
-Security fixes for 1.38.x ship as a new 1.38.x tag (GitHub release and PowerShell Gallery). Older releases are not backported unless a release advisory says otherwise.
+Security fixes ship in a new 2.x release. Older releases are not backported unless a release advisory says otherwise.
 
 ## Reporting a vulnerability
 
@@ -43,4 +43,4 @@ Release executables are **not Authenticode-signed** yet, so Windows SmartScreen 
 - `SHA256SUMS.txt` on each release lists the SHA-256 of every asset.
 - Each asset carries a GitHub build provenance attestation: `gh attestation verify <file> --repo jimididit/foton` proves it was built by this repository's release workflow from a specific commit.
 
-After both checks pass, `Unblock-File` removes the downloaded file's Mark-of-the-Web. Authenticode signing is planned once Foton sees wider public use; this document will be updated when it ships. The 1.38.x scripts and their ExecutionPolicy guidance are documented at the [v1.38.1 tag](https://github.com/jimididit/foton/blob/v1.38.1/docs/USAGE.md).
+After both checks pass, `Unblock-File` removes the downloaded file's Mark-of-the-Web. Authenticode signing is planned once Foton sees wider public use; this document will be updated when it ships. The 1.38.x scripts and their ExecutionPolicy guidance are documented in the [1.38.2 operator guide](https://github.com/jimididit/foton/blob/v1.38.2/legacy/powershell/release-docs/docs/USAGE.md).

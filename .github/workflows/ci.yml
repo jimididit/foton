@@ -10,37 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  pester:
-    name: Pester
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install Pester 5
-        shell: pwsh
-        run: |
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
-            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
-          }
-          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
-            Register-PSRepository -Default
-          }
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-Module Pester -MinimumVersion 5.0.0 -Force -Scope CurrentUser -SkipPublisherCheck
-
-      # Frozen 1.38.x line (parity oracle for the C# port). Job name stays "Pester": it is a required check.
-      - name: Run Foton tests (legacy PowerShell)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          & .\legacy\powershell\tests\Invoke-FotonTests.ps1
-          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-  # Foton v2 (C#). Builds net462 executables with the SDK pinned in global.json.
+  # Builds net462 executables with the SDK pinned in global.json.
   dotnet:
     name: dotnet
     runs-on: windows-latest

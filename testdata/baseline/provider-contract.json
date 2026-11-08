@@ -1,0 +1,565 @@
+[
+    {
+        "RecordType":  "ActiveSetup",
+        "IdentityFields":  [
+                               "Key",
+                               "Guid"
+                           ],
+        "ComparedFields":  [
+                               "StubPath",
+                               "Version",
+                               "IsInstalled"
+                           ],
+        "SortKeys":  [
+                         "Key",
+                         "Guid"
+                     ],
+        "FalsePositives":  "Office, browsers, and runtimes add GUIDs and bump Version. StubPath changing to a user-writable binary is the review item. HKCU once-per-user stamps are Collect-only."
+    },
+    {
+        "RecordType":  "AppInitDll",
+        "IdentityFields":  [
+                               "Key",
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Value"
+                           ],
+        "SortKeys":  [
+                         "Key",
+                         "Name"
+                     ],
+        "FalsePositives":  "Legacy AV and some graphics injectors still use AppInit. LoadAppInit_DLLs=0 with an empty DLL list is the usual modern default."
+    },
+    {
+        "RecordType":  "Autorun",
+        "IdentityFields":  [
+                               "Key",
+                               "ValueName"
+                           ],
+        "ComparedFields":  [
+                               "Command"
+                           ],
+        "SortKeys":  [
+                         "Key",
+                         "ValueName"
+                     ],
+        "FalsePositives":  "Installers add Run keys. Cloud-sync and updaters live here. Compare Command, not presence of a vendor Run value."
+    },
+    {
+        "RecordType":  "BitsJob",
+        "IdentityFields":  [
+                               "JobId"
+                           ],
+        "ComparedFields":  [
+                               "DisplayName",
+                               "TransferType",
+                               "OwnerAccount",
+                               "Priority",
+                               "ProxyUsage",
+                               "NotifyCmdLine"
+                           ],
+        "SortKeys":  [
+                         "JobId"
+                     ],
+        "FalsePositives":  "Windows Update and Store use BITS. Added/Removed JobIds between captures are common. A new or changed NotifyCmdLine (bitsadmin /SetNotifyCmdLine) is the usual review item, not BytesTransferred."
+    },
+    {
+        "RecordType":  "Certificate",
+        "IdentityFields":  [
+                               "Store",
+                               "Thumbprint"
+                           ],
+        "ComparedFields":  [
+                               "Subject",
+                               "Issuer",
+                               "NotAfter"
+                           ],
+        "SortKeys":  [
+                         "Store",
+                         "Thumbprint"
+                     ],
+        "FalsePositives":  "Enterprise Root CA rollout and Intune add roots. A new Root thumbprint that is not Microsoft/your org CA is the usual review item. Renewal changes NotAfter for the same thumbprint only if the cert is reissued with the same key - often a new thumbprint (Added+Removed)."
+    },
+    {
+        "RecordType":  "CmdAutoRun",
+        "IdentityFields":  [
+                               "Hive",
+                               "Key"
+                           ],
+        "ComparedFields":  [
+                               "Command"
+                           ],
+        "SortKeys":  [
+                         "Hive",
+                         "Key"
+                     ],
+        "FalsePositives":  "IT shops set AutoRun for doskey, clink, or conda hooks. That is a Command change, not malware by itself. Empty HKCU is omitted so logon/logoff does not churn (not set) rows."
+    },
+    {
+        "RecordType":  "DefenderPreference",
+        "IdentityFields":  [
+                               "Kind",
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Value"
+                           ],
+        "SortKeys":  [
+                         "Kind",
+                         "Name"
+                     ],
+        "FalsePositives":  "Intune, GPO, and tamper-protection UI change these. An exclusion add is a new row (Kind + path), not proof of compromise."
+    },
+    {
+        "RecordType":  "Driver",
+        "IdentityFields":  [
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "DisplayName",
+                               "StartMode",
+                               "PathName"
+                           ],
+        "SortKeys":  [
+                         "Name"
+                     ],
+        "FalsePositives":  "Windows Update replaces driver PathName. Catalog-signed drivers still show odd signature status in Collect; this snapshot does not include signature."
+    },
+    {
+        "RecordType":  "FirewallRule",
+        "IdentityFields":  [
+                               "Name",
+                               "Direction"
+                           ],
+        "ComparedFields":  [
+                               "Action",
+                               "Enabled",
+                               "Profile"
+                           ],
+        "SortKeys":  [
+                         "Name",
+                         "Direction"
+                     ],
+        "FalsePositives":  "Windows and vendor installers add allow rules. A new inbound Allow is worth review; a new outbound Allow is common."
+    },
+    {
+        "RecordType":  "HardeningRegistry",
+        "IdentityFields":  [
+                               "Setting"
+                           ],
+        "ComparedFields":  [
+                               "Value"
+                           ],
+        "SortKeys":  [
+                         "Setting"
+                     ],
+        "FalsePositives":  "Domain GPO and Windows edition change defaults. Expected values in the Collect table are a common lab baseline, not proof of compromise when they differ."
+    },
+    {
+        "RecordType":  "HostsEntry",
+        "IdentityFields":  [
+                               "Address",
+                               "Hostname"
+                           ],
+        "ComparedFields":  [
+
+                           ],
+        "SortKeys":  [
+                         "Address",
+                         "Hostname"
+                     ],
+        "FalsePositives":  "Local development (localhost, kubernetes.docker.internal), ad-block lists, and MDM-managed hosts files. IPv6 localhost (::1) is expected."
+    },
+    {
+        "RecordType":  "ImageFileExecution",
+        "IdentityFields":  [
+                               "ImageName"
+                           ],
+        "ComparedFields":  [
+                               "Debugger"
+                           ],
+        "SortKeys":  [
+                         "ImageName"
+                     ],
+        "FalsePositives":  "Application Verifier, GFlags, and some debuggers set Debugger. SilentProcessExit is a separate RecordType."
+    },
+    {
+        "RecordType":  "InstalledSoftware",
+        "IdentityFields":  [
+                               "DisplayName",
+                               "Publisher"
+                           ],
+        "ComparedFields":  [
+                               "DisplayVersion",
+                               "InstallLocation"
+                           ],
+        "SortKeys":  [
+                         "DisplayName",
+                         "Publisher"
+                     ],
+        "FalsePositives":  "Patch Tuesday and in-place upgrades change DisplayVersion. Publisher string is not stable across all MSI packages."
+    },
+    {
+        "RecordType":  "KnownDll",
+        "IdentityFields":  [
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "MappedFile"
+                           ],
+        "SortKeys":  [
+                         "Name"
+                     ],
+        "FalsePositives":  "Feature updates add KnownDLL entries. DllDirectory / DllDirectory32 follow SysWOW64 layout. A new Name or a MappedFile that is not a System32 DLL is the review item, not the stock ntdll/kernel32 list."
+    },
+    {
+        "RecordType":  "Listener",
+        "IdentityFields":  [
+                               "Protocol",
+                               "LocalAddress",
+                               "LocalPort"
+                           ],
+        "ComparedFields":  [
+
+                           ],
+        "SortKeys":  [
+                         "Protocol",
+                         "LocalPort",
+                         "LocalAddress"
+                     ],
+        "FalsePositives":  "New TCP listeners from debug servers and WinRM. UDP above 49151 is omitted on purpose. Wildcard 0.0.0.0 vs a specific bind looks like remove+add."
+    },
+    {
+        "RecordType":  "LocalAccount",
+        "IdentityFields":  [
+                               "SID"
+                           ],
+        "ComparedFields":  [
+                               "Name",
+                               "Enabled",
+                               "PasswordRequired",
+                               "PasswordExpires"
+                           ],
+        "SortKeys":  [
+                         "SID"
+                     ],
+        "FalsePositives":  "Built-in accounts differ by Windows edition. Enabled Guest is unusual; a renamed Administrator SID is still S-1-5-21-*-500."
+    },
+    {
+        "RecordType":  "LocalGroupMember",
+        "IdentityFields":  [
+                               "Group",
+                               "SID"
+                           ],
+        "ComparedFields":  [
+                               "Member"
+                           ],
+        "SortKeys":  [
+                         "Group",
+                         "SID"
+                     ],
+        "FalsePositives":  "Domain join adds Domain Admins. Intune/LAPS may add a local admin. Compare to the role golden image, not a random workstation."
+    },
+    {
+        "RecordType":  "LsaPackage",
+        "IdentityFields":  [
+                               "Kind",
+                               "Package"
+                           ],
+        "ComparedFields":  [
+
+                           ],
+        "SortKeys":  [
+                         "Kind",
+                         "Package"
+                     ],
+        "FalsePositives":  "Third-party MFA, VPN, and EDR often add a Security Package or Notification Package. Compare to the role image. A new unknown DLL name is the interesting case, not msv1_0/kerberos churn."
+    },
+    {
+        "RecordType":  "MachineEnvironment",
+        "IdentityFields":  [
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Value"
+                           ],
+        "SortKeys":  [
+                         "Name"
+                     ],
+        "FalsePositives":  "Installers and Visual Studio/Java/Python append Path. TEMP/TMP and NUMBER_OF_PROCESSORS can differ by hardware or user TEMP policy."
+    },
+    {
+        "RecordType":  "NetshHelper",
+        "IdentityFields":  [
+                               "Key",
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Dll"
+                           ],
+        "SortKeys":  [
+                         "Key",
+                         "Name"
+                     ],
+        "FalsePositives":  "Inbox helpers (dhcpmon, fwmon, rasmontr, wshelper) are normal. VPN/EDR/third-party stacks add helpers. Wow6432Node is a separate Key."
+    },
+    {
+        "RecordType":  "NetworkShare",
+        "IdentityFields":  [
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Path",
+                               "Type",
+                               "Description"
+                           ],
+        "SortKeys":  [
+                         "Name"
+                     ],
+        "FalsePositives":  "Print and scan shares, OneDrive/File History, and C$/ADMIN$/IPC$ are normal. Type is the Win32_Share numeric type, not a verdict."
+    },
+    {
+        "RecordType":  "PrintMonitor",
+        "IdentityFields":  [
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Driver"
+                           ],
+        "SortKeys":  [
+                         "Name"
+                     ],
+        "FalsePositives":  "Installing a printer or print server role adds Standard TCP/IP Port, WSD, and vendor monitors. A new Driver DLL under an unexpected Name is the review item, not Local Port."
+    },
+    {
+        "RecordType":  "ProxyConfig",
+        "IdentityFields":  [
+                               "Scope",
+                               "Setting"
+                           ],
+        "ComparedFields":  [
+                               "Value"
+                           ],
+        "SortKeys":  [
+                         "Scope",
+                         "Setting"
+                     ],
+        "FalsePositives":  "Corporate PAC (AutoConfigURL) and WPAD change often. Explicit ProxyServer or WinHttpSettings pointing at an unexpected host is the usual review item. Per-user rows exist only when a proxy/PAC is set on a loaded hive."
+    },
+    {
+        "RecordType":  "RemoteAccessConfig",
+        "IdentityFields":  [
+                               "Setting"
+                           ],
+        "ComparedFields":  [
+                               "Value"
+                           ],
+        "SortKeys":  [
+                         "Setting"
+                     ],
+        "FalsePositives":  "Helpdesk turning NLA off or changing the RDP port. Domain GPO for WinRM Basic/unencrypted. File servers that still have SMBv1. fDenyTSConnections is HardeningRegistry, not this type."
+    },
+    {
+        "RecordType":  "ScheduledTask",
+        "IdentityFields":  [
+                               "TaskPath",
+                               "TaskName"
+                           ],
+        "ComparedFields":  [
+                               "Actions",
+                               "RunAsUser",
+                               "RunLevel",
+                               "Triggers"
+                           ],
+        "SortKeys":  [
+                         "TaskPath",
+                         "TaskName"
+                     ],
+        "FalsePositives":  "Vendor software registers tasks after install. Root-folder SYSTEM tasks are more interesting than nested Microsoft\\Windows tasks, but still often legitimate."
+    },
+    {
+        "RecordType":  "Service",
+        "IdentityFields":  [
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "DisplayName",
+                               "StartMode",
+                               "StartName",
+                               "PathName"
+                           ],
+        "SortKeys":  [
+                         "Name"
+                     ],
+        "FalsePositives":  "Patch Tuesday can replace PathName for the same service. Third-party updaters change StartMode. Compare against a provisioning snapshot, not a post-compromise one."
+    },
+    {
+        "RecordType":  "SessionManager",
+        "IdentityFields":  [
+                               "Kind",
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Value"
+                           ],
+        "SortKeys":  [
+                         "Kind",
+                         "Name"
+                     ],
+        "FalsePositives":  "autocheck autochk * is the usual BootExecute. Disk tools and some imaging agents add tokens. AppCertDlls is empty on most hosts; AV/EDR may register a DLL. PendingFileRenameOperations is intentionally omitted."
+    },
+    {
+        "RecordType":  "SilentProcessExit",
+        "IdentityFields":  [
+                               "ImageName"
+                           ],
+        "ComparedFields":  [
+                               "MonitorProcess",
+                               "ReportingMode",
+                               "LocalDumpFolder"
+                           ],
+        "SortKeys":  [
+                         "ImageName"
+                     ],
+        "FalsePositives":  "Procmon, Application Verifier, and crash-dump lab machines set MonitorProcess. ReportingMode/LocalDumpFolder changes without a new MonitorProcess are often debugging, not persistence."
+    },
+    {
+        "RecordType":  "StartupApproved",
+        "IdentityFields":  [
+                               "Scope",
+                               "Store",
+                               "ValueName"
+                           ],
+        "ComparedFields":  [
+                               "State"
+                           ],
+        "SortKeys":  [
+                         "Scope",
+                         "Store",
+                         "ValueName"
+                     ],
+        "FalsePositives":  "Users toggling Teams, OneDrive, chat, and vendor updaters in Settings is a common benign change. Only loaded user hives are visible without hive load."
+    },
+    {
+        "RecordType":  "StartupFile",
+        "IdentityFields":  [
+                               "Scope",
+                               "FileName"
+                           ],
+        "ComparedFields":  [
+                               "Sha256",
+                               "Length"
+                           ],
+        "SortKeys":  [
+                         "Scope",
+                         "FileName"
+                     ],
+        "FalsePositives":  "Vendor updaters drop .lnk files here. Per-user rows follow who has a profile on disk, not who is logged on. desktop.ini is omitted."
+    },
+    {
+        "RecordType":  "SystemBinary",
+        "IdentityFields":  [
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Sha256",
+                               "Length"
+                           ],
+        "SortKeys":  [
+                         "Name"
+                     ],
+        "FalsePositives":  "Patch Tuesday and servicing stack replace these binaries. Missing optional files (pwsh.exe) appear as Added when first installed, not as FileNotFound rows."
+    },
+    {
+        "RecordType":  "TimeProvider",
+        "IdentityFields":  [
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "DllName",
+                               "Enabled",
+                               "InputProvider"
+                           ],
+        "SortKeys":  [
+                         "Name"
+                     ],
+        "FalsePositives":  "NtpClient and NtpServer are the usual pair. Hyper-V VMICTimeProvider and domain NTP stacks are common. Enabled flips are often GPO; DllName changing to a user-writable path is the review item."
+    },
+    {
+        "RecordType":  "UserAutorun",
+        "IdentityFields":  [
+                               "SID",
+                               "Key",
+                               "ValueName"
+                           ],
+        "ComparedFields":  [
+                               "Command"
+                           ],
+        "SortKeys":  [
+                         "SID",
+                         "Key",
+                         "ValueName"
+                     ],
+        "FalsePositives":  "Cloud-sync, chat, and updaters write HKCU Run. Only loaded user hives are visible. Fleet-compare is noisy; temporal on one host is the usual reading."
+    },
+    {
+        "RecordType":  "WdacApplockerPolicy",
+        "IdentityFields":  [
+                               "Kind",
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "PolicyHash",
+                               "Path"
+                           ],
+        "SortKeys":  [
+                         "Kind",
+                         "Name"
+                     ],
+        "FalsePositives":  "Windows Update and WDAC/AppLocker MDM refresh change PolicyHash without a local operator edit. Compare is change between snapshots, not who published the policy."
+    },
+    {
+        "RecordType":  "Winlogon",
+        "IdentityFields":  [
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Value"
+                           ],
+        "SortKeys":  [
+                         "Name"
+                     ],
+        "FalsePositives":  "Some EDR and MFA packages change Userinit or Shell. Compare to the role image, not a busy analyst workstation."
+    },
+    {
+        "RecordType":  "WinsockLsp",
+        "IdentityFields":  [
+                               "Kind",
+                               "Entry"
+                           ],
+        "ComparedFields":  [
+                               "LibraryPath"
+                           ],
+        "SortKeys":  [
+                         "Kind",
+                         "Entry"
+                     ],
+        "FalsePositives":  "VPN, filter, and endpoint-security products register LSPs and namespace providers. Stock Catalog_Entries are many (often mswsock.dll). A new LibraryPath outside System32 is the review item, not the numeric index itself."
+    },
+    {
+        "RecordType":  "WmiPermanentEvent",
+        "IdentityFields":  [
+                               "Kind",
+                               "Name"
+                           ],
+        "ComparedFields":  [
+                               "Detail"
+                           ],
+        "SortKeys":  [
+                         "Kind",
+                         "Name"
+                     ],
+        "FalsePositives":  "ConfigMgr, Defender, and backup agents register WMI consumers. Empty on many home images. Unelevated capture may return zero rows (visibility gap, not proof of absence)."
+    }
+]
