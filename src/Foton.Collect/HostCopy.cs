@@ -217,8 +217,9 @@ namespace Foton.Collect
                     rows.Add(new CopyRow { SourcePath = src, DestRelative = relLeaf, SizeBytes = len, Status = "CappedSkip", Note = skip });
                     continue;
                 }
+                var fitted = FitLeaf(rootFull, packageRelativeDirectory, relLeaf);
                 string destFull;
-                try { destFull = Path.GetFullPath(Path.Combine(destinationDirectory, relLeaf)); }
+                try { destFull = Path.GetFullPath(Path.Combine(destinationDirectory, fitted)); }
                 catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { destFull = ""; }
                 if (destFull.Length == 0 || !destFull.StartsWith(rootFull + "\\", StringComparison.OrdinalIgnoreCase))
                 {
@@ -226,11 +227,45 @@ namespace Foton.Collect
                     continue;
                 }
                 var copy = CopyFile(src, destFull, skipHashing);
-                copy.DestRelative = Rel(packageRelativeDirectory, relLeaf);
+                copy.DestRelative = Rel(packageRelativeDirectory, fitted);
+                if (copy.Status == "Copied" && !string.Equals(fitted, relLeaf, StringComparison.Ordinal))
+                    copy.Note += F(" Name shortened to keep the path inside the package under {0} characters (Windows tools and ZIP extraction fail on longer paths); SourcePath holds the original name.", MaxPackagePath);
                 rows.Add(copy);
                 if (copy.Status == "Copied") { copied++; used += copy.SizeBytes; }
             }
             return rows;
+        }
+
+        // Windows APIs on .NET Framework refuse paths of 260+ characters. A package is also extracted elsewhere
+        // (%TEMP%\FotonPkg-*, D:\Cases\...), so the path inside the case folder keeps room for that root too.
+        internal const int MaxPackagePath = 160;
+        const int MaxFullPath = 259;
+
+        static string F(string format, params object[] args) => string.Format(System.Globalization.CultureInfo.InvariantCulture, format, args);
+
+        /// <summary>
+        /// The leaf of <paramref name="relLeaf"/>, shortened when the copy's path inside the package or on disk would be
+        /// too long: a stem prefix, "~", eight hex digits of the original leaf's SHA-256, and the original extension.
+        /// Unchanged when it fits, or when even a shortened leaf cannot (the copy then fails and is recorded).
+        /// </summary>
+        internal static string FitLeaf(string destinationRoot, string packageRelativeDirectory, string relLeaf)
+        {
+            var inPackage = Rel(packageRelativeDirectory, relLeaf).Length;
+            var onDisk = destinationRoot.Length + 1 + relLeaf.Length;
+            var over = Math.Max(inPackage - MaxPackagePath, onDisk - MaxFullPath);
+            if (over <= 0) return relLeaf;
+            var cut = relLeaf.LastIndexOfAny(new[] { '\\', '/' });
+            var dir = cut >= 0 ? relLeaf.Substring(0, cut + 1) : "";
+            var leaf = relLeaf.Substring(cut + 1);
+            var ext = Path.GetExtension(leaf);
+            if (ext.Length > 16) ext = "";
+            var stem = leaf.Substring(0, leaf.Length - ext.Length);
+            string tag;
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                tag = "~" + BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(leaf)), 0, 4).Replace("-", "");
+            var keep = leaf.Length - over - tag.Length - ext.Length;
+            if (keep < 1 || keep >= stem.Length) return relLeaf;
+            return dir + stem.Substring(0, keep).TrimEnd(' ', '.') + tag + ext;
         }
 
         static string SafeFileName(string path)

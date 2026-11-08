@@ -40,6 +40,9 @@ namespace Foton.Package
         public string CaseRoot { get; private set; } = "";
         /// <summary>The temporary folder a ZIP was extracted to (null for folders); remove with DeleteExtraction.</summary>
         public string? ExtractedTo { get; private set; }
+        readonly List<string> notExtracted = new List<string>();
+        /// <summary>ZIP entries left out of the temporary extraction because their path would be too long for Windows.</summary>
+        public IReadOnlyList<string> NotExtracted => notExtracted;
 
         /// <summary>Deletes the temporary ZIP extraction. Never touches a folder package.</summary>
         public void DeleteExtraction()
@@ -82,9 +85,11 @@ namespace Foton.Package
             if (File.Exists(path) && string.Equals(Path.GetExtension(path), ".zip", StringComparison.OrdinalIgnoreCase))
             {
                 p.Kind = PackageKind.Zip;
-                search = Path.Combine(extractRoot ?? Path.GetTempPath(), "FotonPkg-" + Guid.NewGuid().ToString("N"));
+                // Short folder name: every character here is one less for the deepest path inside the package.
+                do search = Path.Combine(extractRoot ?? Path.GetTempPath(), "FotonPkg-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+                while (Directory.Exists(search) || File.Exists(search));
                 p.ExtractedTo = search;
-                try { SafeZip.Extract(path, search); }
+                try { SafeZip.Extract(path, search, null, p.notExtracted); }
                 catch { p.DeleteExtraction(); throw; }
             }
             else if (Directory.Exists(path))
@@ -175,6 +180,8 @@ namespace Foton.Package
             var v = new HashVerification { HashesFile = csv, HashesFilePresent = File.Exists(csv) };
             if (!v.HashesFilePresent) return v;
             var listed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var skipped = new HashSet<string>(ExtractedTo == null ? new string[0]
+                : notExtracted.Select(n => Path.GetFullPath(Path.Combine(ExtractedTo, n.Replace('/', '\\')))), StringComparer.OrdinalIgnoreCase);
             foreach (var row in Csv.Read(csv))
             {
                 // Older packages wrote forward slashes; compare on one separator.
@@ -184,7 +191,7 @@ namespace Foton.Package
                 var full = Path.GetFullPath(Path.Combine(CaseRoot, rel));
                 if (!full.StartsWith(CaseRoot.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase))
                 { v.Mismatched.Add(rel + " (path outside the case)"); continue; }
-                if (!File.Exists(full)) { v.Missing.Add(rel); continue; }
+                if (!File.Exists(full)) { (skipped.Contains(full) ? v.NotExtracted : v.Missing).Add(rel); continue; }
                 string actual;
                 try { actual = Hashing.Sha256Hex(full); } catch (Exception) { v.Unreadable.Add(rel); continue; }
                 if (string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase)) v.Matched++;
@@ -215,6 +222,8 @@ namespace Foton.Package
         public List<string> Missing { get; } = new List<string>();
         public List<string> Unreadable { get; } = new List<string>();
         public List<string> Unlisted { get; } = new List<string>();
-        public bool Intact => HashesFilePresent && Mismatched.Count == 0 && Missing.Count == 0 && Unreadable.Count == 0;
+        /// <summary>Listed files in the ZIP that were too long to extract here, so their hashes were not checked.</summary>
+        public List<string> NotExtracted { get; } = new List<string>();
+        public bool Intact => HashesFilePresent && Mismatched.Count == 0 && Missing.Count == 0 && Unreadable.Count == 0 && NotExtracted.Count == 0;
     }
 }
