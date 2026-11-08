@@ -6,8 +6,8 @@
   -->
   <PropertyGroup>
     <FotonVersion>2.0.0</FotonVersion>
-    <!-- A tag v$(FotonVersion)-$(FotonPrerelease) publishes a prerelease (release-v2.yml). -->
-    <FotonPrerelease>alpha.1</FotonPrerelease>
+    <!-- Empty for a release (tag v$(FotonVersion)); set it (alpha.1, beta.1) for a prerelease tag v$(FotonVersion)-$(FotonPrerelease). -->
+    <FotonPrerelease></FotonPrerelease>
     <!-- UTC date of the change that set FotonVersion; the banner shows it as Updated. -->
     <FotonReleaseDate>2026-11-08</FotonReleaseDate>
     <!-- 1.14.0: same files, tasks, and columns as 1.13.0; values change (UTC timestamps, AccessDenied / SkippedUnc /
@@ -18,7 +18,8 @@
     <FotonBaselineSchemaVersion>1.16.0</FotonBaselineSchemaVersion>
     <FotonFindingsSchemaVersion>1.0.0</FotonFindingsSchemaVersion>
 
-    <Version>$(FotonVersion)-$(FotonPrerelease)</Version>
+    <Version Condition="'$(FotonPrerelease)' == ''">$(FotonVersion)</Version>
+    <Version Condition="'$(FotonPrerelease)' != ''">$(FotonVersion)-$(FotonPrerelease)</Version>
     <AssemblyVersion>$(FotonVersion).0</AssemblyVersion>
     <FileVersion>$(FotonVersion).0</FileVersion>
     <Product>Foton</Product>
