@@ -73,6 +73,9 @@ namespace Foton.Tests
             Assert.Equal("Unknown", UserCollection.PrincipalSource("S-1-5-4", machine, msa));
             Assert.Equal("Unknown", UserCollection.PrincipalSource("not a sid", machine, msa));
             Assert.Equal("Unknown", UserCollection.PrincipalSource("S-1-5-21-1-2-3-1001", null, msa));
+            Assert.True(CloudJoin.IsJoinKeyName("0123456789ABCDEF0123456789abcdef01234567"));
+            Assert.True(CloudJoin.IsJoinKeyName("{8F3A1B2C-0000-4D5E-9F10-123456789ABC}"));
+            Assert.False(CloudJoin.IsJoinKeyName("Status"));
             Assert.Null(CollectText.DmtfTime("2026-not-a-dmtf"));
             Assert.Equal("", CollectText.Dmtf("99999999999999.999999+999"));
             Assert.Equal(new[] { "User", "Group", "Group", "Group", "" }, new[] { 1, 2, 4, 5, 6 }.Select(UserCollection.ObjectClass));

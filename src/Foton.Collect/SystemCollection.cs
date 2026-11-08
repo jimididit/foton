@@ -200,6 +200,8 @@ namespace Foton.Collect
     public static class CloudJoin
     {
         static readonly Regex Guid = new Regex(@"^[\{]?[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}[\}]?$");
+        // JoinInfo keys are named by the device certificate's SHA-1 thumbprint, not a GUID.
+        static readonly Regex GuidOrThumbprint = new Regex(@"^([\{]?[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}[\}]?|[0-9A-Fa-f]{40})$");
         static readonly Regex Secret = new Regex("(?i)(password|secret|private|token|prt|refresh|encrypted)");
 
         public static List<Dictionary<string, object?>> Rows(IEnumerable<UserHive> hives)
@@ -213,7 +215,7 @@ namespace Foton.Collect
                 ["SourceKey"] = key, ["Note"] = note,
             };
 
-            foreach (var k in GuidKeys(@"HKLM:\SYSTEM\CurrentControlSet\Control\CloudDomainJoin\JoinInfo"))
+            foreach (var k in GuidKeys(@"HKLM:\SYSTEM\CurrentControlSet\Control\CloudDomainJoin\JoinInfo", GuidOrThumbprint))
             {
                 var device = V(k, "DeviceId");
                 rows.Add(Row("AzureAdJoin", "Machine", "N/A", device.Length > 0 ? device : Leaf(k), V(k, "TenantId"), "", device, V(k, "UserEmail"), V(k, "IdpDomain"), "", "", Display(k),
@@ -234,7 +236,7 @@ namespace Foton.Collect
                     $"EnrollmentState={(state.Length > 0 ? state : "(not set)")}. Numeric EnrollmentType is recorded as stored; do not treat a number as a join verdict."));
             }
             foreach (var h in hives)
-                foreach (var k in GuidKeys(Reg.Join(h.Root, @"Software\Microsoft\Windows NT\CurrentVersion\WorkplaceJoin\JoinInfo")))
+                foreach (var k in GuidKeys(Reg.Join(h.Root, @"Software\Microsoft\Windows NT\CurrentVersion\WorkplaceJoin\JoinInfo"), GuidOrThumbprint))
                 {
                     var device = V(k, "DeviceId");
                     rows.Add(Row("WorkplaceJoin", "User", h.UserName.Length > 0 ? h.UserName : h.Sid, device.Length > 0 ? device : Leaf(k), V(k, "TenantId"), "", device,
@@ -245,7 +247,10 @@ namespace Foton.Collect
                 .ThenBy(r => (string)r["User"]!, StringComparer.OrdinalIgnoreCase).ThenBy(r => (string)r["Identity"]!, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        static IEnumerable<string> GuidKeys(string root) => Reg.SubKeyNames(root).Where(n => Guid.IsMatch(n)).Select(n => Reg.Join(root, n)).Where(Reg.Exists);
+        static IEnumerable<string> GuidKeys(string root, Regex? names = null) =>
+            Reg.SubKeyNames(root).Where(n => (names ?? Guid).IsMatch(n)).Select(n => Reg.Join(root, n)).Where(Reg.Exists);
+
+        internal static bool IsJoinKeyName(string name) => GuidOrThumbprint.IsMatch(name);
 
         static string Leaf(string key) => key.Substring(key.LastIndexOf('\\') + 1);
 

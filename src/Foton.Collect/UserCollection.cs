@@ -45,12 +45,13 @@ namespace Foton.Collect
             try { read = LocalUsers.All(); }
             catch (InvalidOperationException)
             {
-                // The SAM read failed: fall back to WMI, which has no logon or password times.
-                var rows = Wmi.Query(Cimv2, "SELECT Name, Disabled, SID, Description, PasswordRequired, PasswordExpires, PasswordChangeable FROM Win32_UserAccount WHERE LocalAccount=True")
+                // The SAM read failed: fall back to WMI, which has no logon or password times. Win32_UserAccount's
+                // PasswordExpires is a yes/no flag, not the expiry date this column holds, so it is left blank.
+                var rows = Wmi.Query(Cimv2, "SELECT Name, Disabled, SID, Description, PasswordRequired, PasswordChangeable FROM Win32_UserAccount WHERE LocalAccount=True")
                     .Select(u => new Dictionary<string, object?>
                     {
                         ["Name"] = Raw(u, "Name"), ["Enabled"] = !(Raw(u, "Disabled") as bool? ?? false), ["SID"] = Raw(u, "SID"), ["Description"] = Raw(u, "Description"),
-                        ["LastLogon"] = "", ["PasswordLastSet"] = "", ["PasswordRequired"] = Raw(u, "PasswordRequired"), ["PasswordExpires"] = Raw(u, "PasswordExpires"),
+                        ["LastLogon"] = "", ["PasswordLastSet"] = "", ["PasswordRequired"] = Raw(u, "PasswordRequired"), ["PasswordExpires"] = "",
                         ["UserMayChangePassword"] = Raw(u, "PasswordChangeable"), ["AccountExpires"] = "",
                     }).ToList();
                 sids.AddRange(rows.Select(r => r["SID"] as string ?? "").Where(v => v.Length > 0));
