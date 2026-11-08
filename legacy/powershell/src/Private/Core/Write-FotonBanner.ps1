@@ -487,6 +487,8 @@ function Write-FotonBanner {
     Write-Host ("     Version     {0}" -f $ver) -ForegroundColor DarkGray
     Write-Host ("     Updated     {0}" -f $released) -ForegroundColor DarkGray
     Write-Host ("     Mode        {0}" -f $mode) -ForegroundColor Gray
+    Write-Host '     Status      Final 1.38.x release. On Windows 10 / Server 2016+ use Foton v2 (foton-collect.exe):' -ForegroundColor Yellow
+    Write-Host '                 https://github.com/jimididit/foton/releases/latest' -ForegroundColor Yellow
     Write-Host '     Opening a window...closes a door' -ForegroundColor DarkGray
     Write-Host ''
 }

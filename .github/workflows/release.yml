@@ -64,7 +64,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          & .\legacy\powershell\build\Build-Release.ps1 -OutputPath (Join-Path $PWD 'dist\release')
+          # The repository docs describe Foton v2; ship the 1.38.x operator docs pinned beside the module.
+          & .\legacy\powershell\build\Build-Release.ps1 -OutputPath (Join-Path $PWD 'dist\release') -DocsRoot (Join-Path $PWD 'legacy\powershell\release-docs')
 
       - name: Upload assets
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -150,7 +151,8 @@ jobs:
           $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
           Set-Content -LiteralPath $notesFile -Value $notes -Encoding UTF8
           $files = @(Get-ChildItem $env:ASSET_DIR -File | Where-Object { $_.Extension -in '.ps1', '.zip', '.txt' } | ForEach-Object FullName)
-          gh release create $env:GITHUB_REF_NAME @files --repo $env:GITHUB_REPOSITORY --title "Foton $ver" --notes-file $notesFile
+          # v2 is the current line: a 1.38.x release must never become "Latest" (docs link to /releases/latest).
+          gh release create $env:GITHUB_REF_NAME @files --repo $env:GITHUB_REPOSITORY --title "Foton $ver" --notes-file $notesFile --latest=false
           if ($LASTEXITCODE -ne 0) { throw "gh release create failed ($LASTEXITCODE)" }
 
       - name: Publish to PowerShell Gallery
