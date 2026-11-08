@@ -145,9 +145,33 @@ namespace Foton.Collect
                 try { files = Directory.GetFiles(d, "manifest.json"); subs = Directory.GetDirectories(d); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { continue; }
                 if (files.Length > 0) return files[0];
-                for (int i = subs.Length - 1; i >= 0; i--) pending.Push(subs[i]);
+                // Extension folders are user-writable: a junction there could loop or point outside the profile.
+                for (int i = subs.Length - 1; i >= 0; i--) if (!Reparse(subs[i])) pending.Push(subs[i]);
             }
             return null;
+        }
+
+        static bool Reparse(string path)
+        {
+            try { return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0; }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return true; }
+        }
+
+        /// <summary>Every file under a folder; a subfolder that cannot be read is skipped, never the whole walk. Junctions are not followed.</summary>
+        static IEnumerable<FileInfo> Files(string root)
+        {
+            var pending = new Stack<DirectoryInfo>();
+            pending.Push(new DirectoryInfo(root));
+            while (pending.Count > 0)
+            {
+                var d = pending.Pop();
+                FileInfo[] files;
+                DirectoryInfo[] subs;
+                try { files = d.GetFiles(); subs = d.GetDirectories(); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { continue; }
+                foreach (var f in files) yield return f;
+                foreach (var sub in subs) if ((sub.Attributes & FileAttributes.ReparsePoint) == 0) pending.Push(sub);
+            }
         }
 
         static object? Read(string manifest)
@@ -195,7 +219,7 @@ namespace Foton.Collect
         /// <summary>A named field of a task row (a dictionary or an object), as text.</summary>
         internal static string Field(object row, string name)
         {
-            object? v = row is IDictionary<string, object?> d ? (d.TryGetValue(name, out var x) ? x : null) : row.GetType().GetProperty(name)?.GetValue(row);
+            object? v = row is IDictionary d ? (d.Contains(name) ? d[name] : null) : row.GetType().GetProperty(name)?.GetValue(row);
             return v == null ? "" : Csv.FormatValue(v);
         }
 
@@ -209,10 +233,7 @@ namespace Foton.Collect
                 };
             var hashed = new[] { ".sys", ".inf", ".cat" };
             var rows = new List<Dictionary<string, object?>>();
-            IEnumerable<FileInfo> files;
-            try { files = new DirectoryInfo(repo).EnumerateFiles("*", SearchOption.AllDirectories).ToList(); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { files = new FileInfo[0]; }
-            foreach (var f in files)
+            foreach (var f in Files(repo))
                 rows.Add(new Dictionary<string, object?>
                 {
                     ["Path"] = f.FullName, ["SizeBytes"] = f.Length, ["Extension"] = f.Extension, ["ModifiedUtc"] = FotonTime.Format(f.LastWriteTimeUtc),

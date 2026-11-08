@@ -66,7 +66,8 @@ namespace Foton.Win
                 result = Query(path!, CatalogFirst);
                 if (result.Status != "Valid") result = Query(path!, EmbeddedOnly);
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is CryptographicException || ex is ArgumentException || ex is NotSupportedException)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is CryptographicException || ex is ArgumentException
+                || ex is NotSupportedException || ex is EntryPointNotFoundException || ex is DllNotFoundException)
             {
                 result = new SignatureInfo { Status = "SignatureCheckError" };
             }
@@ -99,6 +100,7 @@ namespace Foton.Win
         /// </summary>
         public static string Openable(string path)
         {
+            path = path.Trim().Trim('"');
             if (path.StartsWith(@"\??\", StringComparison.Ordinal)) return path.Substring(4);
             if (path.StartsWith(@"\SystemRoot\", StringComparison.OrdinalIgnoreCase))
                 return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), path.Substring(@"\SystemRoot\".Length));

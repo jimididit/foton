@@ -122,6 +122,7 @@ namespace Foton.Tests
             Assert.Equal(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\drivers\y.sys"),
                 Foton.Win.Authenticode.Openable(@"\SystemRoot\System32\drivers\y.sys"));
             Assert.Equal(@"C:\Windows\z.sys", Foton.Win.Authenticode.Openable(@"C:\Windows\z.sys"));
+            Assert.Equal(@"C:\Program Files\q.sys", Foton.Win.Authenticode.Openable(@"""\??\C:\Program Files\q.sys"""));
         }
 
         [Fact]
@@ -130,6 +131,7 @@ namespace Foton.Tests
             Assert.Equal("AnyDesk", SoftwareCollection.Field(new System.Collections.Generic.Dictionary<string, object?> { ["DisplayName"] = "AnyDesk" }, "DisplayName"));
             Assert.Equal("", SoftwareCollection.Field(new System.Collections.Generic.Dictionary<string, object?>(), "DisplayName"));
             Assert.Equal("svc", SoftwareCollection.Field(new { Name = "svc" }, "Name"));
+            Assert.Equal("x", SoftwareCollection.Field(new System.Collections.Generic.Dictionary<string, string> { ["Path"] = "x" }, "Path"));
         }
 
         [Fact]
