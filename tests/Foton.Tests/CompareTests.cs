@@ -101,6 +101,34 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void ServiceDll_is_compared_from_1_17_and_skipped_against_older_baselines()
+        {
+            var meta = new ProviderMeta { RecordType = "Service", IdentityFields = new[] { "Name" }, ComparedFields = new[] { "PathName", "ServiceDll" } };
+            BaselineDocument Doc(string schema, string? dll)
+            {
+                var d = new BaselineDocument { Header = { BaselineSchemaVersion = schema, Hostname = "H" }, Providers = { meta } };
+                var row = new Dictionary<string, object?> { ["Name"] = "Schedule", ["PathName"] = @"C:\Windows\system32\svchost.exe -k netsvcs" };
+                if (dll != null) row["ServiceDll"] = dll;
+                d.Records["Service"] = new List<Dictionary<string, object?>> { row };
+                return d;
+            }
+            var swapped = BaselineComparer.Compare(Doc("1.17.0", @"C:\Windows\system32\schedsvc.dll"), Doc("1.17.0", @"C:\Users\x\evil.dll"), "dif.json");
+            var change = swapped.Changes.Single();
+            Assert.Equal("ServiceDll", change.Field);
+            Assert.Equal("High", ChangeSeverity.Of(change));
+
+            // A 1.16.0 side never captured ServiceDll: no Modified row in either direction, and the note says why.
+            foreach (var r in new[] { BaselineComparer.Compare(Doc("1.16.0", null), Doc("1.17.0", @"C:\Windows\system32\schedsvc.dll"), "dif.json"),
+                                      BaselineComparer.Compare(Doc("1.17.0", @"C:\Windows\system32\schedsvc.dll"), Doc("1.16.0", null), "dif.json") })
+            {
+                Assert.Empty(r.Changes);
+                Assert.Contains("ServiceDll", r.SchemaNote);
+            }
+            Assert.Empty(BaselineSchema.FieldsNotComparable("1.17.0", "1.17.0", "Service"));
+            Assert.Empty(BaselineSchema.FieldsNotComparable("1.14.0", "1.17.0", "Driver"));
+        }
+
+        [Fact]
         public void Identity_values_containing_the_separator_do_not_collide()
         {
             var meta = new ProviderMeta { RecordType = "Autorun", IdentityFields = new[] { "Key", "ValueName" }, ComparedFields = new[] { "Command" } };
@@ -136,6 +164,10 @@ namespace Foton.Tests
             var b = new BaselineDocument { Header = { BaselineSchemaVersion = "1.14.0" } };
             var c = new BaselineDocument { Header = { BaselineSchemaVersion = "1.15.0" } };
             var d = new BaselineDocument { Header = { BaselineSchemaVersion = "1.16.0" } };
+            var e = new BaselineDocument { Header = { BaselineSchemaVersion = "1.17.0" } };
+            var de = BaselineComparer.Compare(d, e, "x.json").SchemaNote!;
+            Assert.Contains("ServiceDll", de);
+            Assert.DoesNotContain("Namespace64", de);
             Assert.Throws<InvalidDataException>(() => BaselineComparer.Compare(a, b, "x.json"));
             Assert.Throws<InvalidDataException>(() => BaselineComparer.Compare(a, d, "x.json"));
             var bc = BaselineComparer.Compare(b, c, "x.json").SchemaNote!;

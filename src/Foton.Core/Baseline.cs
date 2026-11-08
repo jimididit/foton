@@ -173,15 +173,33 @@ namespace Foton.Core
         /// <summary>
         /// Schemas that changed record values and coverage, never identity keys or compared fields, so an older day0
         /// stays usable; each change shows once as Modified or Added. To add a schema, append it to Versions and its
-        /// change to Changes.
+        /// change to Changes. A compared field added in a version goes in AddedComparedFields too, so Compare skips it
+        /// against an older baseline that never captured it instead of reporting every record as Modified.
         /// </summary>
-        static readonly string[] Versions = { "1.14.0", "1.15.0", "1.16.0" };
+        static readonly string[] Versions = { "1.14.0", "1.15.0", "1.16.0", "1.17.0" };
+
+        static readonly Dictionary<string, Dictionary<string, string[]>> AddedComparedFields = new Dictionary<string, Dictionary<string, string[]>>
+        {
+            ["1.17.0"] = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase) { ["Service"] = new[] { "ServiceDll" } },
+        };
 
         static readonly Dictionary<string, string> Changes = new Dictionary<string, string>
         {
             ["1.15.0"] = "1.15.0 records Defender properties the platform no longer reports as \"(not reported)\" (1.14.0 wrote an empty value) and an unset BitsJob NotifyCmdLine as \"(not set)\" (1.14.0 wrote a single space), and writes the WinHttpSettings proxy blob as hex (1.14.0 wrote decimals). A 1.14.0 standard-user capture also skipped every loaded user hive, so per-user UserAutorun, StartupApproved and ProxyConfig rows can show as Added, and 1.15.0 adds active WDAC policies (WdacActiveCip, from CiPolicies\\Active) and the SystemBinary row for explorer.exe, which 1.14.0 looked for in System32.",
             ["1.16.0"] = "1.16.0 adds the 64-bit Winsock namespace catalog (WinsockLsp Kind Namespace64, from NameSpace_Catalog5\\Catalog_Entries64), so those rows show as Added against an older baseline.",
+            ["1.17.0"] = "1.17.0 records and compares the DLL each svchost-hosted service runs (Service ServiceDll). Against an older baseline that field is not compared, because the older side never captured it; recapture day 0 to compare it.",
         };
+
+        /// <summary>Compared fields of a record type that the older of two schemas never captured; Compare skips them.</summary>
+        public static ISet<string> FieldsNotComparable(string a, string b, string recordType)
+        {
+            var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int older = Math.Min(Array.IndexOf(Versions, a), Array.IndexOf(Versions, b));
+            foreach (var kv in AddedComparedFields)
+                if (Array.IndexOf(Versions, kv.Key) > older && kv.Value.TryGetValue(recordType, out var fields))
+                    skip.UnionWith(fields);
+            return skip;
+        }
 
         public static bool CanCompare(string a, string b) => a == b || (Versions.Contains(a) && Versions.Contains(b));
 

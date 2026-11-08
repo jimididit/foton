@@ -120,20 +120,18 @@ jobs:
           $preNote = ''
           if ($tag.Contains('-')) {
             $pre = @('--prerelease')
-            $preNote = '**Prerelease** for testing; not supported. Use the latest v2 release for casework.'
+            $preNote = "`n`n**Prerelease** for testing; not supported. Use the latest v2 release for casework."
           }
           $notes = @"
           ## Foton $tag
 
-          Single-file executables on in-box .NET Framework 4.6.2+ (Windows 10 / Server 2016 and newer). Nothing to install.
-
-          $preNote
+          Single-file executables on in-box .NET Framework 4.6.2+ (Windows 10 / Server 2016 and newer). Nothing to install.$preNote
 
           - **foton-collect.exe**: live triage into a hashed case package (custody, coverage, manifest, findings, ``Foton_Report.html``, ZIP). Same switches as the 1.38.x Collect flat script. Administrator preferred; standard user supported.
           - **foton-baseline.exe**: capture a baseline of stable configuration (37 record types) into a hashed package with ``Foton_Baseline.html``. Same switches as the 1.38.x flat script: ``-OutputPath``, ``-Path``, ``-NoZip``, ``-NoHtml``, ``-RequireAdministrator``.
           - **foton.exe**: workstation verbs ``compare``, ``parse``, ``analyze``, ``ioc``, ``compose``, ``tools``, ``carve``, and ``package`` (verify hashes).
 
-          Collect schema 1.14.0 (same files and columns as 1.38.x, with UTC timestamps and explicit statuses). Baseline schema 1.16.0: Compare accepts 1.14.0 (Foton 1.38.x) and 1.15.0 (v2.0.0-alpha.1) baselines and explains the one-time format and coverage differences.
+          Collect schema 1.14.0 (same files and columns as 1.38.x, with UTC timestamps and explicit statuses). Baseline schema 1.17.0: Compare accepts 1.14.0 (Foton 1.38.x), 1.15.0 (v2.0.0-alpha.1), and 1.16.0 (v2.0.0) baselines and explains the one-time format and coverage differences.
 
           Hosts older than Windows 10 / Server 2016: use [Foton 1.38.1](https://github.com/jimididit/foton/releases/tag/v1.38.1) (PowerShell; security fixes only). Operator guide: [docs/USAGE.md](https://github.com/jimididit/foton/blob/$tag/docs/USAGE.md).
 

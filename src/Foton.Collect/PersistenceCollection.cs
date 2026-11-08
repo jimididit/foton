@@ -248,9 +248,6 @@ namespace Foton.Collect
         }
 
         static readonly Regex ExeInPath = new Regex(@"^(.*?\.exe)(?=\s|$)", RegexOptions.IgnoreCase);
-        static readonly Regex PerUserInstance = new Regex("^(?<base>.+)_[0-9a-fA-F]{4,8}$");
-        const string ServicesKey = @"HKLM:\SYSTEM\CurrentControlSet\Services\";
-
         /// <summary>The executable a service ImagePath launches: the quoted part, else up to the first ".exe", else the first word.</summary>
         internal static string ServiceExe(string pathName)
         {
@@ -276,27 +273,12 @@ namespace Foton.Collect
                 bool unquoted = pathName.Length > 0 && !pathName.StartsWith("\"", StringComparison.Ordinal) && pathName.Contains(" ") && exe.Contains(" ");
                 var exeFile = Authenticode.Openable(exe);
                 var sig = Authenticode.Check(exeFile);
-                // svchost-hosted services share one image; the code that runs is the ServiceDll under Parameters (older
-                // services set it on the service key). Per-user instances (Name_<hex>) use their template's ServiceDll.
+                // svchost-hosted services share one image; the code that runs is their ServiceDll (Foton.Win.ServiceDll).
                 string dll = "", dllSource = "", dllHash = "";
                 var dllSig = new SignatureInfo { Status = "" };
                 if (Regex.IsMatch(exe, @"\\svchost\.exe$", RegexOptions.IgnoreCase))
                 {
-                    dll = BaselineDocument.PsString(Reg.Value(ServicesKey + name + @"\Parameters", "ServiceDll"));
-                    if (dll.Length > 0) dllSource = "Parameters";
-                    else
-                    {
-                        dll = BaselineDocument.PsString(Reg.Value(ServicesKey + name, "ServiceDll"));
-                        if (dll.Length > 0) dllSource = "ServiceKey";
-                    }
-                    var inst = PerUserInstance.Match(name);
-                    if (dll.Length == 0 && inst.Success)
-                    {
-                        var template = inst.Groups["base"].Value;
-                        dll = BaselineDocument.PsString(Reg.Value(ServicesKey + template + @"\Parameters", "ServiceDll"));
-                        if (dll.Length == 0) dll = BaselineDocument.PsString(Reg.Value(ServicesKey + template, "ServiceDll"));
-                        if (dll.Length > 0) dllSource = "Template:" + template;
-                    }
+                    dll = ServiceDll.Resolve(name, out dllSource);
                     if (dll.Length > 0)
                     {
                         dll = Environment.ExpandEnvironmentVariables(dll);
