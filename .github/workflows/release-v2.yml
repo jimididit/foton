@@ -58,7 +58,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $out = New-Item -ItemType Directory -Force -Path 'dist\release-v2'
-          # foton-collect.exe is not ported yet (Phase 4); it ships when it collects.
+          Copy-Item 'cli\Foton.Collect.Cli\bin\Release\net462\foton-collect.exe' $out
           Copy-Item 'cli\Foton.Baseline.Cli\bin\Release\net462\foton-baseline.exe' $out
           Copy-Item 'cli\Foton.Cli\bin\Release\net462\foton.exe' $out
           $sums = Get-ChildItem $out -Filter *.exe | Sort-Object Name | ForEach-Object {
@@ -123,19 +123,20 @@ jobs:
 
           Single-file executables on in-box .NET Framework 4.6.2+ (Windows 10 / Server 2016 and newer). Nothing to install.
 
+          - **foton-collect.exe**: live triage into a hashed case package (custody, coverage, manifest, findings, ``Foton_Report.html``, ZIP). Same switches as the 1.38.x Collect flat script. Administrator preferred; standard user supported.
           - **foton-baseline.exe**: capture a baseline of stable configuration (37 record types) into a hashed package with ``Foton_Baseline.html``. Same switches as the 1.38.x flat script: ``-OutputPath``, ``-Path``, ``-NoZip``, ``-NoHtml``, ``-RequireAdministrator``.
-          - **foton.exe**: ``foton compare <reference> <difference>`` (field-level diff, ``baseline_diff.csv``, ``Foton_BaselineCompare.html``) and ``foton package <folder-or-zip>`` (verify hashes).
+          - **foton.exe**: workstation verbs ``compare``, ``parse``, ``analyze``, ``ioc``, ``compose``, ``tools``, ``carve``, and ``package`` (verify hashes).
 
           Baseline schema 1.15.0. Compare accepts a 1.14.0 baseline from Foton 1.38.x and explains the one-time format and coverage differences.
 
-          **Not in this pre-release:** live triage collection, parse, compose, and analyze. For casework use Foton 1.38.x from the v1 releases.
+          **Pre-release.** Collect was checked against 1.38.x on a lab VM (elevated and standard user), but has not yet been used on real cases. For casework, use Foton 1.38.x from the v1 releases.
 
           ## Verify before use
           The executables are not Authenticode-signed yet, so Windows SmartScreen may warn on first run. Check the hash and the build provenance, then unblock:
           ``````powershell
-          Get-FileHash .\foton-baseline.exe -Algorithm SHA256   # compare with SHA256SUMS.txt
-          gh attestation verify .\foton-baseline.exe --repo $env:GITHUB_REPOSITORY
-          Unblock-File .\foton-baseline.exe
+          Get-FileHash .\foton-collect.exe -Algorithm SHA256   # compare with SHA256SUMS.txt
+          gh attestation verify .\foton-collect.exe --repo $env:GITHUB_REPOSITORY
+          Unblock-File .\foton-collect.exe
           ``````
           "@
           $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
