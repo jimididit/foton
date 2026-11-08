@@ -149,6 +149,14 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Process_owner_comes_from_the_token()
+        {
+            var me = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+            Assert.Equal(me, new Foton.Win.ProcessOwner().Of(System.Diagnostics.Process.GetCurrentProcess().Id), StringComparer.OrdinalIgnoreCase);
+            Assert.Equal("", new Foton.Win.ProcessOwner().Of(-1));
+        }
+
+        [Fact]
         public void A_password_never_set_reads_as_never()
         {
             var now = new DateTime(2026, 11, 8, 0, 0, 0, DateTimeKind.Utc);

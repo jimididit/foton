@@ -176,6 +176,14 @@ $psFind = @(Import-Csv -LiteralPath (Join-Path $psCase '00_Collection\findings.c
 $csFind = @(Import-Csv -LiteralPath (Join-Path $csCase '00_Collection\findings.csv') -ErrorAction SilentlyContinue | ForEach-Object Title)
 Show 'Finding titles' (Compare-Object $psFind $csFind | Select-Object @{ n = 'Title'; e = { $_.InputObject } }, @{ n = 'Only in'; e = { if ($_.SideIndicator -eq '<=') { '1.38.x' } else { 'v2' } } })
 
+# Where each side spent its time (manifest DurationMs), so a slow task is visible instead of looking like a hang.
+$slow = foreach ($side in @(@{ Name = '1.38.x'; Rows = $psMan }, @{ Name = 'v2'; Rows = $csMan })) {
+    $total = ($side.Rows | Measure-Object { [int]$_.DurationMs } -Sum).Sum
+    $top = ($side.Rows | Sort-Object { [int]$_.DurationMs } -Descending | Select-Object -First 3 | ForEach-Object { '{0} {1:N1}s' -f $_.Task, ([int]$_.DurationMs / 1000) }) -join ', '
+    [PSCustomObject]@{ Side = $side.Name; 'Task time' = '{0:N1}s' -f ($total / 1000); Slowest = $top }
+}
+Show 'Duration' @($slow)
+
 $elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 Write-Host ''
 Write-Host "Elevated: $elevated  1.38.x: $psCase  v2: $csCase"

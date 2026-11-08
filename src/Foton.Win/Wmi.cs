@@ -20,6 +20,28 @@ namespace Foton.Win
             return list;
         }
 
+        /// <summary>
+        /// Every instance the token can read. Some providers (firewall filters from policy stores) report access denied
+        /// for part of a class; Get-CimInstance kept the readable instances as a non-terminating error, so the instances
+        /// read before the failure are kept here too and the error is returned instead of thrown.
+        /// </summary>
+        public static List<ManagementBaseObject> QueryReadable(string ns, string wql, out string? error)
+        {
+            var list = new List<ManagementBaseObject>();
+            error = null;
+            try
+            {
+                using (var s = new ManagementObjectSearcher(new ManagementScope(ns), new ObjectQuery(wql)))
+                using (var results = s.Get())
+                    foreach (ManagementBaseObject mo in results) list.Add(mo);
+            }
+            catch (Exception ex) when (ex is ManagementException || ex is UnauthorizedAccessException || ex is System.Runtime.InteropServices.COMException)
+            {
+                error = ex.Message;
+            }
+            return list;
+        }
+
         /// <summary>The property value, null when it is null, or <see cref="NotReported"/> when the class lacks it.</summary>
         public static object? Prop(ManagementBaseObject mo, string name)
         {
