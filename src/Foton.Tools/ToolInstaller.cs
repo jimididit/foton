@@ -144,8 +144,11 @@ namespace Foton.Tools
                     if (!Directory.Exists(src) || File.Exists(dst)) continue;
                     if (Directory.Exists(dst))
                     {
-                        Directory.Delete(dst, true);
-                        Log($"Replaced {leaf}\\ beside the tool with the pinned release's copy.");
+                        // Kept, not deleted: local edits (a tuned config, extra rules) stay recoverable beside the tool.
+                        var kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
+                        for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
+                        Directory.Move(dst, kept);
+                        Log($"Moved the existing {leaf}\\ to {Path.GetFileName(kept)}\\ and installed the pinned release's copy.");
                     }
                     CopyDirectory(src, dst);
                 }

@@ -97,6 +97,13 @@ namespace Foton.Tests
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\9.9.9-test\chainsaw\sigma\regression_data")));
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\sigma\regression_data")));
 
+                // Reinstalling installs the pinned rules again and keeps a locally edited copy beside the tool.
+                Write(t.File(@"tools\chainsaw\rules\local-tuning.yml"), "title: local");
+                ToolInstaller.Install(entry, zip, t.File("tools"), new StatusLog(new StringWriter()));
+                Assert.False(File.Exists(t.File(@"tools\chainsaw\rules\local-tuning.yml")));
+                var keptDir = Directory.GetDirectories(t.File(@"tools\chainsaw"), "rules.replaced-*").Single();
+                Assert.True(File.Exists(Path.Combine(keptDir, "local-tuning.yml")));
+
                 // A support folder name that is empty, ".", nested, or the version folder is refused, and the install survives.
                 foreach (var bad in new[] { "", ".", "..", @"rules\x", "9.9.9-test" })
                 {
