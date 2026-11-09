@@ -6,9 +6,11 @@ Signature scanning of a **capped** blob is supported. Full NTFS unallocated-spac
 
 Walks a file you already copied (default max 8 MiB). Records **MZ** at any offset and **PE** when `e_lfanew` points at `PE\0\0`. Hits are **Tier 3** (offset + window hash, no filename). Corroborate with Prefetch, LNK, or a collected file hash.
 
+Replace the path with the copied file's:
+
 ```powershell
-.\foton.exe carve D:\evidence\unalloc-sample.bin
-# optional: -MaxBytes <n> -MaxHits <n>
+.\foton.exe carve "\path\to\file"
+.\foton.exe carve "\path\to\file" -MaxBytes 67108864 -MaxHits 200   # scan up to 64 MiB, report up to 200 hits
 ```
 
 ## Why not NTFS carving

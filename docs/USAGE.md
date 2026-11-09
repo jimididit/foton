@@ -9,7 +9,15 @@ Foton has **two machines**. Mixing them is what usually causes confusion.
 
 Copy only the endpoint executable to a target. Parse, compose, and analyze read the copied package on the workstation and never touch the live host.
 
-**Versions.** Every executable prints its version, collect schema, and baseline schema with `-Version`. Foton 2.1 writes collect schema **1.14.0** and baseline schema **1.17.0** (see [Formats](#formats-and-compatibility)).
+**First time?** Start with [GETTING-STARTED.md](GETTING-STARTED.md). This page is the full reference.
+
+**How to read the examples.** Examples are PowerShell, run from the folder holding the executables (`cd "\path\to\folder"` first).
+
+- Paths like `"\path\to\case-folder"` are yours to fill in: replace the whole path, keep the quotes.
+- Paths that start with `C:\Foton` are folders Foton creates; use them as written.
+- In tables, `<case-folder>` and similar describe what a switch or verb takes; they are not meant to be pasted.
+
+**Versions.** Every executable prints its version and the collect, baseline, and findings schemas it writes with `-Version` (see [Formats](#formats-and-compatibility)).
 
 **Older hosts.** The executables need Windows 10 / Server 2016 or newer. For Windows 7, 8.1, or Server 2012 R2, use the PowerShell line: [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) and its [1.38.x usage guide](https://github.com/jimididit/foton/blob/v1.38.2/legacy/powershell/release-docs/docs/USAGE.md). 1.38.2 is the final PowerShell release and is no longer maintained ([SECURITY.md](../SECURITY.md)).
 
@@ -28,15 +36,21 @@ Each [GitHub Release](https://github.com/jimididit/foton/releases) tagged `v2.*`
 
 They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is installed, and nothing is fetched at run time except by `foton tools`, which downloads a pinned, hash-checked Hayabusa or Chainsaw release only when you ask.
 
-**Verify before use.** The executables are not Authenticode-signed yet, so Windows SmartScreen may warn on first run. Trust comes from the hash and the build provenance, not a publisher certificate:
+**Verify before use.** The executables are not code-signed yet, so Windows SmartScreen may warn when one is started from File Explorer. Trust comes from the hash and the build provenance, not a publisher certificate. In the folder holding the downloads, print the hash of each executable you have and compare each with its line in `SHA256SUMS.txt`:
 
 ```powershell
-Get-FileHash .\foton-collect.exe -Algorithm SHA256        # must match SHA256SUMS.txt
-gh attestation verify .\foton-collect.exe --repo jimididit/foton
-Unblock-File .\foton-collect.exe
+Get-FileHash .\foton-collect.exe
 ```
 
-`gh attestation verify` proves the file was built by this repository's release workflow from a specific commit. Record the hash in the case notes so the report names the exact collector build that ran.
+The hashes come from the same release as the files, so this catches a corrupted or swapped download but not a release whose files and hash list were both replaced. `gh attestation verify` (needs the [GitHub CLI](https://cli.github.com/)) proves the file was built by this repository's release workflow from a specific commit. Run it for casework, once per file; if you cannot, record that only the hash was checked:
+
+```powershell
+gh attestation verify .\foton-collect.exe --repo jimididit/foton
+```
+
+A browser marks downloaded files as coming from the internet, which makes SmartScreen warn when you start one from File Explorer (running it from PowerShell is not affected). After both checks pass, `Unblock-File .\foton-collect.exe` removes that mark.
+
+Record the collector's hash in the case notes so the report names the exact build that ran.
 
 ### If antivirus blocks the collector
 
@@ -75,10 +89,13 @@ Writes `Foton_<HOSTNAME>_<UTC>Z\` (and a ZIP beside it). Alters the host. Findin
 
 A standard-user run skips the Security log, Prefetch/Amcache/SRUM copies, registry hive exports, VSS, auditpol/secedit, and other users' files. Each skip is recorded (`SkippedNotElevated` in the manifest, `collection_coverage.json`). That is a **visibility gap**, not a clean host.
 
+Each line below is a separate example; run the one you need, not the whole block.
+
 ```powershell
-.\foton-collect.exe -CaseNumber CASE-0001 -Examiner "A. Examiner" -OutputPath D:\Cases -EventLogDays 30 -LoadUserHives
-.\foton-collect.exe -CaseNumber CASE-0001 -Examiner "A. Examiner" -OutputPath D:\Cases -Deep
-.\foton-collect.exe -CaseNumber SELF-AUDIT
+.\foton-collect.exe -CaseNumber CASE-0001 -Examiner "A. Examiner"                                # standard collection to C:\Foton\Cases
+.\foton-collect.exe -CaseNumber CASE-0001 -Examiner "A. Examiner" -EventLogDays 30 -LoadUserHives # longer event window, users not signed in
+.\foton-collect.exe -CaseNumber CASE-0001 -Examiner "A. Examiner" -Deep                          # extended collection (larger, slower)
+.\foton-collect.exe -CaseNumber CASE-0001 -OutputPath "\path\to\folder"                          # somewhere else, such as a USB drive
 ```
 
 Open `Foton_Report.html` **inside** the new folder. Send the **ZIP + `*_PACKAGE_HASH.txt`** (or the whole folder). The HTML alone is not the package.
@@ -90,14 +107,17 @@ Writes `FotonBaseline_<HOSTNAME>_<UTC>Z\` with `baseline.json`, `coverage.json`,
 | Switch | Purpose |
 |--------|---------|
 | `-OutputPath <folder>` | Package parent folder. Default: `C:\Foton\Baselines`, created private like `C:\Foton\Cases` |
-| `-Path D:\Baselines\HOSTNAME.json` | Bare snapshot JSON instead of a package (HTML beside it) |
+| `-Path <file.json>` | Bare snapshot JSON instead of a package (HTML beside it); its folder is created if needed |
 | `-NoZip`, `-NoHtml` | Skip the ZIP or the HTML |
 | `-RequireAdministrator` | Exit if not elevated |
 | `-Version` | Print version and schemas |
 
+Run one of these:
+
 ```powershell
-.\foton-baseline.exe -OutputPath D:\Baselines -NoZip
-.\foton-baseline.exe -Path D:\Baselines\HOSTNAME.json
+.\foton-baseline.exe                                                            # package in C:\Foton\Baselines
+.\foton-baseline.exe -NoZip                                                     # folder only
+.\foton-baseline.exe -Path "\path\to\snapshot.json"                             # bare JSON
 ```
 
 A baseline taken after an incident is a picture of **that** state. Compare proves change between two observations, not when or who.
@@ -117,13 +137,33 @@ A baseline taken after an incident is a picture of **that** state. Compare prove
 | `tools` | List pinned and registered tools, and where compose finds them |
 | `carve <blob>` | MZ/PE signature scan of a copied blob (Tier 3, not NTFS carving). `-MaxBytes`, `-MaxHits` (defaults 8 MiB / 50 hits) |
 
+Check the ZIP first, extract it into a new, empty folder (right-click, **Extract All**), then run the verbs on the extracted case folder (the `Foton_...` folder that holds `00_Collection`):
+
 ```powershell
-.\foton.exe package D:\Cases\Foton_HOSTNAME_20260823-011150Z.zip
-.\foton.exe parse   D:\Cases\Foton_HOSTNAME_20260823-011150Z
-.\foton.exe compose D:\Cases\Foton_HOSTNAME_20260823-011150Z
-.\foton.exe analyze D:\Cases\Foton_HOSTNAME_20260823-011150Z
-.\foton.exe ioc     D:\Cases\Foton_HOSTNAME_20260823-011150Z D:\intel\iocs.txt
-.\foton.exe carve   D:\evidence\unalloc-sample.bin -MaxBytes 67108864 -MaxHits 200
+.\foton.exe package "\path\to\Foton_case.zip"
+.\foton.exe parse   "\path\to\case-folder"
+.\foton.exe compose "\path\to\case-folder"
+.\foton.exe analyze "\path\to\case-folder"
+```
+
+Run `analyze` last: it reads what parse and compose wrote.
+
+`ioc` takes a text file of indicators, one per line, each starting with its kind:
+
+```text
+sha256:<64 hexadecimal characters>
+path:\Users\Public\
+text:mimikatz
+```
+
+```powershell
+.\foton.exe ioc "\path\to\case-folder" "\path\to\iocs.txt"
+```
+
+`carve` scans a file you already copied, such as an unallocated-space export from another tool:
+
+```powershell
+.\foton.exe carve "\path\to\file" -MaxBytes 67108864 -MaxHits 200
 ```
 
 Why re-run `analyze`: **Collect already ran the heuristics on the endpoint**, so `analyze` on an untouched package reproduces `00_Collection\findings.csv` rather than adding detection, and says so. Parse, compose, IOC, and baseline compare add new findings; run them, then analyze again.
@@ -134,18 +174,24 @@ Mode is **Temporal** when the hostnames match, otherwise **Fleet**. Compare refu
 
 **Temporal (same host, day 0 to later).** Capture at provisioning or another known-good moment, store it **off-host**, recapture later on that host, then compare:
 
+On day 0, then again on a later day:
+
 ```powershell
-.\foton-baseline.exe -OutputPath D:\Baselines\day0 -NoZip     # day 0, store off-host
-.\foton-baseline.exe -OutputPath D:\Baselines\dayN -NoZip     # day N, same host
-.\foton.exe compare D:\Baselines\day0\FotonBaseline_HOSTNAME_...Z D:\Baselines\dayN\FotonBaseline_HOSTNAME_...Z
+.\foton-baseline.exe
+```
+
+Each run adds a `FotonBaseline_...` folder to `C:\Foton\Baselines`; copy the day 0 one off the host. Compare with the reference (earlier) baseline first and the later one second. Each argument can be a baseline folder or its `baseline.json`:
+
+```powershell
+.\foton.exe compare "\path\to\day0-baseline-folder" "\path\to\later-baseline-folder"
 ```
 
 **Fleet (host against a role golden).** Capture a golden once on a representative build host, then compare each host against it. The wording is Fleet, not a certificate that the host is clean:
 
+Run `.\foton-baseline.exe` on the golden build host and on each host, copy the baseline folders to the workstation, and compare the golden (first) against a host (second):
+
 ```powershell
-.\foton-baseline.exe -OutputPath D:\Baselines\golden-web -NoZip
-.\foton-baseline.exe -OutputPath D:\Baselines\hosts\WEB01 -NoZip
-.\foton.exe compare D:\Baselines\golden-web\FotonBaseline_...Z D:\Baselines\hosts\WEB01\FotonBaseline_WEB01_...Z
+.\foton.exe compare "\path\to\golden-baseline-folder" "\path\to\host-baseline-folder"
 ```
 
 Expect noise: hostname, SIDs, domain join, LAPS-managed local admin, software version bumps (Info). High-attention rows (service PathName, new Administrators member, Winlogon, IFEO, root CA added, and so on) cite the provider's false-positive notes. Confirm them against the role image; do not treat them as compromise.
@@ -161,14 +207,20 @@ To feed High-attention rows into a triage report, copy `baseline_diff.csv` into 
 Install the pinned Hayabusa and Chainsaw releases once, and register EZ Tools you already have. Tools live under `%LOCALAPPDATA%\Foton\tools` and are recorded in `tools.json` (the same file 1.38.x uses, so registrations carry over). PATH is never changed.
 
 ```powershell
-.\foton.exe tools                                                # what is pinned, registered, and found
-.\foton.exe tools Hayabusa                                       # download the pinned release, verify SHA-256, install (asks first; -Force skips)
-.\foton.exe tools Chainsaw                                       # same for Chainsaw: the release that bundles rules, Sigma rules, and mappings
-.\foton.exe tools Hayabusa D:\Offline\hayabusa-4.0.0-win-x64.zip  # air-gapped install, same hash check (also Chainsaw <zip>)
-.\foton.exe tools EZTools C:\Tools\EZTools                       # register an existing folder; nothing downloaded
+.\foton.exe tools                   # what is pinned, registered, and found
+.\foton.exe tools Hayabusa -Force   # download the pinned release, verify SHA-256, install
+.\foton.exe tools Chainsaw -Force   # same for Chainsaw: the release that bundles rules, Sigma rules, and mappings
 ```
 
-Pinned versions: Hayabusa 4.0.0 and Chainsaw 2.17.1 (`chainsaw_all_platforms+rules.zip`; Sigma test data and repository extras in the archive are not extracted). EZ Tools are not pinned: they are published at unversioned URLs whose contents change with each update, so a hash pin would go stale. Download them with Eric Zimmerman's `Get-ZimmermanTools.ps1` and register the folder.
+Without `-Force`, `tools Hayabusa` and `tools Chainsaw` ask before downloading; when you paste several lines at once, the next line would be taken as the answer, so the examples pass `-Force`. On a computer without internet access, download the release ZIP elsewhere and install from it (same hash check). To register Eric Zimmerman's tools you already have, point at their folder (nothing is downloaded). Run the line you need:
+
+```powershell
+.\foton.exe tools Hayabusa "\path\to\hayabusa-4.0.0-win-x64.zip"
+.\foton.exe tools Chainsaw "\path\to\chainsaw_all_platforms+rules.zip"
+.\foton.exe tools EZTools "\path\to\EZTools"
+```
+
+Pinned versions: Hayabusa 4.0.0 and Chainsaw 2.17.1 (`chainsaw_all_platforms+rules.zip`; Sigma test data and repository extras in the archive are not extracted). EZ Tools are not pinned: they are published at unversioned URLs whose contents change with each update, so a hash pin would go stale. Download them with Eric Zimmerman's `Get-ZimmermanTools` (from [ericzimmerman.github.io](https://ericzimmerman.github.io/)) and register the folder.
 
 EZ Tools unpacks several tools into subfolders (`EvtxeCmd\`, `RECmd\`, `AmcacheParser\`) that a single PATH entry does not cover; registration records each executable's full path. The SHA-256 written to `tools.json` is what Foton observed on disk, not a verification against upstream. Compose looks in `tools.json` first, then PATH.
 
