@@ -295,6 +295,24 @@ namespace Foton.Tests
                 Assert.Equal(1, records);
                 Assert.True(full);   // the second record would pass the budget: stop at a whole record
             }
+
+            // A corrupt length near int.MaxValue must not overflow the bounds check and reach Stream.Write.
+            var corrupt = new byte[8 + 64];
+            BitConverter.GetBytes(0x7FFFFFF8).CopyTo(corrupt, 8);
+            using (var none = new MemoryStream())
+            {
+                Assert.Equal(0, UsnJournal.WriteRecords(corrupt, corrupt.Length, none, long.MaxValue, out var records, out var full));
+                Assert.Equal(0, records);
+                Assert.False(full);
+            }
+
+            // A cap below one read batch could skip every batch; it is refused before the volume is opened.
+            using (var tiny = new MemoryStream())
+            {
+                var r = UsnJournal.Export("C:", tiny, UsnJournal.BatchBytes - 1);
+                Assert.Contains("at least", r.Error);
+                Assert.Equal(0, tiny.Length);
+            }
         }
 
         [Fact]

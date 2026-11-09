@@ -18,6 +18,8 @@ namespace Foton.Win
         public long StartUsn { get; set; }
         public bool Capped { get; set; }
         public string? Error { get; set; }
+        /// <summary>The destination stream failed; what it holds may end in a partly written record.</summary>
+        public bool WriteFailed { get; set; }
     }
 
     /// <summary>
@@ -58,6 +60,8 @@ namespace Foton.Win
         const uint OpenExisting = 3;
         const uint FsctlQueryUsnJournal = 0x000900F4;
         const uint FsctlReadUsnJournal = 0x000900BB;
+        const int ErrorJournalEntryDeleted = 1181;
+        internal const int BatchBytes = 65536;
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr security, uint creation, uint flags, IntPtr template);
@@ -83,6 +87,8 @@ namespace Foton.Win
         {
             var result = new UsnExport();
             if (!DriveLetter.IsMatch(drive)) { result.Error = "Not a drive letter: " + drive; return result; }
+            // Batches are skipped whole to keep the newest records, so the cap must hold at least one batch.
+            if (maxBytes < BatchBytes) { result.Error = "The export cap must be at least " + BatchBytes + " bytes."; return result; }
             using (var volume = CreateFileW(@"\\.\" + drive, GenericRead, ShareReadWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero))
             {
                 if (volume.IsInvalid) { result.Error = "Cannot open volume " + drive + " (error " + Marshal.GetLastWin32Error() + ")."; return result; }
@@ -94,18 +100,30 @@ namespace Foton.Win
                 result.JournalId = journal.UsnJournalId;
                 result.FirstUsn = journal.FirstUsn;
                 result.NextUsn = journal.NextUsn;
-                var buffer = new byte[65536];
+                var buffer = new byte[BatchBytes];
                 // FSCTL_READ_USN_JOURNAL only accepts a StartUsn on a record boundary (error 87 otherwise), so a journal
                 // larger than the cap is read from its first record and whole batches are skipped until what remains fits.
+                // A batch spans at most BatchBytes of USN space, so every kept batch starts within maxBytes of NextUsn.
                 long skipUntil = long.MinValue;
-                if (journal.NextUsn - journal.FirstUsn > maxBytes) { skipUntil = journal.NextUsn - maxBytes + buffer.Length; result.Capped = true; }
+                if (journal.NextUsn - journal.FirstUsn > maxBytes) { skipUntil = journal.NextUsn - maxBytes + BatchBytes; result.Capped = true; }
                 var request = new ReadUsnJournalDataV0 { StartUsn = journal.FirstUsn, ReasonMask = 0xFFFFFFFF, UsnJournalId = journal.UsnJournalId };
                 result.StartUsn = journal.FirstUsn;
+                int purges = 0;
                 while (result.Bytes < maxBytes)
                 {
                     if (!DeviceIoControl(volume, FsctlReadUsnJournal, ref request, Marshal.SizeOf(typeof(ReadUsnJournalDataV0)), buffer, buffer.Length, out var returned, IntPtr.Zero))
                     {
-                        result.Error = "Reading the change journal stopped (error " + Marshal.GetLastWin32Error() + ").";
+                        var error = Marshal.GetLastWin32Error();
+                        // A busy volume can purge the oldest records while they are being read: continue from the new first record.
+                        if (error == ErrorJournalEntryDeleted && purges++ < 8
+                            && DeviceIoControl(volume, FsctlQueryUsnJournal, IntPtr.Zero, 0, out var now, Marshal.SizeOf(typeof(UsnJournalDataV0)), out _, IntPtr.Zero)
+                            && now.UsnJournalId == journal.UsnJournalId && now.FirstUsn > request.StartUsn)
+                        {
+                            request.StartUsn = now.FirstUsn;
+                            result.StartUsn = Math.Max(result.StartUsn, now.FirstUsn);
+                            continue;
+                        }
+                        result.Error = "Reading the change journal stopped (error " + error + ").";
                         break;
                     }
                     if (returned <= 8) break;
@@ -117,7 +135,16 @@ namespace Foton.Win
                         result.StartUsn = skipTo;
                         continue;
                     }
-                    var bytes = WriteRecords(buffer, returned, destination, maxBytes - result.Bytes, out var records, out var full);
+                    long bytes;
+                    int records;
+                    bool full;
+                    try { bytes = WriteRecords(buffer, returned, destination, maxBytes - result.Bytes, out records, out full); }
+                    catch (IOException ex)
+                    {
+                        result.Error = "Writing the change-journal export failed: " + ex.Message;
+                        result.WriteFailed = true;
+                        break;
+                    }
                     result.Bytes += bytes;
                     result.Records += records;
                     if (full) { result.Capped = true; break; }
@@ -144,7 +171,7 @@ namespace Foton.Win
             while (offset + 4 <= returned)
             {
                 var length = BitConverter.ToInt32(buffer, offset);
-                if (length < 60 || length % 8 != 0 || offset + length > returned) break;
+                if (length < 60 || length % 8 != 0 || length > returned - offset) break;
                 if (written + length > budget) { full = true; break; }
                 destination.Write(buffer, offset, length);
                 written += length;

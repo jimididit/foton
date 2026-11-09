@@ -272,13 +272,16 @@ namespace Foton.Collect
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
+                // No partial export stays in the package: hashes.csv would list a file the row says was not copied.
+                try { if (File.Exists(dest)) File.Delete(dest); } catch (Exception del) when (del is IOException || del is UnauthorizedAccessException) { }
                 row.Note = "Could not write the change-journal export: " + ex.Message;
+                row.DestRelative = "";
                 return row;
             }
             var how = $"Records read with FSCTL_READ_USN_JOURNAL (journal {export.JournalId:X}, USN {export.StartUsn} to {export.NextUsn}), written in on-disk record layout without the sparse region; MFTECmd parses it as $J. Parent paths need $MFT (KAPE/ORC).";
-            if (export.Records == 0)
+            if (export.Records == 0 || export.WriteFailed)
             {
-                try { File.Delete(dest); } catch (IOException) { }
+                try { File.Delete(dest); } catch (Exception del) when (del is IOException || del is UnauthorizedAccessException) { }
                 row.Note = (export.Error ?? "The change journal returned no records.") + " Visibility gap, not proof no files changed.";
                 row.Status = export.Error == null ? "NoData" : "CopyError";
                 row.DestRelative = "";
