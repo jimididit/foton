@@ -12,7 +12,7 @@ namespace Foton.Tools
         public IReadOnlyList<string> Patterns { get; }
     }
 
-    /// <summary>The tools compose knows (Get-FotonComposeToolExecutables). EZTools is the six Eric Zimmerman tools.</summary>
+    /// <summary>The tools compose knows (Get-FotonComposeToolExecutables). EZTools is the Eric Zimmerman tools compose runs.</summary>
     public static class ComposeTools
     {
         public static readonly IReadOnlyList<ComposeTool> All = new[]
@@ -23,11 +23,13 @@ namespace Foton.Tools
             new ComposeTool("EvtxECmd", "EvtxECmd.exe"),
             new ComposeTool("AmcacheParser", "AmcacheParser.exe"),
             new ComposeTool("RECmd", "RECmd.exe"),
+            new ComposeTool("AppCompatCacheParser", "AppCompatCacheParser.exe"),
+            new ComposeTool("SBECmd", "SBECmd.exe"),
             new ComposeTool("Hayabusa", "hayabusa.exe", "hayabusa-*.exe"),
             new ComposeTool("Chainsaw", "chainsaw.exe"),
         };
 
-        static readonly string[] EzTools = { "PECmd", "LECmd", "JLECmd", "EvtxECmd", "AmcacheParser", "RECmd" };
+        static readonly string[] EzTools = { "PECmd", "LECmd", "JLECmd", "EvtxECmd", "AmcacheParser", "RECmd", "AppCompatCacheParser", "SBECmd" };
 
         public static IReadOnlyList<ComposeTool> Expand(string name)
         {
@@ -35,7 +37,7 @@ namespace Foton.Tools
                 return All.Where(t => EzTools.Contains(t.Name)).ToList();
             var one = All.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
             if (one != null) return new[] { one };
-            throw new ArgumentException($"Unknown tool '{name}'. Use EZTools, PECmd, LECmd, JLECmd, EvtxECmd, AmcacheParser, RECmd, Hayabusa, or Chainsaw.");
+            throw new ArgumentException($"Unknown tool '{name}'. Use EZTools, {string.Join(", ", All.Select(t => t.Name).Take(All.Count - 1))}, or {All[All.Count - 1].Name}.");
         }
     }
 }
