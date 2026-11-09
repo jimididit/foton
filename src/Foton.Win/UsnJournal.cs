@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -80,14 +81,15 @@ namespace Foton.Win
 
         /// <summary>
         /// Writes the journal of <paramref name="drive"/> ("C:") to <paramref name="destination"/>. When the journal holds
-        /// more than <paramref name="maxBytes"/>, the newest records are kept (older batches are read and skipped).
+        /// more than <paramref name="maxBytes"/>, the newest records are kept: a first pass finds the earliest whole batch
+        /// from which the rest fits, and the export runs from there to where that pass ended.
         /// Never throws for a host condition: an error is returned in UsnExport.Error with what was written so far.
         /// </summary>
         public static UsnExport Export(string drive, Stream destination, long maxBytes)
         {
             var result = new UsnExport();
             if (!DriveLetter.IsMatch(drive)) { result.Error = "Not a drive letter: " + drive; return result; }
-            // Batches are skipped whole to keep the newest records, so the cap must hold at least one batch.
+            // The cap must hold at least one whole read batch, or not even the newest batch could be kept.
             if (maxBytes < BatchBytes) { result.Error = "The export cap must be at least " + BatchBytes + " bytes."; return result; }
             using (var volume = CreateFileW(@"\\.\" + drive, GenericRead, ShareReadWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero))
             {
@@ -101,40 +103,65 @@ namespace Foton.Win
                 result.FirstUsn = journal.FirstUsn;
                 result.NextUsn = journal.NextUsn;
                 var buffer = new byte[BatchBytes];
-                // FSCTL_READ_USN_JOURNAL only accepts a StartUsn on a record boundary (error 87 otherwise), so a journal
-                // larger than the cap is read from its first record and whole batches are skipped until what remains fits.
-                // A batch spans at most BatchBytes of USN space, so every kept batch starts within maxBytes of NextUsn.
-                long skipUntil = long.MinValue;
-                if (journal.NextUsn - journal.FirstUsn > maxBytes) { skipUntil = journal.NextUsn - maxBytes + BatchBytes; result.Capped = true; }
                 var request = new ReadUsnJournalDataV0 { StartUsn = journal.FirstUsn, ReasonMask = 0xFFFFFFFF, UsnJournalId = journal.UsnJournalId };
-                result.StartUsn = journal.FirstUsn;
+                int size = Marshal.SizeOf(typeof(ReadUsnJournalDataV0));
                 int purges = 0;
-                while (result.Bytes < maxBytes)
+
+                // A busy volume can purge the oldest records while they are read (ERROR_JOURNAL_ENTRY_DELETED): the new
+                // first record of the same journal, or null when reading cannot continue.
+                long? Purged(int error)
                 {
-                    if (!DeviceIoControl(volume, FsctlReadUsnJournal, ref request, Marshal.SizeOf(typeof(ReadUsnJournalDataV0)), buffer, buffer.Length, out var returned, IntPtr.Zero))
+                    if (error != ErrorJournalEntryDeleted || purges++ >= 8) return null;
+                    if (!DeviceIoControl(volume, FsctlQueryUsnJournal, IntPtr.Zero, 0, out var now, Marshal.SizeOf(typeof(UsnJournalDataV0)), out _, IntPtr.Zero)) return null;
+                    return now.UsnJournalId == journal.UsnJournalId && now.FirstUsn > request.StartUsn ? now.FirstUsn : (long?)null;
+                }
+
+                // Pass 1, only when the journal is larger than the cap: walk the batches without writing, then start at the
+                // earliest batch from which the rest fits. FSCTL_READ_USN_JOURNAL accepts only a StartUsn on a record
+                // boundary, and a batch's USN span can exceed its byte count, so the start cannot be computed from NextUsn.
+                long stopAt = long.MaxValue;
+                if (journal.NextUsn - journal.FirstUsn > maxBytes)
+                {
+                    var batches = new List<KeyValuePair<long, long>>();
+                    while (true)
                     {
-                        var error = Marshal.GetLastWin32Error();
-                        // A busy volume can purge the oldest records while they are being read: continue from the new first record.
-                        if (error == ErrorJournalEntryDeleted && purges++ < 8
-                            && DeviceIoControl(volume, FsctlQueryUsnJournal, IntPtr.Zero, 0, out var now, Marshal.SizeOf(typeof(UsnJournalDataV0)), out _, IntPtr.Zero)
-                            && now.UsnJournalId == journal.UsnJournalId && now.FirstUsn > request.StartUsn)
+                        if (!DeviceIoControl(volume, FsctlReadUsnJournal, ref request, size, buffer, buffer.Length, out var returned, IntPtr.Zero))
                         {
-                            request.StartUsn = now.FirstUsn;
-                            result.StartUsn = Math.Max(result.StartUsn, now.FirstUsn);
+                            var error = Marshal.GetLastWin32Error();
+                            var first = Purged(error);
+                            if (first == null) { result.Error = "Reading the change journal stopped (error " + error + ")."; return result; }
+                            batches.RemoveAll(b => b.Key < first.Value);
+                            request.StartUsn = first.Value;
                             continue;
                         }
-                        result.Error = "Reading the change journal stopped (error " + error + ").";
-                        break;
+                        if (returned <= 8) break;
+                        var next = BitConverter.ToInt64(buffer, 0);
+                        batches.Add(new KeyValuePair<long, long>(request.StartUsn, returned - 8));
+                        if (next <= request.StartUsn) break;
+                        request.StartUsn = next;
                     }
-                    if (returned <= 8) break;
-                    if (BitConverter.ToInt64(buffer, 0) <= skipUntil)
+                    stopAt = request.StartUsn;
+                    request.StartUsn = StartForCap(batches, maxBytes, stopAt);
+                    result.Capped = batches.Count > 0 && request.StartUsn > batches[0].Key;
+                }
+                result.StartUsn = request.StartUsn;
+
+                // Pass 2: write whole records from the start, up to where pass 1 ended (a snapshot of the journal at that
+                // moment; records appended since are mostly the collector's own) or, uncapped, to the end.
+                while (request.StartUsn < stopAt)
+                {
+                    if (!DeviceIoControl(volume, FsctlReadUsnJournal, ref request, size, buffer, buffer.Length, out var returned, IntPtr.Zero))
                     {
-                        var skipTo = BitConverter.ToInt64(buffer, 0);
-                        if (skipTo <= request.StartUsn) break;
-                        request.StartUsn = skipTo;
-                        result.StartUsn = skipTo;
+                        var error = Marshal.GetLastWin32Error();
+                        var first = Purged(error);
+                        if (first == null) { result.Error = "Reading the change journal stopped (error " + error + ")."; break; }
+                        if (result.Records == 0) result.StartUsn = first.Value;
+                        else result.Error = (result.Error == null ? "" : result.Error + " ")
+                            + "Records from USN " + request.StartUsn + " to " + first.Value + " were purged by the volume during the export; the export has a gap there.";
+                        request.StartUsn = first.Value;
                         continue;
                     }
+                    if (returned <= 8) break;
                     long bytes;
                     int records;
                     bool full;
@@ -149,12 +176,28 @@ namespace Foton.Win
                     result.Records += records;
                     if (full) { result.Capped = true; break; }
                     if (bytes < returned - 8) { result.Error = "A malformed change-journal record ended the export; records before it were kept."; break; }
-                    var next = BitConverter.ToInt64(buffer, 0);
-                    if (next <= request.StartUsn) break;
-                    request.StartUsn = next;
+                    var nextUsn = BitConverter.ToInt64(buffer, 0);
+                    if (nextUsn <= request.StartUsn) break;
+                    request.StartUsn = nextUsn;
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// The StartUsn of the earliest batch (start USN, record bytes) from which every later batch together fits in
+        /// <paramref name="maxBytes"/>; <paramref name="end"/> when not even the newest batch fits.
+        /// </summary>
+        internal static long StartForCap(IReadOnlyList<KeyValuePair<long, long>> batches, long maxBytes, long end)
+        {
+            long total = 0, start = end;
+            for (int i = batches.Count - 1; i >= 0; i--)
+            {
+                if (total + batches[i].Value > maxBytes) break;
+                total += batches[i].Value;
+                start = batches[i].Key;
+            }
+            return start;
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.AccessControl;
@@ -305,6 +306,17 @@ namespace Foton.Tests
                 Assert.Equal(0, records);
                 Assert.False(full);
             }
+
+            // Capped start: the earliest batch from which the newest batches fit, counting record bytes (not USN span,
+            // which can be larger), and the end when not even the newest batch fits.
+            var batches = new List<KeyValuePair<long, long>>
+            {
+                new KeyValuePair<long, long>(100, 40), new KeyValuePair<long, long>(400, 40), new KeyValuePair<long, long>(900, 40),
+            };
+            Assert.Equal(400, UsnJournal.StartForCap(batches, 80, 1000));
+            Assert.Equal(400, UsnJournal.StartForCap(batches, 119, 1000));
+            Assert.Equal(100, UsnJournal.StartForCap(batches, 120, 1000));
+            Assert.Equal(1000, UsnJournal.StartForCap(batches, 39, 1000));
 
             // A cap below one read batch could skip every batch; it is refused before the volume is opened.
             using (var tiny = new MemoryStream())
