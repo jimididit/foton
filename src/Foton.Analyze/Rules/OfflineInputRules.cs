@@ -627,25 +627,28 @@ namespace Foton.Analyze.Rules
                 if (!m.Success) continue;
                 var table = m.Groups["t"].Value;
                 var network = string.Equals(table, "NetworkUsages", StringComparison.OrdinalIgnoreCase);
-                var data = ReadCsv(file);
-                if (data == null) continue;
-                foreach (var row in data)
+                // Streamed: AppResourceUseInfo alone runs to hundreds of thousands of rows, so the cap bounds memory too.
+                try
                 {
-                    if (++rows > max) { capped = true; rows = max; break; }
-                    Bump(tables, table);
-                    var exe = V(row, "ExeInfo");
-                    if (exe.Length > 0) apps.Add(exe);
-                    var ts = V(row, "Timestamp");
-                    if (ts.Length >= 19)
+                    foreach (var row in Csv.Stream(file))
                     {
-                        if (first.Length == 0 || string.CompareOrdinal(ts, first) < 0) first = ts;
-                        if (string.CompareOrdinal(ts, last) > 0) last = ts;
+                        if (++rows > max) { capped = true; rows = max; break; }
+                        Bump(tables, table);
+                        var exe = V(row, "ExeInfo");
+                        if (exe.Length > 0) apps.Add(exe);
+                        var ts = V(row, "Timestamp");
+                        if (ts.Length >= 19)
+                        {
+                            if (first.Length == 0 || string.CompareOrdinal(ts, first) < 0) first = ts;
+                            if (string.CompareOrdinal(ts, last) > 0) last = ts;
+                        }
+                        if (!network || !IsCode(exe) || !c.UserWritablePath(exe)) continue;
+                        if (!traffic.TryGetValue(exe, out var t)) traffic[exe] = t = new long[2];
+                        t[0] += Bytes(V(row, "BytesSent"));
+                        t[1] += Bytes(V(row, "BytesReceived"));
                     }
-                    if (!network || !IsCode(exe) || !c.UserWritablePath(exe)) continue;
-                    if (!traffic.TryGetValue(exe, out var t)) traffic[exe] = t = new long[2];
-                    t[0] += Bytes(V(row, "BytesSent"));
-                    t[1] += Bytes(V(row, "BytesReceived"));
                 }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 if (capped) break;
             }
             if (rows == 0) return;
@@ -692,27 +695,36 @@ namespace Foton.Analyze.Rules
             var code = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             foreach (var file in SafeFiles(dir, "*.csv"))
             {
-                var data = ReadCsv(file);
-                if (data == null || data.Count == 0 || !data[0].Keys.Any(k => string.Equals(k, "UpdateReasons", StringComparison.OrdinalIgnoreCase))) continue;
-                foreach (var row in data)
+                // Streamed: a journal export runs to millions of rows, so the cap bounds memory too.
+                try
                 {
-                    if (++rows > max) { capped = true; rows = max; break; }
-                    var ts = V(row, "UpdateTimestamp");
-                    if (ts.Length >= 19)
+                    bool header = false;
+                    foreach (var row in Csv.Stream(file))
                     {
-                        var t19 = ts.Substring(0, 19);
-                        if (winStart != null && string.CompareOrdinal(t19, winStart) >= 0 && string.CompareOrdinal(t19, winEnd) <= 0) { self++; continue; }
-                        if (first.Length == 0 || string.CompareOrdinal(t19, first) < 0) first = t19;
-                        if (string.CompareOrdinal(t19, last) > 0) last = t19;
+                        if (!header)
+                        {
+                            header = true;
+                            if (!row.Keys.Any(k => string.Equals(k, "UpdateReasons", StringComparison.OrdinalIgnoreCase))) break;
+                        }
+                        if (++rows > max) { capped = true; rows = max; break; }
+                        var ts = V(row, "UpdateTimestamp");
+                        if (ts.Length >= 19)
+                        {
+                            var t19 = ts.Substring(0, 19);
+                            if (winStart != null && string.CompareOrdinal(t19, winStart) >= 0 && string.CompareOrdinal(t19, winEnd) <= 0) { self++; continue; }
+                            if (first.Length == 0 || string.CompareOrdinal(t19, first) < 0) first = t19;
+                            if (string.CompareOrdinal(t19, last) > 0) last = t19;
+                        }
+                        var reasons = V(row, "UpdateReasons");
+                        var isCreate = reasons.IndexOf("FileCreate", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (isCreate) created++;
+                        if (reasons.IndexOf("FileDelete", StringComparison.OrdinalIgnoreCase) >= 0) deleted++;
+                        if (reasons.IndexOf("RenameNewName", StringComparison.OrdinalIgnoreCase) >= 0) renamed++;
+                        var name = V(row, "Name");
+                        if (isCreate && IsCode(name)) Bump(code, name);
                     }
-                    var reasons = V(row, "UpdateReasons");
-                    var isCreate = reasons.IndexOf("FileCreate", StringComparison.OrdinalIgnoreCase) >= 0;
-                    if (isCreate) created++;
-                    if (reasons.IndexOf("FileDelete", StringComparison.OrdinalIgnoreCase) >= 0) deleted++;
-                    if (reasons.IndexOf("RenameNewName", StringComparison.OrdinalIgnoreCase) >= 0) renamed++;
-                    var name = V(row, "Name");
-                    if (isCreate && IsCode(name)) Bump(code, name);
                 }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 if (capped) break;
             }
             if (rows == 0) return;

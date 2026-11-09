@@ -161,6 +161,36 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Streamed_csv_rows_match_the_whole_file_reader()
+        {
+            using (var t = new TempDir())
+            {
+                var path = t.File("tricky.csv");
+                var text = "#TYPE System.Management.Automation.PSCustomObject\r\n" +
+                           "Name,Note,Extra\r\n" +
+                           "a,\"comma, inside\",1\r\n" +
+                           "b,\"line one\r\nline two\",2\n" +
+                           "\r\n" +
+                           "c,\"say \"\"hi\"\"\"\r\n" +
+                           "d,last";
+                File.WriteAllText(path, text, new System.Text.UTF8Encoding(true));
+                var whole = Csv.Read(path);
+                var streamed = Csv.Stream(path).ToList();
+                Assert.Equal(4, whole.Count);
+                Assert.Equal(whole.Count, streamed.Count);
+                for (int i = 0; i < whole.Count; i++)
+                {
+                    Assert.Equal(whole[i].Keys.ToList(), streamed[i].Keys.ToList());
+                    foreach (var k in whole[i].Keys) Assert.Equal(whole[i][k], streamed[i][k]);
+                }
+                Assert.Equal("line one\r\nline two", streamed[1]["Note"]);
+                Assert.Equal("say \"hi\"", streamed[2]["Note"]);
+                Assert.Null(streamed[2]["Extra"]);   // a short row leaves later columns null
+                Assert.Equal("last", streamed[3]["Note"]);   // no trailing newline
+            }
+        }
+
+        [Fact]
         public void Custody_header_reads_back_case_and_examiner()
         {
             using (var t = new TempDir())
