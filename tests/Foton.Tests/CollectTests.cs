@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Foton.Analyze;
 using Foton.Collect;
 using Foton.Core;
@@ -268,6 +270,47 @@ namespace Foton.Tests
                 Assert.False(File.Exists(Path.Combine(t.Path, "escape.lnk")));
                 Assert.Equal(TaskStatus.Partial, CopyTaskStatus.Evaluate(rows).Status);
                 Assert.Equal("NoData", HostCopy.CappedList(new CopyItem[0], dest, "", false).Single().Status);
+            }
+        }
+
+        [Fact]
+        public void Default_output_is_a_Foton_folder_on_the_Windows_drive()
+        {
+            var root = Path.GetPathRoot(Environment.SystemDirectory)!;
+            Assert.Equal(Path.Combine(root, "Foton", "Cases"), OutputFolder.Default("Cases"));
+            Assert.Equal(Path.Combine(root, "Foton", "Baselines"), OutputFolder.Default("Baselines"));
+        }
+
+        [Fact]
+        public void Default_output_folders_are_created_private_and_existing_ones_are_checked()
+        {
+            using (var t = new TempDir())
+            {
+                var leaf = Path.Combine(t.Path, "Foton", "Cases");
+                Assert.Empty(OutputFolder.EnsurePrivate(leaf));
+                var mine = new[]
+                {
+                    new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+                    new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+                    WindowsIdentity.GetCurrent().User!,
+                };
+                foreach (var dir in new[] { Path.Combine(t.Path, "Foton"), leaf })
+                {
+                    var acl = Directory.GetAccessControl(dir);
+                    Assert.True(acl.AreAccessRulesProtected, dir + " still inherits from its parent");
+                    foreach (FileSystemAccessRule r in acl.GetAccessRules(true, true, typeof(SecurityIdentifier)))
+                        Assert.Contains((SecurityIdentifier)r.IdentityReference, mine);
+                }
+
+                // An existing folder is left alone, and other readers are reported for the warning.
+                var open = Directory.CreateDirectory(Path.Combine(t.Path, "open")).FullName;
+                var sec = Directory.GetAccessControl(open);
+                sec.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
+                    FileSystemRights.ReadAndExecute, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+                Directory.SetAccessControl(open, sec);
+                var others = OutputFolder.EnsurePrivate(open);
+                Assert.Contains(others, n => n.EndsWith("\\Users", StringComparison.OrdinalIgnoreCase) || n == "S-1-5-32-545");
+                Assert.False(Directory.GetAccessControl(open).AreAccessRulesProtected);
             }
         }
 

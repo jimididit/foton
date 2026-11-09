@@ -60,7 +60,8 @@ namespace Foton.Baseline.Cli
                 return 0;
             }
 
-            var parent = outputPath ?? DefaultOutputPath();
+            var parent = outputPath ?? OutputFolder.Default("Baselines");
+            if (outputPath == null && !OutputFolder.Prepare(parent, log)) return 1;
             BaselineLayout.Create(session, parent);
             log.Write("Baseline folder: " + session.CaseRoot, StatusLevel.Good);
             var result = BaselineCapture.Capture(session);
@@ -92,18 +93,6 @@ namespace Foton.Baseline.Cli
             }
         }
 
-        /// <summary>
-        /// The Desktop, as in 1.38.x. RMM sessions running as SYSTEM or a service account may have no Desktop folder,
-        /// so fall back to Desktop under the profile (created on write), then the working directory.
-        /// </summary>
-        static string DefaultOutputPath()
-        {
-            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            if (!string.IsNullOrEmpty(desktop)) return desktop;
-            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            return string.IsNullOrEmpty(profile) ? Directory.GetCurrentDirectory() : Path.Combine(profile, "Desktop");
-        }
-
         static void Summary(StatusLog log, CaptureResult r, string json, string? root, string? html, string? zip)
         {
             int total = r.Coverage.Sum(c => c.Count);
@@ -125,6 +114,7 @@ namespace Foton.Baseline.Cli
             Console.Error.WriteLine("Usage: foton-baseline [-OutputPath <folder>] [-NoZip] [-NoHtml] [-RequireAdministrator]");
             Console.Error.WriteLine("       foton-baseline -Path <snapshot.json>");
             Console.Error.WriteLine("       foton-baseline -Version");
+            Console.Error.WriteLine("Default -OutputPath: " + OutputFolder.Default("Baselines") + " (created private to SYSTEM, Administrators, and this account)");
             return 1;
         }
     }

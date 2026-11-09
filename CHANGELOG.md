@@ -4,7 +4,10 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
-## [2.2.2] - 2026-11-09
+## [2.3.0] - 2026-11-09
+
+### Changed
+- `foton-collect` and `foton-baseline` now write to `C:\Foton\Cases` and `C:\Foton\Baselines` on the Windows drive when `-OutputPath` is not given, instead of the current user's Desktop. On many machines the Desktop is backed up to OneDrive, which uploaded case data to the cloud. Under RMM running as SYSTEM, or in an admin prompt opened with another account, the Desktop was also not where the operator looked. When Foton creates these folders, it limits them to SYSTEM, Administrators, and the account running the collection, because a folder under the drive root otherwise lets every signed-in user read it. If the folder already exists and other accounts can read it, the run warns and continues. If it cannot be created, the run stops and asks for `-OutputPath`. An explicit `-OutputPath` is used as given, with its permissions unchanged.
 
 ### Fixed
 - The triage report (`Foton_Report.html`) showed Case and Examiner as "(not supplied)" even when `-CaseNumber` and `-Examiner` were given. The report now reads both from the package's `chain_of_custody.txt` (Foton 1.38.x packages included). Values are HTML-encoded like every other package value, and "(not supplied)" remains only when the package did not record them.

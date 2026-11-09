@@ -58,7 +58,7 @@ Writes `Foton_<HOSTNAME>_<UTC>Z\` (and a ZIP beside it). Alters the host. Findin
 
 | Switch | Purpose |
 |--------|---------|
-| `-OutputPath D:\Cases` | Case parent folder (default: the current user's Desktop) |
+| `-OutputPath <folder>` | Case parent folder. Default: `C:\Foton\Cases` on the Windows drive, created readable only by SYSTEM, Administrators, and the account that runs the collection. A folder you name is used as it is |
 | `-CaseNumber CASE-0001` | Custody header |
 | `-Examiner "A. Examiner"` | Custody header |
 | `-EventLogDays 14` | Event / recent-file window |
@@ -89,7 +89,7 @@ Writes `FotonBaseline_<HOSTNAME>_<UTC>Z\` with `baseline.json`, `coverage.json`,
 
 | Switch | Purpose |
 |--------|---------|
-| `-OutputPath D:\Baselines` | Package parent folder (default: Desktop) |
+| `-OutputPath <folder>` | Package parent folder. Default: `C:\Foton\Baselines`, created private like `C:\Foton\Cases` |
 | `-Path D:\Baselines\HOSTNAME.json` | Bare snapshot JSON instead of a package (HTML beside it) |
 | `-NoZip`, `-NoHtml` | Skip the ZIP or the HTML |
 | `-RequireAdministrator` | Exit if not elevated |
