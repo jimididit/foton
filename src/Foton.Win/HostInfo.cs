@@ -34,6 +34,9 @@ namespace Foton.Win
         /// <summary>%ProgramData% from the known-folder API (same reason as WindowsDir).</summary>
         public static string ProgramDataDir => Known(Environment.SpecialFolder.CommonApplicationData, @"C:\ProgramData");
 
+        /// <summary>The native Program Files folder (the executables are AnyCPU without Prefer32Bit, so not the x86 one on 64-bit Windows).</summary>
+        public static string ProgramFilesDir => Known(Environment.SpecialFolder.ProgramFiles, @"C:\Program Files");
+
         static string Known(Environment.SpecialFolder folder, string fallback)
         {
             var p = Environment.GetFolderPath(folder);

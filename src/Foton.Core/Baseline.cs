@@ -176,7 +176,7 @@ namespace Foton.Core
         /// change to Changes. A compared field added in a version goes in AddedComparedFields too, so Compare skips it
         /// against an older baseline that never captured it instead of reporting every record as Modified.
         /// </summary>
-        static readonly string[] Versions = { "1.14.0", "1.15.0", "1.16.0", "1.17.0" };
+        static readonly string[] Versions = { "1.14.0", "1.15.0", "1.16.0", "1.17.0", "1.18.0" };
 
         static readonly Dictionary<string, Dictionary<string, string[]>> AddedComparedFields = new Dictionary<string, Dictionary<string, string[]>>
         {
@@ -188,6 +188,7 @@ namespace Foton.Core
             ["1.15.0"] = "1.15.0 records Defender properties the platform no longer reports as \"(not reported)\" (1.14.0 wrote an empty value) and an unset BitsJob NotifyCmdLine as \"(not set)\" (1.14.0 wrote a single space), and writes the WinHttpSettings proxy blob as hex (1.14.0 wrote decimals). A 1.14.0 standard-user capture also skipped every loaded user hive, so per-user UserAutorun, StartupApproved and ProxyConfig rows can show as Added, and 1.15.0 adds active WDAC policies (WdacActiveCip, from CiPolicies\\Active) and the SystemBinary row for explorer.exe, which 1.14.0 looked for in System32.",
             ["1.16.0"] = "1.16.0 adds the 64-bit Winsock namespace catalog (WinsockLsp Kind Namespace64, from NameSpace_Catalog5\\Catalog_Entries64), so those rows show as Added against an older baseline.",
             ["1.17.0"] = "1.17.0 records and compares the DLL each svchost-hosted service runs (Service ServiceDll). Against an older baseline that field is not compared, because the older side never captured it; recapture day 0 to compare it.",
+            ["1.18.0"] = "1.18.0 records the SystemBinary row for pwsh.exe from Program Files\\PowerShell\\7, where PowerShell 7 installs (earlier schemas looked for it in System32 and never found it), so it shows as Added against an older baseline on hosts with PowerShell 7.",
         };
 
         /// <summary>Compared fields of a record type that the older of two schemas never captured; Compare skips them.</summary>

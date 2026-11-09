@@ -41,7 +41,7 @@ namespace Foton.Analyze
             ["SilentProcessExit"] = @"Procmon, Application Verifier, and crash-dump lab machines set MonitorProcess. ReportingMode/LocalDumpFolder changes without a new MonitorProcess are often debugging, not persistence.",
             ["StartupApproved"] = @"Users toggling Teams, OneDrive, chat, and vendor updaters in Settings is a common benign change. Only loaded user hives are visible without hive load.",
             ["StartupFile"] = @"Vendor updaters drop .lnk files here. Per-user rows follow who has a profile on disk, not who is logged on. desktop.ini is omitted.",
-            ["SystemBinary"] = @"Patch Tuesday and servicing stack replace these binaries. Missing optional files (pwsh.exe) appear as Added when first installed, not as FileNotFound rows.",
+            ["SystemBinary"] = @"Patch Tuesday and servicing stack replace these binaries; PowerShell 7 updates replace pwsh.exe. Missing optional files (pwsh.exe) appear as Added when first installed, not as FileNotFound rows.",
             ["TimeProvider"] = @"NtpClient and NtpServer are the usual pair. Hyper-V VMICTimeProvider and domain NTP stacks are common. Enabled flips are often GPO; DllName changing to a user-writable path is the review item.",
             ["UserAutorun"] = @"Cloud-sync, chat, and updaters write HKCU Run. Only loaded user hives are visible. Fleet-compare is noisy; temporal on one host is the usual reading.",
             ["WdacApplockerPolicy"] = @"Windows Update and WDAC/AppLocker MDM refresh change PolicyHash without a local operator edit. Compare is change between snapshots, not who published the policy.",
