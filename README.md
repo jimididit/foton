@@ -10,18 +10,28 @@ Windows DFIR, baseline, and security-audit toolkit. Capture a host into a hashed
 
 Windows 10 / Server 2016 or newer; nothing to install.
 
-1. Download [foton-collect.exe](https://github.com/jimididit/foton/releases/latest/download/foton-collect.exe) from the latest release. If the browser says it "isn't commonly downloaded", choose **Keep**. For casework, [verify the download](docs/GETTING-STARTED.md#2-verify-your-download) before the next step.
-2. Open PowerShell as Administrator (Start menu, type `PowerShell`, right-click **Windows PowerShell**, **Run as administrator**) and run:
+1. Download `foton-collect.exe` and `SHA256SUMS.txt` from the [latest release](https://github.com/jimididit/foton/releases/latest).
+2. Open PowerShell as Administrator (Start menu, type `PowerShell`, right-click **Windows PowerShell**, **Run as administrator**). Go to the folder where you saved the files, replacing the path with yours:
 
-```powershell
-cd "$env:USERPROFILE\Downloads"
-.\foton-collect.exe -CaseNumber CASE-0001
-explorer C:\Foton\Cases
-```
+   ```powershell
+   cd "\path\to\folder"
+   ```
 
-3. Open the new `Foton_...` folder and double-click `Foton_Report.html`.
+3. Check the download. The `Hash` value it prints must match the `foton-collect.exe` line in `SHA256SUMS.txt`. If it does not, delete the file and download it again.
 
-To analyze the package on another computer with `foton.exe`, or to take baselines, follow [Getting started](docs/GETTING-STARTED.md).
+   ```powershell
+   Get-FileHash .\foton-collect.exe
+   ```
+
+4. Run it:
+
+   ```powershell
+   .\foton-collect.exe -CaseNumber CASE-0001
+   ```
+
+5. Open `Foton_Report.html` in the new folder under `C:\Foton\Cases`.
+
+[Getting started](docs/GETTING-STARTED.md) covers analyzing the package on another computer with `foton.exe`, baselines, and the stronger provenance check for casework.
 
 ## Three executables
 
@@ -38,7 +48,7 @@ Each is one file. Copy only the endpoint executable to a target; parse, compose,
 - Windows 10 / Server 2016 or newer. The executables run on the .NET Framework that ships with Windows (4.6.2+); nothing to install. The commands in these docs are for PowerShell, which is built in.
 - Output goes to `C:\Foton\Cases` and `C:\Foton\Baselines` unless you pass `-OutputPath`.
 - **Administrator recommended**, not required. A standard-user run skips the Security log, Prefetch/Amcache/SRUM copies, registry hive exports, and other users' files, and records each as a visibility gap, not a clean result.
-- The executables are not code-signed yet, so Windows SmartScreen may warn when one is started from File Explorer. For casework, check each file's SHA-256 against the release's `SHA256SUMS.txt` and its GitHub build provenance attestation, which proves it was built by this repository's release workflow ([how](docs/GETTING-STARTED.md#2-verify-your-download)).
+- The executables are not code-signed yet, so Windows SmartScreen may warn when one is started from File Explorer. For casework, check each file's SHA-256 against the release's `SHA256SUMS.txt` and its GitHub build provenance attestation, which proves it was built by this repository's release workflow ([how](docs/GETTING-STARTED.md#2-check-the-download)).
 - Older hosts (Windows 7, 8.1, Server 2012 R2): use the PowerShell line, [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) with its [1.38.x usage guide](https://github.com/jimididit/foton/blob/v1.38.2/legacy/powershell/release-docs/docs/USAGE.md). 1.38.2 is the final PowerShell release and is no longer maintained.
 
 ## What Foton is (and is not)
