@@ -274,6 +274,22 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void SRUM_is_copied_from_System32_sru_with_its_logs()
+        {
+            Assert.Equal(@"C:\Windows\System32\sru", FilesystemCollection.SrumDirectory(@"C:\Windows"));
+            using (var t = new TempDir())
+            {
+                // The ESE logs and checkpoint do not share SRUDB.dat's name; the folder copy takes them all.
+                var src = Directory.CreateDirectory(Path.Combine(t.Path, "sru")).FullName;
+                foreach (var f in new[] { "SRUDB.dat", "SRU.chk", "SRU.log", "SRU0001A.log", "SRUDB.jfm" }) File.WriteAllText(Path.Combine(src, f), f);
+                var rows = HostCopy.CappedDirectory(src, "*", Path.Combine(t.Path, "d"), @"08_Filesystem\srum", false, 64, 1073741824, "SRUM missing");
+                Assert.Equal(5, rows.Count(r => r.Status == "Copied"));
+                Assert.Contains(rows, r => r.DestRelative == @"08_Filesystem\srum\SRU.chk");
+                Assert.Equal("SRUM missing", HostCopy.CappedDirectory(Path.Combine(t.Path, "absent"), "*", t.Path, "", false, missingNote: "SRUM missing").Single().Note);
+            }
+        }
+
+        [Fact]
         public void Default_output_is_a_Foton_folder_on_the_Windows_drive()
         {
             var root = Path.GetPathRoot(Environment.SystemDirectory)!;

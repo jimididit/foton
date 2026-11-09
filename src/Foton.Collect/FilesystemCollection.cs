@@ -36,8 +36,9 @@ namespace Foton.Collect
                 () => HostCopy.CappedDirectory(Path.Combine(HostInfo.WindowsDir, "Prefetch"), "*.pf", Dest(s, "prefetch"), Rel("prefetch"), skip), elevated: true);
             Task(s, Cat, "amcache_hive", "Copied Amcache.hve plus hive logs (locked-file copy)", TaskFormat.Csv,
                 () => HostCopy.Family(Path.Combine(HostInfo.WindowsDir, @"AppCompat\Programs\Amcache.hve"), Dest(s, "amcache"), Rel("amcache"), skip), elevated: true);
-            Task(s, Cat, "srum_database", "Copied SRUDB.dat plus WAL/SHM if present (capped; locked-file copy)", TaskFormat.Csv,
-                () => HostCopy.Family(Path.Combine(HostInfo.ProgramDataDir, @"Microsoft\Windows\SRUM\SRUDB.dat"), Dest(s, "srum"), Rel("srum"), skip, 104857600), elevated: true);
+            Task(s, Cat, "srum_database", "Copied SRUM database folder (System32\\sru: SRUDB.dat, ESE logs, checkpoint; capped; locked-file copy)", TaskFormat.Csv,
+                () => HostCopy.CappedDirectory(SrumDirectory(HostInfo.WindowsDir), "*", Dest(s, "srum"), Rel("srum"), skip, 64, 1073741824,
+                    "SRUM folder not found or not readable. SRUM exists on Windows 8 and later; a missing folder is a visibility gap, not proof SRUM was off."), elevated: true);
             Task(s, Cat, "registry_hives_machine", "SYSTEM/SOFTWARE/DEFAULT hives exported with reg save (loaded hives cannot be file-copied; not parsed on the endpoint). SAM and SECURITY are not collected by design. For RECmd / Registry Explorer.", TaskFormat.Csv,
                 () => MachineHives(s), elevated: true);
             Task(s, Cat, "registry_hives_user", "NTUSER.DAT and UsrClass.dat per profile: file copy for unloaded hives, reg save for loaded ones (capped; not parsed on the endpoint).", TaskFormat.Csv,
@@ -66,6 +67,13 @@ namespace Foton.Collect
         }
 
         static string Dest(FotonSession s, string sub) => Path.Combine(s.Dirs[Cat], sub);
+
+        /// <summary>
+        /// The SRUM ESE database folder. 1.38.x and v2 before 2.4.0 looked for SRUDB.dat under ProgramData, where it
+        /// never is, so no package held SRUM. The whole folder is copied: the database alone is dirty without its
+        /// logs (SRU*.log, SRU.chk), which do not share its name.
+        /// </summary>
+        internal static string SrumDirectory(string windowsDir) => Path.Combine(windowsDir, "System32", "sru");
         static string Rel(string sub) => Path.Combine(CaseCategories.FolderOf(Cat), sub);
         static string Utc(DateTime t) => FotonTime.Format(t);
 
