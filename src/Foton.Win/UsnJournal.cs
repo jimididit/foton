@@ -164,8 +164,8 @@ namespace Foton.Win
                     if (returned <= 8) break;
                     long bytes;
                     int records;
-                    bool full;
-                    try { bytes = WriteRecords(buffer, returned, destination, maxBytes - result.Bytes, out records, out full); }
+                    bool full, stopped;
+                    try { bytes = WriteRecords(buffer, returned, destination, maxBytes - result.Bytes, out records, out full, out stopped, stopAt); }
                     catch (IOException ex)
                     {
                         result.Error = "Writing the change-journal export failed: " + ex.Message;
@@ -175,6 +175,7 @@ namespace Foton.Win
                     result.Bytes += bytes;
                     result.Records += records;
                     if (full) { result.Capped = true; break; }
+                    if (stopped) break;
                     if (bytes < returned - 8) { result.Error = "A malformed change-journal record ended the export; records before it were kept."; break; }
                     var nextUsn = BitConverter.ToInt64(buffer, 0);
                     if (nextUsn <= request.StartUsn) break;
@@ -204,17 +205,21 @@ namespace Foton.Win
         /// Writes the USN records in one FSCTL_READ_USN_JOURNAL output (an 8-byte next-USN, then records) to
         /// <paramref name="destination"/>, up to <paramref name="budget"/> bytes and only whole records. A record whose
         /// length is zero, unaligned, shorter than a header, or past the data ends the batch: nothing past it is trusted.
+        /// A record whose USN is <paramref name="stopUsn"/> or later is not written and sets <paramref name="stopped"/>.
         /// </summary>
-        internal static long WriteRecords(byte[] buffer, int returned, Stream destination, long budget, out int records, out bool full)
+        internal static long WriteRecords(byte[] buffer, int returned, Stream destination, long budget, out int records, out bool full,
+            out bool stopped, long stopUsn = long.MaxValue)
         {
             records = 0;
             full = false;
+            stopped = false;
             int offset = 8;
             long written = 0;
             while (offset + 4 <= returned)
             {
                 var length = BitConverter.ToInt32(buffer, offset);
                 if (length < 60 || length % 8 != 0 || length > returned - offset) break;
+                if (RecordUsn(buffer, offset) >= stopUsn) { stopped = true; break; }
                 if (written + length > budget) { full = true; break; }
                 destination.Write(buffer, offset, length);
                 written += length;
@@ -222,6 +227,18 @@ namespace Foton.Win
                 offset += length;
             }
             return written;
+        }
+
+        /// <summary>
+        /// The record's USN: after two 64-bit file references in USN_RECORD_V2 (offset 24), two 128-bit ones in V3
+        /// (offset 40). Another major version reads as long.MinValue, so it is never past a stop USN.
+        /// </summary>
+        internal static long RecordUsn(byte[] buffer, int offset)
+        {
+            var major = BitConverter.ToUInt16(buffer, offset + 4);
+            return major == 2 ? BitConverter.ToInt64(buffer, offset + 24)
+                : major == 3 ? BitConverter.ToInt64(buffer, offset + 40)
+                : long.MinValue;
         }
     }
 }

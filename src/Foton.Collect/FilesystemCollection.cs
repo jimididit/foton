@@ -270,9 +270,10 @@ namespace Foton.Collect
             {
                 using (var fs = File.Create(dest)) export = Foton.Win.UsnJournal.Export(drive, fs, UsnCap);
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            catch (SystemException ex)
             {
-                // No partial export stays in the package: hashes.csv would list a file the row says was not copied.
+                // Any failure of the native read or the write (not only I/O): no partial export stays in the package,
+                // because hashes.csv would list a file the row says was not copied.
                 try { if (File.Exists(dest)) File.Delete(dest); } catch (Exception del) when (del is IOException || del is UnauthorizedAccessException) { }
                 row.Note = "Could not write the change-journal export: " + ex.Message;
                 row.DestRelative = "";

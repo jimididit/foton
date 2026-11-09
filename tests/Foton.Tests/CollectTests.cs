@@ -285,14 +285,14 @@ namespace Foton.Tests
             BitConverter.GetBytes(3).CopyTo(buffer, 144);   // malformed: shorter than a record header
             using (var all = new MemoryStream())
             {
-                Assert.Equal(136, UsnJournal.WriteRecords(buffer, buffer.Length, all, long.MaxValue, out var records, out var full));
+                Assert.Equal(136, UsnJournal.WriteRecords(buffer, buffer.Length, all, long.MaxValue, out var records, out var full, out _));
                 Assert.Equal(2, records);
                 Assert.False(full);
                 Assert.Equal(136, all.Length);
             }
             using (var capped = new MemoryStream())
             {
-                Assert.Equal(64, UsnJournal.WriteRecords(buffer, buffer.Length, capped, 100, out var records, out var full));
+                Assert.Equal(64, UsnJournal.WriteRecords(buffer, buffer.Length, capped, 100, out var records, out var full, out _));
                 Assert.Equal(1, records);
                 Assert.True(full);   // the second record would pass the budget: stop at a whole record
             }
@@ -302,8 +302,26 @@ namespace Foton.Tests
             BitConverter.GetBytes(0x7FFFFFF8).CopyTo(corrupt, 8);
             using (var none = new MemoryStream())
             {
-                Assert.Equal(0, UsnJournal.WriteRecords(corrupt, corrupt.Length, none, long.MaxValue, out var records, out var full));
+                Assert.Equal(0, UsnJournal.WriteRecords(corrupt, corrupt.Length, none, long.MaxValue, out var records, out var full, out _));
                 Assert.Equal(0, records);
+                Assert.False(full);
+            }
+
+            // A capped export ends at the pass-1 snapshot: records at or past the stop USN (V2 at offset 24, V3 at 40) are not written.
+            var snap = new byte[8 + 64 + 80];
+            BitConverter.GetBytes(64).CopyTo(snap, 8);
+            BitConverter.GetBytes((ushort)2).CopyTo(snap, 12);
+            BitConverter.GetBytes(1000L).CopyTo(snap, 8 + 24);
+            BitConverter.GetBytes(80).CopyTo(snap, 72);
+            BitConverter.GetBytes((ushort)3).CopyTo(snap, 76);
+            BitConverter.GetBytes(2000L).CopyTo(snap, 72 + 40);
+            Assert.Equal(1000, UsnJournal.RecordUsn(snap, 8));
+            Assert.Equal(2000, UsnJournal.RecordUsn(snap, 72));
+            using (var upTo = new MemoryStream())
+            {
+                Assert.Equal(64, UsnJournal.WriteRecords(snap, snap.Length, upTo, long.MaxValue, out var records, out var full, out var stopped, 1500));
+                Assert.Equal(1, records);
+                Assert.True(stopped);
                 Assert.False(full);
             }
 
