@@ -121,16 +121,29 @@ namespace Foton.Baseline.Capture
             "mmc.exe", "netsh.exe", "taskhostw.exe",
         };
 
+        /// <summary>
+        /// Where each system binary is looked for. explorer.exe lives in the Windows directory (1.38.x probed System32 and
+        /// never recorded it). pwsh.exe is PowerShell 7's MSI/ZIP install under Program Files\PowerShell\7 (before 1.18.0
+        /// it was probed in System32, where it never is); preview builds, the Store package, and custom folders are not
+        /// looked for, so a host with only those has no pwsh.exe row.
+        /// </summary>
+        internal static IEnumerable<string> SystemBinaryPaths(string windowsDir, string programFilesDir)
+        {
+            var system32 = Path.Combine(windowsDir, "System32");
+            foreach (var n in SystemBinaries)
+                yield return n == "explorer.exe" ? Path.Combine(windowsDir, n)
+                    : n == "pwsh.exe" ? Path.Combine(programFilesDir, "PowerShell", "7", n)
+                    : Path.Combine(system32, n);
+        }
+
         public static Provider SystemBinary => new Provider
         {
             RecordType = "SystemBinary", IdentityFields = new[] { "Name" }, ComparedFields = new[] { "Sha256", "Length" },
-            FalsePositives = "Patch Tuesday and servicing stack replace these binaries. Missing optional files (pwsh.exe) appear as Added when first installed, not as FileNotFound rows.",
+            FalsePositives = "Patch Tuesday and servicing stack replace these binaries; PowerShell 7 updates replace pwsh.exe. Missing optional files (pwsh.exe) appear as Added when first installed, not as FileNotFound rows.",
             SortKeys = new[] { "Name" },
             Collect = ctx =>
             {
-                var root = Path.Combine(HostInfo.WindowsDir, "System32");
-                // explorer.exe lives in the Windows directory; 1.38.x probed System32 for it and never recorded it.
-                return SystemBinaries.Select(n => Path.Combine(n == "explorer.exe" ? HostInfo.WindowsDir : root, n)).Where(File.Exists).Select(p =>
+                return SystemBinaryPaths(HostInfo.WindowsDir, HostInfo.ProgramFilesDir).Where(File.Exists).Select(p =>
                 {
                     string len;
                     try { len = new FileInfo(p).Length.ToString(System.Globalization.CultureInfo.InvariantCulture); } catch (Exception) { len = ""; }

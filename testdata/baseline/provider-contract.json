@@ -470,7 +470,7 @@
         "SortKeys":  [
                          "Name"
                      ],
-        "FalsePositives":  "Patch Tuesday and servicing stack replace these binaries. Missing optional files (pwsh.exe) appear as Added when first installed, not as FileNotFound rows."
+        "FalsePositives":  "Patch Tuesday and servicing stack replace these binaries; PowerShell 7 updates replace pwsh.exe. Missing optional files (pwsh.exe) appear as Added when first installed, not as FileNotFound rows."
     },
     {
         "RecordType":  "TimeProvider",

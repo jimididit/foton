@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Foton.Baseline.Capture;
 using Foton.Baseline.Compare;
 using Foton.Core;
 using Xunit;
@@ -126,6 +128,27 @@ namespace Foton.Tests
             }
             Assert.Empty(BaselineSchema.FieldsNotComparable("1.17.0", "1.17.0", "Service"));
             Assert.Empty(BaselineSchema.FieldsNotComparable("1.14.0", "1.17.0", "Driver"));
+        }
+
+        [Fact]
+        public void Schema_1_18_is_comparable_and_explains_the_pwsh_row()
+        {
+            Assert.True(BaselineSchema.CanCompare("1.14.0", "1.18.0"));
+            Assert.True(BaselineSchema.CanCompare("1.18.0", "1.17.0"));
+            Assert.Contains("pwsh.exe", BaselineSchema.CrossVersionNote("1.17.0", "1.18.0"));
+            Assert.DoesNotContain("pwsh.exe", BaselineSchema.CrossVersionNote("1.16.0", "1.17.0"));
+            Assert.Empty(BaselineSchema.FieldsNotComparable("1.17.0", "1.18.0", "SystemBinary"));
+        }
+
+        [Fact]
+        public void System_binaries_are_looked_for_where_they_install()
+        {
+            var paths = OtherProviders.SystemBinaryPaths(@"C:\Windows", @"C:\Program Files").ToList();
+            Assert.Contains(@"C:\Program Files\PowerShell\7\pwsh.exe", paths);
+            Assert.Contains(@"C:\Windows\explorer.exe", paths);
+            Assert.Contains(@"C:\Windows\System32\lsass.exe", paths);
+            Assert.DoesNotContain(@"C:\Windows\System32\pwsh.exe", paths);
+            Assert.Equal(paths.Count, paths.Select(System.IO.Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).Count());   // Name stays a unique identity
         }
 
         [Fact]

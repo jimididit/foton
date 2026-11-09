@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.4.0] - 2026-11-09
+
+### Fixed
+- Baselines never recorded `pwsh.exe`: the SystemBinary provider looked for it in System32, but PowerShell 7 installs under `Program Files\PowerShell\7`. It is now read from there. Baseline schema 1.18.0; Compare still accepts 1.14.0 and later baselines and explains that `pwsh.exe` shows as Added against an older one. Preview builds, the Microsoft Store package, and custom install folders are not looked for. This was the last open item from the 1.38.x defects found during the port.
+
 ## [2.3.0] - 2026-11-09
 
 ### Changed
