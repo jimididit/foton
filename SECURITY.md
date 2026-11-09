@@ -40,7 +40,7 @@ You should receive an acknowledgement within a few business days.
 
 Release executables are **not Authenticode-signed** yet, so Windows SmartScreen may warn on first run. Trust comes from two checks that need no certificate:
 
-- `SHA256SUMS.txt` on each release lists the SHA-256 of every asset.
-- Each asset carries a GitHub build provenance attestation. With the optional [GitHub CLI](https://cli.github.com/), `gh attestation verify <file> --repo jimididit/foton` proves it was built by this repository's release workflow from a specific commit.
+- `SHA256SUMS.txt` on each release lists the SHA-256 of every asset. It catches a corrupted or swapped download, but it is published on the same release page as the files, so on its own it does not prove who built them.
+- Each asset carries a GitHub build provenance attestation. With the [GitHub CLI](https://cli.github.com/), `gh attestation verify <file> --repo jimididit/foton` proves it was built by this repository's release workflow from a specific commit.
 
 [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md#1-download-and-verify) has paste-ready commands for both checks. After they pass, `Unblock-File` removes the downloaded file's Mark-of-the-Web. Authenticode signing is planned once Foton sees wider public use; this document will be updated when it ships. The 1.38.x scripts and their ExecutionPolicy guidance are documented in the [1.38.2 operator guide](https://github.com/jimididit/foton/blob/v1.38.2/legacy/powershell/release-docs/docs/USAGE.md).

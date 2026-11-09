@@ -43,13 +43,15 @@ You should see three `OK` lines. A file that does not match is deleted, so it ca
 Set-Location (Join-Path $env:USERPROFILE 'Foton')
 ```
 
-**Optional: prove the build came from this repository.** If you have the [GitHub CLI](https://cli.github.com/) (`gh`) and are signed in, this checks the build provenance attestation (where and from which commit GitHub built each file):
+**What the hash check proves, and what it does not.** It proves each file matches the `SHA256SUMS.txt` published with the same release, so a corrupted or swapped download is caught. It cannot catch someone who replaced both the files and `SHA256SUMS.txt` on the release page, because both come from the same place.
+
+**Prove the build came from this repository (recommended for casework).** The build provenance attestation is signed by GitHub and names the repository, workflow, and commit that built each file. Checking it needs the [GitHub CLI](https://cli.github.com/) (`gh`), signed in with `gh auth login`:
 
 ```powershell
 Get-ChildItem *.exe | ForEach-Object { gh attestation verify $_.Name --repo jimididit/foton }
 ```
 
-You do not need `gh` to use Foton. The hash check above is enough to know the files are the ones published.
+Each file should report a successful verification. If you cannot install `gh`, Foton still runs; record in your case notes that only the hash was checked.
 
 **Windows SmartScreen or antivirus.** The executables are not code-signed yet, so Windows may warn when one runs from File Explorer; running them from PowerShell as shown here avoids that prompt. Security products sometimes flag forensic tools, because they read the same places attackers do. See [If antivirus blocks the collector](USAGE.md#if-antivirus-blocks-the-collector); never modify the executable to get past a scanner.
 
@@ -163,7 +165,7 @@ The comparison shows what changed between the two snapshots. It does not show wh
 | `Cannot create the default output folder C:\Foton\Cases` | This account may not create folders there (or another account already created it). Add `-OutputPath` with a folder you can write to. |
 | `Access to the path ... is denied` when opening `C:\Foton\Cases` | The case was collected by a different account. Open PowerShell as Administrator, or as that account. |
 | The report says "Standard user - reduced coverage" | PowerShell was not running as Administrator. Collect again from an Administrator window for full coverage. |
-| `gh` is not recognized | The GitHub CLI is optional. Skip the attestation step, or install it from [cli.github.com](https://cli.github.com/). |
+| `gh` is not recognized | The GitHub CLI is not installed. Install it from [cli.github.com](https://cli.github.com/) and run `gh auth login`, or skip the attestation check and note in your case notes that only the hash was checked. |
 | Antivirus quarantined `foton-collect.exe` | See [If antivirus blocks the collector](USAGE.md#if-antivirus-blocks-the-collector). |
 
 Every switch, verb, and output is in [USAGE.md](USAGE.md).
