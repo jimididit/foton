@@ -98,12 +98,13 @@ namespace Foton.Collect
 
         /// <summary>Copy-FotonCappedHostFiles: newest-first files matching a filter in one directory (Prefetch).</summary>
         public static List<CopyRow> CappedDirectory(string sourceDirectory, string filter, string destinationDirectory, string packageRelativeDirectory,
-            bool skipHashing, int maxFiles = 1024, long maxTotalBytes = 83886080)
+            bool skipHashing, int maxFiles = 1024, long maxTotalBytes = 83886080,
+            string missingNote = "Source directory not found. Prefetch is often disabled or the token cannot see it.")
         {
             var rows = new List<CopyRow>();
             if (!Hashing.IsLocalPath(sourceDirectory) || !Directory.Exists(sourceDirectory))
             {
-                rows.Add(new CopyRow { SourcePath = sourceDirectory, Status = "Missing", Note = "Source directory not found. Prefetch is often disabled or the token cannot see it." });
+                rows.Add(new CopyRow { SourcePath = sourceDirectory, Status = "Missing", Note = missingNote });
                 return rows;
             }
             FileInfo[] files;

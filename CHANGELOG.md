@@ -8,6 +8,7 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 
 ### Fixed
 - Baselines never recorded `pwsh.exe`: the SystemBinary provider looked for it in System32, but PowerShell 7 installs under `Program Files\PowerShell\7`. It is now read from there. Baseline schema 1.18.0; Compare still accepts 1.14.0 and later baselines and explains that `pwsh.exe` shows as Added against an older one. Preview builds, the Microsoft Store package, and custom install folders are not looked for. This was the last open item from the 1.38.x defects found during the port.
+- Collect never copied SRUM. It looked for `SRUDB.dat` under `ProgramData\Microsoft\Windows\SRUM`, a folder that does not exist (the path came from 1.38.x), recorded it as Missing, and marked the task Success. It now copies the whole `System32\sru` folder: the database plus its ESE logs and checkpoint, which do not share its name and which a parser needs to read a database copied while in use. The cap rises from 100 MiB to 1 GiB, because a busy host's database passes 100 MiB.
 
 ## [2.3.0] - 2026-11-09
 
