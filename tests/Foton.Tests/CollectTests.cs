@@ -114,6 +114,9 @@ namespace Foton.Tests
                 Assert.Equal("NotSigned", Foton.Win.Authenticode.Check(t.File("plain.ps1")).Status);
                 Assert.Equal("UnknownError", Foton.Win.Authenticode.Check(t.File("plain.txt")).Status);
                 Assert.Equal("FileNotFound", Foton.Win.Authenticode.Check(t.File("missing.sys")).Status);
+                // The no-format shortcut is decided by content, not extension: a signed binary renamed .lnk still verifies.
+                File.Copy(Path.Combine(sys, "notepad.exe"), t.File("renamed.lnk"));
+                Assert.Equal("Valid", Foton.Win.Authenticode.Check(t.File("renamed.lnk")).Status);
             }
             Assert.Equal("Unknown", Foton.Win.Authenticode.Check("").Status);
             Assert.Equal(new[] { "NotSigned", "UnknownError", "NotSigned", "HashMismatch", "HashMismatch", "Valid", "Valid", "NotTrusted", "UnknownError" },
