@@ -17,6 +17,12 @@ namespace Foton.Core
         public string Hostname { get; set; } = "";
         public string CapturedUtc { get; set; } = "";
         public bool Elevated { get; set; }
+        /// <summary>
+        /// -LoadUserHives was in effect (elevated): hives of users not signed in were mounted, so their per-user rows
+        /// are present. Older readers ignore these header fields; a baseline without them reads as false and 0.
+        /// </summary>
+        public bool LoadUserHives { get; set; }
+        public int UserHivesMounted { get; set; }
         public string PayloadSha256 { get; set; } = "";
         public string Note { get; set; } = "";
     }
@@ -103,6 +109,8 @@ namespace Foton.Core
                 doc.Header.Hostname = Str(hd, "Hostname");
                 doc.Header.CapturedUtc = Str(hd, "CapturedUtc");
                 doc.Header.Elevated = hd.TryGetValue("Elevated", out var e) && e is bool b && b;
+                doc.Header.LoadUserHives = hd.TryGetValue("LoadUserHives", out var lh) && lh is bool lb && lb;
+                doc.Header.UserHivesMounted = Count(hd, "UserHivesMounted");
                 doc.Header.PayloadSha256 = Str(hd, "PayloadSha256");
                 doc.Header.Note = Str(hd, "Note");
             }
@@ -135,6 +143,16 @@ namespace Foton.Core
             : new[] { v };
 
         static string Str(Dictionary<string, object> d, string key) => d.TryGetValue(key, out var v) ? PsString(v) : "";
+
+        /// <summary>
+        /// A non-negative whole count whatever number type the parser boxed it as (int, long, decimal such as 2.0, or a
+        /// string); anything else, including a fraction or a negative, reads as 0.
+        /// </summary>
+        static int Count(Dictionary<string, object> d, string key) =>
+            d.TryGetValue(key, out var v) && v != null && !(v is bool)
+            && decimal.TryParse(PsString(v), NumberStyles.Float, CultureInfo.InvariantCulture, out var n)
+            && n >= 0 && n <= int.MaxValue && n == decimal.Truncate(n)
+                ? (int)n : 0;
 
         /// <summary>
         /// A value as PowerShell's [string] cast renders it, which is what 1.38.x compared and keyed on:

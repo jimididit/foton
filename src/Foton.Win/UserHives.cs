@@ -4,15 +4,15 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Foton.Core;
-using Foton.Win;
 
-namespace Foton.Collect
+namespace Foton.Win
 {
     /// <summary>
-    /// -LoadUserHives (Mount-FotonOfflineUserHive / Dismount-FotonOfflineUserHive): loads NTUSER.DAT for local
-    /// profiles whose hive is not loaded, so per-user persistence keys can be read. This WRITES to the registry; the
-    /// methodology disclosure says so, and Unload always runs in a finally block. reg.exe is used as in 1.38.x, so the
-    /// footprint (an in-box process that enables its own restore privilege) is unchanged.
+    /// -LoadUserHives for Collect and Baseline (Mount-FotonOfflineUserHive / Dismount-FotonOfflineUserHive): loads
+    /// NTUSER.DAT for local profiles whose hive is not loaded, so per-user keys can be read. This WRITES to the
+    /// registry; each tool discloses it, and Unload always runs in a finally block. reg.exe is used as in 1.38.x, so
+    /// the footprint (an in-box process that enables its own restore privilege) is unchanged. HostInfo.HiveRoots maps
+    /// a Foton_&lt;SID&gt; mount back to its SID, so a mounted user's rows match a signed-in user's.
     /// </summary>
     public static class UserHives
     {

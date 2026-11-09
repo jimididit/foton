@@ -195,5 +195,18 @@ namespace Foton.Tests
                 Assert.Equal(r.Document.Header.PayloadSha256, reloaded.Header.PayloadSha256);
             }
         }
+
+        [Fact]
+        public void LoadUserHives_is_ignored_without_elevation_and_nothing_is_mounted()
+        {
+            var output = new StringWriter();
+            var log = new StatusLog(output);
+            var s = new FotonSession(new SessionOptions { LoadUserHives = true }, DateTime.UtcNow, Environment.MachineName, HostInfo.Account(), false, log);
+            var r = BaselineCapture.Capture(s);
+            Assert.False(r.Document.Header.LoadUserHives);
+            Assert.Equal(0, r.Document.Header.UserHivesMounted);
+            Assert.False(s.LoadUserHivesActive);
+            Assert.Contains("LoadUserHives ignored: mounting NTUSER.DAT requires elevation", output.ToString());
+        }
     }
 }

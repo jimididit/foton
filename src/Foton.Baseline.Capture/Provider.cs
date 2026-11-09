@@ -16,7 +16,7 @@ namespace Foton.Baseline.Capture
         List<UserHive>? _hives;
         List<UserProfile>? _profiles;
 
-        /// <summary>Loaded user hives (no hive is mounted by a baseline capture).</summary>
+        /// <summary>Loaded user hives, including Foton_&lt;SID&gt; mounts from -LoadUserHives (keyed by the user's SID).</summary>
         public List<UserHive> Hives => _hives ?? (_hives = HostInfo.HiveRoots(Elevated));
 
         public List<UserProfile> Profiles => _profiles ?? (_profiles = HostInfo.Profiles(Elevated));

@@ -110,6 +110,7 @@ Writes `FotonBaseline_<HOSTNAME>_<UTC>Z\` with `baseline.json`, `coverage.json`,
 | `-Path <file.json>` | Bare snapshot JSON instead of a package (HTML beside it); its folder is created if needed |
 | `-NoZip`, `-NoHtml` | Skip the ZIP or the HTML |
 | `-RequireAdministrator` | Exit if not elevated |
+| `-LoadUserHives` | Load NTUSER.DAT for users not logged on, so their per-user rows are captured (elevated only; unloaded in `finally`) |
 | `-Version` | Print version and schemas |
 
 Run one of these:
@@ -118,7 +119,10 @@ Run one of these:
 .\foton-baseline.exe                                                            # package in C:\Foton\Baselines
 .\foton-baseline.exe -NoZip                                                     # folder only
 .\foton-baseline.exe -Path "\path\to\snapshot.json"                             # bare JSON
+.\foton-baseline.exe -LoadUserHives                                             # include users not signed in
 ```
+
+Without `-LoadUserHives`, a baseline sees only the users signed in at that moment. Their per-user rows (UserAutorun, StartupApproved, ProxyConfig, CmdAutoRun) come and go between baselines as people sign in and out. `-LoadUserHives` mounts each other user's `NTUSER.DAT` under `HKEY_USERS` for the capture and unmounts it afterwards. That is a registry write on the host, recorded in the baseline header and log. Use the same choice for every baseline you plan to compare; Compare warns when only one side used it.
 
 A baseline taken after an incident is a picture of **that** state. Compare proves change between two observations, not when or who.
 

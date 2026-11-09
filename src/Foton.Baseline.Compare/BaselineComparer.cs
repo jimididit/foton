@@ -27,6 +27,8 @@ namespace Foton.Baseline.Compare
         public BaselineHeader DifferenceHeader { get; internal set; } = new BaselineHeader();
         /// <summary>Set when two different but compatible schemas were compared.</summary>
         public string? SchemaNote { get; internal set; }
+        /// <summary>Set when only one baseline mounted the hives of users who were not signed in (-LoadUserHives).</summary>
+        public string? UserHivesNote { get; internal set; }
         /// <summary>False when a baseline's records no longer match its own PayloadSha256 (edited after capture).</summary>
         public bool ReferencePayloadIntact { get; internal set; }
         public bool DifferencePayloadIntact { get; internal set; }
@@ -56,6 +58,7 @@ namespace Foton.Baseline.Compare
                 ReferenceHeader = reference.Header,
                 DifferenceHeader = difference.Header,
                 SchemaNote = BaselineSchema.CrossVersionNote(rv, dv),
+                UserHivesNote = UserHivesCoverage(reference.Header, difference.Header),
                 ReferencePayloadIntact = reference.PayloadMatches(),
                 DifferencePayloadIntact = difference.PayloadMatches(),
             };
@@ -102,6 +105,18 @@ namespace Foton.Baseline.Compare
             foreach (var c in result.Changes)
                 result.Findings.Add(FindingFor(c, result.Mode, reference, difference, differenceFileName));
             return result;
+        }
+
+        /// <summary>
+        /// A user who was not signed in is only visible to a capture that mounted their hive, so per-user rows for that
+        /// user appear or vanish between a -LoadUserHives baseline and one without it.
+        /// </summary>
+        static string? UserHivesCoverage(BaselineHeader reference, BaselineHeader difference)
+        {
+            if (reference.LoadUserHives == difference.LoadUserHives) return null;
+            var with = reference.LoadUserHives ? "reference" : "difference";
+            var change = reference.LoadUserHives ? "Removed" : "Added";
+            return $"Only the {with} baseline mounted the registry hives of users who were not signed in (-LoadUserHives), so per-user rows (UserAutorun, StartupApproved, ProxyConfig, CmdAutoRun) for those users can show as {change}. That is a coverage difference, not a host change; capture both baselines with the same switch.";
         }
 
         sealed class KeyedRecord { public string Identity = ""; public Dictionary<string, object?> Record = null!; }
@@ -186,6 +201,7 @@ namespace Foton.Baseline.Compare
                 result.DiffCsvPath = csv;
             }
             if (result.SchemaNote != null) log.Write(result.SchemaNote, StatusLevel.Warn);
+            if (result.UserHivesNote != null) log.Write(result.UserHivesNote, StatusLevel.Warn);
             if (!result.ReferencePayloadIntact) log.Write($"Reference baseline records do not match its PayloadSha256: edited after capture, or a placeholder hash ({Path.GetFileName(refFile)}).", StatusLevel.Warn);
             if (!result.DifferencePayloadIntact) log.Write($"Difference baseline records do not match its PayloadSha256: edited after capture, or a placeholder hash ({Path.GetFileName(difFile)}).", StatusLevel.Warn);
             log.Write($"Baseline diff ({result.Mode}): {result.Changes.Count} change(s), {result.Findings.Count} finding(s)", StatusLevel.Good);
