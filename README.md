@@ -10,7 +10,7 @@ Windows DFIR, baseline, and security-audit toolkit. Capture a host into a hashed
 
 Windows 10 / Server 2016 or newer; nothing to install.
 
-1. Download [foton-collect.exe](https://github.com/jimididit/foton/releases/latest/download/foton-collect.exe) from the latest release. If the browser says it "isn't commonly downloaded", choose **Keep**.
+1. Download [foton-collect.exe](https://github.com/jimididit/foton/releases/latest/download/foton-collect.exe) from the latest release. If the browser says it "isn't commonly downloaded", choose **Keep**. For casework, [verify the download](docs/GETTING-STARTED.md#2-verify-your-download) before the next step.
 2. Open PowerShell as Administrator (Start menu, type `PowerShell`, right-click **Windows PowerShell**, **Run as administrator**) and run:
 
 ```powershell
@@ -21,7 +21,7 @@ explorer C:\Foton\Cases
 
 3. Open the new `Foton_...` folder and double-click `Foton_Report.html`.
 
-For casework, [verify the download](docs/GETTING-STARTED.md#2-verify-your-download) before running it. To analyze the package on another computer with `foton.exe`, or to take baselines, follow [Getting started](docs/GETTING-STARTED.md).
+To analyze the package on another computer with `foton.exe`, or to take baselines, follow [Getting started](docs/GETTING-STARTED.md).
 
 ## Three executables
 

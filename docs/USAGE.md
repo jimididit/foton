@@ -55,10 +55,10 @@ A file that does not match is deleted so it cannot be run by mistake. The hashes
 `gh attestation verify` (needs the [GitHub CLI](https://cli.github.com/)) proves each file was built by this repository's release workflow from a specific commit. Run it for casework; if you cannot, record that only the hash was checked:
 
 ```powershell
-Get-ChildItem *.exe | ForEach-Object { gh attestation verify $_.Name --repo jimididit/foton }
+Get-Item foton-collect.exe, foton-baseline.exe, foton.exe -ErrorAction SilentlyContinue | ForEach-Object { gh attestation verify $_.Name --repo jimididit/foton }
 ```
 
-A browser marks downloaded files as coming from the internet, which makes SmartScreen warn when you start one from File Explorer (running it from PowerShell is not affected). After both checks pass, `Get-ChildItem *.exe | Unblock-File` removes that mark. Files downloaded with `Invoke-WebRequest` are not marked.
+A browser marks downloaded files as coming from the internet, which makes SmartScreen warn when you start one from File Explorer (running it from PowerShell is not affected). After both checks pass, `Get-Item foton-collect.exe, foton-baseline.exe, foton.exe -ErrorAction SilentlyContinue | Unblock-File` removes that mark from the Foton files only (not from anything else in the folder). Files downloaded with `Invoke-WebRequest` are not marked.
 
 Record the collector's hash in the case notes so the report names the exact build that ran.
 
