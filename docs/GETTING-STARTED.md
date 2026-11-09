@@ -81,12 +81,15 @@ $zip = Get-ChildItem .\Foton_*.zip | Sort-Object LastWriteTime | Select-Object -
 .\foton.exe package $zip.FullName
 ```
 
-`foton package` re-hashes every file against the list made at collection time. When it reports no changed or missing files, extract the ZIP and remember the folder:
+`foton package` re-hashes every file against the list made at collection time. When it reports no changed or missing files, extract the ZIP into a new folder of its own and remember the case folder inside it:
 
 ```powershell
-Expand-Archive $zip.FullName -DestinationPath . -Force
-$case = Join-Path $PWD $zip.BaseName
+$dest = Join-Path $PWD ($zip.BaseName + '-extracted')
+Expand-Archive $zip.FullName -DestinationPath $dest
+$case = Join-Path $dest $zip.BaseName
 ```
+
+The ZIP came from the endpoint, so it is extracted only into that new folder and never over existing files; a crafted ZIP cannot replace `foton.exe` beside it. If the folder already exists from an earlier try, delete it first.
 
 If `foton package` reports a problem, do not analyze that copy: copy the package from the endpoint again, and if it still fails, record in your case notes that the package changed after collection.
 
