@@ -277,11 +277,23 @@ namespace Foton.Tests
         [Fact]
         public void Usn_records_are_written_whole_and_a_malformed_record_ends_the_batch()
         {
+            // A record header: RecordLength, MajorVersion, USN, and FileNameLength / FileNameOffset at the end of the
+            // fixed header (60 bytes in V2, 76 in V3), with the name placed right after it.
+            void Rec(byte[] b, int at, int length, ushort major, long usn, ushort nameLength)
+            {
+                int header = major == 3 ? 76 : 60;
+                BitConverter.GetBytes(length).CopyTo(b, at);
+                BitConverter.GetBytes(major).CopyTo(b, at + 4);
+                BitConverter.GetBytes(usn).CopyTo(b, at + (major == 3 ? 40 : 24));
+                BitConverter.GetBytes(nameLength).CopyTo(b, at + header - 4);
+                BitConverter.GetBytes((ushort)header).CopyTo(b, at + header - 2);
+            }
+
             // FSCTL_READ_USN_JOURNAL output: an 8-byte next USN, then records whose first DWORD is RecordLength.
             var buffer = new byte[8 + 64 + 72 + 8];
             BitConverter.GetBytes(4096L).CopyTo(buffer, 0);
-            BitConverter.GetBytes(64).CopyTo(buffer, 8);
-            BitConverter.GetBytes(72).CopyTo(buffer, 72);
+            Rec(buffer, 8, 64, 2, 10, 4);
+            Rec(buffer, 72, 72, 2, 20, 12);
             BitConverter.GetBytes(3).CopyTo(buffer, 144);   // malformed: shorter than a record header
             using (var all = new MemoryStream())
             {
@@ -309,12 +321,8 @@ namespace Foton.Tests
 
             // A capped export ends at the pass-1 snapshot: records at or past the stop USN (V2 at offset 24, V3 at 40) are not written.
             var snap = new byte[8 + 64 + 80];
-            BitConverter.GetBytes(64).CopyTo(snap, 8);
-            BitConverter.GetBytes((ushort)2).CopyTo(snap, 12);
-            BitConverter.GetBytes(1000L).CopyTo(snap, 8 + 24);
-            BitConverter.GetBytes(80).CopyTo(snap, 72);
-            BitConverter.GetBytes((ushort)3).CopyTo(snap, 76);
-            BitConverter.GetBytes(2000L).CopyTo(snap, 72 + 40);
+            Rec(snap, 8, 64, 2, 1000, 4);
+            Rec(snap, 72, 80, 3, 2000, 4);
             Assert.Equal(1000, UsnJournal.RecordUsn(snap, 8));
             Assert.Equal(2000, UsnJournal.RecordUsn(snap, 72));
             using (var upTo = new MemoryStream())
@@ -324,6 +332,20 @@ namespace Foton.Tests
                 Assert.True(stopped);
                 Assert.False(full);
             }
+
+            // Per-version header sizes and a file name inside the record: a V3 record shorter than its 76-byte header,
+            // a name running past the record, a name inside the header, and an unknown major version are all refused.
+            var shapes = new byte[8 + 96];
+            Rec(shapes, 8, 64, 3, 1, 0);
+            Assert.False(UsnJournal.WellFormed(shapes, 8, 64, shapes.Length));
+            Rec(shapes, 8, 72, 2, 1, 16);
+            Assert.False(UsnJournal.WellFormed(shapes, 8, 72, shapes.Length));
+            Rec(shapes, 8, 72, 2, 1, 8);
+            Assert.True(UsnJournal.WellFormed(shapes, 8, 72, shapes.Length));
+            BitConverter.GetBytes((ushort)40).CopyTo(shapes, 8 + 58);
+            Assert.False(UsnJournal.WellFormed(shapes, 8, 72, shapes.Length));
+            Rec(shapes, 8, 72, 4, 1, 8);
+            Assert.False(UsnJournal.WellFormed(shapes, 8, 72, shapes.Length));
 
             // Capped start: the earliest batch from which the newest batches fit, counting record bytes (not USN span,
             // which can be larger), and the end when not even the newest batch fits.

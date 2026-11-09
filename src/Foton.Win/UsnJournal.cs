@@ -215,10 +215,10 @@ namespace Foton.Win
             stopped = false;
             int offset = 8;
             long written = 0;
-            while (offset + 4 <= returned)
+            while (offset + 8 <= returned)
             {
                 var length = BitConverter.ToInt32(buffer, offset);
-                if (length < 60 || length % 8 != 0 || length > returned - offset) break;
+                if (!WellFormed(buffer, offset, length, returned)) break;
                 if (RecordUsn(buffer, offset) >= stopUsn) { stopped = true; break; }
                 if (written + length > budget) { full = true; break; }
                 destination.Write(buffer, offset, length);
@@ -229,16 +229,28 @@ namespace Foton.Win
             return written;
         }
 
+        // Fixed header size, and where FileNameLength / FileNameOffset sit, per record version: USN_RECORD_V2 has 64-bit
+        // file references (60-byte header), V3 128-bit ones (76 bytes). READ_USN_JOURNAL_DATA_V0 asks for V2; V3 appears
+        // only on volumes with 128-bit file IDs. Anything else is not trusted.
+        const int V2Header = 60, V3Header = 76;
+
         /// <summary>
-        /// The record's USN: after two 64-bit file references in USN_RECORD_V2 (offset 24), two 128-bit ones in V3
-        /// (offset 40). Another major version reads as long.MinValue, so it is never past a stop USN.
+        /// A whole V2 or V3 record: 8-byte aligned, inside the data, at least its version's header, and with its file name
+        /// inside the record.
         /// </summary>
-        internal static long RecordUsn(byte[] buffer, int offset)
+        internal static bool WellFormed(byte[] buffer, int offset, int length, int returned)
         {
+            if (length % 8 != 0 || length < V2Header || length > returned - offset) return false;
             var major = BitConverter.ToUInt16(buffer, offset + 4);
-            return major == 2 ? BitConverter.ToInt64(buffer, offset + 24)
-                : major == 3 ? BitConverter.ToInt64(buffer, offset + 40)
-                : long.MinValue;
+            int header = major == 2 ? V2Header : major == 3 ? V3Header : 0;
+            if (header == 0 || length < header) return false;
+            int nameLength = BitConverter.ToUInt16(buffer, offset + header - 4);
+            int nameOffset = BitConverter.ToUInt16(buffer, offset + header - 2);
+            return nameOffset >= header && nameOffset + nameLength <= length;
         }
+
+        /// <summary>The record's USN: offset 24 in USN_RECORD_V2 (after two 64-bit file references), 40 in V3 (two 128-bit ones).</summary>
+        internal static long RecordUsn(byte[] buffer, int offset) =>
+            BitConverter.ToInt64(buffer, offset + (BitConverter.ToUInt16(buffer, offset + 4) == 3 ? 40 : 24));
     }
 }
