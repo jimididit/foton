@@ -121,9 +121,11 @@ namespace Foton.Analyze
                 // Foton_Report.html in the case root so relative artifact links resolve; beside a ZIP otherwise.
                 log.Write("Building HTML overview report", StatusLevel.Step);
                 run.ReportPath = pkg.Kind == PackageKind.Zip ? BesideZip(pkg, "_Report.html") : Path.Combine(root, TriageReport.FileName);
+                var custody = ChainOfCustody.ReadHeader(root);
                 TriageReport.Write(new TriageReportInput
                 {
                     Data = ctx.Data, Findings = ctx.Findings, Manifest = pkg.Manifest, Errors = pkg.Errors, CaseRoot = root,
+                    CaseNumber = custody.CaseNumber, Examiner = custody.Examiner,
                     CollectedUtc = pkg.StartTimeUtc, Version = reportVersion ?? FotonVersion.Product, EventLogDays = ctx.EventLogDays,
                     FromZip = pkg.Kind == PackageKind.Zip,
                 }, run.ReportPath);
@@ -151,9 +153,11 @@ namespace Foton.Analyze
             log.Write($"Findings generated: {ctx.Findings.Count}", StatusLevel.Good);
             log.Write("Building HTML overview report", StatusLevel.Step);
             var report = Path.Combine(pkg.CaseRoot, TriageReport.FileName);
+            var custody = ChainOfCustody.ReadHeader(pkg.CaseRoot);
             TriageReport.Write(new TriageReportInput
             {
                 Data = ctx.Data, Findings = ctx.Findings, Manifest = pkg.Manifest, Errors = pkg.Errors, CaseRoot = pkg.CaseRoot,
+                CaseNumber = custody.CaseNumber, Examiner = custody.Examiner,
                 CollectedUtc = collectedUtc, Version = FotonVersion.Product, EventLogDays = eventLogDays,
             }, report);
             log.Write("Report written: " + report, StatusLevel.Good);

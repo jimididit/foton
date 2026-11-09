@@ -129,6 +129,16 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Report_shows_case_and_examiner_from_custody_encoded()
+        {
+            var html = TriageReport.Render(new TriageReportInput { CaseNumber = "CASE-0001", Examiner = "<b>A. Examiner</b>" });
+            Assert.Contains("<div><b>Case</b>CASE-0001</div>", html);
+            Assert.Contains("<div><b>Examiner</b>&lt;b&gt;A. Examiner&lt;/b&gt;</div>", html);
+            Assert.Contains("by &lt;b&gt;A. Examiner&lt;/b&gt; &middot;", html);
+            Assert.DoesNotContain("(not supplied)", html);
+        }
+
+        [Fact]
         public void Package_values_cannot_inject_markup_or_script_links_into_the_report()
         {
             var html = TriageReport.Render(new TriageReportInput

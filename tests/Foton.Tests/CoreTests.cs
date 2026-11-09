@@ -161,6 +161,28 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Custody_header_reads_back_case_and_examiner()
+        {
+            using (var t = new TempDir())
+            {
+                var s = Sessions.New(t.File("a"), options: new SessionOptions { CaseNumber = "CASE-0001", Examiner = "A. Examiner: IR" });
+                ChainOfCustody.Write(s, new CustodyFacts());
+                var h = ChainOfCustody.ReadHeader(s.CaseRoot);
+                Assert.Equal("CASE-0001", h.CaseNumber);
+                Assert.Equal("A. Examiner: IR", h.Examiner);   // only the first colon separates label and value
+
+                var none = Sessions.New(t.File("b"), options: new SessionOptions { Examiner = "" });
+                ChainOfCustody.Write(none, new CustodyFacts());
+                var empty = ChainOfCustody.ReadHeader(none.CaseRoot);
+                Assert.Null(empty.CaseNumber);   // written as "(not supplied)"
+                Assert.Null(empty.Examiner);
+
+                Assert.Null(ChainOfCustody.ReadHeader(t.File("no-such-case")).CaseNumber);
+                Assert.Null(ChainOfCustody.ReadHeader(null).Examiner);
+            }
+        }
+
+        [Fact]
         public void Custody_discloses_the_coverage_profile_and_hive_handling()
         {
             using (var t = new TempDir())
