@@ -42,21 +42,23 @@ They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is inst
 
 ```powershell
 $sums = @{}
-Get-Content .\SHA256SUMS.txt | ForEach-Object { $hash, $name = $_ -split '\s+', 2; $sums[$name] = $hash }
+Get-Content .\SHA256SUMS.txt | ForEach-Object { $hash, $name = $_ -split '\s+', 2; $sums[($name.Trim() -replace '^\*?(\./)?', '')] = $hash }
 foreach ($f in 'foton-collect.exe', 'foton-baseline.exe', 'foton.exe') {
     if (-not (Test-Path $f)) { continue }
-    if ($sums[$f] -and (Get-FileHash $f -Algorithm SHA256).Hash -eq $sums[$f]) { Unblock-File $f; "OK    $f" }
+    if ($sums[$f] -and (Get-FileHash $f -Algorithm SHA256).Hash -eq $sums[$f]) { "OK    $f" }
     else { Remove-Item $f; "FAIL  $f  (deleted: it does not match SHA256SUMS.txt)" }
 }
 ```
 
-Only files that match are unblocked; a file that does not match is deleted so it cannot be run by mistake. The hashes come from the same release as the files, so this catches a corrupted or swapped download but not a release whose files and hash list were both replaced.
+A file that does not match is deleted so it cannot be run by mistake. The hashes come from the same release as the files, so this catches a corrupted or swapped download but not a release whose files and hash list were both replaced.
 
 `gh attestation verify` (needs the [GitHub CLI](https://cli.github.com/)) proves each file was built by this repository's release workflow from a specific commit. Run it for casework; if you cannot, record that only the hash was checked:
 
 ```powershell
 Get-ChildItem *.exe | ForEach-Object { gh attestation verify $_.Name --repo jimididit/foton }
 ```
+
+A browser marks downloaded files as coming from the internet, which makes SmartScreen warn when you start one from File Explorer (running it from PowerShell is not affected). After both checks pass, `Get-ChildItem *.exe | Unblock-File` removes that mark. Files downloaded with `Invoke-WebRequest`, as in the guide, are not marked.
 
 Record the collector's hash in the case notes so the report names the exact build that ran.
 
