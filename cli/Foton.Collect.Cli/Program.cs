@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Foton.Collect;
 using Foton.Core;
+using Foton.Win;
 
 namespace Foton.Collect.Cli
 {
@@ -17,9 +18,10 @@ namespace Foton.Collect.Cli
         {
             var o = new SessionOptions
             {
-                OutputPath = DefaultOutputPath(),
+                OutputPath = OutputFolder.Default("Cases"),
                 Examiner = Environment.UserName,
             };
+            bool defaultOutput = true;
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
@@ -31,7 +33,7 @@ namespace Foton.Collect.Cli
                     foreach (var line in FotonVersion.Describe("foton-collect")) Console.WriteLine(line);
                     return 0;
                 }
-                if (Is("-OutputPath")) { var v = Next(); if (v == null) return Usage("-OutputPath needs a folder."); o.OutputPath = v; }
+                if (Is("-OutputPath")) { var v = Next(); if (v == null) return Usage("-OutputPath needs a folder."); o.OutputPath = v; defaultOutput = false; }
                 else if (Is("-CaseNumber")) { var v = Next(); if (v == null) return Usage("-CaseNumber needs a value."); o.CaseNumber = v; }
                 else if (Is("-Examiner")) { var v = Next(); if (v == null) return Usage("-Examiner needs a value."); o.Examiner = v; }
                 else if (Is("-EventLogDays")) { if (!Int(Next(), out var n)) return Usage("-EventLogDays needs a whole number of days."); o.EventLogDays = n; }
@@ -58,6 +60,7 @@ namespace Foton.Collect.Cli
                 log.WriteConsole("      Re-run from an elevated prompt, or omit -RequireAdministrator to collect with standard-user coverage.", ConsoleColor.Red);
                 return 1;
             }
+            if (defaultOutput && !OutputFolder.Prepare(o.OutputPath, log)) return 1;
             if (!s.IsElevated)
             {
                 log.WriteConsole("  [!] Standard-user coverage (not Administrator).", ConsoleColor.Yellow);
@@ -110,18 +113,6 @@ namespace Foton.Collect.Cli
 
         static bool Int(string? v, out int n) => int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out n) && n >= 0;
 
-        /// <summary>
-        /// The Desktop, as in 1.38.x. RMM sessions running as SYSTEM or a service account may have no Desktop folder,
-        /// so fall back to Desktop under the profile (created on write), then the working directory.
-        /// </summary>
-        static string DefaultOutputPath()
-        {
-            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            if (!string.IsNullOrEmpty(desktop)) return desktop;
-            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            return string.IsNullOrEmpty(profile) ? Directory.GetCurrentDirectory() : Path.Combine(profile, "Desktop");
-        }
-
         static int Usage(string error)
         {
             Console.Error.WriteLine(error);
@@ -130,6 +121,7 @@ namespace Foton.Collect.Cli
             Console.Error.WriteLine("                     [-LoadUserHives] [-IncludeFileTimeline] [-IncludeUsnJournal] [-Deep] [-NoZip]");
             Console.Error.WriteLine("                     [-RequireAdministrator]");
             Console.Error.WriteLine("       foton-collect -Version");
+            Console.Error.WriteLine("Default -OutputPath: " + OutputFolder.Default("Cases") + " (must be private to SYSTEM, Administrators, and this account)");
             return 1;
         }
     }

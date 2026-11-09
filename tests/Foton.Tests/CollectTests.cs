@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Foton.Analyze;
 using Foton.Collect;
 using Foton.Core;
@@ -268,6 +270,57 @@ namespace Foton.Tests
                 Assert.False(File.Exists(Path.Combine(t.Path, "escape.lnk")));
                 Assert.Equal(TaskStatus.Partial, CopyTaskStatus.Evaluate(rows).Status);
                 Assert.Equal("NoData", HostCopy.CappedList(new CopyItem[0], dest, "", false).Single().Status);
+            }
+        }
+
+        [Fact]
+        public void Default_output_is_a_Foton_folder_on_the_Windows_drive()
+        {
+            var root = Path.GetPathRoot(Environment.SystemDirectory)!;
+            Assert.Equal(Path.Combine(root, "Foton", "Cases"), OutputFolder.Default("Cases"));
+            Assert.Equal(Path.Combine(root, "Foton", "Baselines"), OutputFolder.Default("Baselines"));
+        }
+
+        [Fact]
+        public void Default_output_folders_are_created_private_and_existing_ones_are_checked()
+        {
+            using (var t = new TempDir())
+            {
+                var leaf = Path.Combine(t.Path, "Foton", "Cases");
+                Assert.Null(OutputFolder.EnsurePrivate(leaf, t.Path));
+                Assert.Null(OutputFolder.EnsurePrivate(leaf, t.Path));   // already private: still accepted
+                var mine = new[]
+                {
+                    new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+                    new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+                    WindowsIdentity.GetCurrent().User!,
+                };
+                foreach (var dir in new[] { Path.Combine(t.Path, "Foton"), leaf })
+                {
+                    var acl = Directory.GetAccessControl(dir);
+                    Assert.True(acl.AreAccessRulesProtected, dir + " still inherits from its parent");
+                    foreach (FileSystemAccessRule r in acl.GetAccessRules(true, true, typeof(SecurityIdentifier)))
+                        Assert.Contains((SecurityIdentifier)r.IdentityReference, mine);
+                }
+
+                // A folder someone else prepared (here: Users may read it) is refused and left as it was.
+                var open = Directory.CreateDirectory(Path.Combine(t.Path, "open")).FullName;
+                var sec = Directory.GetAccessControl(open);
+                sec.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
+                    FileSystemRights.ReadAndExecute, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+                Directory.SetAccessControl(open, sec);
+                var problem = OutputFolder.EnsurePrivate(Path.Combine(open, "Cases"), t.Path);
+                Assert.NotNull(problem);
+                Assert.Contains("gives access to", problem);
+                Assert.False(Directory.GetAccessControl(open).AreAccessRulesProtected);
+                Assert.False(Directory.Exists(Path.Combine(open, "Cases")));   // nothing created inside a refused folder
+
+                // A junction in the chain is refused even when its target is private.
+                var link = Path.Combine(t.Path, "link");
+                Exec.System32("cmd.exe", $"/c mklink /J \"{link}\" \"{Path.Combine(t.Path, "Foton")}\"", out var code, 30000);
+                Assert.Equal(0, code);
+                Assert.Contains("junction", OutputFolder.Problem(Path.Combine(link, "Cases"), t.Path));
+                Directory.Delete(link);
             }
         }
 
