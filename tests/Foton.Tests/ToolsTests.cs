@@ -245,7 +245,7 @@ namespace Foton.Tests
                 foreach (var f in new[] { "PECmd.exe", "LECmd.exe", @"EvtxeCmd\EvtxECmd.exe", @"RECmd\RECmd.exe" }) Write(t.File(@"EZTools\" + f), "x");
                 var root = t.File("tools");
                 var rows = ToolRegistry.Register("eztools", t.File("EZTools"), root);
-                Assert.Equal(8, rows.Count);
+                Assert.Equal(10, rows.Count);
                 Assert.Equal("Registered", rows.Single(r => r.Name == "EvtxECmd").Status);
                 Assert.Equal("NotFound", rows.Single(r => r.Name == "AmcacheParser").Status);
                 Assert.Equal("NotFound", rows.Single(r => r.Name == "SBECmd").Status);

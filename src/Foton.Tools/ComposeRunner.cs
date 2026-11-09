@@ -75,6 +75,8 @@ namespace Foton.Tools
             var hives = Path.Combine(root, fs, "hives");
             var hivesMachine = Path.Combine(hives, "machine");
             var hivesUsers = Path.Combine(hives, "users");
+            var srum = Path.Combine(root, fs, "srum");
+            var usn = Path.Combine(root, fs, "usn");
 
             List<string> Ez(string input, string output, string csvName) => new List<string> { "-d", input, "--csv", output, "--csvf", csvName };
             var jobs = new[]
@@ -113,6 +115,29 @@ namespace Foton.Tools
                 {
                     Tool = "SBECmd", Names = new[] { "SBECmd.exe", "SBECmd" }, NeedDir = hivesUsers,
                     Args = (e, i, o) => new List<string> { "-d", i, "--nl", "--csv", o },
+                },
+                // SRUM from the copied System32\sru folder; the SOFTWARE hive names the apps and users when present. SrumECmd
+                // opens a temporary copy (with the ESE logs) instead of the evidence; it goes in the staging folder and
+                // SrumECmd removes it when done.
+                new Job
+                {
+                    Tool = "SrumECmd", Names = new[] { "SrumECmd.exe", "SrumECmd" }, NeedDir = srum,
+                    NeedFile = Path.Combine(srum, "SRUDB.dat"),
+                    Args = (e, i, o) =>
+                    {
+                        var a = new List<string> { "-f", Path.Combine(i, "SRUDB.dat") };
+                        var software = Path.Combine(hivesMachine, "SOFTWARE");
+                        if (File.Exists(software)) a.AddRange(new[] { "-r", software });
+                        a.AddRange(new[] { "--csv", o, "--temp", Path.Combine(o, "srum-temp") });
+                        return a;
+                    },
+                },
+                // The change journal Collect exported with -IncludeUsnJournal. Without $MFT there are names but no parent paths.
+                new Job
+                {
+                    Tool = "MFTECmd", Names = new[] { "MFTECmd.exe", "MFTECmd" }, NeedDir = usn,
+                    NeedFile = Path.Combine(usn, "UsnJrnl_J.bin"),
+                    Args = (e, i, o) => new List<string> { "-f", Path.Combine(i, "UsnJrnl_J.bin"), "--csv", o, "--csvf", "usnjrnl.csv" },
                 },
                 new Job { Tool = "Hayabusa", Names = new[] { "hayabusa.exe", "hayabusa" }, NeedDir = evtx, Args = HayabusaArgs },
                 // Hunt with Sigma/Chainsaw rules shipped beside the binary. Without rules there is nothing to hunt; a

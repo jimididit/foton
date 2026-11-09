@@ -25,11 +25,13 @@ namespace Foton.Tools
             new ComposeTool("RECmd", "RECmd.exe"),
             new ComposeTool("AppCompatCacheParser", "AppCompatCacheParser.exe"),
             new ComposeTool("SBECmd", "SBECmd.exe"),
+            new ComposeTool("SrumECmd", "SrumECmd.exe"),
+            new ComposeTool("MFTECmd", "MFTECmd.exe"),
             new ComposeTool("Hayabusa", "hayabusa.exe", "hayabusa-*.exe"),
             new ComposeTool("Chainsaw", "chainsaw.exe"),
         };
 
-        static readonly string[] EzTools = { "PECmd", "LECmd", "JLECmd", "EvtxECmd", "AmcacheParser", "RECmd", "AppCompatCacheParser", "SBECmd" };
+        static readonly string[] EzTools = { "PECmd", "LECmd", "JLECmd", "EvtxECmd", "AmcacheParser", "RECmd", "AppCompatCacheParser", "SBECmd", "SrumECmd", "MFTECmd" };
 
         public static IReadOnlyList<ComposeTool> Expand(string name)
         {

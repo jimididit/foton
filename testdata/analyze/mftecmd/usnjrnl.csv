@@ -1,0 +1,8 @@
+Name,Extension,EntryNumber,SequenceNumber,ParentEntryNumber,ParentSequenceNumber,ParentPath,UpdateSequenceNumber,UpdateTimestamp,UpdateReasons,FileAttributes,OffsetToData,SourceFile
+setup.exe,.exe,1000,1,500,1,,100,2026-01-14 09:00:00.1234567,FileCreate,Archive,0,C:\Cases\Foton_HOST_20260115-120000Z\08_Filesystem\usn\UsnJrnl_J.bin
+setup.exe,.exe,1000,1,500,1,,200,2026-01-14 09:00:00.2234567,DataExtend|FileCreate|Close,Archive,0,C:\Cases\Foton_HOST_20260115-120000Z\08_Filesystem\usn\UsnJrnl_J.bin
+notes.txt,.txt,1000,1,500,1,,300,2026-01-14 09:10:00.0000000,FileCreate|Close,Archive,0,C:\Cases\Foton_HOST_20260115-120000Z\08_Filesystem\usn\UsnJrnl_J.bin
+old.ps1,.ps1,1000,1,500,1,,400,2026-01-14 09:20:00.0000000,FileDelete|Close,Archive,0,C:\Cases\Foton_HOST_20260115-120000Z\08_Filesystem\usn\UsnJrnl_J.bin
+report.docx,.docx,1000,1,500,1,,500,2026-01-14 09:30:00.0000000,RenameNewName,Archive,0,C:\Cases\Foton_HOST_20260115-120000Z\08_Filesystem\usn\UsnJrnl_J.bin
+run.ps1,.ps1,1000,1,500,1,,600,2026-01-15 12:00:30.5000000,FileCreate|Close,Archive,0,C:\Cases\Foton_HOST_20260115-120000Z\08_Filesystem\usn\UsnJrnl_J.bin
+hive_copy.dat,.dat,1000,1,500,1,,700,2026-01-15 12:01:00.9000000,FileCreate,Archive,0,C:\Cases\Foton_HOST_20260115-120000Z\08_Filesystem\usn\UsnJrnl_J.bin
