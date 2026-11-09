@@ -138,6 +138,8 @@ namespace Foton.Cli
             foreach (var f in v.Mismatched.Take(20)) log.Write("Changed since hashing: " + f, StatusLevel.Warn);
             foreach (var f in v.Missing.Take(20)) log.Write("Listed but missing: " + f, StatusLevel.Warn);
             foreach (var f in v.Unreadable.Take(20)) log.Write("Could not read: " + f, StatusLevel.Warn);
+            if (v.NotExtracted.Count > 0)
+                log.Write($"{v.NotExtracted.Count} listed file(s) have paths too long to extract under {p.ExtractedTo}, so their hashes were not checked (packages from Foton 2.2.0 and earlier can hold long shortcut names). Extract the ZIP to a short folder such as C:\\x and run foton package on that folder.", StatusLevel.Warn);
             if (v.Unlisted.Count > 0)
                 log.Write("Files not in hashes.csv are expected for workstation outputs written after collection (analysis\\, reports); they are not part of the hashed record.", StatusLevel.Info);
             if (p.Manifest.Count > 0 && v.Mismatched.Any(f => f.EndsWith(@"00_Collection\collection.log", StringComparison.OrdinalIgnoreCase)))

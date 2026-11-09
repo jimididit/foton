@@ -19,7 +19,14 @@ namespace Foton.Package
         /// As Extract, skipping entries whose stored path (forward slashes) starts with one of <paramref name="skipPrefixes"/>.
         /// Every entry is still checked for an unsafe path first.
         /// </summary>
-        public static void Extract(string zipPath, string destination, IReadOnlyCollection<string>? skipPrefixes)
+        public static void Extract(string zipPath, string destination, IReadOnlyCollection<string>? skipPrefixes) =>
+            Extract(zipPath, destination, skipPrefixes, null);
+
+        /// <summary>
+        /// As Extract; when <paramref name="tooLong"/> is given, an entry whose extracted path would reach the Windows
+        /// 260-character limit is listed there (stored name) and not written, instead of failing the whole extraction.
+        /// </summary>
+        public static void Extract(string zipPath, string destination, IReadOnlyCollection<string>? skipPrefixes, List<string>? tooLong)
         {
             var root = Path.GetFullPath(destination).TrimEnd('\\') + "\\";
             Directory.CreateDirectory(root);
@@ -37,6 +44,11 @@ namespace Foton.Package
                     var target = Path.GetFullPath(Path.Combine(root, name));
                     if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + entry.FullName);
+                    if (tooLong != null && (target.Length > 259 || Path.GetDirectoryName(target)!.Length > 247))
+                    {
+                        tooLong.Add(entry.FullName);
+                        continue;
+                    }
                     if (name.EndsWith("\\", StringComparison.Ordinal)) { Directory.CreateDirectory(target); continue; }
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                     entry.ExtractToFile(target, overwrite: false);

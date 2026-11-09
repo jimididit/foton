@@ -59,6 +59,31 @@ namespace Foton.Tests
             }
         }
 
+        [Fact]
+        public void A_zip_entry_too_long_to_extract_is_reported_not_fatal()
+        {
+            using (var t = new TempDir())
+            {
+                var folder = CopyFixture(t);
+                var rel = @"08_Filesystem\lnk_jumplist\user1\Recent\" + new string('n', 230) + ".lnk";
+                File.AppendAllText(Path.Combine(folder, "00_Collection", "hashes.csv"), rel + ",3," + new string('B', 64) + ",2026-01-15 12:00:00\r\n");
+                var zip = t.File("case.zip");
+                ZipFile.CreateFromDirectory(folder, zip, CompressionLevel.Fastest, includeBaseDirectory: true);
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Update))
+                using (var w = new StreamWriter(z.CreateEntry(Path.GetFileName(folder) + "/" + rel.Replace('\\', '/')).Open())) w.Write("lnk");
+
+                var temp = Directory.CreateDirectory(Path.Combine(t.Path, "temp")).FullName;
+                var p = FotonPackage.Open(zip, temp);
+                Assert.Single(p.NotExtracted);
+                Assert.Matches(@"^FotonPkg-[0-9a-f]{8}$", Path.GetFileName(p.ExtractedTo));
+                var v = p.VerifyHashes();
+                Assert.Equal(new[] { rel }, v.NotExtracted);
+                Assert.DoesNotContain(rel, v.Missing);
+                Assert.False(v.Intact);
+                p.DeleteExtraction();
+            }
+        }
+
         [Theory]
         [InlineData("../escape.txt")]
         [InlineData("a/../../escape.txt")]

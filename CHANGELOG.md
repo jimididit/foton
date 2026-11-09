@@ -4,6 +4,12 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.2.1] - 2026-11-08
+
+### Fixed
+- Collect skipped shortcut files whose names push the copy past the Windows 260-character path limit (Game Bar and phone-notification shortcuts in `Recent` reach about 190 characters) and marked the task Partial. A copied file whose path inside the case folder would exceed 160 characters is now saved under a shortened name (prefix, `~`, eight hex digits of the original name's hash, original extension). The copy row's note says so, and `SourcePath` keeps the original name.
+- `foton package` on a ZIP failed outright when an entry's path was too long to extract under `%TEMP%`. Such entries are now listed as not extracted (integrity not checked, package not reported intact) and the rest is verified. The temporary extraction folder name is shorter (`FotonPkg-` plus eight hex digits).
+
 ## [2.2.0] - 2026-11-08
 
 ### Added

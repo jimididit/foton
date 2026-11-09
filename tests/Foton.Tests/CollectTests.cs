@@ -272,6 +272,35 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_long_shortcut_name_is_shortened_to_fit_and_keeps_its_extension()
+        {
+            using (var t = new TempDir())
+            {
+                // Game Bar and phone-notification shortcuts in Recent carry 150-200 character names.
+                var src = Directory.CreateDirectory(Path.Combine(t.Path, "s")).FullName;
+                var longName = "ms-gamebar--hotkey-gamepadCommand=GPCMD_NEXUS_LONGPRESS&source=GbEm&deviceId=" + new string('0', 64) + ".lnk";
+                var longSrc = Path.Combine(src, longName);
+                File.WriteAllText(longSrc, "lnk");
+                var shortSrc = Path.Combine(src, "short.lnk");
+                File.WriteAllText(shortSrc, "lnk2");
+                var rows = HostCopy.CappedList(new[] { new CopyItem(longSrc, @"user1\Recent\" + longName), new CopyItem(shortSrc, @"user1\Recent\short.lnk") },
+                    Path.Combine(t.Path, "d"), @"08_Filesystem\lnk_jumplist", skipHashing: false);
+
+                var fitted = rows.Single(r => r.SourcePath == longSrc);
+                Assert.Equal("Copied", fitted.Status);
+                Assert.True(fitted.DestRelative.Length <= 160, fitted.DestRelative.Length.ToString());
+                Assert.StartsWith(@"08_Filesystem\lnk_jumplist\user1\Recent\ms-gamebar--hotkey", fitted.DestRelative);
+                Assert.Matches(@"~[0-9A-F]{8}\.lnk$", fitted.DestRelative);
+                Assert.Contains("SourcePath holds the original name", fitted.Note);
+                Assert.True(File.Exists(Path.Combine(t.Path, "d", fitted.DestRelative.Substring(@"08_Filesystem\lnk_jumplist\".Length))));
+
+                var plain = rows.Single(r => r.SourcePath == shortSrc);
+                Assert.Equal(@"08_Filesystem\lnk_jumplist\user1\Recent\short.lnk", plain.DestRelative);
+                Assert.DoesNotContain("shortened", plain.Note);
+            }
+        }
+
+        [Fact]
         public void Family_copy_takes_the_primary_first_and_respects_the_budget()
         {
             using (var t = new TempDir())
