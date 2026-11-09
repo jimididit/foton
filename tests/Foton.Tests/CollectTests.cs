@@ -274,6 +274,30 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Usn_records_are_written_whole_and_a_malformed_record_ends_the_batch()
+        {
+            // FSCTL_READ_USN_JOURNAL output: an 8-byte next USN, then records whose first DWORD is RecordLength.
+            var buffer = new byte[8 + 64 + 72 + 8];
+            BitConverter.GetBytes(4096L).CopyTo(buffer, 0);
+            BitConverter.GetBytes(64).CopyTo(buffer, 8);
+            BitConverter.GetBytes(72).CopyTo(buffer, 72);
+            BitConverter.GetBytes(3).CopyTo(buffer, 144);   // malformed: shorter than a record header
+            using (var all = new MemoryStream())
+            {
+                Assert.Equal(136, UsnJournal.WriteRecords(buffer, buffer.Length, all, long.MaxValue, out var records, out var full));
+                Assert.Equal(2, records);
+                Assert.False(full);
+                Assert.Equal(136, all.Length);
+            }
+            using (var capped = new MemoryStream())
+            {
+                Assert.Equal(64, UsnJournal.WriteRecords(buffer, buffer.Length, capped, 100, out var records, out var full));
+                Assert.Equal(1, records);
+                Assert.True(full);   // the second record would pass the budget: stop at a whole record
+            }
+        }
+
+        [Fact]
         public void SRUM_is_copied_from_System32_sru_with_its_logs()
         {
             Assert.Equal(@"C:\Windows\System32\sru", FilesystemCollection.SrumDirectory(@"C:\Windows"));

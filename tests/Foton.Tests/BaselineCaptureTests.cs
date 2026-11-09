@@ -134,6 +134,8 @@ namespace Foton.Tests
             // BG_JOB_TIMES: three FILETIMEs.
             Assert.Equal(24, Bits.StructSize());
             Assert.Equal(600, FileStreams.StructSize());
+            // USN_JOURNAL_DATA_V0: seven 64-bit fields; READ_USN_JOURNAL_DATA_V0: USN, two DWORDs, three 64-bit fields.
+            Assert.Equal(new[] { 56, 40 }, UsnJournal.StructSizes());
         }
 
         [Fact]

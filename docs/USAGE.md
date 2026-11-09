@@ -81,7 +81,7 @@ Writes `Foton_<HOSTNAME>_<UTC>Z\` (and a ZIP beside it). Alters the host. Findin
 | `-SkipHashing` | Skip per-file SHA-256 (the package is still hashed) |
 | `-LoadUserHives` | Load NTUSER.DAT for users not logged on (elevated only; unloaded in `finally`) |
 | `-IncludeFileTimeline` | Deeper user-writable executable sweep (not a MACB timeline) |
-| `-IncludeUsnJournal` | Also copy `$J` when possible. The default is `fsutil usn queryjournal` text only. **`$MFT` is never copied** (use KAPE/ORC). |
+| `-IncludeUsnJournal` | Also export the NTFS change journal (`$J`) of the system volume, elevated only: its records are read with `FSCTL_READ_USN_JOURNAL` (as `fsutil` does) into `08_Filesystem\usn\UsnJrnl_J.bin`, which MFTECmd parses as `$J`. Capped at 1 GiB, keeping the newest records. The default is `fsutil usn queryjournal` text only. **`$MFT` is never copied** (use KAPE/ORC), so journal records carry file names but not full parent paths. |
 | `-Deep` | Opt-in extended Collect. Forces `-IncludeFileTimeline` and `-IncludeUsnJournal`, and adds task-referenced script copies, PnP inventory, DriverStore FileRepository inventory (hashes for `.sys`/`.inf`/`.cat` only, not a full binary tree), and elevated `gpresult /h` HTML. Task-script copies use raised caps (10k files / 1 GiB), are skipped when the output volume has under 2 GiB free, refuse non-local paths (`SkippedUnc`, no remote authentication), and keep drive letters in package paths so `C:\` and `D:\` copies do not collide. |
 | `-NoZip` | Folder only |
 | `-RequireAdministrator` | Exit if not elevated |

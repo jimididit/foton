@@ -244,13 +244,7 @@ namespace Foton.Collect
                 rows.Add(new CopyRow { SourcePath = "fsutil usn queryjournal " + drive, Status = "CopyError", Note = ex.Message });
             }
             if (s.Options.IncludeUsnJournal)
-            {
-                var jPath = drive + @"\$Extend\$UsnJrnl:$J";
-                var copy = HostCopy.CopyFile(jPath, Path.Combine(destDir, "UsnJrnl_J.bin"), s.Options.SkipHashing);
-                copy.DestRelative = Path.Combine(rel, "UsnJrnl_J.bin");
-                if (copy.Status != "Copied") copy.Note = "Optional $J copy failed or is unsupported on this volume. Use KAPE/ORC for USN. " + copy.Note;
-                rows.Add(copy);
-            }
+                rows.Add(UsnRecords(drive, destDir, rel, s.Options.SkipHashing));
             else
                 rows.Add(new CopyRow
                 {
@@ -258,6 +252,45 @@ namespace Foton.Collect
                     Note = "Full USN $J copy is off by default (size). Re-collect with -IncludeUsnJournal. $MFT is never copied by Foton.",
                 });
             return rows;
+        }
+
+        const long UsnCap = 1073741824;
+
+        /// <summary>
+        /// $J exported through FSCTL_READ_USN_JOURNAL. 1.38.x and v2 before 2.4.0 opened "C:\$Extend\$UsnJrnl:$J" as a
+        /// file, which Windows does not allow, so the copy was always Missing. The export holds the records only (no
+        /// sparse leading zeros), in on-disk layout, so MFTECmd parses it as $J. Parent paths need $MFT (KAPE/ORC).
+        /// </summary>
+        static CopyRow UsnRecords(string drive, string destDir, string rel, bool skipHashing)
+        {
+            var dest = Path.Combine(destDir, "UsnJrnl_J.bin");
+            var row = new CopyRow { SourcePath = drive + @"\$Extend\$UsnJrnl:$J", DestRelative = Path.Combine(rel, "UsnJrnl_J.bin"), Status = "CopyError" };
+            UsnExport export;
+            try
+            {
+                using (var fs = File.Create(dest)) export = Foton.Win.UsnJournal.Export(drive, fs, UsnCap);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                row.Note = "Could not write the change-journal export: " + ex.Message;
+                return row;
+            }
+            var how = $"Records read with FSCTL_READ_USN_JOURNAL (journal {export.JournalId:X}, USN {export.StartUsn} to {export.NextUsn}), written in on-disk record layout without the sparse region; MFTECmd parses it as $J. Parent paths need $MFT (KAPE/ORC).";
+            if (export.Records == 0)
+            {
+                try { File.Delete(dest); } catch (IOException) { }
+                row.Note = (export.Error ?? "The change journal returned no records.") + " Visibility gap, not proof no files changed.";
+                row.Status = export.Error == null ? "NoData" : "CopyError";
+                row.DestRelative = "";
+                return row;
+            }
+            row.SizeBytes = export.Bytes;
+            row.SHA256 = Hashing.SafeHash(dest, skipHashing);
+            row.Status = "Copied";
+            row.Note = how
+                + (export.Capped ? $" Capped at {UsnCap.ToString(System.Globalization.CultureInfo.InvariantCulture)} bytes: the newest records were kept, older ones were not exported." : "")
+                + (export.Error != null ? " " + export.Error : "");
+            return row;
         }
 
         /// <summary>ConvertFrom-FotonFileTimeUtc: the FILETIME at the start of the data, or (not set) / (unparsed).</summary>

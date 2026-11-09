@@ -118,6 +118,13 @@ namespace Foton.Core
                 l.Add("SAM and SECURITY are not collected by design (credential material).");
                 l.Add("");
             }
+            if (o.IncludeUsnJournal && s.IsElevated)
+            {
+                l.Add("The -IncludeUsnJournal option was used: the system volume was opened");
+                l.Add("read-only and its NTFS change journal read with FSCTL_READ_USN_JOURNAL");
+                l.Add("(the interface fsutil uses). Nothing on the volume is written.");
+                l.Add("");
+            }
             if (o.LoadUserHives && s.IsElevated)
             {
                 l.Add("The -LoadUserHives option was used: NTUSER.DAT hives for users not");
