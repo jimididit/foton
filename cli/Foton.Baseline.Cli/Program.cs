@@ -114,7 +114,7 @@ namespace Foton.Baseline.Cli
             Console.Error.WriteLine("Usage: foton-baseline [-OutputPath <folder>] [-NoZip] [-NoHtml] [-RequireAdministrator]");
             Console.Error.WriteLine("       foton-baseline -Path <snapshot.json>");
             Console.Error.WriteLine("       foton-baseline -Version");
-            Console.Error.WriteLine("Default -OutputPath: " + OutputFolder.Default("Baselines") + " (created private to SYSTEM, Administrators, and this account)");
+            Console.Error.WriteLine("Default -OutputPath: " + OutputFolder.Default("Baselines") + " (must be private to SYSTEM, Administrators, and this account)");
             return 1;
         }
     }

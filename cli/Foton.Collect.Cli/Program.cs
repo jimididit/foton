@@ -121,7 +121,7 @@ namespace Foton.Collect.Cli
             Console.Error.WriteLine("                     [-LoadUserHives] [-IncludeFileTimeline] [-IncludeUsnJournal] [-Deep] [-NoZip]");
             Console.Error.WriteLine("                     [-RequireAdministrator]");
             Console.Error.WriteLine("       foton-collect -Version");
-            Console.Error.WriteLine("Default -OutputPath: " + OutputFolder.Default("Cases") + " (created private to SYSTEM, Administrators, and this account)");
+            Console.Error.WriteLine("Default -OutputPath: " + OutputFolder.Default("Cases") + " (must be private to SYSTEM, Administrators, and this account)");
             return 1;
         }
     }

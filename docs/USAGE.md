@@ -58,7 +58,7 @@ Writes `Foton_<HOSTNAME>_<UTC>Z\` (and a ZIP beside it). Alters the host. Findin
 
 | Switch | Purpose |
 |--------|---------|
-| `-OutputPath <folder>` | Case parent folder. Default: `C:\Foton\Cases` on the Windows drive, created readable only by SYSTEM, Administrators, and the account that runs the collection. A folder you name is used as it is |
+| `-OutputPath <folder>` | Case parent folder. Default: `C:\Foton\Cases` on the Windows drive, created readable only by SYSTEM, Administrators, and the account that runs the collection. If `C:\Foton` or `C:\Foton\Cases` already exists and is not private that way (another owner, other accounts with access, or a junction), the run stops before collecting. A folder you name is used as it is |
 | `-CaseNumber CASE-0001` | Custody header |
 | `-Examiner "A. Examiner"` | Custody header |
 | `-EventLogDays 14` | Event / recent-file window |

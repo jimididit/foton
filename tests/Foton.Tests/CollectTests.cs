@@ -287,7 +287,8 @@ namespace Foton.Tests
             using (var t = new TempDir())
             {
                 var leaf = Path.Combine(t.Path, "Foton", "Cases");
-                Assert.Empty(OutputFolder.EnsurePrivate(leaf));
+                Assert.Null(OutputFolder.EnsurePrivate(leaf, t.Path));
+                Assert.Null(OutputFolder.EnsurePrivate(leaf, t.Path));   // already private: still accepted
                 var mine = new[]
                 {
                     new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
@@ -302,15 +303,24 @@ namespace Foton.Tests
                         Assert.Contains((SecurityIdentifier)r.IdentityReference, mine);
                 }
 
-                // An existing folder is left alone, and other readers are reported for the warning.
+                // A folder someone else prepared (here: Users may read it) is refused and left as it was.
                 var open = Directory.CreateDirectory(Path.Combine(t.Path, "open")).FullName;
                 var sec = Directory.GetAccessControl(open);
                 sec.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
                     FileSystemRights.ReadAndExecute, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
                 Directory.SetAccessControl(open, sec);
-                var others = OutputFolder.EnsurePrivate(open);
-                Assert.Contains(others, n => n.EndsWith("\\Users", StringComparison.OrdinalIgnoreCase) || n == "S-1-5-32-545");
+                var problem = OutputFolder.EnsurePrivate(Path.Combine(open, "Cases"), t.Path);
+                Assert.NotNull(problem);
+                Assert.Contains("gives access to", problem);
                 Assert.False(Directory.GetAccessControl(open).AreAccessRulesProtected);
+                Assert.False(Directory.Exists(Path.Combine(open, "Cases")));   // nothing created inside a refused folder
+
+                // A junction in the chain is refused even when its target is private.
+                var link = Path.Combine(t.Path, "link");
+                Exec.System32("cmd.exe", $"/c mklink /J \"{link}\" \"{Path.Combine(t.Path, "Foton")}\"", out var code, 30000);
+                Assert.Equal(0, code);
+                Assert.Contains("junction", OutputFolder.Problem(Path.Combine(link, "Cases"), t.Path));
+                Directory.Delete(link);
             }
         }
 
