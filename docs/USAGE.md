@@ -11,7 +11,7 @@ Copy only the endpoint executable to a target. Parse, compose, and analyze read 
 
 **First time?** Start with [GETTING-STARTED.md](GETTING-STARTED.md). This page is the full reference.
 
-**How to read the examples.** Every example is PowerShell and runs from the folder holding the executables. If you followed the guide, that folder is reached with `Set-Location (Join-Path $env:USERPROFILE 'Foton')`. Workstation examples use `$case` for a case folder; this sets it to the newest case under `C:\Foton\Cases`:
+**How to read the examples.** Every example is PowerShell and runs from the folder holding the executables. If you downloaded them with a browser, that is usually `cd "$env:USERPROFILE\Downloads"`. Workstation examples use `$case` for a case folder; this sets it to the newest case under `C:\Foton\Cases`:
 
 ```powershell
 $case = (Get-ChildItem C:\Foton\Cases -Directory -Filter 'Foton_*' | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
@@ -38,7 +38,7 @@ Each [GitHub Release](https://github.com/jimididit/foton/releases) tagged `v2.*`
 
 They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is installed, and nothing is fetched at run time except by `foton tools`, which downloads a pinned, hash-checked Hayabusa or Chainsaw release only when you ask.
 
-**Verify before use.** The executables are not code-signed yet, so Windows SmartScreen may warn when one is started from File Explorer. Trust comes from the hash and the build provenance, not a publisher certificate. [GETTING-STARTED.md](GETTING-STARTED.md#1-download-and-verify) has a block that downloads the latest release and checks every file. To check files you downloaded yourself, run this in the folder holding them and `SHA256SUMS.txt`:
+**Verify before use.** The executables are not code-signed yet, so Windows SmartScreen may warn when one is started from File Explorer. Trust comes from the hash and the build provenance, not a publisher certificate. [GETTING-STARTED.md](GETTING-STARTED.md#2-verify-your-download) shows the one-file check (`Get-FileHash`, compared by eye with `SHA256SUMS.txt`). To check every executable at once, run this in the folder holding them and `SHA256SUMS.txt`:
 
 ```powershell
 $sums = @{}
@@ -58,7 +58,7 @@ A file that does not match is deleted so it cannot be run by mistake. The hashes
 Get-ChildItem *.exe | ForEach-Object { gh attestation verify $_.Name --repo jimididit/foton }
 ```
 
-A browser marks downloaded files as coming from the internet, which makes SmartScreen warn when you start one from File Explorer (running it from PowerShell is not affected). After both checks pass, `Get-ChildItem *.exe | Unblock-File` removes that mark. Files downloaded with `Invoke-WebRequest`, as in the guide, are not marked.
+A browser marks downloaded files as coming from the internet, which makes SmartScreen warn when you start one from File Explorer (running it from PowerShell is not affected). After both checks pass, `Get-ChildItem *.exe | Unblock-File` removes that mark. Files downloaded with `Invoke-WebRequest` are not marked.
 
 Record the collector's hash in the case notes so the report names the exact build that ran.
 
@@ -127,7 +127,7 @@ Run one of these:
 ```powershell
 .\foton-baseline.exe                                                            # package in C:\Foton\Baselines
 .\foton-baseline.exe -NoZip                                                     # folder only
-.\foton-baseline.exe -Path (Join-Path $env:USERPROFILE 'Foton\snapshot.json')   # bare JSON
+.\foton-baseline.exe -Path "$env:USERPROFILE\Downloads\snapshot.json"           # bare JSON
 ```
 
 A baseline taken after an incident is a picture of **that** state. Compare proves change between two observations, not when or who.
