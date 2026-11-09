@@ -8,7 +8,8 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 
 ### Added
 - `compose` runs Eric Zimmerman's **AppCompatCacheParser** on the copied SYSTEM hive (Shimcache) and **SBECmd** on the copied user hives (shellbags). `analyze` reads both. Shimcache becomes an overview (entries per control set, how many are marked Executed) and a Medium finding for executables or scripts in user-writable paths; the caveat says an entry shows a file was evaluated, not that it ran. Shellbags become an overview of folders browsed per user, including phone and camera (MTP) entries, network paths, archive contents, and drive letters other than the system drive.
-- `foton tools EZTools` registers AppCompatCacheParser and SBECmd too. A folder registered with an earlier version needs registering again to pick them up.
+- `compose` runs **SrumECmd** on the SRUM copy (with the SOFTWARE hive to name apps and users) and **MFTECmd** on the change journal exported with `-IncludeUsnJournal`. `analyze` reads both. SRUM becomes an overview (rows per table, apps, dates covered) and a Medium finding for executables in user-writable paths that used the network, with bytes sent and received. The journal becomes an overview (creates, deletes, renames in the period covered) and an Info list of executables or scripts created, by name only, because folder paths need `$MFT`. Journal rows from the collection itself are counted apart.
+- `foton tools EZTools` registers AppCompatCacheParser, SBECmd, SrumECmd, and MFTECmd too. A folder registered with an earlier version needs registering again to pick them up.
 
 ## [2.4.0] - 2026-11-09
 

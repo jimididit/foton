@@ -104,6 +104,69 @@ namespace Foton.Core
             return result;
         }
 
+        /// <summary>
+        /// The rows of <see cref="Read"/>, one at a time, without loading the file: for compose CSVs of hundreds of
+        /// thousands of rows that a caller caps or aggregates. Same parsing rules (BOM, quoted newlines, "#TYPE", blank lines).
+        /// </summary>
+        public static IEnumerable<Dictionary<string, string?>> Stream(string path)
+        {
+            using (var reader = new StreamReader(path, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true))
+            {
+                List<string>? header = null;
+                bool first = true;
+                foreach (var r in Records(reader))
+                {
+                    if (header == null)
+                    {
+                        if (first && r.Count == 1 && r[0].StartsWith("#TYPE", StringComparison.Ordinal)) { first = false; continue; }
+                        header = r;
+                        continue;
+                    }
+                    if (r.Count == 1 && r[0].Length == 0) continue; // blank line
+                    var row = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                    for (int c = 0; c < header.Count; c++)
+                        row[header[c]] = c < r.Count ? r[c] : null;
+                    yield return row;
+                }
+            }
+        }
+
+        /// <summary>The record state machine of <see cref="Parse"/> over a reader.</summary>
+        static IEnumerable<List<string>> Records(TextReader reader)
+        {
+            var record = new List<string>();
+            var field = new StringBuilder();
+            bool quoted = false, any = false;
+            int next;
+            while ((next = reader.Read()) >= 0)
+            {
+                char ch = (char)next;
+                if (quoted)
+                {
+                    if (ch == '"')
+                    {
+                        if (reader.Peek() == '"') { field.Append('"'); reader.Read(); }
+                        else quoted = false;
+                    }
+                    else field.Append(ch);
+                    continue;
+                }
+                switch (ch)
+                {
+                    case '"': quoted = true; any = true; break;
+                    case ',': record.Add(field.ToString()); field.Clear(); any = true; break;
+                    case '\r': break;
+                    case '\n':
+                        record.Add(field.ToString()); field.Clear();
+                        yield return record;
+                        record = new List<string>(); any = false;
+                        break;
+                    default: field.Append(ch); any = true; break;
+                }
+            }
+            if (any || field.Length > 0) { record.Add(field.ToString()); yield return record; }
+        }
+
         static List<List<string>> Parse(string text)
         {
             var records = new List<List<string>>();

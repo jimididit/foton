@@ -407,6 +407,58 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void SrumECmd_output_becomes_overview_and_user_writable_network_findings()
+        {
+            using (var t = new TempDir())
+            {
+                CopyFixture("srumecmd", t.Path, "SrumECmd");
+                var c = Context(new PackageData(), t.Path);
+                Analyzer.Run(c);
+
+                var overview = c.Findings.Single(f => f.Title == "SrumECmd SRUM tables present in compose output");
+                Assert.Equal("Info", overview.Severity);
+                Assert.Contains("7 SRUM row(s) across 2 table(s) (NetworkUsages (5); AppResourceUseInfo (2))", overview.Observation);
+                Assert.Contains("for 5 distinct app(s), covering 2026-01-09 08:00:00 to 2026-01-12 10:00:00 UTC", overview.Observation);
+
+                var net = c.Findings.Single(f => f.Title == "SrumECmd SRUM shows network use by code in user-writable paths");
+                Assert.Equal("Medium", net.Severity);
+                Assert.Contains("2 distinct executable(s)", net.Observation);
+                Assert.Contains(@"\users\user1\appdata\local\tool\agent.exe (sent 3.0 MiB, received 1.0 MiB)", net.Observation);   // summed over hours, busiest first
+                Assert.Contains(@"sync.exe (sent 0.0 MiB, received 0.5 MiB)", net.Observation);
+                Assert.True(net.Observation.IndexOf("agent.exe", StringComparison.Ordinal) < net.Observation.IndexOf("sync.exe", StringComparison.Ordinal));
+                Assert.DoesNotContain("browser.exe", net.Observation);   // Program Files, however busy
+            }
+        }
+
+        [Fact]
+        public void MFTECmd_usn_output_becomes_overview_and_created_code_names_outside_the_collection_window()
+        {
+            using (var t = new TempDir())
+            {
+                CopyFixture("mftecmd", t.Path, "MFTECmd");
+                Directory.CreateDirectory(Path.Combine(t.Path, "00_Collection"));
+                File.WriteAllLines(Path.Combine(t.Path, "00_Collection", "collection.log"), new[]
+                {
+                    "2026-01-15 12:00:00 UTC [INFO] collection started", "2026-01-15 12:01:00 UTC [INFO] collection finished",
+                });
+                var c = Context(new PackageData(), t.Path);
+                Analyzer.Run(c);
+
+                var overview = c.Findings.Single(f => f.Title == "MFTECmd USN journal rows present in compose output");
+                Assert.Equal("Info", overview.Severity);
+                Assert.Contains("5 change-journal row(s) covering 2026-01-14 09:00:00 to 2026-01-14 09:30:00 UTC: 3 with FileCreate, 1 with FileDelete, 1 with RenameNewName", overview.Observation);
+                Assert.Contains("Excludes 2 row(s) inside the collection window", overview.Observation);
+
+                var code = c.Findings.Single(f => f.Title == "MFTECmd USN journal records executables or scripts being created");
+                Assert.Equal("Info", code.Severity);
+                Assert.Contains("1 distinct executable or script name(s)", code.Observation);
+                Assert.Contains("setup.exe (2)", code.Observation);
+                Assert.DoesNotContain("run.ps1", code.Observation);   // created inside the collection window
+                Assert.DoesNotContain("old.ps1", code.Observation);   // deleted, not created
+            }
+        }
+
+        [Fact]
         public void A_bare_Foton_case_path_is_not_collector_noise()
         {
             using (var t = new TempDir())

@@ -57,6 +57,8 @@ namespace Foton.Analyze.Rules
             AmcacheParser(c, root);
             AppCompatCache(c, root);
             Shellbags(c, root);
+            Srum(c, root);
+            UsnJournal(c, root);
         }
 
         static void ParsedRecords(AnalysisContext c, string root)
@@ -600,6 +602,148 @@ namespace Foton.Analyze.Rules
         }
 
         static readonly Regex DriveSegment = new Regex(@"(?:^|\\)([A-Za-z]:)(?:\\|$)");
+
+        static readonly Regex SrumTable = new Regex(@"_SrumECmd_(?<t>[A-Za-z0-9]+)_Output\.csv$", RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// SrumECmd tables (&lt;stamp&gt;_SrumECmd_&lt;Table&gt;_Output.csv): Id, Timestamp, ExeInfo, ... and per table counters.
+        /// ExeInfo is a device path (\device\harddiskvolumeN\...\app.exe), a bare name (services, hosts), or a package
+        /// family name. NetworkUsages adds BytesSent / BytesReceived per app per hour.
+        /// </summary>
+        static void Srum(AnalysisContext c, string root)
+        {
+            var dir = Path.Combine(root, "analysis", "external", "SrumECmd");
+            if (!Directory.Exists(dir)) return;
+            const int max = 2000000;
+            int rows = 0;
+            bool capped = false;
+            var tables = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var apps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string first = "", last = "";
+            var traffic = new Dictionary<string, long[]>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in SafeFiles(dir, "*.csv"))
+            {
+                var m = SrumTable.Match(Path.GetFileName(file));
+                if (!m.Success) continue;
+                var table = m.Groups["t"].Value;
+                var network = string.Equals(table, "NetworkUsages", StringComparison.OrdinalIgnoreCase);
+                // Streamed: AppResourceUseInfo alone runs to hundreds of thousands of rows, so the cap bounds memory too.
+                try
+                {
+                    foreach (var row in Csv.Stream(file))
+                    {
+                        if (++rows > max) { capped = true; rows = max; break; }
+                        Bump(tables, table);
+                        var exe = V(row, "ExeInfo");
+                        if (exe.Length > 0) apps.Add(exe);
+                        var ts = V(row, "Timestamp");
+                        if (ts.Length >= 19)
+                        {
+                            if (first.Length == 0 || string.CompareOrdinal(ts, first) < 0) first = ts;
+                            if (string.CompareOrdinal(ts, last) > 0) last = ts;
+                        }
+                        if (!network || !IsCode(exe) || !c.UserWritablePath(exe)) continue;
+                        if (!traffic.TryGetValue(exe, out var t)) traffic[exe] = t = new long[2];
+                        t[0] += Bytes(V(row, "BytesSent"));
+                        t[1] += Bytes(V(row, "BytesReceived"));
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                if (capped) break;
+            }
+            if (rows == 0) return;
+            const string art = "analysis/external/SrumECmd";
+            c.Add("Info", "Execution", 1, "SrumECmd SRUM tables present in compose output",
+                F("SrumECmd wrote {0} SRUM row(s) across {1} table(s) ({2}) for {3} distinct app(s), covering {4} to {5} UTC.{6}",
+                    rows, tables.Count, TopText(tables, 8), apps.Count, first.Length > 0 ? first.Substring(0, 19) : "(no timestamps)", last.Length > 0 ? last.Substring(0, 19) : "(no timestamps)",
+                    capped ? F(" Row scan capped at {0}; counts are a floor.", max) : ""),
+                "These are Eric Zimmerman SrumECmd facts about the SRUM database copied into the package: Windows' own hourly record of which apps used CPU, disk, and network. Retention differs by table (often weeks; some tables, such as energy usage, keep years), so the date range is the union of all tables. It shows an app was active in an hour, not what it did. Rows are aggregated, so they cannot be tied to one connection or file.",
+                art,
+                "Filter the AppResourceUseInfo and NetworkUsages CSVs by ExeInfo for apps of interest and place their active hours on the timeline next to logons and process creation.");
+            if (traffic.Count > 0)
+            {
+                var top = traffic.OrderByDescending(kv => kv.Value[0] + kv.Value[1]).ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase).Take(8)
+                    .Select(kv => F("{0} (sent {1}, received {2})", kv.Key, Mib(kv.Value[0]), Mib(kv.Value[1])));
+                c.Add("Medium", "Network", 2, "SrumECmd SRUM shows network use by code in user-writable paths",
+                    F("SRUM NetworkUsages rows attribute network traffic to {0} distinct executable(s) under user-writable locations. Highest by total bytes: {1}", traffic.Count, string.Join("; ", top)),
+                    "Browsers, chat and meeting clients, game launchers, and updaters install per user under AppData and use the network all day. SRUM counts bytes per app per hour; it does not show destinations, content, or that data left the organization.",
+                    art,
+                    "Check each executable's signature and hash if it is in the package, and look for its connections in EVTX, firewall, and proxy logs for the busiest hours.");
+            }
+        }
+
+        static long Bytes(string v) => long.TryParse(v, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) && n > 0 ? n : 0;
+
+        static string Mib(long bytes) => (bytes / 1048576.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " MiB";
+
+        /// <summary>
+        /// MFTECmd over the change journal Collect exported (usnjrnl.csv): Name, Extension, EntryNumber, ParentEntryNumber,
+        /// ParentPath (empty without $MFT), UpdateSequenceNumber, UpdateTimestamp, UpdateReasons ("FileCreate|Close"), ...
+        /// Rows inside the collection window are counted apart: the collector writes its own output on the same volume.
+        /// </summary>
+        static void UsnJournal(AnalysisContext c, string root)
+        {
+            var dir = Path.Combine(root, "analysis", "external", "MFTECmd");
+            if (!Directory.Exists(dir)) return;
+            const int max = 5000000;
+            int rows = 0, created = 0, deleted = 0, renamed = 0, self = 0;
+            bool capped = false;
+            string first = "", last = "";
+            var window = CollectionWindow.FromCase(root);
+            var winStart = window != null ? FotonTime.Format(window.StartUtc) : null;
+            var winEnd = window != null ? FotonTime.Format(window.EndUtc) : null;
+            var code = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in SafeFiles(dir, "*.csv"))
+            {
+                // Streamed: a journal export runs to millions of rows, so the cap bounds memory too.
+                try
+                {
+                    bool header = false;
+                    foreach (var row in Csv.Stream(file))
+                    {
+                        if (!header)
+                        {
+                            header = true;
+                            if (!row.Keys.Any(k => string.Equals(k, "UpdateReasons", StringComparison.OrdinalIgnoreCase))) break;
+                        }
+                        if (++rows > max) { capped = true; rows = max; break; }
+                        var ts = V(row, "UpdateTimestamp");
+                        if (ts.Length >= 19)
+                        {
+                            var t19 = ts.Substring(0, 19);
+                            if (winStart != null && string.CompareOrdinal(t19, winStart) >= 0 && string.CompareOrdinal(t19, winEnd) <= 0) { self++; continue; }
+                            if (first.Length == 0 || string.CompareOrdinal(t19, first) < 0) first = t19;
+                            if (string.CompareOrdinal(t19, last) > 0) last = t19;
+                        }
+                        var reasons = V(row, "UpdateReasons");
+                        var isCreate = reasons.IndexOf("FileCreate", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (isCreate) created++;
+                        if (reasons.IndexOf("FileDelete", StringComparison.OrdinalIgnoreCase) >= 0) deleted++;
+                        if (reasons.IndexOf("RenameNewName", StringComparison.OrdinalIgnoreCase) >= 0) renamed++;
+                        var name = V(row, "Name");
+                        if (isCreate && IsCode(name)) Bump(code, name);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                if (capped) break;
+            }
+            if (rows == 0) return;
+            const string art = "analysis/external/MFTECmd";
+            var selfNote = self > 0 ? F(" Excludes {0} row(s) inside the collection window ({1} to {2} UTC): the collector writes its own output to the volume.", self, winStart, winEnd) : "";
+            c.Add("Info", "Filesystem", 1, "MFTECmd USN journal rows present in compose output",
+                F("MFTECmd wrote {0} change-journal row(s) covering {1} to {2} UTC: {3} with FileCreate, {4} with FileDelete, {5} with RenameNewName.{6}{7}",
+                    rows - self, first.Length > 0 ? first : "(no timestamps)", last.Length > 0 ? last : "(no timestamps)", created, deleted, renamed, selfNote,
+                    capped ? F(" Row scan capped at {0}; counts are a floor.", max) : ""),
+                "These are Eric Zimmerman MFTECmd facts about the NTFS change journal Collect exported: file creates, deletes, renames, and writes on the system volume, with names but without folder paths (those need $MFT, which Foton does not collect; use KAPE or DFIR-ORC). The journal is a rolling buffer, so it covers days to weeks on a busy host, and absence of a record is not evidence nothing happened.",
+                art,
+                "Filter usnjrnl.csv by Name and UpdateTimestamp around events of interest; for full paths, collect $MFT with KAPE or DFIR-ORC and run MFTECmd with -m.");
+            if (code.Count > 0)
+                c.Add("Info", "Filesystem", 2, "MFTECmd USN journal records executables or scripts being created",
+                    F("{0} distinct executable or script name(s) were created in the period covered{1}. Sample: {2}", code.Count, self > 0 ? " (outside the collection window)" : "", TopText(code, 12)),
+                    "Software installs and updates create executables and scripts constantly, so this is context, not suspicion. The journal has names but not folders here, so a name cannot be placed in a user-writable location without $MFT.",
+                    art,
+                    "Look for the names in Prefetch/PECmd, Amcache, and Shimcache to see where they ran from, or collect $MFT to resolve their folders.");
+        }
 
         /// <summary>The system drive from os_info when the package has it, else C:.</summary>
         static string SystemDrive(AnalysisContext c)

@@ -1,0 +1,6 @@
+Id,Timestamp,ExeInfo,ExeInfoDescription,ExeTimestamp,SidType,Sid,UserName,UserId,AppId,BytesReceived,BytesSent,InterfaceLuid,InterfaceType,L2ProfileFlags,L2ProfileId,ProfileName
+1,2026-01-10 10:00:00,\device\harddiskvolume3\users\user1\appdata\local\tool\agent.exe,,,UnknownOrUserSid,,user1,,,1048576,2097152,,IF_TYPE_IEEE80211,,,
+2,2026-01-11 11:00:00,\device\harddiskvolume3\users\user1\appdata\local\tool\agent.exe,,,UnknownOrUserSid,,user1,,,0,1048576,,IF_TYPE_IEEE80211,,,
+3,2026-01-11 12:00:00,\device\harddiskvolume3\program files\browser\browser.exe,,,UnknownOrUserSid,,user1,,,999999999,999999999,,IF_TYPE_IEEE80211,,,
+4,2026-01-11 13:00:00,svchost.exe,,,LocalSystem,,,,,100,100,,IF_TYPE_IEEE80211,,,
+5,2026-01-12 09:00:00,\device\harddiskvolume3\users\user1\appdata\local\sync\sync.exe,,,UnknownOrUserSid,,user1,,,524288,0,,IF_TYPE_IEEE80211,,,
