@@ -117,7 +117,7 @@ Foton can install Hayabusa and Chainsaw for you. It downloads the release it is 
 .\foton.exe tools Chainsaw -Force
 ```
 
-For Eric Zimmerman's tools (PECmd, EvtxECmd, RECmd, LECmd, JLECmd, AmcacheParser), download `Get-ZimmermanTools` from [ericzimmerman.github.io](https://ericzimmerman.github.io/), run it into a folder, and register that folder:
+For Eric Zimmerman's tools (PECmd, EvtxECmd, RECmd, LECmd, JLECmd, AmcacheParser, AppCompatCacheParser, SBECmd), download `Get-ZimmermanTools` from [ericzimmerman.github.io](https://ericzimmerman.github.io/), run it into a folder, and register that folder:
 
 ```powershell
 .\foton.exe tools EZTools "\path\to\EZTools"

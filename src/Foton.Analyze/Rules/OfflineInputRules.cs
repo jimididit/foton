@@ -55,6 +55,8 @@ namespace Foton.Analyze.Rules
             ShellLinks(c, root, "LECmd", "shortcut (LNK)");
             ShellLinks(c, root, "JLECmd", "jump list");
             AmcacheParser(c, root);
+            AppCompatCache(c, root);
+            Shellbags(c, root);
         }
 
         static void ParsedRecords(AnalysisContext c, string root)
@@ -496,6 +498,115 @@ namespace Foton.Analyze.Rules
                     "Old hardware vendor drivers, test-signed development drivers, and virtualization tools can show as unsigned in Amcache. A kernel driver outside Windows without a signature still deserves a look, because vulnerable or malicious drivers are a known path to kernel access.",
                     art,
                     "Find the driver file, check its signature and hash, and compare against drivers.csv and the loaded-driver list from Collect.");
+        }
+
+        /// <summary>
+        /// AppCompatCacheParser (appcompatcache.csv) over the copied SYSTEM hive: ControlSet, CacheEntryPosition, Path,
+        /// LastModifiedTimeUTC, Executed, Duplicate, SourceFile, FromSlack. Packaged-app entries have no drive path.
+        /// </summary>
+        static void AppCompatCache(AnalysisContext c, string root)
+        {
+            var dir = Path.Combine(root, "analysis", "external", "AppCompatCacheParser");
+            if (!Directory.Exists(dir)) return;
+            const int max = 200000;
+            int rows = 0, executed = 0, packaged = 0;
+            bool capped = false;
+            var controlSets = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var writable = new List<string>();
+            int writableExecuted = 0;
+            foreach (var file in SafeFiles(dir, "*.csv"))
+            {
+                var data = ReadCsv(file);
+                if (data == null || data.Count == 0 || !data[0].Keys.Any(k => string.Equals(k, "CacheEntryPosition", StringComparison.OrdinalIgnoreCase))) continue;
+                foreach (var row in data)
+                {
+                    if (++rows > max) { capped = true; rows = max; break; }
+                    if (V(row, "ControlSet").Length > 0) Bump(controlSets, V(row, "ControlSet"));
+                    var ran = Eq(V(row, "Executed"), "Yes");
+                    if (ran) executed++;
+                    var path = V(row, "Path");
+                    if (!DrivePath.IsMatch(path)) { packaged++; continue; }
+                    if (IsCode(path) && c.UserWritablePath(path) && !writable.Contains(path, StringComparer.OrdinalIgnoreCase))
+                    {
+                        writable.Add(path);
+                        if (ran) writableExecuted++;
+                    }
+                }
+                if (capped) break;
+            }
+            if (rows == 0) return;
+            const string art = "analysis/external/AppCompatCacheParser";
+            c.Add("Info", "Execution", 1, "AppCompatCacheParser Shimcache rows present in compose output",
+                F("AppCompatCacheParser wrote {0} Shimcache entr(ies) from control set(s) {1}: {2} marked Executed, {3} without a drive path (packaged apps and similar).{4}",
+                    rows, TopText(controlSets, 4), executed, packaged, capped ? F(" Row scan capped at {0}; counts are a floor.", max) : ""),
+                "These are Eric Zimmerman AppCompatCacheParser facts about the Shimcache in the SYSTEM hive copied into the package. On Windows 10 and later an entry shows Windows evaluated the file for compatibility, which usually means it existed and was browsed or run; the Executed flag is the tool's reading of an insert flag and is not proof of execution. LastModifiedTimeUTC is the file's own modification time, not when it ran.",
+                art,
+                "Read appcompatcache.csv by CacheEntryPosition (newest first) for files of interest, and corroborate execution with Prefetch/PECmd, Amcache, and event logs.");
+            if (writable.Count > 0)
+                c.Add("Medium", "Execution", 2, "AppCompatCacheParser Shimcache lists code in user-writable paths",
+                    F("Shimcache entries name {0} distinct executable or script path(s) under user-writable locations, {1} of them marked Executed. Sample: {2}", writable.Count, writableExecuted, string.Join("; ", writable.Take(8))),
+                    "Installers, updaters, and portable tools run from Downloads, Temp, and AppData every day. A Shimcache entry shows the file was there and evaluated; it does not show the file was malicious or that it ran.",
+                    art,
+                    "Hash the file if it is in the package, check its signature, and corroborate with Prefetch/PECmd and Amcache.");
+        }
+
+        static readonly Regex DrivePath = new Regex(@"^[A-Za-z]:\\");
+
+        /// <summary>
+        /// SBECmd shellbags, one CSV per user hive (&lt;user&gt;_NTUSER.csv, &lt;user&gt;_UsrClass.csv): BagPath, ShellType,
+        /// AbsolutePath, timestamps, HasExplored, and more. AbsolutePath starts at "Desktop". MTP shell types are phones and
+        /// cameras; a drive letter alone does not say whether the volume was removable.
+        /// </summary>
+        static void Shellbags(AnalysisContext c, string root)
+        {
+            var dir = Path.Combine(root, "analysis", "external", "SBECmd");
+            if (!Directory.Exists(dir)) return;
+            const int max = 500000;
+            int rows = 0, mtp = 0, network = 0, zip = 0;
+            bool capped = false;
+            var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var hives = new List<string>();
+            var drives = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var systemDrive = SystemDrive(c);
+            foreach (var file in SafeFiles(dir, "*.csv"))
+            {
+                var data = ReadCsv(file);
+                if (data == null || data.Count == 0 || !data[0].Keys.Any(k => string.Equals(k, "BagPath", StringComparison.OrdinalIgnoreCase))) continue;
+                hives.Add(Path.GetFileNameWithoutExtension(file));
+                foreach (var row in data)
+                {
+                    if (++rows > max) { capped = true; rows = max; break; }
+                    var path = V(row, "AbsolutePath");
+                    var type = V(row, "ShellType");
+                    if (path.Length > 0) folders.Add(path);
+                    if (type.StartsWith("MTP", StringComparison.OrdinalIgnoreCase)) mtp++;
+                    if (type.IndexOf("Network", StringComparison.OrdinalIgnoreCase) >= 0 || path.StartsWith(@"\\", StringComparison.Ordinal)
+                        || path.IndexOf(@"\Network\", StringComparison.OrdinalIgnoreCase) >= 0) network++;
+                    if (type.IndexOf("Zip", StringComparison.OrdinalIgnoreCase) >= 0 || type.IndexOf("Archive", StringComparison.OrdinalIgnoreCase) >= 0) zip++;
+                    var m = DriveSegment.Match(path);
+                    if (m.Success && !string.Equals(m.Groups[1].Value, systemDrive, StringComparison.OrdinalIgnoreCase)) Bump(drives, m.Groups[1].Value.ToUpperInvariant());
+                }
+                if (capped) break;
+            }
+            if (rows == 0) return;
+            const string art = "analysis/external/SBECmd";
+            c.Add("Info", "Users", 1, "SBECmd shellbag rows present in compose output",
+                F("SBECmd wrote {0} shellbag row(s) from {1} hive(s) ({2}), naming {3} distinct folder(s). Phone or camera (MTP) entries: {4}. Network paths: {5}. Archive contents browsed: {6}. Drive letters other than the system drive: {7}.{8}",
+                    rows, hives.Count, string.Join("; ", hives.Take(8)), folders.Count, mtp, network, zip,
+                    drives.Count > 0 ? TopText(drives, 8) : "none", capped ? F(" Row scan capped at {0}; counts are a floor.", max) : ""),
+                "These are Eric Zimmerman SBECmd facts about shellbags in the user hives copied into the package: folders a user opened or browsed in Explorer, including folders that no longer exist. Shellbags persist after the folder, drive, or device is gone, which makes them useful for removable and network media. A drive letter alone does not say whether the volume was removable; MTP entries are phones and cameras. Browsing a folder is not suspicious by itself.",
+                art,
+                "Filter the per-hive CSVs by AbsolutePath for drives, devices, and shares of interest, read FirstInteracted/LastInteracted, and corroborate with USB device history and LNK/jump list targets.");
+        }
+
+        static readonly Regex DriveSegment = new Regex(@"(?:^|\\)([A-Za-z]:)(?:\\|$)");
+
+        /// <summary>The system drive from os_info when the package has it, else C:.</summary>
+        static string SystemDrive(AnalysisContext c)
+        {
+            var os = c.Data["os_info"];
+            var dir = IsTrue(os) ? Str(Get(os, "SystemDirectory")) : "";
+            return dir.Length >= 2 && dir[1] == ':' ? dir.Substring(0, 2) : "C:";
         }
 
         static IEnumerable<string> SafeFiles(string dir, string pattern)

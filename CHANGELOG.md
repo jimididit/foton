@@ -4,6 +4,12 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.5.0] - 2026-11-09
+
+### Added
+- `compose` runs Eric Zimmerman's **AppCompatCacheParser** on the copied SYSTEM hive (Shimcache) and **SBECmd** on the copied user hives (shellbags). `analyze` reads both. Shimcache becomes an overview (entries per control set, how many are marked Executed) and a Medium finding for executables or scripts in user-writable paths; the caveat says an entry shows a file was evaluated, not that it ran. Shellbags become an overview of folders browsed per user, including phone and camera (MTP) entries, network paths, archive contents, and drive letters other than the system drive.
+- `foton tools EZTools` registers AppCompatCacheParser and SBECmd too. A folder registered with an earlier version needs registering again to pick them up.
+
 ## [2.4.0] - 2026-11-09
 
 ### Fixed

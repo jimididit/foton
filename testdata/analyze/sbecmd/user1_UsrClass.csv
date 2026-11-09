@@ -1,0 +1,7 @@
+BagPath,Slot,NodeSlot,MRUPosition,AbsolutePath,ShellType,Value,ChildBags,CreatedOn,ModifiedOn,AccessedOn,LastWriteTime,MFTEntry,MFTSequenceNumber,ExtensionBlockCount,FirstInteracted,LastInteracted,HasExplored,Miscellaneous
+BagMRU\0\0,0,1,0,Desktop\This PC\C:\Users\user1\Documents,Directory,Documents,0,,,,2026-01-14 09:00:00,,,,,,True,
+BagMRU\0\1,0,1,0,Desktop\This PC\E:\Payroll,Directory,Payroll,0,,,,2026-01-14 09:00:00,,,,,,True,
+BagMRU\0\2,0,1,0,Desktop\This PC\Pixel 7,MTP device,Pixel 7,0,,,,2026-01-14 09:00:00,,,,,,True,
+BagMRU\0\2\0,0,1,0,Desktop\This PC\Pixel 7\Internal shared storage,MTP storage,Internal shared storage,0,,,,2026-01-14 09:00:00,,,,,,True,
+BagMRU\1\0,0,1,0,Desktop\Downloads\archive.zip\inner,Zip file contents,inner,0,,,,2026-01-14 09:00:00,,,,,,True,
+BagMRU\2\0,0,1,0,Desktop\Network\fileserver\share,Directory,share,0,,,,2026-01-14 09:00:00,,,,,,True,

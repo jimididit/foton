@@ -359,6 +359,54 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void AppCompatCacheParser_output_becomes_overview_and_writable_code_findings()
+        {
+            using (var t = new TempDir())
+            {
+                CopyFixture("appcompatcacheparser", t.Path, "AppCompatCacheParser");
+                var c = Context(new PackageData(), t.Path);
+                Analyzer.Run(c);
+
+                var overview = c.Findings.Single(f => f.Title == "AppCompatCacheParser Shimcache rows present in compose output");
+                Assert.Equal("Info", overview.Severity);
+                Assert.Contains("6 Shimcache entr(ies)", overview.Observation);
+                Assert.Contains("1 (5); 2 (1)", overview.Observation);
+                Assert.Contains("3 marked Executed", overview.Observation);
+                Assert.Contains("1 without a drive path", overview.Observation);
+
+                var writable = c.Findings.Single(f => f.Title == "AppCompatCacheParser Shimcache lists code in user-writable paths");
+                Assert.Equal("Medium", writable.Severity);
+                Assert.Contains("2 distinct executable or script path(s)", writable.Observation);   // tool.exe once across both control sets
+                Assert.Contains("1 of them marked Executed", writable.Observation);
+                Assert.Contains(@"C:\Users\user1\AppData\Local\Temp\x1\setup.ps1", writable.Observation);
+                Assert.DoesNotContain("report.pdf", writable.Observation);
+                Assert.DoesNotContain("notepad.exe", writable.Observation);
+            }
+        }
+
+        [Fact]
+        public void SBECmd_output_becomes_a_shellbag_overview_with_devices_drives_and_shares()
+        {
+            using (var t = new TempDir())
+            {
+                CopyFixture("sbecmd", t.Path, "SBECmd");
+                var c = Context(new PackageData(), t.Path);
+                Analyzer.Run(c);
+
+                var f = c.Findings.Single(x => x.Title == "SBECmd shellbag rows present in compose output");
+                Assert.Equal("Info", f.Severity);
+                Assert.Contains("8 shellbag row(s) from 2 hive(s)", f.Observation);
+                Assert.Contains("user1_NTUSER", f.Observation);
+                Assert.Contains("naming 8 distinct folder(s)", f.Observation);
+                Assert.Contains("(MTP) entries: 2", f.Observation);
+                Assert.Contains("Network paths: 1", f.Observation);
+                Assert.Contains("Archive contents browsed: 1", f.Observation);
+                Assert.Contains("system drive: E: (2)", f.Observation);   // C: is the system drive and is not listed
+                Assert.DoesNotContain(c.Findings, x => x.Title.StartsWith("SBECmd") && x.Severity != "Info");
+            }
+        }
+
+        [Fact]
         public void A_bare_Foton_case_path_is_not_collector_noise()
         {
             using (var t = new TempDir())

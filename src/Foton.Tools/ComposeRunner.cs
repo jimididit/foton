@@ -73,6 +73,8 @@ namespace Foton.Tools
             var evtx = Path.Combine(root, CaseCategories.FolderOf("EventLogs"), "evtx");
             var amcache = Path.Combine(root, fs, "amcache");
             var hives = Path.Combine(root, fs, "hives");
+            var hivesMachine = Path.Combine(hives, "machine");
+            var hivesUsers = Path.Combine(hives, "users");
 
             List<string> Ez(string input, string output, string csvName) => new List<string> { "-d", input, "--csv", output, "--csvf", csvName };
             var jobs = new[]
@@ -98,6 +100,19 @@ namespace Foton.Tools
                         Note = @"RECmd found but no BatchExamples\DFIRBatch.reb or Kroll_Batch.reb beside it. RECmd does nothing without a batch or search switch; reinstall EZ Tools with BatchExamples.",
                     },
                     Args = (e, i, o) => new List<string> { "-d", i, "--bn", ComposeSupport.RecmdBatch(e)!, "--csv", o, "--csvf", "recmd.csv" },
+                },
+                // Shimcache from the SYSTEM export. reg save writes a consistent hive with no transaction logs, hence --nl.
+                new Job
+                {
+                    Tool = "AppCompatCacheParser", Names = new[] { "AppCompatCacheParser.exe", "AppCompatCacheParser" }, NeedDir = hivesMachine,
+                    NeedFile = Path.Combine(hivesMachine, "SYSTEM"),
+                    Args = (e, i, o) => new List<string> { "-f", Path.Combine(i, "SYSTEM"), "--nl", "--csv", o, "--csvf", "appcompatcache.csv" },
+                },
+                // Shellbags from every copied NTUSER.DAT / UsrClass.dat: one CSV per hive, named after its user folder.
+                new Job
+                {
+                    Tool = "SBECmd", Names = new[] { "SBECmd.exe", "SBECmd" }, NeedDir = hivesUsers,
+                    Args = (e, i, o) => new List<string> { "-d", i, "--nl", "--csv", o },
                 },
                 new Job { Tool = "Hayabusa", Names = new[] { "hayabusa.exe", "hayabusa" }, NeedDir = evtx, Args = HayabusaArgs },
                 // Hunt with Sigma/Chainsaw rules shipped beside the binary. Without rules there is nothing to hunt; a
