@@ -17,7 +17,7 @@ namespace Foton.Baseline.Cli
         static int Main(string[] args)
         {
             string? path = null, outputPath = null;
-            bool noZip = false, noHtml = false, requireAdmin = false;
+            bool noZip = false, noHtml = false, requireAdmin = false, loadUserHives = false;
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
@@ -35,6 +35,7 @@ namespace Foton.Baseline.Cli
                 if (Is("-NoZip")) { noZip = true; continue; }
                 if (Is("-NoHtml")) { noHtml = true; continue; }
                 if (Is("-RequireAdministrator")) { requireAdmin = true; continue; }
+                if (Is("-LoadUserHives")) { loadUserHives = true; continue; }
                 return Usage("Unknown argument: " + a);
             }
             if (path != null && outputPath != null) return Usage("Use -Path (JSON only) or -OutputPath (package folder), not both.");
@@ -50,7 +51,7 @@ namespace Foton.Baseline.Cli
             if (!elevated)
                 log.Write("Standard-user capture: some providers see less (loaded hives only, WMI subscriptions, other users' files). Gaps are recorded, not hidden.", StatusLevel.Warn);
 
-            var session = new FotonSession(new SessionOptions(), DateTime.UtcNow, Environment.MachineName, HostInfo.Account(), elevated, log);
+            var session = new FotonSession(new SessionOptions { LoadUserHives = loadUserHives }, DateTime.UtcNow, Environment.MachineName, HostInfo.Account(), elevated, log);
             if (path != null)
             {
                 var r = BaselineCapture.Capture(session);
@@ -100,6 +101,8 @@ namespace Foton.Baseline.Cli
             log.WriteConsole("");
             log.WriteConsole($"   Records         : {total} across {r.Coverage.Count} record types" + (incomplete > 0 ? $" ({incomplete} provider(s) incomplete; see coverage)" : ""), ConsoleColor.White);
             log.WriteConsole("   PayloadSha256   : " + r.Document.Header.PayloadSha256, ConsoleColor.White);
+            if (r.Document.Header.LoadUserHives)
+                log.WriteConsole($"   User hives      : {r.Document.Header.UserHivesMounted} mounted for capture (-LoadUserHives)", ConsoleColor.White);
             if (root != null) log.WriteConsole("   Baseline folder : " + root, ConsoleColor.White);
             log.WriteConsole("   Snapshot JSON   : " + json, ConsoleColor.White);
             if (html != null) log.WriteConsole("   Snapshot HTML   : " + html, ConsoleColor.White);
@@ -111,8 +114,8 @@ namespace Foton.Baseline.Cli
         static int Usage(string error)
         {
             Console.Error.WriteLine(error);
-            Console.Error.WriteLine("Usage: foton-baseline [-OutputPath <folder>] [-NoZip] [-NoHtml] [-RequireAdministrator]");
-            Console.Error.WriteLine("       foton-baseline -Path <snapshot.json>");
+            Console.Error.WriteLine("Usage: foton-baseline [-OutputPath <folder>] [-NoZip] [-NoHtml] [-RequireAdministrator] [-LoadUserHives]");
+            Console.Error.WriteLine("       foton-baseline -Path <snapshot.json> [-LoadUserHives]");
             Console.Error.WriteLine("       foton-baseline -Version");
             Console.Error.WriteLine("Default -OutputPath: " + OutputFolder.Default("Baselines") + " (must be private to SYSTEM, Administrators, and this account)");
             return 1;

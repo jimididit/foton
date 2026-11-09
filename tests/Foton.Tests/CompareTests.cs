@@ -181,6 +181,38 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void LoadUserHives_header_round_trips_and_older_baselines_read_as_off()
+        {
+            using (var t = new TempDir())
+            {
+                var doc = new BaselineDocument { Header = { BaselineSchemaVersion = "1.18.0", LoadUserHives = true, UserHivesMounted = 2 } };
+                File.WriteAllText(t.File("new.json"), doc.ToJson());
+                var reloaded = BaselineDocument.Load(t.File("new.json"));
+                Assert.True(reloaded.Header.LoadUserHives);
+                Assert.Equal(2, reloaded.Header.UserHivesMounted);
+
+                File.WriteAllText(t.File("old.json"), "{\"Header\":{\"BaselineSchemaVersion\":\"1.18.0\",\"Elevated\":true},\"Records\":{}}");
+                var old = BaselineDocument.Load(t.File("old.json"));
+                Assert.False(old.Header.LoadUserHives);
+                Assert.Equal(0, old.Header.UserHivesMounted);
+            }
+        }
+
+        [Fact]
+        public void Comparing_with_and_without_LoadUserHives_explains_per_user_rows()
+        {
+            BaselineDocument Doc(bool mounted) => new BaselineDocument { Header = { BaselineSchemaVersion = "1.18.0", Hostname = "H", LoadUserHives = mounted } };
+            var added = BaselineComparer.Compare(Doc(false), Doc(true), "x.json").UserHivesNote!;
+            Assert.Contains("Only the difference baseline", added);
+            Assert.Contains("can show as Added", added);
+            var removed = BaselineComparer.Compare(Doc(true), Doc(false), "x.json").UserHivesNote!;
+            Assert.Contains("Only the reference baseline", removed);
+            Assert.Contains("can show as Removed", removed);
+            Assert.Null(BaselineComparer.Compare(Doc(true), Doc(true), "x.json").UserHivesNote);
+            Assert.Null(BaselineComparer.Compare(Doc(false), Doc(false), "x.json").UserHivesNote);
+        }
+
+        [Fact]
         public void Schema_mismatch_is_refused_except_the_value_only_changes_since_1_14()
         {
             var a = new BaselineDocument { Header = { BaselineSchemaVersion = "1.13.0" } };

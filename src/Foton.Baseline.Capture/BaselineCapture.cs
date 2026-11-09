@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Foton.Core;
+using Foton.Win;
 
 namespace Foton.Baseline.Capture
 {
@@ -29,6 +30,37 @@ namespace Foton.Baseline.Capture
     public static class BaselineCapture
     {
         public static CaptureResult Capture(FotonSession session)
+        {
+            // Every mounted hive is in this list the moment it loads, so the finally block unloads it whatever fails.
+            var mounted = new List<string>();
+            try
+            {
+                if (session.Options.LoadUserHives)
+                {
+                    if (!session.IsElevated) session.Status.Write("LoadUserHives ignored: mounting NTUSER.DAT requires elevation", StatusLevel.Warn);
+                    else
+                    {
+                        session.Status.Write("Mounting offline user registry hives (writes HKU until capture ends)", StatusLevel.Step);
+                        session.LoadUserHivesActive = true;
+                        try { UserHives.Load(session, mounted); }
+                        catch (Exception ex) { session.Status.Write("LoadUserHives failed: " + ex.Message, StatusLevel.Warn); }
+                        session.Status.Write($"Mounted {mounted.Count} offline hive(s)", StatusLevel.Info);
+                    }
+                }
+                return CaptureRecords(session, mounted.Count);
+            }
+            finally
+            {
+                if (mounted.Count > 0)
+                {
+                    session.Status.Write("Unmounting offline user registry hives", StatusLevel.Step);
+                    try { UserHives.Unload(session, mounted); }
+                    catch (Exception ex) { session.Status.Write($"UnloadUserHives failed: {ex.Message} - check HKU for {UserHives.MountPrefix}_ keys", StatusLevel.Warn); }
+                }
+            }
+        }
+
+        static CaptureResult CaptureRecords(FotonSession session, int hivesMounted)
         {
             var ctx = new CaptureContext(session.IsElevated);
             var result = new CaptureResult();
@@ -64,6 +96,8 @@ namespace Foton.Baseline.Capture
                 Hostname = session.Hostname,
                 CapturedUtc = FotonTime.Format(session.StartTimeUtc),
                 Elevated = session.IsElevated,
+                LoadUserHives = session.LoadUserHivesActive,
+                UserHivesMounted = hivesMounted,
                 PayloadSha256 = doc.ComputePayloadSha256(),
                 Note = BaselineDocument.HeaderNote,
             };
@@ -99,6 +133,8 @@ namespace Foton.Baseline.Capture
             TextFile.Write(Path.Combine(root, "coverage.json"), Json.Indented(new Dictionary<string, object?>
             {
                 ["Elevated"] = session.IsElevated,
+                ["LoadUserHives"] = r.Document.Header.LoadUserHives,
+                ["UserHivesMounted"] = r.Document.Header.UserHivesMounted,
                 ["BaselineSchemaVersion"] = r.Document.Header.BaselineSchemaVersion,
                 ["ToolVersion"] = r.Document.Header.ToolVersion,
                 ["CapturedUtc"] = r.Document.Header.CapturedUtc,

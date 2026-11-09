@@ -17,6 +17,12 @@ namespace Foton.Core
         public string Hostname { get; set; } = "";
         public string CapturedUtc { get; set; } = "";
         public bool Elevated { get; set; }
+        /// <summary>
+        /// -LoadUserHives was in effect (elevated): hives of users not signed in were mounted, so their per-user rows
+        /// are present. Older readers ignore these header fields; a baseline without them reads as false and 0.
+        /// </summary>
+        public bool LoadUserHives { get; set; }
+        public int UserHivesMounted { get; set; }
         public string PayloadSha256 { get; set; } = "";
         public string Note { get; set; } = "";
     }
@@ -103,6 +109,8 @@ namespace Foton.Core
                 doc.Header.Hostname = Str(hd, "Hostname");
                 doc.Header.CapturedUtc = Str(hd, "CapturedUtc");
                 doc.Header.Elevated = hd.TryGetValue("Elevated", out var e) && e is bool b && b;
+                doc.Header.LoadUserHives = hd.TryGetValue("LoadUserHives", out var lh) && lh is bool lb && lb;
+                doc.Header.UserHivesMounted = hd.TryGetValue("UserHivesMounted", out var um) && um is int n && n > 0 ? n : 0;
                 doc.Header.PayloadSha256 = Str(hd, "PayloadSha256");
                 doc.Header.Note = Str(hd, "Note");
             }

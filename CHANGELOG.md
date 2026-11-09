@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.6.0] - 2026-11-09
+
+### Added
+- `foton-baseline -LoadUserHives` captures the per-user rows (UserAutorun, StartupApproved, ProxyConfig, CmdAutoRun) of users who are not signed in, the way `foton-collect -LoadUserHives` already did. It requires elevation: it mounts each such user's `NTUSER.DAT` under `HKEY_USERS` with `reg.exe` and always unmounts it when the capture ends. Without elevation the switch is ignored with a warning. The baseline header and `coverage.json` record whether hives were mounted and how many. Before, a baseline saw only the users signed in at that moment, so per-user rows came and went as people signed in and out. Compare warns when only one of the two baselines used the switch, because those rows then show as Added or Removed without anything changing on the host. Baseline schema stays 1.18.0: the records do not change, and older Foton versions ignore the new header fields.
+
 ## [2.5.0] - 2026-11-09
 
 ### Added
