@@ -195,6 +195,15 @@ namespace Foton.Tests
                 var old = BaselineDocument.Load(t.File("old.json"));
                 Assert.False(old.Header.LoadUserHives);
                 Assert.Equal(0, old.Header.UserHivesMounted);
+
+                // Any number shape the parser can box (int, long, decimal) or a string reads as the count; a fraction,
+                // negative, out-of-range value, boolean, or text reads as 0.
+                foreach (var c in new[] { "3:3", "3.0:3", "\"3\":3", "2147483647:2147483647", "4294967296:0", "2.5:0", "-1:0", "true:0", "\"x\":0", "null:0" })
+                {
+                    var i = c.LastIndexOf(':');
+                    File.WriteAllText(t.File("n.json"), "{\"Header\":{\"UserHivesMounted\":" + c.Substring(0, i) + "},\"Records\":{}}");
+                    Assert.Equal(int.Parse(c.Substring(i + 1)), BaselineDocument.Load(t.File("n.json")).Header.UserHivesMounted);
+                }
             }
         }
 

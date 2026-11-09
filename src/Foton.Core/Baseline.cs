@@ -110,7 +110,7 @@ namespace Foton.Core
                 doc.Header.CapturedUtc = Str(hd, "CapturedUtc");
                 doc.Header.Elevated = hd.TryGetValue("Elevated", out var e) && e is bool b && b;
                 doc.Header.LoadUserHives = hd.TryGetValue("LoadUserHives", out var lh) && lh is bool lb && lb;
-                doc.Header.UserHivesMounted = hd.TryGetValue("UserHivesMounted", out var um) && um is int n && n > 0 ? n : 0;
+                doc.Header.UserHivesMounted = Count(hd, "UserHivesMounted");
                 doc.Header.PayloadSha256 = Str(hd, "PayloadSha256");
                 doc.Header.Note = Str(hd, "Note");
             }
@@ -143,6 +143,16 @@ namespace Foton.Core
             : new[] { v };
 
         static string Str(Dictionary<string, object> d, string key) => d.TryGetValue(key, out var v) ? PsString(v) : "";
+
+        /// <summary>
+        /// A non-negative whole count whatever number type the parser boxed it as (int, long, decimal such as 2.0, or a
+        /// string); anything else, including a fraction or a negative, reads as 0.
+        /// </summary>
+        static int Count(Dictionary<string, object> d, string key) =>
+            d.TryGetValue(key, out var v) && v != null && !(v is bool)
+            && decimal.TryParse(PsString(v), NumberStyles.Float, CultureInfo.InvariantCulture, out var n)
+            && n >= 0 && n <= int.MaxValue && n == decimal.Truncate(n)
+                ? (int)n : 0;
 
         /// <summary>
         /// A value as PowerShell's [string] cast renders it, which is what 1.38.x compared and keyed on:
