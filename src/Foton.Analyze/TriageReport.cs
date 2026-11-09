@@ -17,6 +17,9 @@ namespace Foton.Analyze
         public IReadOnlyList<Dictionary<string, string?>> Manifest { get; set; } = new Dictionary<string, string?>[0];
         public IReadOnlyList<Dictionary<string, string?>> Errors { get; set; } = new Dictionary<string, string?>[0];
         public string? CaseRoot { get; set; }
+        /// <summary>From the package's chain_of_custody.txt (ChainOfCustody.ReadHeader); null renders "(not supplied)".</summary>
+        public string? CaseNumber { get; set; }
+        public string? Examiner { get; set; }
         public DateTime? CollectedUtc { get; set; }
         public string Version { get; set; } = FotonVersion.Product;
         public int EventLogDays { get; set; } = 14;
@@ -109,7 +112,7 @@ namespace Foton.Analyze
             var collected = r.CollectedUtc.HasValue ? FotonTime.Format(r.CollectedUtc.Value) : "(not recorded)";
             var findings = Order(r.Findings);
             int Count(string sev) => findings.Count(f => f.Severity == sev);
-            const string notSupplied = "(not supplied)";
+            string Supplied(string? v) => string.IsNullOrWhiteSpace(v) ? "(not supplied)" : Html.Encode(v!);
 
             var sb = new StringBuilder();
             sb.AppendLine("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">");
@@ -133,8 +136,8 @@ namespace Foton.Analyze
                 sb.AppendLine("<div><b>Domain</b>" + E(Get(os, "Domain")) + "</div>");
                 sb.AppendLine("<div><b>Last Boot (UTC)</b>" + E(Get(os, "LastBootUtc")) + " &middot; up " + E(Get(os, "UptimeDays")) + "d</div>");
             }
-            sb.AppendLine("<div><b>Case</b>" + notSupplied + "</div>");
-            sb.AppendLine("<div><b>Examiner</b>" + notSupplied + "</div>");
+            sb.AppendLine("<div><b>Case</b>" + Supplied(r.CaseNumber) + "</div>");
+            sb.AppendLine("<div><b>Examiner</b>" + Supplied(r.Examiner) + "</div>");
             sb.AppendLine("<div><b>Collected (UTC)</b>" + Html.Encode(collected) + "</div>");
             sb.AppendLine($"<div><b>Event Window</b>Last {r.EventLogDays} days (analysis default if not stored in package)</div>");
             sb.AppendLine("<div><b>Privilege</b>" + (elevated ? "Elevated (Administrator)" : "Standard user - reduced coverage") + "</div>");
@@ -277,7 +280,7 @@ namespace Foton.Analyze
             if (r.FromZip)
                 sb.AppendLine("<li><b>Rendered from a ZIP.</b> This report sits beside the source ZIP, not inside the case folder, so relative artifact links such as 06_Security_Posture/defender_status.json do not resolve from here. Extract the ZIP and re-run analyze against the folder if you need those links.</li>");
             sb.AppendLine(ReportChrome.TriageLimitsEnd);
-            sb.AppendLine($"<footer>Foton v{Html.Encode(r.Version)} &middot; collected {Html.Encode(collected)} UTC on {Html.Encode(host)} by {notSupplied} &middot; verify artifact hashes in 00_Collection/hashes.csv before analysis</footer>");
+            sb.AppendLine($"<footer>Foton v{Html.Encode(r.Version)} &middot; collected {Html.Encode(collected)} UTC on {Html.Encode(host)} by {Supplied(r.Examiner)} &middot; verify artifact hashes in 00_Collection/hashes.csv before analysis</footer>");
             sb.AppendLine("</div>");
             sb.AppendLine(ReportChrome.TriageScript);
             sb.AppendLine(ReportChrome.NavScript);

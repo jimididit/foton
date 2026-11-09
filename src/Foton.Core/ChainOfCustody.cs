@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 
 namespace Foton.Core
 {
@@ -23,6 +24,13 @@ namespace Foton.Core
         public string? ExecutableSha256 { get; set; }
         public TimeZoneInfo TimeZone { get; set; } = TimeZoneInfo.Local;
         public DateTime LocalTimeAtStart { get; set; } = DateTime.Now;
+    }
+
+    /// <summary>Case Number and Examiner as a package's chain_of_custody.txt records them; null when not recorded.</summary>
+    public sealed class CustodyHeader
+    {
+        public string? CaseNumber { get; set; }
+        public string? Examiner { get; set; }
     }
 
     /// <summary>
@@ -150,6 +158,35 @@ namespace Foton.Core
             var path = Path.Combine(s.Dir("Collection"), "chain_of_custody.txt");
             TextFile.WriteLines(path, Lines(s, f));
             return path;
+        }
+
+        /// <summary>
+        /// Reads Case Number and Examiner from the header of a case's chain_of_custody.txt (Foton 1.38.x and v2 write
+        /// the same "Label : value" lines). Only the header is read, up to "Parameters Used:". A missing or unreadable
+        /// file gives an empty header, and "(not supplied)" reads as not recorded.
+        /// </summary>
+        public static CustodyHeader ReadHeader(string? caseRoot)
+        {
+            var h = new CustodyHeader();
+            if (string.IsNullOrEmpty(caseRoot)) return h;
+            try
+            {
+                var path = Path.Combine(caseRoot, CaseTree.CollectionFolder, "chain_of_custody.txt");
+                if (!File.Exists(path)) return h;
+                foreach (var line in File.ReadLines(path).Take(60))
+                {
+                    if (line.StartsWith("Parameters Used", StringComparison.Ordinal)) break;
+                    var colon = line.IndexOf(':');
+                    if (colon < 0) continue;
+                    var label = line.Substring(0, colon).Trim();
+                    var value = line.Substring(colon + 1).Trim();
+                    if (value.Length == 0 || value == "(not supplied)") continue;
+                    if (h.CaseNumber == null && label == "Case Number") h.CaseNumber = value;
+                    else if (h.Examiner == null && label == "Examiner") h.Examiner = value;
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            return h;
         }
     }
 }

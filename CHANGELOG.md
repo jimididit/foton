@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.2.2] - 2026-11-09
+
+### Fixed
+- The triage report (`Foton_Report.html`) showed Case and Examiner as "(not supplied)" even when `-CaseNumber` and `-Examiner` were given. The report now reads both from the package's `chain_of_custody.txt` (Foton 1.38.x packages included). Values are HTML-encoded like every other package value, and "(not supplied)" remains only when the package did not record them.
+
 ## [2.2.1] - 2026-11-08
 
 ### Fixed
