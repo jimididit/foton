@@ -25,17 +25,19 @@ $ProgressPreference = 'SilentlyContinue'
 $foton = Join-Path $env:USERPROFILE 'Foton'
 New-Item -ItemType Directory -Path $foton -Force | Out-Null
 Set-Location $foton
-foreach ($f in 'foton-collect.exe', 'foton-baseline.exe', 'foton.exe', 'SHA256SUMS.txt') {
+$exes = 'foton-collect.exe', 'foton-baseline.exe', 'foton.exe'
+foreach ($f in $exes + 'SHA256SUMS.txt') {
     Invoke-WebRequest "https://github.com/jimididit/foton/releases/latest/download/$f" -OutFile $f -UseBasicParsing
 }
-Get-Content .\SHA256SUMS.txt | ForEach-Object {
-    $hash, $name = $_ -split '\s+', 2
-    if ((Get-FileHash $name -Algorithm SHA256).Hash -eq $hash) { "OK    $name" } else { "FAIL  $name  (do not run it; download again)" }
+$sums = @{}
+Get-Content .\SHA256SUMS.txt | ForEach-Object { $hash, $name = $_ -split '\s+', 2; $sums[$name] = $hash }
+foreach ($f in $exes) {
+    if ($sums[$f] -and (Get-FileHash $f -Algorithm SHA256).Hash -eq $sums[$f]) { Unblock-File $f; "OK    $f" }
+    else { Remove-Item $f; "FAIL  $f  (deleted: it does not match SHA256SUMS.txt; run this block again)" }
 }
-Get-ChildItem *.exe | Unblock-File
 ```
 
-You should see three `OK` lines. The folder is in your own profile, so other accounts on the computer cannot replace the executables. When you open a new PowerShell window later, go back to it first:
+You should see three `OK` lines. A file that does not match is deleted, so it cannot be run by mistake; run the block again. The folder is in your own profile, so other accounts on the computer cannot replace the executables. When you open a new PowerShell window later, go back to it first:
 
 ```powershell
 Set-Location (Join-Path $env:USERPROFILE 'Foton')
@@ -92,11 +94,13 @@ Copy the ZIP and its `_PACKAGE_HASH.txt` into the window that opened. Then verif
 Set-Location (Join-Path $env:USERPROFILE 'Foton')
 $zip = Get-ChildItem .\Cases -Filter 'Foton_*.zip' | Sort-Object LastWriteTime | Select-Object -Last 1
 .\foton.exe package $zip.FullName
-Expand-Archive $zip.FullName -DestinationPath .\Cases -Force
-$case = Join-Path (Resolve-Path .\Cases) $zip.BaseName
+if ($LASTEXITCODE -eq 0) {
+    Expand-Archive $zip.FullName -DestinationPath .\Cases -Force
+    $case = Join-Path (Resolve-Path .\Cases) $zip.BaseName
+} else { $case = $null; "Not extracted: the package check above reported a problem." }
 ```
 
-`foton package` re-hashes every file against the list made at collection time and reports anything changed or missing.
+`foton package` re-hashes every file against the list made at collection time and reports anything changed or missing. The ZIP is extracted only when every file matches. If it reports a problem, copy the package from the endpoint again; if it still fails, record that in your case notes, because the package changed after collection.
 
 **Trying Foton on one computer?** Skip the copy and point `$case` at the case folder Foton just wrote (run this in the same Administrator window you collected from):
 

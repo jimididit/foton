@@ -41,12 +41,16 @@ They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is inst
 **Verify before use.** The executables are not code-signed yet, so Windows SmartScreen may warn when one is started from File Explorer. Trust comes from the hash and the build provenance, not a publisher certificate. [GETTING-STARTED.md](GETTING-STARTED.md#1-download-and-verify) has a block that downloads the latest release and checks every file. To check files you downloaded yourself, run this in the folder holding them and `SHA256SUMS.txt`:
 
 ```powershell
-Get-Content .\SHA256SUMS.txt | ForEach-Object {
-    $hash, $name = $_ -split '\s+', 2
-    if ((Get-FileHash $name -Algorithm SHA256).Hash -eq $hash) { "OK    $name" } else { "FAIL  $name" }
+$sums = @{}
+Get-Content .\SHA256SUMS.txt | ForEach-Object { $hash, $name = $_ -split '\s+', 2; $sums[$name] = $hash }
+foreach ($f in 'foton-collect.exe', 'foton-baseline.exe', 'foton.exe') {
+    if (-not (Test-Path $f)) { continue }
+    if ($sums[$f] -and (Get-FileHash $f -Algorithm SHA256).Hash -eq $sums[$f]) { Unblock-File $f; "OK    $f" }
+    else { Remove-Item $f; "FAIL  $f  (deleted: it does not match SHA256SUMS.txt)" }
 }
-Get-ChildItem *.exe | Unblock-File
 ```
+
+Only files that match are unblocked; a file that does not match is deleted so it cannot be run by mistake.
 
 With the [GitHub CLI](https://cli.github.com/) (optional), `gh attestation verify` proves each file was built by this repository's release workflow from a specific commit:
 

@@ -19,14 +19,16 @@ $ProgressPreference = 'SilentlyContinue'
 $foton = Join-Path $env:USERPROFILE 'Foton'
 New-Item -ItemType Directory -Path $foton -Force | Out-Null
 Set-Location $foton
-foreach ($f in 'foton-collect.exe', 'foton-baseline.exe', 'foton.exe', 'SHA256SUMS.txt') {
+$exes = 'foton-collect.exe', 'foton-baseline.exe', 'foton.exe'
+foreach ($f in $exes + 'SHA256SUMS.txt') {
     Invoke-WebRequest "https://github.com/jimididit/foton/releases/latest/download/$f" -OutFile $f -UseBasicParsing
 }
-Get-Content .\SHA256SUMS.txt | ForEach-Object {
-    $hash, $name = $_ -split '\s+', 2
-    if ((Get-FileHash $name -Algorithm SHA256).Hash -eq $hash) { "OK    $name" } else { "FAIL  $name  (do not run it; download again)" }
+$sums = @{}
+Get-Content .\SHA256SUMS.txt | ForEach-Object { $hash, $name = $_ -split '\s+', 2; $sums[$name] = $hash }
+foreach ($f in $exes) {
+    if ($sums[$f] -and (Get-FileHash $f -Algorithm SHA256).Hash -eq $sums[$f]) { Unblock-File $f; "OK    $f" }
+    else { Remove-Item $f; "FAIL  $f  (deleted: it does not match SHA256SUMS.txt; run this block again)" }
 }
-Get-ChildItem *.exe | Unblock-File
 ```
 
 3. Collect, then open the report:
