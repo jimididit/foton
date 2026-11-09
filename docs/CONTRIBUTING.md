@@ -51,7 +51,7 @@ Version and schema numbers live once in [`Directory.Build.props`](../Directory.B
 6. A path read from the host is opened only when it is plainly local (`Hashing.IsLocalPath`), and a cloud-only placeholder is never read (`Hashing.IsCloudPlaceholder`).
 7. UTC everywhere (`yyyy-MM-dd HH:mm:ss`, invariant culture), and SHA-256 on everything collected.
 8. Prefer **composing** specialist tools (EZ Tools, Hayabusa, KAPE/ORC) over reimplementing them. Propose large capabilities (especially NTFS carving) before building.
-9. Public docs use placeholders (`CASE-0001`, `D:\Cases`, `HOSTNAME`), never personal host names.
+9. Public docs never name personal hosts, and every command in them runs as pasted on a default Windows install: no drives or folders that may not exist (`D:\Cases`), no example file names a reader must guess (`Foton_HOSTNAME_...`). Use the default output folders (`C:\Foton\Cases`, `C:\Foton\Baselines`), a `$case` variable set by a pasted line, or a quoted `"<description>"` placeholder introduced in the text above the block. Optional tools (`gh`) are marked optional with an install link. Commands that ask a question get the switch that answers it (`-Force`) so a pasted block does not feed its next line in as the answer. Paste every changed block into PowerShell before merging.
 
 ## Add a collection task
 
