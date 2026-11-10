@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.7.1] - 2026-11-10
+
+### Fixed
+- `foton-collect -LoadUserHives` lost the hives it loaded: `registry_hives_user` tried to file-copy `NTUSER.DAT` and its logs for each mounted user, which the mount locks, and fell back to `reg save` only for users who were signed in. Those users' `NTUSER.DAT` was missing from the package (task Partial, `CopyError` rows), so RECmd and SBECmd in `compose` never saw it. A hive mounted by `-LoadUserHives` is now exported with `reg save` from its `HKU\Foton_<SID>` mount, like a signed-in user's, and its locked logs are marked `SupersededBySave`.
+
 ## [2.7.0] - 2026-11-10
 
 ### Changed

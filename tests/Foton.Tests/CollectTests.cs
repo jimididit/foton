@@ -99,6 +99,17 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_hive_mounted_by_LoadUserHives_is_exported_from_its_mount_key()
+        {
+            const string sid = "S-1-5-21-1-2-3-1002";
+            Assert.Equal(@"HKU\" + sid, FilesystemCollection.NtUserKey(sid, k => k == @"HKU\" + sid));
+            Assert.Equal(@"HKU\Foton_" + sid, FilesystemCollection.NtUserKey(sid, k => k == @"HKU\Foton_" + sid));
+            // Signed in wins over a stale mount; neither loaded keeps the plain key (the file copy works then).
+            Assert.Equal(@"HKU\" + sid, FilesystemCollection.NtUserKey(sid, k => true));
+            Assert.Equal(@"HKU\" + sid, FilesystemCollection.NtUserKey(sid, k => false));
+        }
+
+        [Fact]
         public void Parallel_signature_checks_match_sequential_ones_in_input_order()
         {
             var files = Directory.GetFiles(Environment.GetFolderPath(Environment.SpecialFolder.System))
