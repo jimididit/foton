@@ -19,8 +19,8 @@ namespace Foton.Parse
 
     /// <summary>
     /// Runs every parser over a package (folder or ZIP) or one file (Invoke-FotonParse). Offline: reads only
-    /// copied bytes. A package run writes analysis\parsed_records.csv and analysis\Foton_Parse.html (beside a ZIP:
-    /// &lt;name&gt;_parse.csv and &lt;name&gt;_Parse.html). Never writes findings or touches the collect hashes.
+    /// copied bytes. A package run writes analysis\parsed_records.csv and analysis\Foton_Parse.html (a ZIP's in its
+    /// extraction beside it). Never writes findings or touches the collect hashes.
     /// </summary>
     public static class ParseRunner
     {
@@ -39,8 +39,8 @@ namespace Foton.Parse
             if (!File.Exists(full) && !Directory.Exists(full)) throw new FileNotFoundException("Parse path not found: " + path, path);
 
             var pkg = FotonPackage.Open(full);
-            try { return RunPackage(pkg, log); }
-            finally { pkg.DeleteExtraction(); }
+            if (pkg.ZipNote != null) log.Write(pkg.ZipNote, StatusLevel.Info);
+            return RunPackage(pkg, log);
         }
 
         static ParseRun RunPackage(FotonPackage pkg, StatusLog log)
@@ -54,19 +54,10 @@ namespace Foton.Parse
             Summarize(run, log);
 
             var host = Hostname(pkg);
-            if (pkg.Kind == PackageKind.Zip)
-            {
-                var stem = Path.Combine(Path.GetDirectoryName(pkg.SourcePath)!, Path.GetFileNameWithoutExtension(pkg.SourcePath));
-                run.CsvPath = stem + "_parse.csv";
-                run.HtmlPath = stem + "_Parse.html";
-            }
-            else
-            {
-                var analysis = Path.Combine(pkg.CaseRoot, "analysis");
-                Directory.CreateDirectory(analysis);
-                run.CsvPath = Path.Combine(analysis, "parsed_records.csv");
-                run.HtmlPath = Path.Combine(analysis, ParseReport.FileName);
-            }
+            var analysis = Path.Combine(pkg.CaseRoot, "analysis");
+            Directory.CreateDirectory(analysis);
+            run.CsvPath = Path.Combine(analysis, "parsed_records.csv");
+            run.HtmlPath = Path.Combine(analysis, ParseReport.FileName);
             Csv.Write(run.CsvPath, run.Rows);
             log.Write("Wrote " + run.CsvPath, StatusLevel.Good);
             ParseReport.Write(run.Rows, run.HtmlPath, host, run.EmptyReason);

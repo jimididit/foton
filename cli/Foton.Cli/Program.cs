@@ -66,6 +66,7 @@ namespace Foton.Cli
             Console.WriteLine();
             Console.WriteLine("Usage:");
             Console.WriteLine("  foton -Version");
+            Console.WriteLine("  A <zip> is extracted once to <zip name>-extracted beside it; every verb reuses that folder and writes its outputs there.");
             Console.WriteLine("  foton package <case-folder-or-zip>   open a package and verify hashes.csv");
             Console.WriteLine("  foton parse <case-folder-zip-or-file> parse copied Prefetch, LNK, jumplists, EVTX, Amcache;");
             Console.WriteLine("                                        writes analysis\\parsed_records.csv and Foton_Parse.html");
@@ -73,7 +74,7 @@ namespace Foton.Cli
             Console.WriteLine("  foton ioc <case-folder-or-zip> <ioc-file>");
             Console.WriteLine("                                        match an IOC list (.txt sha256:/path:/text:, .csv, .json);");
             Console.WriteLine("                                        writes analysis\\ioc_matches.csv");
-            Console.WriteLine("  foton compose <case-folder>          run EZ Tools / Hayabusa / Chainsaw on copied files;");
+            Console.WriteLine("  foton compose <case-folder-or-zip>   run EZ Tools / Hayabusa / Chainsaw on copied files;");
             Console.WriteLine("                                        writes analysis\\external\\ and external_parse_inventory.csv");
             Console.WriteLine("  foton tools                          list pinned and registered tools");
             Console.WriteLine("  foton tools <Hayabusa|Chainsaw> [-Force]");
@@ -114,14 +115,12 @@ namespace Foton.Cli
                 log.Write("Cannot verify package: " + ex.Message, StatusLevel.Error);
                 return 1;
             }
-            finally { p.DeleteExtraction(); }
         }
 
         static int Report(StatusLog log, FotonPackage p)
         {
+            if (p.ZipNote != null) log.Write(p.ZipNote, StatusLevel.Info);
             log.Write($"Loaded package {p.CaseRoot} ({p.Artifacts.Count} artifacts, {p.Manifest.Count} manifest rows, {p.Kind})", StatusLevel.Good);
-            if (p.Kind == PackageKind.Zip)
-                log.Write("ZIP verified from a temporary extraction that is removed afterwards; chain parse/compose/analyze on an extracted folder.", StatusLevel.Info);
             if (p.NestedDuplicate != null)
                 log.Write($"This package contains a full copy of itself at {Path.GetFileName(p.NestedDuplicate)}. It is skipped so artifacts are not counted twice.", StatusLevel.Warn);
             foreach (var other in p.OtherNestedCases)
@@ -133,18 +132,38 @@ namespace Foton.Cli
                 log.Write("No 00_Collection\\hashes.csv: integrity cannot be verified for this package.", StatusLevel.Warn);
                 return 2;
             }
-            log.Write($"hashes.csv: {v.Matched} matched, {v.Mismatched.Count} changed, {v.Missing.Count} missing, {v.Unreadable.Count} unreadable, {v.Unlisted.Count} not listed",
+            var where = p.Kind == PackageKind.Zip ? "hashes.csv (checked inside the ZIP)" : "hashes.csv";
+            log.Write($"{where}: {v.Matched} matched, {v.Mismatched.Count} changed, {v.Missing.Count} missing, {v.Unreadable.Count} unreadable, {v.Unlisted.Count} not listed",
                 v.Intact ? StatusLevel.Good : StatusLevel.Warn);
             foreach (var f in v.Mismatched.Take(20)) log.Write("Changed since hashing: " + f, StatusLevel.Warn);
             foreach (var f in v.Missing.Take(20)) log.Write("Listed but missing: " + f, StatusLevel.Warn);
             foreach (var f in v.Unreadable.Take(20)) log.Write("Could not read: " + f, StatusLevel.Warn);
             if (v.NotExtracted.Count > 0)
-                log.Write($"{v.NotExtracted.Count} listed file(s) have paths too long to extract under {p.ExtractedTo}, so their hashes were not checked (packages from Foton 2.2.0 and earlier can hold long shortcut names). Extract the ZIP to a short folder such as C:\\x and run foton package on that folder.", StatusLevel.Warn);
+                log.Write($"{v.NotExtracted.Count} listed file(s) were not extracted (path too long), so their hashes were not checked.", StatusLevel.Warn);
             if (v.Unlisted.Count > 0)
                 log.Write("Files not in hashes.csv are expected for workstation outputs written after collection (analysis\\, reports); they are not part of the hashed record.", StatusLevel.Info);
             if (p.Manifest.Count > 0 && v.Mismatched.Any(f => f.EndsWith(@"00_Collection\collection.log", StringComparison.OrdinalIgnoreCase)))
                 log.Write("collection.log differs from its hash: Foton 1.38.x appended status lines after hashing, so this alone is expected for 1.38.x packages.", StatusLevel.Info);
-            return v.Intact ? 0 : 2;
+            var extractionMatches = ExtractionMatches(log, p);
+            return v.Intact && extractionMatches ? 0 : 2;
+        }
+
+        /// <summary>
+        /// For a ZIP, also checks the extraction that parse, compose, and analyze read. Foton_Report.html is left out:
+        /// analyze rewrites it there by design.
+        /// </summary>
+        static bool ExtractionMatches(StatusLog log, FotonPackage p)
+        {
+            if (p.Kind != PackageKind.Zip) return true;
+            if (p.NotExtracted.Count > 0)
+                log.Write($"{p.NotExtracted.Count} file(s) in the ZIP have paths too long to extract under {p.ExtractedTo} (packages from Foton 2.2.0 and earlier can hold long shortcut names). Their hashes were checked in the ZIP, but parse, compose, and analyze do not see them. Move the ZIP to a folder with a shorter path, delete {Path.GetFileName(p.ExtractedTo)}, and run again.", StatusLevel.Warn);
+            var e = p.VerifyExtraction();
+            var drift = e.Mismatched.Concat(e.Missing).Concat(e.Unreadable)
+                .Where(f => !string.Equals(f, Foton.Analyze.TriageReport.FileName, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (drift.Count == 0) return true;
+            log.Write($"The extraction no longer matches hashes.csv for {drift.Count} file(s) that parse, compose, and analyze read. Delete {p.ExtractedTo} and run again to extract a fresh copy from the ZIP.", StatusLevel.Warn);
+            foreach (var f in drift.Take(20)) log.Write("Changed in the extraction: " + f, StatusLevel.Warn);
+            return false;
         }
 
         /// <summary>Exit 0 after a diff (changes are findings, not failures), 1 when a baseline cannot be read or compared.</summary>
@@ -223,7 +242,7 @@ namespace Foton.Cli
                 var n = run.Findings.Count(f => f.Severity == sev);
                 if (n > 0) log.Write($"{sev}: {n}", sev == "High" ? StatusLevel.Warn : StatusLevel.Info);
             }
-            log.Write("Findings: " + (run.FindingsPath ?? run.BesideZipPath), StatusLevel.Good);
+            log.Write("Findings: " + run.FindingsPath, StatusLevel.Good);
             log.Write("Report: " + run.ReportPath, StatusLevel.Good);
             log.WriteConsole("     Findings are observations with a tier and a benign explanation. None is a compromise verdict.", ConsoleColor.DarkGray);
             return 0;
@@ -264,7 +283,7 @@ namespace Foton.Cli
             foreach (var r in run.Rows)
                 log.WriteConsole($"   {r.Tool,-14} {(r.Version.Length > 0 ? r.Version : "-"),-12} {r.Status,-14} {(r.DestRelative.Length > 0 ? r.DestRelative : r.Note)}",
                     r.Status == "Copied" ? ConsoleColor.White : ConsoleColor.DarkGray);
-            log.Write(@"Inventory: analysis\external\external_parse_inventory.csv. Native foton parse if tools are missing.", StatusLevel.Good);
+            log.Write("Inventory: " + run.InventoryPath + ". Native foton parse if tools are missing.", StatusLevel.Good);
             log.WriteConsole("     Missing Hayabusa or Chainsaw: foton tools Hayabusa | Chainsaw. Existing EZ Tools folder: foton tools EZTools <dir>", ConsoleColor.DarkGray);
             return 0;
         }

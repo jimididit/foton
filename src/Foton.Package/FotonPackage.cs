@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using Foton.Core;
 
@@ -38,18 +41,19 @@ namespace Foton.Package
         public string SourcePath { get; private set; } = "";
         public PackageKind Kind { get; private set; }
         public string CaseRoot { get; private set; } = "";
-        /// <summary>The temporary folder a ZIP was extracted to (null for folders); remove with DeleteExtraction.</summary>
+        /// <summary>The &lt;name&gt;-extracted folder beside a ZIP (null for folders). It is kept: outputs are written into it.</summary>
         public string? ExtractedTo { get; private set; }
+        /// <summary>SHA-256 of the ZIP as opened (null for folders).</summary>
+        public string? ZipSha256 { get; private set; }
+        /// <summary>True when an earlier run had already extracted this same ZIP.</summary>
+        public bool ExtractionReused { get; private set; }
         readonly List<string> notExtracted = new List<string>();
-        /// <summary>ZIP entries left out of the temporary extraction because their path would be too long for Windows.</summary>
+        /// <summary>ZIP entries left out of the extraction because their path would be too long for Windows.</summary>
         public IReadOnlyList<string> NotExtracted => notExtracted;
 
-        /// <summary>Deletes the temporary ZIP extraction. Never touches a folder package.</summary>
-        public void DeleteExtraction()
-        {
-            if (ExtractedTo == null || !Directory.Exists(ExtractedTo)) return;
-            try { Directory.Delete(ExtractedTo, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
-        }
+        /// <summary>One status line saying where a ZIP was extracted (null for a folder package).</summary>
+        public string? ZipNote => Kind != PackageKind.Zip ? null
+            : $"{Path.GetFileName(SourcePath)} (SHA-256 {ZipSha256}) {(ExtractionReused ? "was already extracted to" : "extracted to")} {ExtractedTo}; outputs are written there.";
         /// <summary>A verified full copy of the case nested inside it, skipped by every recursive walk.</summary>
         public string? NestedDuplicate { get; private set; }
         /// <summary>
@@ -68,29 +72,28 @@ namespace Foton.Package
         static readonly HashSet<string> SkipNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "hashes.csv", "hashes.txt", "findings.csv", "collection.log",
-            "chain_of_custody.txt", "collection_manifest.csv", "collection_errors.csv",
+            "chain_of_custody.txt", "collection_manifest.csv", "collection_errors.csv", ZipExtraction.RecordName,
         };
 
         static readonly Regex SkipDirs = new Regex(@"[\\/](evtx|analysis)([\\/]|$)", RegexOptions.IgnoreCase);
         static readonly Regex Stamp = new Regex(@"_(20\d{6}-\d{6})Z$");
 
         /// <summary>
-        /// Opens a case folder (or a parent holding one), or extracts a ZIP to a fresh folder under
-        /// <paramref name="extractRoot"/> (default %TEMP%). Throws when no 00_Collection is found.
+        /// Opens a case folder (or a parent holding one), or a ZIP through its &lt;name&gt;-extracted folder beside it
+        /// (extracted on first use, reused while the ZIP's SHA-256 matches). Throws when no 00_Collection is found.
         /// </summary>
-        public static FotonPackage Open(string path, string? extractRoot = null)
+        public static FotonPackage Open(string path)
         {
             var p = new FotonPackage { SourcePath = Path.GetFullPath(path) };
             string search;
             if (File.Exists(path) && string.Equals(Path.GetExtension(path), ".zip", StringComparison.OrdinalIgnoreCase))
             {
                 p.Kind = PackageKind.Zip;
-                // Short folder name: every character here is one less for the deepest path inside the package.
-                do search = Path.Combine(extractRoot ?? Path.GetTempPath(), "FotonPkg-" + Guid.NewGuid().ToString("N").Substring(0, 8));
-                while (Directory.Exists(search) || File.Exists(search));
-                p.ExtractedTo = search;
-                try { SafeZip.Extract(path, search, null, p.notExtracted); }
-                catch { p.DeleteExtraction(); throw; }
+                var x = ZipExtraction.Ensure(p.SourcePath);
+                p.ExtractedTo = search = x.Folder;
+                p.ZipSha256 = x.ZipSha256;
+                p.ExtractionReused = x.Reused;
+                p.notExtracted.AddRange(x.NotExtracted);
             }
             else if (Directory.Exists(path))
             {
@@ -101,10 +104,7 @@ namespace Foton.Package
 
             var root = CaseTree.FindCaseRoot(search);
             if (root == null)
-            {
-                p.DeleteExtraction();
                 throw new InvalidDataException("No 00_Collection folder under " + search + ". Point at an extracted WinFoton/Foton case.");
-            }
             p.CaseRoot = root;
             p.NestedDuplicate = CaseTree.FindNestedDuplicate(p.CaseRoot);
             p.OtherNestedCases = CaseTree.OtherChildCases(p.CaseRoot);
@@ -173,8 +173,18 @@ namespace Foton.Package
             catch (Exception) { return null; }
         }
 
-        /// <summary>Re-hashes every file listed in 00_Collection\hashes.csv against the bytes on disk.</summary>
-        public HashVerification VerifyHashes()
+        /// <summary>
+        /// Re-hashes every file listed in 00_Collection\hashes.csv. For a ZIP, the entries inside the ZIP against the
+        /// hashes.csv inside it: the evidence as collected, whatever later verbs wrote into the extraction. For a folder,
+        /// the bytes on disk.
+        /// </summary>
+        public HashVerification VerifyHashes() => Kind == PackageKind.Zip ? VerifyZip() : VerifyExtraction();
+
+        /// <summary>
+        /// The files on disk under CaseRoot against hashes.csv: for a ZIP, its extraction, which parse, compose, and
+        /// analyze read. Entries too long to extract are listed as NotExtracted, not Missing.
+        /// </summary>
+        public HashVerification VerifyExtraction()
         {
             var csv = Path.Combine(CaseRoot, CaseTree.CollectionFolder, "hashes.csv");
             var v = new HashVerification { HashesFile = csv, HashesFilePresent = File.Exists(csv) };
@@ -203,7 +213,61 @@ namespace Foton.Package
                 var rel = f.Substring(CaseRoot.Length).TrimStart('\\');
                 var name = Path.GetFileName(f);
                 if (name == "hashes.csv" || name == "hashes.txt" || listed.Contains(rel)) continue;
+                if (ExtractedTo != null && string.Equals(f, Path.Combine(ExtractedTo, ZipExtraction.RecordName), StringComparison.OrdinalIgnoreCase)) continue;
                 v.Unlisted.Add(rel);
+            }
+            return v;
+        }
+
+        HashVerification VerifyZip()
+        {
+            var csvRel = CaseTree.CollectionFolder + "\\hashes.csv";
+            var v = new HashVerification { HashesFile = Path.Combine(CaseRoot, csvRel) };
+            var extracted = ExtractedTo!.TrimEnd('\\');
+            var prefix = CaseRoot.Length > extracted.Length ? CaseRoot.Substring(extracted.Length).Trim('\\') + "\\" : "";
+            var nested = NestedDuplicate == null ? null : NestedDuplicate.Substring(CaseRoot.TrimEnd('\\').Length).Trim('\\') + "\\";
+            using (var zip = ZipFile.OpenRead(SourcePath))
+            {
+                // Entries by path relative to the case root, as hashes.csv lists them.
+                var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.OrdinalIgnoreCase);
+                foreach (var e in zip.Entries)
+                {
+                    var name = e.FullName.Replace('/', '\\');
+                    if (name.Length == 0 || name.EndsWith("\\", StringComparison.Ordinal) || !name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                    var rel = name.Substring(prefix.Length);
+                    if (nested != null && rel.StartsWith(nested, StringComparison.OrdinalIgnoreCase)) continue;
+                    entries[rel] = e;
+                }
+                if (!entries.TryGetValue(csvRel, out var hashes)) return v;
+                v.HashesFilePresent = true;
+                string text;
+                using (var reader = new StreamReader(hashes.Open(), Encoding.UTF8)) text = reader.ReadToEnd();
+                var listed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var sha = SHA256.Create())
+                    foreach (var row in Csv.ReadText(text))
+                    {
+                        // Older packages wrote forward slashes; compare on one separator.
+                        var rel = (row.TryGetValue("RelativePath", out var r) ? r ?? "" : "").Replace('/', '\\');
+                        var expected = row.TryGetValue("SHA256", out var h) ? h ?? "" : "";
+                        // Normalized without building a full path, so an entry too long to extract is still checked.
+                        var parts = rel.Split('\\').Where(s => s.Length > 0 && s != ".").ToArray();
+                        if (Path.IsPathRooted(rel) || rel.IndexOf(':') >= 0 || parts.Length == 0 || parts.Contains(".."))
+                        { v.Mismatched.Add(rel + " (path outside the case)"); continue; }
+                        var key = string.Join("\\", parts);
+                        listed.Add(key);
+                        if (!entries.TryGetValue(key, out var entry)) { v.Missing.Add(rel); continue; }
+                        string actual;
+                        try { using (var s = entry.Open()) actual = Hashing.ToHex(sha.ComputeHash(s)); }
+                        catch (Exception) { v.Unreadable.Add(rel); continue; }
+                        if (string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase)) v.Matched++;
+                        else v.Mismatched.Add(rel);
+                    }
+                foreach (var rel in entries.Keys.OrderBy(k => k, StringComparer.Ordinal))
+                {
+                    var name = Path.GetFileName(rel);
+                    if (name == "hashes.csv" || name == "hashes.txt" || listed.Contains(rel)) continue;
+                    v.Unlisted.Add(rel);
+                }
             }
             return v;
         }
@@ -222,7 +286,7 @@ namespace Foton.Package
         public List<string> Missing { get; } = new List<string>();
         public List<string> Unreadable { get; } = new List<string>();
         public List<string> Unlisted { get; } = new List<string>();
-        /// <summary>Listed files in the ZIP that were too long to extract here, so their hashes were not checked.</summary>
+        /// <summary>Listed files too long to extract, so their hashes were not checked on disk (VerifyExtraction only).</summary>
         public List<string> NotExtracted { get; } = new List<string>();
         public bool Intact => HashesFilePresent && Mismatched.Count == 0 && Missing.Count == 0 && Unreadable.Count == 0 && NotExtracted.Count == 0;
     }

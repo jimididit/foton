@@ -4,6 +4,14 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.7.0] - 2026-11-10
+
+### Changed
+- `foton` verbs on a package ZIP no longer extract it to a temporary folder under `%TEMP%` each time. The first verb extracts the ZIP once, beside it, into a folder named like the ZIP with `-extracted` at the end; later verbs reuse it, and all outputs are written there, as for a case folder: `analysis\parsed_records.csv`, `analysis\findings.csv`, `analysis\ioc_matches.csv`, and `Foton_Report.html` in the case folder, where its artifact links now work. The `<name>_findings.csv`, `<name>_Report.html`, `<name>_parse.csv`, `<name>_Parse.html`, and `<name>_ioc_matches.csv` files that 2.6.1 and earlier wrote beside the ZIP are no longer written. Case data is no longer left in `%TEMP%`, and the ZIP is extracted once instead of on every verb.
+- `foton compose` now accepts a package ZIP and works in its `-extracted` folder; before, it refused a ZIP.
+- The folder holds `foton_extraction.json` with the ZIP's SHA-256. Every verb re-hashes the ZIP before reusing the folder. If the ZIP was replaced, or the folder was not left by a finished Foton extraction, the verb stops and names the folder instead of mixing two packages; Foton never deletes that folder. Extraction is written under a temporary name and renamed when complete, so an interrupted run never leaves a folder that looks finished.
+- `foton package` on a ZIP verifies the files inside the ZIP against its `hashes.csv`, so the result describes the package as collected, not what later verbs wrote into the folder. Files whose paths were too long to extract (packages from 2.2.0 and earlier) are now verified too. It then checks the extraction, which parse, compose, and analyze read, and exits with 2 when a collected file changed there (`Foton_Report.html` excepted, because analyze rewrites it).
+
 ## [2.6.1] - 2026-11-09
 
 ### Changed
