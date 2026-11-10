@@ -44,10 +44,14 @@ namespace Foton.Collect
             catch (Exception ex) when (WmiFailed(ex)) { }
             var rows = new List<Dictionary<string, object?>>();
             var owners = new ProcessOwner();
+            // Many processes share one image (svchost, browser and Electron helpers): check and hash each path once per task.
+            var sigs = new Dictionary<string, SignatureInfo>(StringComparer.OrdinalIgnoreCase);
+            var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var p in procs.OrderBy(kv => kv.Key).Select(kv => kv.Value))
             {
                 var path = Wmi.Str(p, "ExecutablePath");
-                var sig = Authenticode.Check(path);
+                if (!sigs.TryGetValue(path, out var sig)) sigs[path] = sig = Authenticode.Check(path);
+                if (!hashes.TryGetValue(path, out var hash)) hashes[path] = hash = Hashing.SafeHash(path, s.Options.SkipHashing);
                 var parent = Convert.ToInt32(Raw(p, "ParentProcessId") ?? 0);
                 rows.Add(new Dictionary<string, object?>
                 {
@@ -63,7 +67,7 @@ namespace Foton.Collect
                     ["SignatureStatus"] = sig.Status,
                     ["Signer"] = sig.Signer,
                     ["IsOSBinary"] = sig.IsOSBinary,
-                    ["SHA256"] = Hashing.SafeHash(path, s.Options.SkipHashing),
+                    ["SHA256"] = hash,
                     ["UserWritablePath"] = UserWritable(path),
                     // Kept for schema continuity: Analyze derives the hits from CommandLine on the workstation, where the
                     // suspicious-command list is; the endpoint executable never carries it.
@@ -127,6 +131,8 @@ namespace Foton.Collect
         static object NonStandardModules(FotonSession s)
         {
             var rows = new List<Dictionary<string, object?>>();
+            // One row per path, from the first process in name order; later processes loading it are not re-read or re-hashed.
+            var seen = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
             foreach (var proc in Process.GetProcesses().OrderBy(p => p.ProcessName, StringComparer.InvariantCultureIgnoreCase).ThenBy(p => p.Id))
             {
                 using (proc)
@@ -136,7 +142,7 @@ namespace Foton.Collect
                         foreach (ProcessModule m in proc.Modules)
                         {
                             var fn = m.FileName ?? "";
-                            if (IsStandardModule(fn)) continue;
+                            if (IsStandardModule(fn) || seen.Contains(fn)) continue;
                             string company = "";
                             try { company = m.FileVersionInfo.CompanyName ?? ""; } catch (Exception ex) when (ex is IOException || ex is ArgumentException) { }
                             rows.Add(new Dictionary<string, object?>
@@ -144,14 +150,14 @@ namespace Foton.Collect
                                 ["ProcessName"] = proc.ProcessName, ["PID"] = proc.Id, ["Module"] = m.ModuleName, ["Path"] = fn,
                                 ["Company"] = company, ["SHA256"] = Hashing.SafeHash(fn, s.Options.SkipHashing),
                             });
+                            seen.Add(fn);
                         }
                     }
                     // Another user's or a protected process: its modules are not readable with this token.
                     catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is NotSupportedException) { }
                 }
             }
-            return rows.GroupBy(r => (string)r["Path"]!, StringComparer.InvariantCultureIgnoreCase).Select(g => g.First())
-                .OrderBy(r => (string)r["Path"]!, StringComparer.InvariantCultureIgnoreCase).ToList();
+            return rows.OrderBy(r => (string)r["Path"]!, StringComparer.InvariantCultureIgnoreCase).ToList();
         }
 
         static object ConsoleHistory(FotonSession s)

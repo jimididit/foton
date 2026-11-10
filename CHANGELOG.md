@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.6.1] - 2026-11-09
+
+### Changed
+- `foton-collect` is faster with the same output. An elevated collect on a busy workstation fell from about 270 to 167 seconds. `running_processes` checks the signature and hash of each executable once instead of once per process (105 to 17 seconds on 440 processes, where browsers and Electron apps run dozens of processes from one large executable). `loaded_modules_nonstandard` hashes each module path once. The signature check no longer makes a second query for file types Windows has no signature format for, such as shortcuts; the result is unchanged, because such a file can carry no signature. Results on 2,571 test files matched the previous version exactly.
+
 ## [2.6.0] - 2026-11-09
 
 ### Added

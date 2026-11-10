@@ -67,10 +67,11 @@ namespace Foton.Win
             {
                 if (!File.Exists(path)) { result.Status = "FileNotFound"; return result; }
                 if (Foton.Core.Hashing.IsCloudPlaceholder(path!)) { result.Status = "CloudPlaceholderNotChecked"; return result; }
-                result = Query(path!, CatalogFirst);
-                if (result.Status != "Valid")
+                result = Query(path!, CatalogFirst, out var unsupported);
+                // No SIP handles this file type (.lnk, most scripts): there is no embedded signature to find either.
+                if (result.Status != "Valid" && !unsupported)
                 {
-                    var embedded = Query(path!, EmbeddedOnly);
+                    var embedded = Query(path!, EmbeddedOnly, out _);
                     if (embedded.Status == "Valid" || result.Status == "NotSigned" || result.Status == "UnknownError") result = embedded;
                 }
             }
@@ -82,8 +83,10 @@ namespace Foton.Win
             return result;
         }
 
-        static SignatureInfo Query(string path, uint flags)
+        /// <param name="unsupported">The query succeeded with SIGNATURE_STATE_UNSIGNED_UNSUPPORTED (not a failed call).</param>
+        static SignatureInfo Query(string path, uint flags, out bool unsupported)
         {
+            unsupported = false;
             var result = new SignatureInfo();
             using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
             {
@@ -92,6 +95,7 @@ namespace Foton.Win
                 try
                 {
                     if (hr < 0) { result.Status = "UnknownError"; return result; }
+                    unsupported = info.SignatureState == 1;
                     result.Status = StatusOf(info.SignatureState);
                     result.IsOSBinary = info.OSBinary != 0;
                     if (cert != IntPtr.Zero)
