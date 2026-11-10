@@ -139,8 +139,6 @@ namespace Foton.Cli
             foreach (var f in v.Mismatched.Take(20)) log.Write("Changed since hashing: " + f, StatusLevel.Warn);
             foreach (var f in v.Missing.Take(20)) log.Write("Listed but missing: " + f, StatusLevel.Warn);
             foreach (var f in v.Unreadable.Take(20)) log.Write("Could not read: " + f, StatusLevel.Warn);
-            if (v.NotExtracted.Count > 0)
-                log.Write($"{v.NotExtracted.Count} listed file(s) were not extracted (path too long), so their hashes were not checked.", StatusLevel.Warn);
             if (v.Unlisted.Count > 0)
                 log.Write("Files not in hashes.csv are expected for workstation outputs written after collection (analysis\\, reports); they are not part of the hashed record.", StatusLevel.Info);
             if (p.Manifest.Count > 0 && v.Mismatched.Any(f => f.EndsWith(@"00_Collection\collection.log", StringComparison.OrdinalIgnoreCase)))
@@ -159,8 +157,9 @@ namespace Foton.Cli
             if (p.NotExtracted.Count > 0)
                 log.Write($"{p.NotExtracted.Count} file(s) in the ZIP have paths too long to extract under {p.ExtractedTo} (packages from Foton 2.2.0 and earlier can hold long shortcut names). Their hashes were checked in the ZIP, but parse, compose, and analyze do not see them. Move the ZIP to a folder with a shorter path, delete {Path.GetFileName(p.ExtractedTo)}, and run again.", StatusLevel.Warn);
             var e = p.VerifyExtraction();
+            // hashes.csv paths are relative to the case root; older packages may prefix them with .\ or \.
             var drift = e.Mismatched.Concat(e.Missing).Concat(e.Unreadable)
-                .Where(f => !string.Equals(f, Foton.Analyze.TriageReport.FileName, StringComparison.OrdinalIgnoreCase)).ToList();
+                .Where(f => !string.Equals(f.TrimStart('.', '\\'), Foton.Analyze.TriageReport.FileName, StringComparison.OrdinalIgnoreCase)).ToList();
             if (drift.Count == 0) return true;
             log.Write($"The extraction no longer matches hashes.csv for {drift.Count} file(s) that parse, compose, and analyze read. Delete {p.ExtractedTo} and run again to extract a fresh copy from the ZIP.", StatusLevel.Warn);
             foreach (var f in drift.Take(20)) log.Write("Changed in the extraction: " + f, StatusLevel.Warn);
