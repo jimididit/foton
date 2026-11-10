@@ -11,8 +11,10 @@ namespace Foton.Analyze.Rules
     /// <summary>Findings from exported event log CSVs (Collect's selected Event IDs).</summary>
     static class EventLogRules
     {
-        // 5007 setting paths that change what Defender scans or whether it protects (policy and local keys alike).
-        const string DefenderProtectionSetting = @"Windows Defender\\(Exclusions|Real-Time Protection|Spynet)\\|Windows Defender\\Features\\TamperProtection|\\Disable[A-Za-z]+\s*=";
+        // 5007 setting paths that change what Defender scans or whether it protects: local and GPO keys (Exclusions,
+        // Real-Time Protection, Spynet, Disable*), the MDM/Intune Policy Manager key (Excluded*, Allow*), and the
+        // TamperProtection value itself (not TamperProtectionSource, which only names who manages it).
+        const string DefenderProtectionSetting = @"Windows Defender\\(Exclusions|Real-Time Protection|Spynet)\\|Windows Defender\\Policy Manager\\(Excluded|Allow)[A-Za-z]*\s*=|Windows Defender\\Features\\TamperProtection\s*=|\\Disable[A-Za-z]+\s*=";
 
         static readonly Regex NamesCollector1 = new Regex(@"(?i)\b[A-Za-z]+-Foton[A-Za-z0-9]*\b");
         static readonly Regex NamesCollector2 = new Regex(@"(?i)\bFotonSession\b");

@@ -226,12 +226,18 @@ namespace Foton.Tests
             d.Set("autorun_registry_keys", Csv(desktop, startup, run));
             Assert.DoesNotContain("Autostart entries point to user-writable locations or contain risky patterns", Titles(d));
 
-            var redirected = Autorun(shell, "Common Startup", @"C:\Users\Public\boot", true);
-            d.Set("autorun_registry_keys", Csv(desktop, redirected, run));
-            var c = Context(d);
-            Analyzer.Run(c);
-            var f = c.Findings.Single(x => x.Title == "Autostart entries point to user-writable locations or contain risky patterns");
-            Assert.StartsWith(@"1 of 2 autostart entries flagged. Sample: Common Startup = C:\Users\Public\boot", f.Observation);
+            d.Set("autorun_registry_keys", Csv(Autorun(shell, "Common Startup", @"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\", true), run));
+            Assert.DoesNotContain("Autostart entries point to user-writable locations or contain risky patterns", Titles(d));
+
+            // A redirect, including one to a look-alike folder that ends like the default, flags.
+            foreach (var target in new[] { @"C:\Users\Public\boot", @"C:\Users\Public\Microsoft\Windows\Start Menu\Programs\Startup" })
+            {
+                d.Set("autorun_registry_keys", Csv(desktop, Autorun(shell, "Common Startup", target, true), run));
+                var c = Context(d);
+                Analyzer.Run(c);
+                var f = c.Findings.Single(x => x.Title == "Autostart entries point to user-writable locations or contain risky patterns");
+                Assert.StartsWith("1 of 2 autostart entries flagged. Sample: Common Startup = " + target, f.Observation);
+            }
         }
 
         [Fact]
@@ -287,6 +293,12 @@ namespace Foton.Tests
                 Assert.StartsWith("1 process(es)", c.Findings.Single(x => x.Title == "Unsigned processes running from user-writable paths").Observation);
                 Assert.Contains("collector's own process", c.Findings.Single(x => x.Title == "Unsigned processes running from user-writable paths").Observation);
                 Assert.Contains("collector's own executable", c.Findings.Single(x => x.Title == "Unsigned executables present in user-writable directories").Observation);
+
+                // A custody value that is not a SHA-256 is ignored, so nothing is left out.
+                var notHex = new string('Z', 64);
+                File.WriteAllText(Path.Combine(t.Path, "00_Collection", "chain_of_custody.txt"), "Executable SHA-256   : " + notHex + "\r\n");
+                d.Set("running_processes", Csv(Proc("foton-collect.exe", notHex)));
+                Assert.Contains("Unsigned processes running from user-writable paths", Titles(d, t.Path));
             }
         }
 
@@ -300,7 +312,8 @@ namespace Foton.Tests
             const string high = "Defender configuration or protection state was changed", info = "Defender recorded routine configuration changes";
             var routine = Ev(5007, @"Old value: New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Diagnostics\Thing = 0x1");
             var d = new PackageData();
-            d.Set("defender_operational", Csv(routine, Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Features\Controls\X = 0x2")));
+            d.Set("defender_operational", Csv(routine, Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Features\Controls\X = 0x2"),
+                Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Features\TamperProtectionSource = 0x5")));
             var titles = Titles(d);
             Assert.DoesNotContain(high, titles);
             Assert.Contains(info, titles);
@@ -310,6 +323,8 @@ namespace Foton.Tests
                 Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths\C:\x = 0x0"),
                 Ev(5007, @"New value: HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection\DisableRealtimeMonitoring = 0x1"),
                 Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Features\TamperProtection = 0x4"),
+                Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Policy Manager\ExcludedPaths = C:\x|"),
+                Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Policy Manager\AllowRealtimeMonitoring = 0x0"),
                 Ev(5001, "Real-time protection is disabled."),
             })
             {

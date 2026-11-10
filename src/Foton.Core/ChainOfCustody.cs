@@ -192,7 +192,7 @@ namespace Foton.Core
                     if (value.Length == 0 || value == "(not supplied)") continue;
                     if (h.CaseNumber == null && label == "Case Number") h.CaseNumber = value;
                     else if (h.Examiner == null && label == "Examiner") h.Examiner = value;
-                    else if (h.ExecutableSha256 == null && label == "Executable SHA-256" && value.Length == 64) h.ExecutableSha256 = value;
+                    else if (h.ExecutableSha256 == null && label == "Executable SHA-256" && value.Length == 64 && value.All(Uri.IsHexDigit)) h.ExecutableSha256 = value;
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }

@@ -13,8 +13,16 @@ namespace Foton.Analyze.Rules
         // default Startup folder (a redirect makes Explorer run whatever sits in the new folder at logon).
         static bool ShellFolder(object? a) => S(a, "Key").EndsWith(@"\Explorer\Shell Folders", System.StringComparison.OrdinalIgnoreCase);
         static bool StartupFolderValue(object? a) => In(S(a, "ValueName"), "Common Startup", "Startup");
+        // The whole default path, not its tail: a redirect to C:\Users\Public\Microsoft\Windows\Start Menu\Programs\Startup
+        // ends the same way.
+        static readonly System.Text.RegularExpressions.Regex DefaultCommonStartup = new System.Text.RegularExpressions.Regex(
+            @"^([a-z]:\\ProgramData|%ProgramData%)\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        static readonly System.Text.RegularExpressions.Regex DefaultUserStartup = new System.Text.RegularExpressions.Regex(
+            @"^([a-z]:\\Users\\[^\\]+\\AppData\\Roaming|%USERPROFILE%\\AppData\\Roaming|%APPDATA%)\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
         static bool RedirectedStartup(object? a) => StartupFolderValue(a)
-            && !S(a, "Command").TrimEnd('\\').EndsWith(@"\Microsoft\Windows\Start Menu\Programs\Startup", System.StringComparison.OrdinalIgnoreCase);
+            && !(Eq(Get(a, "ValueName"), "Common Startup") ? DefaultCommonStartup : DefaultUserStartup).IsMatch(S(a, "Command").Trim());
 
         // Defender's platform folder is under ProgramData, which the user-writable list matches, but only SYSTEM,
         // Administrators, and TrustedInstaller can write it. Exempt only Microsoft-signed binaries there, so a planted
