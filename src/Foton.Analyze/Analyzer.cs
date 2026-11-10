@@ -13,7 +13,6 @@ namespace Foton.Analyze
     {
         public List<Finding> Findings { get; internal set; } = new List<Finding>();
         public string? FindingsPath { get; internal set; }
-        public string? BesideZipPath { get; internal set; }
         public string? ReportPath { get; internal set; }
     }
 
@@ -83,56 +82,43 @@ namespace Foton.Analyze
         }
 
         /// <summary>
-        /// Loads a package (folder or ZIP), analyzes it, and writes analysis\findings.csv (beside a ZIP:
-        /// &lt;name&gt;_findings.csv). Never rewrites 00_Collection\hashes.csv.
+        /// Loads a package (folder, or ZIP through its extraction beside it), analyzes it, and writes
+        /// analysis\findings.csv. Never rewrites 00_Collection\hashes.csv.
         /// </summary>
         public static AnalysisRun RunPackage(string path, StatusLog log, IReadOnlyList<string> suspiciousPatterns, string? reportVersion = null)
         {
             var pkg = FotonPackage.Open(path);
-            try
+            if (pkg.ZipNote != null) log.Write(pkg.ZipNote, StatusLevel.Info);
+            log.Write($"Loaded package {pkg.CaseRoot} ({pkg.Artifacts.Count} cached artifact keys)", StatusLevel.Good);
+            var ctx = new AnalysisContext(PackageData.From(pkg), pkg.Manifest, pkg.CaseRoot, suspiciousPatterns, PatternLists.UserWritable);
+            log.Write("Evaluating collected artifacts against triage heuristics", StatusLevel.Step);
+            Run(ctx);
+            log.Write($"Findings generated: {ctx.Findings.Count}", StatusLevel.Good);
+
+            var run = new AnalysisRun { Findings = ctx.Findings };
+            var root = pkg.CaseRoot;
+            var extras = new[] { Path.Combine(root, "analysis", "parsed_records.csv"), Path.Combine(root, "analysis", "baseline_diff.csv"), Path.Combine(root, "analysis", "external") };
+            if (File.Exists(Path.Combine(root, CaseTree.CollectionFolder, "findings.csv")) && !extras.Any(p => File.Exists(p) || Directory.Exists(p)))
+                log.Write(@"These heuristics already ran on the endpoint during Collect (00_Collection\findings.csv), so this run reproduces that report rather than adding detection. New findings come from parse, compose, IOC matching, or a baseline compare - then re-run analyze.", StatusLevel.Warn);
+
+            var dir = Path.Combine(root, "analysis");
+            Directory.CreateDirectory(dir);
+            run.FindingsPath = Path.Combine(dir, "findings.csv");
+            // Written even with zero findings, so an earlier run's file is never left looking current.
+            Csv.Write(run.FindingsPath, ctx.Findings);
+
+            // Foton_Report.html in the case root so relative artifact links resolve.
+            log.Write("Building HTML overview report", StatusLevel.Step);
+            run.ReportPath = Path.Combine(root, TriageReport.FileName);
+            var custody = ChainOfCustody.ReadHeader(root);
+            TriageReport.Write(new TriageReportInput
             {
-                log.Write($"Loaded package {pkg.CaseRoot} ({pkg.Artifacts.Count} cached artifact keys)", StatusLevel.Good);
-                var ctx = new AnalysisContext(PackageData.From(pkg), pkg.Manifest, pkg.CaseRoot, suspiciousPatterns, PatternLists.UserWritable);
-                log.Write("Evaluating collected artifacts against triage heuristics", StatusLevel.Step);
-                Run(ctx);
-                log.Write($"Findings generated: {ctx.Findings.Count}", StatusLevel.Good);
-
-                var run = new AnalysisRun { Findings = ctx.Findings };
-                var root = pkg.CaseRoot;
-                var extras = new[] { Path.Combine(root, "analysis", "parsed_records.csv"), Path.Combine(root, "analysis", "baseline_diff.csv"), Path.Combine(root, "analysis", "external") };
-                if (File.Exists(Path.Combine(root, CaseTree.CollectionFolder, "findings.csv")) && !extras.Any(p => File.Exists(p) || Directory.Exists(p)))
-                    log.Write(@"These heuristics already ran on the endpoint during Collect (00_Collection\findings.csv), so this run reproduces that report rather than adding detection. New findings come from parse, compose, IOC matching, or a baseline compare - then re-run analyze.", StatusLevel.Warn);
-
-                if (pkg.Kind == PackageKind.Zip)
-                {
-                    // The case root is a temporary extraction the operator never sees.
-                    run.BesideZipPath = BesideZip(pkg, "_findings.csv");
-                    Csv.Write(run.BesideZipPath, ctx.Findings);
-                }
-                else
-                {
-                    var dir = Path.Combine(root, "analysis");
-                    Directory.CreateDirectory(dir);
-                    run.FindingsPath = Path.Combine(dir, "findings.csv");
-                    // Written even with zero findings, so an earlier run's file is never left looking current.
-                    Csv.Write(run.FindingsPath, ctx.Findings);
-                }
-
-                // Foton_Report.html in the case root so relative artifact links resolve; beside a ZIP otherwise.
-                log.Write("Building HTML overview report", StatusLevel.Step);
-                run.ReportPath = pkg.Kind == PackageKind.Zip ? BesideZip(pkg, "_Report.html") : Path.Combine(root, TriageReport.FileName);
-                var custody = ChainOfCustody.ReadHeader(root);
-                TriageReport.Write(new TriageReportInput
-                {
-                    Data = ctx.Data, Findings = ctx.Findings, Manifest = pkg.Manifest, Errors = pkg.Errors, CaseRoot = root,
-                    CaseNumber = custody.CaseNumber, Examiner = custody.Examiner,
-                    CollectedUtc = pkg.StartTimeUtc, Version = reportVersion ?? FotonVersion.Product, EventLogDays = ctx.EventLogDays,
-                    FromZip = pkg.Kind == PackageKind.Zip,
-                }, run.ReportPath);
-                log.Write("Report written: " + run.ReportPath, StatusLevel.Good);
-                return run;
-            }
-            finally { pkg.DeleteExtraction(); }
+                Data = ctx.Data, Findings = ctx.Findings, Manifest = pkg.Manifest, Errors = pkg.Errors, CaseRoot = root,
+                CaseNumber = custody.CaseNumber, Examiner = custody.Examiner,
+                CollectedUtc = pkg.StartTimeUtc, Version = reportVersion ?? FotonVersion.Product, EventLogDays = ctx.EventLogDays,
+            }, run.ReportPath);
+            log.Write("Report written: " + run.ReportPath, StatusLevel.Good);
+            return run;
         }
 
         /// <summary>
@@ -165,32 +151,20 @@ namespace Foton.Analyze
         }
 
         /// <summary>
-        /// Invoke-FotonIocMatch over a package. Hits are written to analysis\ioc_matches.csv (beside a ZIP:
-        /// &lt;name&gt;_ioc_matches.csv); 1.38.x only printed them.
+        /// Invoke-FotonIocMatch over a package. Hits are written to analysis\ioc_matches.csv; 1.38.x only printed them.
         /// </summary>
         public static IocRun RunIoc(string packagePath, string iocPath, StatusLog log)
         {
             var iocs = IocMatcher.Load(iocPath);
             var pkg = FotonPackage.Open(packagePath);
-            try
-            {
-                var data = PackageData.From(pkg);
-                var run = new IocRun { Hits = IocMatcher.Match(data, data.Names.ToList(), iocs) };
-                log.Write($"IOC matches: {run.Hits.Count} ({iocs.Count} indicator(s))", StatusLevel.Good);
-                if (pkg.Kind == PackageKind.Zip)
-                    run.HitsPath = BesideZip(pkg, "_ioc_matches.csv");
-                else
-                {
-                    Directory.CreateDirectory(Path.Combine(pkg.CaseRoot, "analysis"));
-                    run.HitsPath = Path.Combine(pkg.CaseRoot, "analysis", "ioc_matches.csv");
-                }
-                Csv.Write(run.HitsPath, run.Hits);
-                return run;
-            }
-            finally { pkg.DeleteExtraction(); }
+            if (pkg.ZipNote != null) log.Write(pkg.ZipNote, StatusLevel.Info);
+            var data = PackageData.From(pkg);
+            var run = new IocRun { Hits = IocMatcher.Match(data, data.Names.ToList(), iocs) };
+            log.Write($"IOC matches: {run.Hits.Count} ({iocs.Count} indicator(s))", StatusLevel.Good);
+            Directory.CreateDirectory(Path.Combine(pkg.CaseRoot, "analysis"));
+            run.HitsPath = Path.Combine(pkg.CaseRoot, "analysis", "ioc_matches.csv");
+            Csv.Write(run.HitsPath, run.Hits);
+            return run;
         }
-
-        static string BesideZip(FotonPackage pkg, string suffix) =>
-            Path.Combine(Path.GetDirectoryName(Path.GetFullPath(pkg.SourcePath)) ?? "", Path.GetFileNameWithoutExtension(pkg.SourcePath) + suffix);
     }
 }

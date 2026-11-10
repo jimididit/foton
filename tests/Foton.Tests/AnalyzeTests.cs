@@ -182,15 +182,19 @@ namespace Foton.Tests
         }
 
         [Fact]
-        public void Zip_package_writes_findings_beside_the_zip()
+        public void Zip_package_is_analyzed_in_its_extraction_beside_the_zip()
         {
             using (var t = new TempDir())
             {
                 var zip = t.File("Foton_KITCHEN_20260115-120000Z.zip");
                 ZipFile.CreateFromDirectory(Kitchen, zip, CompressionLevel.Fastest, includeBaseDirectory: true);
                 var run = Analyzer.RunPackage(zip, Quiet, WorkstationPatterns.SuspiciousCommands);
-                Assert.Equal(t.File("Foton_KITCHEN_20260115-120000Z_findings.csv"), run.BesideZipPath);
-                Assert.Equal(File.ReadAllBytes(TestPaths.Golden("analyze-kitchen-findings.csv")), File.ReadAllBytes(run.BesideZipPath!));
+                var root = t.File(@"Foton_KITCHEN_20260115-120000Z-extracted\Foton_KITCHEN_20260115-120000Z");
+                Assert.Equal(Path.Combine(root, "analysis", "findings.csv"), run.FindingsPath);
+                Assert.Equal(File.ReadAllBytes(TestPaths.Golden("analyze-kitchen-findings.csv")), File.ReadAllBytes(run.FindingsPath!));
+                // In the case root, so its relative artifact links resolve.
+                Assert.Equal(Path.Combine(root, TriageReport.FileName), run.ReportPath);
+                Assert.True(File.Exists(run.ReportPath));
             }
         }
 

@@ -25,10 +25,14 @@ namespace Foton.Package
         /// <summary>
         /// As Extract; when <paramref name="tooLong"/> is given, an entry whose extracted path would reach the Windows
         /// 260-character limit is listed there (stored name) and not written, instead of failing the whole extraction.
+        /// <paramref name="finalDestination"/> is where the folder ends up when it is renamed after extraction: lengths are
+        /// measured there, so nothing extracted becomes unreachable after the rename.
         /// </summary>
-        public static void Extract(string zipPath, string destination, IReadOnlyCollection<string>? skipPrefixes, List<string>? tooLong)
+        public static void Extract(string zipPath, string destination, IReadOnlyCollection<string>? skipPrefixes, List<string>? tooLong,
+            string? finalDestination = null)
         {
             var root = Path.GetFullPath(destination).TrimEnd('\\') + "\\";
+            var measureRoot = finalDestination == null ? root : Path.GetFullPath(finalDestination).TrimEnd('\\') + "\\";
             Directory.CreateDirectory(root);
             using (var zip = ZipFile.OpenRead(zipPath))
             {
@@ -44,7 +48,8 @@ namespace Foton.Package
                     var target = Path.GetFullPath(Path.Combine(root, name));
                     if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + entry.FullName);
-                    if (tooLong != null && (target.Length > 259 || Path.GetDirectoryName(target)!.Length > 247))
+                    var measured = measureRoot + target.Substring(root.Length);
+                    if (tooLong != null && (Math.Max(target.Length, measured.Length) > 259 || Path.GetDirectoryName(measured)!.Length > 247 || Path.GetDirectoryName(target)!.Length > 247))
                     {
                         tooLong.Add(entry.FullName);
                         continue;

@@ -495,12 +495,18 @@ namespace Foton.Tests
         }
 
         [Fact]
-        public void Compose_refuses_a_ZIP_because_its_output_belongs_in_the_case_folder()
+        public void Compose_on_a_ZIP_writes_into_its_extraction_and_refuses_a_single_file()
         {
             using (var t = new TempDir())
             {
-                File.WriteAllBytes(t.File("case.zip"), new byte[] { 0x50, 0x4B, 5, 6 });
-                Assert.Contains("Extract the ZIP", Assert.Throws<InvalidOperationException>(() => Compose(t.File("case.zip"), t.File("empty"))).Message);
+                var src = Package(t.File(@"src\Foton_HOST_20260115-120000Z"));
+                System.IO.Compression.ZipFile.CreateFromDirectory(src, t.File("case.zip"), System.IO.Compression.CompressionLevel.Fastest, includeBaseDirectory: true);
+                var run = Compose(t.File("case.zip"), t.File("empty"));
+                Assert.Equal(t.File(@"case-extracted\Foton_HOST_20260115-120000Z\analysis\external\external_parse_inventory.csv"), run.InventoryPath);
+                Assert.True(File.Exists(run.InventoryPath));
+
+                File.WriteAllText(t.File("notes.txt"), "x");
+                Assert.Contains("not a single file", Assert.Throws<InvalidOperationException>(() => Compose(t.File("notes.txt"), t.File("empty"))).Message);
             }
         }
     }

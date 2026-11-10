@@ -23,8 +23,6 @@ namespace Foton.Analyze
         public DateTime? CollectedUtc { get; set; }
         public string Version { get; set; } = FotonVersion.Product;
         public int EventLogDays { get; set; } = 14;
-        /// <summary>Rendered beside a ZIP: relative artifact links do not resolve, and the report says so.</summary>
-        public bool FromZip { get; set; }
     }
 
     /// <summary>
@@ -277,8 +275,6 @@ namespace Foton.Analyze
             sb.AppendLine("<h2 id=\"sec-method\">Methodology, Tiers, and Limitations</h2>");
             sb.AppendLine(ReportChrome.TriageTiers);
             sb.AppendLine(ReportChrome.TriageLimits);
-            if (r.FromZip)
-                sb.AppendLine("<li><b>Rendered from a ZIP.</b> This report sits beside the source ZIP, not inside the case folder, so relative artifact links such as 06_Security_Posture/defender_status.json do not resolve from here. Extract the ZIP and re-run analyze against the folder if you need those links.</li>");
             sb.AppendLine(ReportChrome.TriageLimitsEnd);
             sb.AppendLine($"<footer>Foton v{Html.Encode(r.Version)} &middot; collected {Html.Encode(collected)} UTC on {Html.Encode(host)} by {Supplied(r.Examiner)} &middot; verify artifact hashes in 00_Collection/hashes.csv before analysis</footer>");
             sb.AppendLine("</div>");

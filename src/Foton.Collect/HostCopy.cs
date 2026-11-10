@@ -238,7 +238,8 @@ namespace Foton.Collect
         }
 
         // Windows APIs on .NET Framework refuse paths of 260+ characters. A package is also extracted elsewhere
-        // (%TEMP%\FotonPkg-*, D:\Cases\...), so the path inside the case folder keeps room for that root too.
+        // (beside the ZIP as <name>-extracted\<case>, or wherever the analyst extracts it), so the path inside the case
+        // folder keeps room for that root too.
         internal const int MaxPackagePath = 160;
         const int MaxFullPath = 259;
 

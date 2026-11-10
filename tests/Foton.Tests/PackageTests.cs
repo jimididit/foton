@@ -49,13 +49,59 @@ namespace Foton.Tests
 
                 var zip = t.File("case.zip");
                 ZipFile.CreateFromDirectory(folder, zip, CompressionLevel.Fastest, includeBaseDirectory: true);
-                var z = FotonPackage.Open(zip, t.Path);
+                var z = FotonPackage.Open(zip);
                 Assert.Equal(PackageKind.Zip, z.Kind);
                 Assert.Equal(FotonPackage.Open(folder).Artifacts.Keys.OrderBy(k => k), z.Artifacts.Keys.OrderBy(k => k));
-                Assert.True(Directory.Exists(z.ExtractedTo));
-                z.DeleteExtraction();
-                Assert.False(Directory.Exists(z.ExtractedTo));
+                Assert.Equal(t.File("case-extracted"), z.ExtractedTo);
+                Assert.Equal(Hashing.Sha256Hex(zip), z.ZipSha256);
+                Assert.False(z.ExtractionReused);
+                Assert.True(File.Exists(Path.Combine(z.ExtractedTo!, ZipExtraction.RecordName)));
+                Assert.Empty(Directory.GetDirectories(t.Path, "~*")); // the staging folder was renamed, not left behind
+
+                // A second verb reuses the extraction, and what an earlier verb wrote there is still present.
+                File.WriteAllText(Path.Combine(z.CaseRoot, "analysis.txt"), "earlier output");
+                var again = FotonPackage.Open(zip);
+                Assert.True(again.ExtractionReused);
+                Assert.Equal(z.CaseRoot, again.CaseRoot);
+                Assert.True(File.Exists(Path.Combine(again.CaseRoot, "analysis.txt")));
+                Assert.Contains("was already extracted to", again.ZipNote);
                 Assert.True(Directory.Exists(folder)); // a folder package is never touched
+            }
+        }
+
+        [Fact]
+        public void A_replaced_zip_or_an_unfinished_extraction_is_refused_and_never_deleted()
+        {
+            using (var t = new TempDir())
+            {
+                var folder = CopyFixture(t);
+                var zip = t.File("case.zip");
+                ZipFile.CreateFromDirectory(folder, zip, CompressionLevel.Fastest, includeBaseDirectory: true);
+                var extracted = FotonPackage.Open(zip).ExtractedTo!;
+
+                File.Delete(zip);
+                ZipFile.CreateFromDirectory(folder, zip, CompressionLevel.NoCompression, includeBaseDirectory: true);
+                Assert.Contains("different ZIP", Assert.Throws<InvalidDataException>(() => FotonPackage.Open(zip)).Message);
+                Assert.True(Directory.Exists(extracted));
+
+                File.Delete(Path.Combine(extracted, ZipExtraction.RecordName));
+                Assert.Contains("not a completed Foton extraction", Assert.Throws<InvalidDataException>(() => FotonPackage.Open(zip)).Message);
+                Assert.True(Directory.Exists(extracted));
+            }
+        }
+
+        [Fact]
+        public void A_zip_without_a_top_folder_does_not_count_the_extraction_record_as_case_data()
+        {
+            using (var t = new TempDir())
+            {
+                var folder = CopyFixture(t);
+                var zip = t.File("flat.zip");
+                ZipFile.CreateFromDirectory(folder, zip, CompressionLevel.Fastest, includeBaseDirectory: false);
+                var p = FotonPackage.Open(zip);
+                Assert.Equal(p.ExtractedTo, p.CaseRoot);
+                Assert.False(p.Artifacts.ContainsKey("foton_extraction"));
+                Assert.DoesNotContain(ZipExtraction.RecordName, p.VerifyHashes().Unlisted);
             }
         }
 
@@ -72,15 +118,51 @@ namespace Foton.Tests
                 using (var z = ZipFile.Open(zip, ZipArchiveMode.Update))
                 using (var w = new StreamWriter(z.CreateEntry(Path.GetFileName(folder) + "/" + rel.Replace('\\', '/')).Open())) w.Write("lnk");
 
-                var temp = Directory.CreateDirectory(Path.Combine(t.Path, "temp")).FullName;
-                var p = FotonPackage.Open(zip, temp);
+                var p = FotonPackage.Open(zip);
                 Assert.Single(p.NotExtracted);
-                Assert.Matches(@"^FotonPkg-[0-9a-f]{8}$", Path.GetFileName(p.ExtractedTo));
+                Assert.Equal(t.File("case-extracted"), p.ExtractedTo);
+                // Inside the ZIP the long entry is still hashed: its placeholder hash shows as changed, not unchecked.
                 var v = p.VerifyHashes();
-                Assert.Equal(new[] { rel }, v.NotExtracted);
-                Assert.DoesNotContain(rel, v.Missing);
+                Assert.Contains(rel, v.Mismatched);
+                Assert.Empty(v.NotExtracted);
                 Assert.False(v.Intact);
-                p.DeleteExtraction();
+                var onDisk = p.VerifyExtraction();
+                Assert.Equal(new[] { rel }, onDisk.NotExtracted);
+                Assert.DoesNotContain(rel, onDisk.Missing);
+
+                // The record keeps the list, so a reused extraction still reports the entry as not extracted (not missing).
+                var again = FotonPackage.Open(zip);
+                Assert.True(again.ExtractionReused);
+                Assert.Equal(new[] { rel }, again.VerifyExtraction().NotExtracted);
+            }
+        }
+
+        [Fact]
+        public void A_zip_is_verified_from_its_entries_whatever_was_written_into_the_extraction()
+        {
+            using (var t = new TempDir())
+            {
+                var s = Sessions.New(Directory.CreateDirectory(t.File("cases")).FullName);
+                File.WriteAllText(Path.Combine(s.Dir("System"), "os.json"), "{}");
+                PackageFiles.WriteArtifactHashes(s);
+                var zip = t.File("case.zip");
+                ZipFile.CreateFromDirectory(s.CaseRoot!, zip, CompressionLevel.Fastest, includeBaseDirectory: true);
+
+                var p = FotonPackage.Open(zip);
+                Assert.True(p.VerifyHashes().Intact);
+                File.WriteAllText(Path.Combine(p.CaseRoot, "01_System", "os.json"), "{\"edited\":true}");
+                Directory.CreateDirectory(Path.Combine(p.CaseRoot, "analysis"));
+                File.WriteAllText(Path.Combine(p.CaseRoot, "analysis", "findings.csv"), "x");
+                var zipCheck = FotonPackage.Open(zip).VerifyHashes();
+                Assert.True(zipCheck.Intact);
+                Assert.Empty(zipCheck.Unlisted);
+                Assert.Equal(new[] { @"01_System\os.json" }, FotonPackage.Open(zip).VerifyExtraction().Mismatched);
+
+                // A changed entry inside a ZIP is caught from the ZIP itself.
+                File.WriteAllText(Path.Combine(s.CaseRoot!, "01_System", "os.json"), "{\"changed\":true}");
+                var tampered = t.File("tampered.zip");
+                ZipFile.CreateFromDirectory(s.CaseRoot!, tampered, CompressionLevel.Fastest, includeBaseDirectory: true);
+                Assert.Equal(new[] { @"01_System\os.json" }, FotonPackage.Open(tampered).VerifyHashes().Mismatched);
             }
         }
 
@@ -99,10 +181,10 @@ namespace Foton.Tests
                 Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
                 Assert.False(File.Exists(Path.Combine(t.Path, "escape.txt")));
 
-                var temp = Path.Combine(t.Path, "temp");
-                Directory.CreateDirectory(temp);
-                Assert.Throws<InvalidDataException>(() => FotonPackage.Open(zip, temp));
-                Assert.Empty(Directory.GetDirectories(temp)); // a refused ZIP leaves no extraction behind
+                Assert.Throws<InvalidDataException>(() => FotonPackage.Open(zip));
+                // A refused ZIP leaves no extraction and no staging folder behind.
+                Assert.False(Directory.Exists(t.File("evil-extracted")));
+                Assert.Empty(Directory.GetDirectories(t.Path, "~*"));
             }
         }
 

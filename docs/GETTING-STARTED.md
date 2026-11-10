@@ -88,21 +88,21 @@ On the workstation, in PowerShell, in the folder with `foton.exe`, check the ZIP
 
 `foton package` re-hashes every file against the list made at collection time. If it reports changed or missing files, do not analyze that copy: copy the package from the endpoint again, and if it still fails, record in your case notes that the package changed after collection.
 
-When it reports no problems, extract the ZIP: right-click it, choose **Extract All**, and extract into a **new, empty folder**. The ZIP came from the endpoint, so do not extract it over other files (such as the folder holding `foton.exe`). Inside, you will find the case folder, named like the ZIP.
+You do not need to extract the ZIP yourself. `foton package` extracted it into a new folder beside the ZIP, named like the ZIP with `-extracted` at the end, and the next steps reuse that folder.
 
-**One computer only?** Skip the copy. Use the case folder in `C:\Foton\Cases` directly in the next step, from the same Administrator window you collected in.
+**One computer only?** Skip the copy. In the next step, use the case folder in `C:\Foton\Cases` (the `Foton_...` folder that holds `00_Collection`) instead of the ZIP, from the same Administrator window you collected in.
 
 ## 6. Analyze on the workstation
 
-Run these in order, replacing the path with the case folder (the `Foton_...` folder that holds `00_Collection`):
+Run these in order, with the same ZIP path as in step 5:
 
 ```powershell
-.\foton.exe parse "\path\to\case-folder"
-.\foton.exe compose "\path\to\case-folder"
-.\foton.exe analyze "\path\to\case-folder"
+.\foton.exe parse "\path\to\Foton_case.zip"
+.\foton.exe compose "\path\to\Foton_case.zip"
+.\foton.exe analyze "\path\to\Foton_case.zip"
 ```
 
-Then open `Foton_Report.html` in the case folder again.
+Then open `Foton_Report.html` in the case folder inside the `-extracted` folder (`analyze` prints its full path).
 
 - `parse` reads the copied Prefetch, shortcuts, jump lists, event logs, and Amcache.
 - `compose` runs specialist tools (Hayabusa, Chainsaw, Eric Zimmerman's tools) over the copied files, if you installed them (below). Missing tools are listed, not errors.

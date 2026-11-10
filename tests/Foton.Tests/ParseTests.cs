@@ -257,16 +257,18 @@ namespace Foton.Tests
         }
 
         [Fact]
-        public void Zip_package_writes_csv_beside_the_zip()
+        public void Zip_package_writes_its_outputs_into_the_extraction_beside_the_zip()
         {
             using (var t = new TempDir())
             {
                 var zip = t.File(Case + ".zip");
                 ZipFile.CreateFromDirectory(Fixture(Case), zip, CompressionLevel.Fastest, includeBaseDirectory: true);
                 var run = ParseRunner.Run(zip, Quiet);
-                Assert.Equal(t.File(Case + "_parse.csv"), run.CsvPath);
+                var analysis = t.File(Case + @"-extracted\" + Case + @"\analysis");
+                Assert.Equal(Path.Combine(analysis, "parsed_records.csv"), run.CsvPath);
                 Assert.Equal(File.ReadAllBytes(TestPaths.Golden("parse-records.csv")), File.ReadAllBytes(run.CsvPath!));
-                Assert.True(File.Exists(t.File(Case + "_Parse.html")));
+                Assert.True(File.Exists(Path.Combine(analysis, "Foton_Parse.html")));
+                Assert.False(File.Exists(t.File(Case + "_parse.csv")));
             }
         }
 

@@ -58,9 +58,10 @@ namespace Foton.Tools
             IDictionary<string, string>? toolPaths = null, string? pathEnv = null)
         {
             var full = Path.GetFullPath(packagePath);
-            if (File.Exists(full))
-                throw new InvalidOperationException("Compose writes tool output into the case folder, so it needs an extracted package. Extract the ZIP and run compose on the folder.");
+            if (File.Exists(full) && !full.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Compose runs on a case folder or a package ZIP, not a single file.");
             var pkg = FotonPackage.Open(full);
+            if (pkg.ZipNote != null) log.Write(pkg.ZipNote, StatusLevel.Info);
             var root = pkg.CaseRoot.TrimEnd('\\', '/');
             log.Write("Running external parsers on copied package files (offline)", StatusLevel.Step);
 
