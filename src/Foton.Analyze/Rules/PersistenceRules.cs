@@ -19,10 +19,12 @@ namespace Foton.Analyze.Rules
             @"^([a-z]:\\ProgramData|%ProgramData%)\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\?$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
         static readonly System.Text.RegularExpressions.Regex DefaultUserStartup = new System.Text.RegularExpressions.Regex(
-            @"^([a-z]:\\Users\\[^\\]+\\AppData\\Roaming|%USERPROFILE%\\AppData\\Roaming|%APPDATA%)\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\?$",
+            @"^([a-z]:\\Users\\(?!(Public|Default|All Users)\\)[^\\]+\\AppData\\Roaming|%USERPROFILE%\\AppData\\Roaming|%APPDATA%)\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\?$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        // The machine key has no per-user Startup value by default, so one there is a redirect whatever it names.
         static bool RedirectedStartup(object? a) => StartupFolderValue(a)
-            && !(Eq(Get(a, "ValueName"), "Common Startup") ? DefaultCommonStartup : DefaultUserStartup).IsMatch(S(a, "Command").Trim());
+            && (Eq(Get(a, "ValueName"), "Common Startup") ? !DefaultCommonStartup.IsMatch(S(a, "Command").Trim())
+                : !Eq(Get(a, "Scope"), "User") || !DefaultUserStartup.IsMatch(S(a, "Command").Trim()));
 
         // Defender's platform folder is under ProgramData, which the user-writable list matches, but only SYSTEM,
         // Administrators, and TrustedInstaller can write it. Exempt only Microsoft-signed binaries there, so a planted

@@ -238,6 +238,22 @@ namespace Foton.Tests
                 var f = c.Findings.Single(x => x.Title == "Autostart entries point to user-writable locations or contain risky patterns");
                 Assert.StartsWith("1 of 2 autostart entries flagged. Sample: Common Startup = " + target, f.Observation);
             }
+
+            // A per-user Startup value: in the machine key it is a redirect whatever it names; in a user hive the user's own
+            // AppData folder is the default, and the Public profile's is not.
+            const string userStartup = @"C:\Users\a\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup";
+            var machineStartup = Autorun(shell, "Startup", userStartup, true);
+            var ownStartup = Autorun(shell, "Startup", userStartup, true);
+            ownStartup["Scope"] = "User";
+            var publicStartup = Autorun(shell, "Startup", @"C:\Users\Public\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup", true);
+            publicStartup["Scope"] = "User";
+            d.Set("autorun_registry_keys", Csv(ownStartup, run));
+            Assert.DoesNotContain("Autostart entries point to user-writable locations or contain risky patterns", Titles(d));
+            foreach (var row in new[] { machineStartup, publicStartup })
+            {
+                d.Set("autorun_registry_keys", Csv(row, run));
+                Assert.Contains("Autostart entries point to user-writable locations or contain risky patterns", Titles(d));
+            }
         }
 
         [Fact]

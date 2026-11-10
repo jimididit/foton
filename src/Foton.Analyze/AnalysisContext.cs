@@ -49,7 +49,7 @@ namespace Foton.Analyze
         /// an unsigned foton-collect.exe run from Downloads is the tool, not an observation about the host.
         /// </summary>
         internal bool IsCollector(object? row) =>
-            CollectorSha256 != null && string.Equals(Ps.Str(Ps.Get(row, "SHA256")), CollectorSha256, StringComparison.OrdinalIgnoreCase);
+            CollectorSha256 != null && CollectorSha256.Length == 64 && string.Equals(Ps.Str(Ps.Get(row, "SHA256")), CollectorSha256, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>Add-FotonFinding. Tier is evidentiary strength (1 fact, 2 inference, 3 hypothesis), not urgency.</summary>
         public void Add(string severity, string category, int tier, string title, string observation,
