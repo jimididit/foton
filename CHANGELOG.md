@@ -4,6 +4,15 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.7.1] - 2026-11-10
+
+### Fixed
+- `analyze` raised High findings that every Windows 10/11 host triggers. Found on a real elevated collection; re-running `foton analyze` on an existing package applies the fixes.
+  - **Autostart entries:** Collect lists `Explorer\Shell Folders` for its Startup value, but Analyze treated every value there (Common Desktop, Documents, Start Menu) as an autostart command in a user-writable folder. Only `Common Startup` and `Startup` count now, and only when they no longer point to the default Startup folder.
+  - **Services from user-writable paths:** Microsoft Defender's own services run from `ProgramData\Microsoft\Windows Defender\Platform`, which the user-writable list matches but only SYSTEM, Administrators, and TrustedInstaller can write. Binaries there are exempt when they are validly signed by Microsoft Corporation; an unsigned file there, or a Microsoft-signed one elsewhere, still flags.
+  - **Defender configuration changed:** every event 5007 counted, and Defender logs dozens itself (Diagnostics, CoreService, Features) on platform and intelligence updates. High now needs 5001/5010/5012 or a 5007 that changes exclusions, real-time protection, tamper protection, cloud protection, or a `Disable*` setting; the rest are one Info finding with a count.
+  - **The collector itself:** an unsigned `foton-collect.exe` run from Downloads was listed among unsigned processes and executables in user-writable paths. The row whose SHA-256 matches the collector recorded in `chain_of_custody.txt` is left out, and the finding says so.
+
 ## [2.7.0] - 2026-11-10
 
 ### Changed

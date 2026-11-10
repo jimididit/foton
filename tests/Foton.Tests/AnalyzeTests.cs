@@ -210,6 +210,117 @@ namespace Foton.Tests
             return c.Findings.Select(f => f.Title).ToList();
         }
 
+        static Dictionary<string, string?> Autorun(string key, string name, string command, bool writable) => new Dictionary<string, string?>
+        {
+            ["Scope"] = "Machine", ["Key"] = key, ["ValueName"] = name, ["Command"] = command, ["SuspiciousHits"] = "", ["UserWritableTarget"] = writable ? "True" : "False",
+        };
+
+        [Fact]
+        public void Shell_folder_locations_are_not_autostart_entries_unless_Startup_is_redirected()
+        {
+            const string shell = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders";
+            var desktop = Autorun(shell, "Common Desktop", @"C:\Users\Public\Desktop", true);
+            var startup = Autorun(shell, "Common Startup", @"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup", true);
+            var run = Autorun(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", "Vendor", @"C:\Program Files\Vendor\v.exe", false);
+            var d = new PackageData();
+            d.Set("autorun_registry_keys", Csv(desktop, startup, run));
+            Assert.DoesNotContain("Autostart entries point to user-writable locations or contain risky patterns", Titles(d));
+
+            var redirected = Autorun(shell, "Common Startup", @"C:\Users\Public\boot", true);
+            d.Set("autorun_registry_keys", Csv(desktop, redirected, run));
+            var c = Context(d);
+            Analyzer.Run(c);
+            var f = c.Findings.Single(x => x.Title == "Autostart entries point to user-writable locations or contain risky patterns");
+            Assert.StartsWith(@"1 of 2 autostart entries flagged. Sample: Common Startup = C:\Users\Public\boot", f.Observation);
+        }
+
+        [Fact]
+        public void Microsoft_signed_Defender_platform_services_are_not_user_writable_findings()
+        {
+            Dictionary<string, string?> Svc(string name, string exe, string status, string signer) => new Dictionary<string, string?>
+            {
+                ["Name"] = name, ["PathName"] = "\"" + exe + "\"", ["ResolvedExe"] = exe, ["UserWritablePath"] = "True", ["State"] = "Running",
+                ["SignatureStatus"] = status, ["Signer"] = signer,
+            };
+            const string ms = "CN=Microsoft Windows Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US";
+            const string platform = @"C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26100.4-0\";
+            const string title = "Services execute binaries from user-writable paths";
+            var d = new PackageData();
+            d.Set("services", Csv(Svc("WinDefend", platform + "MsMpEng.exe", "Valid", ms), Svc("WdNisSvc", platform + "NisSrv.exe", "Valid", ms)));
+            Assert.DoesNotContain(title, Titles(d));
+
+            // Unsigned in the platform folder, or a Microsoft-signed binary outside it, still flags.
+            d.Set("services", Csv(Svc("Fake", platform + "MsMpEng.exe", "NotSigned", ""), Svc("Moved", @"C:\ProgramData\Microsoft\Windows Defender\MsMpEng.exe", "Valid", ms)));
+            var c = Context(d);
+            Analyzer.Run(c);
+            Assert.StartsWith("2 service(s): Fake", c.Findings.Single(x => x.Title == title).Observation);
+        }
+
+        [Fact]
+        public void The_collector_itself_is_matched_by_its_custody_hash_and_not_counted()
+        {
+            using (var t = new TempDir())
+            {
+                var self = new string('A', 64);
+                Directory.CreateDirectory(Path.Combine(t.Path, "00_Collection"));
+                File.WriteAllText(Path.Combine(t.Path, "00_Collection", "chain_of_custody.txt"), "Executable SHA-256   : " + self + "\r\n");
+                Dictionary<string, string?> Proc(string name, string sha) => new Dictionary<string, string?>
+                {
+                    ["Name"] = name, ["PID"] = "1", ["Path"] = @"C:\Users\a\Downloads\" + name, ["UserWritablePath"] = "True", ["SignatureStatus"] = "NotSigned", ["SHA256"] = sha,
+                };
+                Dictionary<string, string?> Exe(string name, string sha) => new Dictionary<string, string?>
+                {
+                    ["Path"] = @"C:\Users\a\Downloads\" + name, ["Extension"] = ".exe", ["SignatureStatus"] = "NotSigned", ["ModifiedUtc"] = "2026-01-15 12:00:00", ["SHA256"] = sha,
+                };
+                var d = new PackageData();
+                d.Set("running_processes", Csv(Proc("foton-collect.exe", self)));
+                d.Set("executables_in_user_writable_paths", Csv(Exe("foton-collect.exe", self)));
+                var titles = Titles(d, t.Path);
+                Assert.DoesNotContain("Unsigned processes running from user-writable paths", titles);
+                Assert.DoesNotContain("Unsigned executables present in user-writable directories", titles);
+
+                // The same name with another hash is not the collector.
+                d.Set("running_processes", Csv(Proc("foton-collect.exe", self), Proc("foton-collect.exe", new string('B', 64))));
+                d.Set("executables_in_user_writable_paths", Csv(Exe("foton-collect.exe", self), Exe("other.exe", new string('C', 64))));
+                var c = Context(d, t.Path);
+                Analyzer.Run(c);
+                Assert.StartsWith("1 process(es)", c.Findings.Single(x => x.Title == "Unsigned processes running from user-writable paths").Observation);
+                Assert.Contains("collector's own process", c.Findings.Single(x => x.Title == "Unsigned processes running from user-writable paths").Observation);
+                Assert.Contains("collector's own executable", c.Findings.Single(x => x.Title == "Unsigned executables present in user-writable directories").Observation);
+            }
+        }
+
+        [Fact]
+        public void Routine_Defender_5007_changes_are_Info_and_protection_changes_are_High()
+        {
+            Dictionary<string, string?> Ev(int id, string message) => new Dictionary<string, string?>
+            {
+                ["EventId"] = id.ToString(System.Globalization.CultureInfo.InvariantCulture), ["TimeCreatedUtc"] = "2026-01-14 03:05:00", ["Message"] = message,
+            };
+            const string high = "Defender configuration or protection state was changed", info = "Defender recorded routine configuration changes";
+            var routine = Ev(5007, @"Old value: New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Diagnostics\Thing = 0x1");
+            var d = new PackageData();
+            d.Set("defender_operational", Csv(routine, Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Features\Controls\X = 0x2")));
+            var titles = Titles(d);
+            Assert.DoesNotContain(high, titles);
+            Assert.Contains(info, titles);
+
+            foreach (var e in new[]
+            {
+                Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths\C:\x = 0x0"),
+                Ev(5007, @"New value: HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection\DisableRealtimeMonitoring = 0x1"),
+                Ev(5007, @"New value: HKLM\SOFTWARE\Microsoft\Windows Defender\Features\TamperProtection = 0x4"),
+                Ev(5001, "Real-time protection is disabled."),
+            })
+            {
+                d.Set("defender_operational", Csv(routine, e));
+                var c = Context(d);
+                Analyzer.Run(c);
+                Assert.StartsWith("1 protection or exclusion change event(s)", c.Findings.Single(x => x.Title == high).Observation);
+                Assert.Single(c.Findings, x => x.Title == info); // the routine 5007 is still counted on its own
+            }
+        }
+
         [Fact]
         public void Quiet_side_of_firewall_sysmon_and_wdigest()
         {

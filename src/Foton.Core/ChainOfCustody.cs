@@ -31,6 +31,8 @@ namespace Foton.Core
     {
         public string? CaseNumber { get; set; }
         public string? Examiner { get; set; }
+        /// <summary>SHA-256 of the collector executable that ran (packages from 2.0.0 on), so its own rows can be told apart.</summary>
+        public string? ExecutableSha256 { get; set; }
     }
 
     /// <summary>
@@ -190,6 +192,7 @@ namespace Foton.Core
                     if (value.Length == 0 || value == "(not supplied)") continue;
                     if (h.CaseNumber == null && label == "Case Number") h.CaseNumber = value;
                     else if (h.Examiner == null && label == "Examiner") h.Examiner = value;
+                    else if (h.ExecutableSha256 == null && label == "Executable SHA-256" && value.Length == 64) h.ExecutableSha256 = value;
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
