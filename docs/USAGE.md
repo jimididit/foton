@@ -141,7 +141,7 @@ A baseline taken after an incident is a picture of **that** state. Compare prove
 | `tools` | List pinned and registered tools, and where compose finds them |
 | `carve <blob>` | MZ/PE signature scan of a copied blob (Tier 3, not NTFS carving). `-MaxBytes`, `-MaxHits` (defaults 8 MiB / 50 hits) |
 
-Every verb takes the package ZIP or a case folder (the `Foton_...` folder that holds `00_Collection`). The first verb run on a ZIP extracts it once, beside the ZIP, into a folder named like the ZIP with `-extracted` at the end. Later verbs reuse that folder and write their outputs into it, so the report ends up in `...-extracted\Foton_...\Foton_Report.html`. Foton needs write access to the folder holding the ZIP.
+`package`, `parse`, `compose`, `analyze`, and `ioc` take the package ZIP or a case folder (the `Foton_...` folder that holds `00_Collection`). The first of them run on a ZIP extracts it once, beside the ZIP, into a folder named like the ZIP with `-extracted` at the end. Later verbs reuse that folder and write their outputs into it, so the report ends up in `...-extracted\Foton_...\Foton_Report.html`. Foton needs write access to the folder holding the ZIP.
 
 Each verb re-hashes the ZIP before reusing the folder. If the ZIP was replaced, or the folder was not left by a finished Foton extraction, the verb stops and names the folder; Foton never deletes it, so move or remove it yourself.
 

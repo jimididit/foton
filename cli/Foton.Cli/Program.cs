@@ -66,7 +66,8 @@ namespace Foton.Cli
             Console.WriteLine();
             Console.WriteLine("Usage:");
             Console.WriteLine("  foton -Version");
-            Console.WriteLine("  A <zip> is extracted once to <zip name>-extracted beside it; every verb reuses that folder and writes its outputs there.");
+            Console.WriteLine("  package, parse, compose, analyze, and ioc extract a <zip> once to <zip name>-extracted beside it,");
+            Console.WriteLine("  then reuse that folder and write their outputs there.");
             Console.WriteLine("  foton package <case-folder-or-zip>   open a package and verify hashes.csv");
             Console.WriteLine("  foton parse <case-folder-zip-or-file> parse copied Prefetch, LNK, jumplists, EVTX, Amcache;");
             Console.WriteLine("                                        writes analysis\\parsed_records.csv and Foton_Parse.html");
