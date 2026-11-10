@@ -119,20 +119,45 @@ namespace Foton.Collect
             foreach (var p in profiles.Where(p => p.Exists))
                 roots.AddRange(new[] { @"AppData\Local\Temp", @"AppData\Roaming", "Downloads", "Desktop" }.Select(sub => Path.Combine(p.ProfilePath, sub)));
             var depth = s.Options.IncludeFileTimeline ? 6 : 3;
-            var rows = new List<Dictionary<string, object?>>();
+            var files = new List<FileInfo>();
             foreach (var r in UniqueSorted(roots).Where(HostInfo.Accessible))
                 foreach (var f in FileWalk.Files(r, depth))
+                    if (ExecutableExtensions.Contains(f.Extension.ToLowerInvariant()) && !IsCaseOutputPath(s, f.FullName)) files.Add(f);
+            var checks = InOrder(files, f => new FileCheck(Authenticode.Check(f.FullName), Hashing.SafeHash(f.FullName, s.Options.SkipHashing)));
+            var rows = new List<Dictionary<string, object?>>();
+            for (int i = 0; i < files.Count; i++)
+            {
+                var f = files[i];
+                rows.Add(new Dictionary<string, object?>
                 {
-                    if (!ExecutableExtensions.Contains(f.Extension.ToLowerInvariant()) || IsCaseOutputPath(s, f.FullName)) continue;
-                    var sig = Authenticode.Check(f.FullName);
-                    rows.Add(new Dictionary<string, object?>
-                    {
-                        ["Path"] = f.FullName, ["SizeBytes"] = f.Length, ["CreatedUtc"] = Utc(f.CreationTimeUtc), ["ModifiedUtc"] = Utc(f.LastWriteTimeUtc),
-                        ["AccessedUtc"] = Utc(f.LastAccessTimeUtc), ["Extension"] = f.Extension, ["SignatureStatus"] = sig.Status, ["Signer"] = sig.Signer,
-                        ["SHA256"] = Hashing.SafeHash(f.FullName, s.Options.SkipHashing),
-                    });
-                }
+                    ["Path"] = f.FullName, ["SizeBytes"] = f.Length, ["CreatedUtc"] = Utc(f.CreationTimeUtc), ["ModifiedUtc"] = Utc(f.LastWriteTimeUtc),
+                    ["AccessedUtc"] = Utc(f.LastAccessTimeUtc), ["Extension"] = f.Extension, ["SignatureStatus"] = checks[i].Signature.Status, ["Signer"] = checks[i].Signature.Signer,
+                    ["SHA256"] = checks[i].Sha256,
+                });
+            }
             return rows.OrderByDescending(r => (string)r["ModifiedUtc"]!, StringComparer.Ordinal).ToList();
+        }
+
+        sealed class FileCheck
+        {
+            public FileCheck(SignatureInfo signature, string sha256) { Signature = signature; Sha256 = sha256; }
+            public SignatureInfo Signature { get; }
+            public string Sha256 { get; }
+        }
+
+        /// <summary>
+        /// At most this many signature checks and hashes at once. The work is WinTrust catalog lookups and file reads,
+        /// so a few in parallel cut a minute-long task to seconds without saturating a small endpoint.
+        /// </summary>
+        internal const int MaxParallelChecks = 4;
+
+        /// <summary>Applies <paramref name="check"/> to every item with bounded parallelism; results keep the input order.</summary>
+        internal static TResult[] InOrder<TItem, TResult>(IList<TItem> items, Func<TItem, TResult> check)
+        {
+            var results = new TResult[items.Count];
+            var options = new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Math.Min(MaxParallelChecks, Environment.ProcessorCount)) };
+            System.Threading.Tasks.Parallel.For(0, items.Count, options, i => results[i] = check(items[i]));
+            return results;
         }
 
         static object RecentSystemFiles(FotonSession s)

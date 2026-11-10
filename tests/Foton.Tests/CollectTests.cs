@@ -99,6 +99,22 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Parallel_signature_checks_match_sequential_ones_in_input_order()
+        {
+            var files = Directory.GetFiles(Environment.GetFolderPath(Environment.SpecialFolder.System))
+                .Where(f => f.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase).Take(150).ToList();
+            Func<string, string> check = f =>
+            {
+                var sig = Foton.Win.Authenticode.Check(f);
+                return string.Join("|", f, sig.Status, sig.Signer, sig.IsOSBinary, Hashing.SafeHash(f, false));
+            };
+            var sequential = files.Select(check).ToArray();
+            Assert.Equal(sequential, FilesystemCollection.InOrder(files, check));
+            Assert.Empty(FilesystemCollection.InOrder(new List<string>(), check));
+        }
+
+        [Fact]
         public void Authenticode_reads_catalog_and_embedded_signatures_like_Get_AuthenticodeSignature()
         {
             var sys = Environment.GetFolderPath(Environment.SpecialFolder.System);

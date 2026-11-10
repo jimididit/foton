@@ -7,7 +7,7 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 ## [2.6.1] - 2026-11-09
 
 ### Changed
-- `foton-collect` is faster with the same output. An elevated collect on a busy workstation fell from about 270 to 167 seconds. `running_processes` checks the signature and hash of each executable once instead of once per process (105 to 17 seconds on 440 processes, where browsers and Electron apps run dozens of processes from one large executable). `loaded_modules_nonstandard` hashes each module path once. The signature check no longer makes a second query for file types Windows has no signature format for, such as shortcuts; the result is unchanged, because such a file can carry no signature. Results on 2,571 test files matched the previous version exactly.
+- `foton-collect` is faster with the same output. An elevated collect on a busy workstation fell from about 270 to 141 seconds. `executables_in_user_writable_paths` checks signatures and hashes up to four files at a time (fewer on machines with fewer cores), keeping the same row order (43 to 14 seconds on 1,600 files). `running_processes` checks the signature and hash of each executable once instead of once per process (105 to 17 seconds on 440 processes, where browsers and Electron apps run dozens of processes from one large executable). `loaded_modules_nonstandard` hashes each module path once. The signature check no longer makes a second query for file types Windows has no signature format for, such as shortcuts; the result is unchanged, because such a file can carry no signature. Results on 2,571 test files matched the previous version exactly.
 
 ## [2.6.0] - 2026-11-09
 
