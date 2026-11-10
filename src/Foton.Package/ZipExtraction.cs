@@ -50,6 +50,9 @@ namespace Foton.Package
             try
             {
                 SafeZip.Extract(zip, staging, null, result.NotExtracted, result.Folder);
+                // The record must describe the bytes extracted, so a ZIP replaced while extracting is refused.
+                if (!string.Equals(Hashing.Sha256Hex(zip), result.ZipSha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException(Path.GetFileName(zip) + " changed while it was being extracted. Run again once it is no longer being written.");
                 TextFile.Write(Path.Combine(staging, RecordName), Json.Indented(new Dictionary<string, object?>
                 {
                     ["ZipFile"] = Path.GetFileName(zip),
@@ -58,7 +61,7 @@ namespace Foton.Package
                     ["FotonVersion"] = FotonVersion.Product,
                     ["NotExtracted"] = result.NotExtracted,
                 }));
-                Directory.Move(staging, result.Folder);
+                MoveWithRetry(staging, result.Folder);
             }
             catch (IOException) when (Directory.Exists(result.Folder) && Directory.Exists(staging))
             {
@@ -88,6 +91,22 @@ namespace Foton.Package
                 result.NotExtracted.AddRange(names.OfType<string>());
             result.Reused = true;
             return result;
+        }
+
+        /// <summary>
+        /// Windows refuses to rename a folder while another process (typically antivirus scanning the files just written)
+        /// holds one of them open, so a few short retries before the failure is reported.
+        /// </summary>
+        static void MoveWithRetry(string from, string to)
+        {
+            for (int attempt = 1; ; attempt++)
+            {
+                try { Directory.Move(from, to); return; }
+                catch (Exception ex) when ((ex is IOException || ex is UnauthorizedAccessException) && attempt < 5 && !Directory.Exists(to))
+                {
+                    System.Threading.Thread.Sleep(200 * attempt);
+                }
+            }
         }
 
         static void TryDelete(string folder)
