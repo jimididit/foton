@@ -7,6 +7,7 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 ## [2.7.1] - 2026-11-10
 
 ### Fixed
+- `foton-collect -LoadUserHives` lost the hives it loaded: `registry_hives_user` tried to file-copy `NTUSER.DAT` and its logs for each mounted user, which the mount locks, and fell back to `reg save` only for users who were signed in. Those users' `NTUSER.DAT` was missing from the package (task Partial, `CopyError` rows), so RECmd and SBECmd in `compose` never saw it. A hive mounted by `-LoadUserHives` is now exported with `reg save` from its `HKU\Foton_<SID>` mount, like a signed-in user's, and its locked logs are marked `SupersededBySave`.
 - `analyze` raised High findings that every Windows 10/11 host triggers. Found on a real elevated collection; re-running `foton analyze` on an existing package applies the fixes.
   - **Autostart entries:** Collect lists `Explorer\Shell Folders` for its Startup value, but Analyze treated every value there (Common Desktop, Documents, Start Menu) as an autostart command in a user-writable folder. Only `Common Startup` and `Startup` count now, and only when they no longer point to the default Startup folder.
   - **Services from user-writable paths:** Microsoft Defender's own services run from `ProgramData\Microsoft\Windows Defender\Platform`, which the user-writable list matches but only SYSTEM, Administrators, and TrustedInstaller can write. Binaries there are exempt when they are validly signed by Microsoft Corporation; an unsigned file there, or a Microsoft-signed one elsewhere, still flags.

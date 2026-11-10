@@ -200,6 +200,18 @@ namespace Foton.Collect
             return rows;
         }
 
+        /// <summary>
+        /// The key a user's NTUSER.DAT is loaded under: HKU\&lt;SID&gt; when the user is signed in, HKU\Foton_&lt;SID&gt; when
+        /// -LoadUserHives mounted it for this collection. Either way the file is locked, so the copy falls back to reg save
+        /// of that key (without the mounted key, -LoadUserHives lost the very hives it loaded).
+        /// </summary>
+        internal static string NtUserKey(string sid, Func<string, bool> keyExists)
+        {
+            var signedIn = @"HKU\" + sid;
+            var mounted = @"HKU\" + UserHives.MountPrefix + "_" + sid;
+            return !keyExists(signedIn) && keyExists(mounted) ? mounted : signedIn;
+        }
+
         static object UserHiveCopies(FotonSession s, List<UserProfile> profiles)
         {
             var rows = new List<CopyRow>();
@@ -210,17 +222,19 @@ namespace Foton.Collect
                 var userDest = Path.Combine(Dest(s, @"hives\users"), seg);
                 var userRel = Path.Combine(Rel(@"hives\users"), seg);
                 // The SID goes on the reg.exe command line, so only a well-formed one can fall back to reg save.
-                bool loaded = HostCopy.IsSid(p.Sid) && Reg.Exists(@"Registry::HKEY_USERS\" + p.Sid);
+                var ntuserKey = NtUserKey(p.Sid, k => Reg.Exists(@"Registry::HKEY_USERS\" + k.Substring(4)));
+                bool loaded = HostCopy.IsSid(p.Sid) && Reg.Exists(@"Registry::HKEY_USERS\" + ntuserKey.Substring(4));
                 foreach (var h in new[]
                 {
-                    new { Src = Path.Combine(p.ProfilePath, "NTUSER.DAT"), Key = @"HKU\" + p.Sid, File = "NTUSER.DAT" },
+                    new { Src = Path.Combine(p.ProfilePath, "NTUSER.DAT"), Key = ntuserKey, File = "NTUSER.DAT" },
                     new { Src = Path.Combine(p.ProfilePath, @"AppData\Local\Microsoft\Windows\UsrClass.dat"), Key = @"HKU\" + p.Sid + "_Classes", File = "UsrClass.dat" },
                 })
                 {
                     if (budget <= 0) break;
                     var fam = HostCopy.Family(h.Src, userDest, userRel, s.Options.SkipHashing, budget);
                     var primary = fam.FirstOrDefault(r => string.Equals(Path.GetFileName(r.SourcePath), h.File, StringComparison.OrdinalIgnoreCase));
-                    // A signed-in user's hive is loaded and locked like the machine hives: export the loaded key instead.
+                    // A signed-in user's hive, or one -LoadUserHives mounted, is loaded and locked like the machine hives:
+                    // export the loaded key instead.
                     // The copied sidecars (.LOG*, .regtrans-ms) stay as context.
                     if (primary != null && primary.Status == "CopyError" && loaded && Reg.Exists("Registry::HKEY_USERS\\" + h.Key.Substring(4)))
                     {
