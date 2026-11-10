@@ -8,16 +8,44 @@ namespace Foton.Analyze.Rules
     {
         static string S(object? row, string name) => Str(Get(row, name));
 
+        // Explorer\Shell Folders holds folder locations (Desktop, Documents, Start Menu), not commands; Collect lists the
+        // key for its Startup value. Only that value is a persistence point, and only when it no longer names the
+        // default Startup folder (a redirect makes Explorer run whatever sits in the new folder at logon).
+        static bool ShellFolder(object? a) => S(a, "Key").EndsWith(@"\Explorer\Shell Folders", System.StringComparison.OrdinalIgnoreCase);
+        static bool StartupFolderValue(object? a) => In(S(a, "ValueName"), "Common Startup", "Startup");
+        // The whole default path, not its tail: a redirect to C:\Users\Public\Microsoft\Windows\Start Menu\Programs\Startup
+        // ends the same way.
+        static readonly System.Text.RegularExpressions.Regex DefaultCommonStartup = new System.Text.RegularExpressions.Regex(
+            @"^([a-z]:\\ProgramData|%ProgramData%)\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        static readonly System.Text.RegularExpressions.Regex DefaultUserStartup = new System.Text.RegularExpressions.Regex(
+            @"^([a-z]:\\Users\\(?!(Public|Default|All Users)\\)[^\\]+\\AppData\\Roaming|%USERPROFILE%\\AppData\\Roaming|%APPDATA%)\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        // The machine key has no per-user Startup value by default, so one there is a redirect whatever it names.
+        static bool RedirectedStartup(object? a) => StartupFolderValue(a)
+            && (Eq(Get(a, "ValueName"), "Common Startup") ? !DefaultCommonStartup.IsMatch(S(a, "Command").Trim())
+                : !Eq(Get(a, "Scope"), "User") || !DefaultUserStartup.IsMatch(S(a, "Command").Trim()));
+
+        // Defender's platform folder is under ProgramData, which the user-writable list matches, but only SYSTEM,
+        // Administrators, and TrustedInstaller can write it. Exempt only Microsoft-signed binaries there, so a planted
+        // file under a look-alike path still flags.
+        static readonly System.Text.RegularExpressions.Regex DefenderPlatformPath = new System.Text.RegularExpressions.Regex(
+            @"^[a-z]:\\ProgramData\\Microsoft\\Windows Defender( Advanced Threat Protection)?\\Platform\\[^\\]+\\[^\\]+\.exe$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        static bool DefenderPlatform(object? s) => DefenderPlatformPath.IsMatch(S(s, "ResolvedExe"))
+            && Eq(Get(s, "SignatureStatus"), "Valid") && S(s, "Signer").IndexOf("O=Microsoft Corporation", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
         public static void Persistence(AnalysisContext c)
         {
             var autoruns = c.Data["autorun_registry_keys"];
             if (IsTrue(autoruns))
             {
-                var bad = Items(autoruns).Where(a => Eq(Get(a, "UserWritableTarget"), true)
-                    || (a is PsRow r && c.ResolveHits(r, "SuspiciousHits", "Command").Length > 0)).ToList();
+                var entries = Items(autoruns).Where(a => !ShellFolder(a) || StartupFolderValue(a)).ToList();
+                var bad = entries.Where(a => ShellFolder(a) ? RedirectedStartup(a)
+                    : Eq(Get(a, "UserWritableTarget"), true) || (a is PsRow r && c.ResolveHits(r, "SuspiciousHits", "Command").Length > 0)).ToList();
                 if (bad.Count > 0)
                     c.Add("High", "Persistence", 2, "Autostart entries point to user-writable locations or contain risky patterns",
-                        F("{0} of {1} autostart entries flagged. Sample: {2}.", bad.Count, Items(autoruns).Count, Sample(bad.Select(a => (object?)$"{S(a, "ValueName")} = {S(a, "Command")}"), 4)),
+                        F("{0} of {1} autostart entries flagged. Sample: {2}.", bad.Count, entries.Count, Sample(bad.Select(a => (object?)$"{S(a, "ValueName")} = {S(a, "Command")}"), 4)),
                         "Run keys are the most common persistence mechanism. Entries executing from AppData or Temp, or invoking script interpreters, deserve individual verification.",
                         AnalysisContext.Artifact("Persistence", "autorun_registry_keys", "csv"),
                         "For each flagged entry, hash the target binary, check its signature, and determine the registry key write time from a registry hive if available.");
@@ -47,7 +75,7 @@ namespace Foton.Analyze.Rules
             if (IsTrue(svcs))
             {
                 var art = AnalysisContext.Artifact("Persistence", "services", "csv");
-                var userPath = Items(svcs).Where(s => Eq(Get(s, "UserWritablePath"), true) && IsTrue(Get(s, "ResolvedExe"))).ToList();
+                var userPath = Items(svcs).Where(s => Eq(Get(s, "UserWritablePath"), true) && IsTrue(Get(s, "ResolvedExe")) && !DefenderPlatform(s)).ToList();
                 // ServiceDll columns exist from collect schema 1.13.0; older packages lack them.
                 var userDll = Items(svcs).Where(s => s is PsRow r && r.Has("ServiceDllUserWritablePath") && Eq(r["ServiceDllUserWritablePath"], true) && IsTrue(r["ServiceDll"])).ToList();
                 if (userPath.Count > 0 || userDll.Count > 0)

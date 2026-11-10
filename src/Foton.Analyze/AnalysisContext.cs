@@ -32,6 +32,25 @@ namespace Foton.Analyze
         public int EventLogDays { get; set; } = 14;
         public List<Finding> Findings { get; } = new List<Finding>();
 
+        string? _collectorSha256;
+        bool _collectorRead;
+        /// <summary>The collector's own SHA-256 from chain_of_custody.txt (null when not recorded).</summary>
+        internal string? CollectorSha256
+        {
+            get
+            {
+                if (!_collectorRead) { _collectorSha256 = ChainOfCustody.ReadHeader(CaseRoot).ExecutableSha256; _collectorRead = true; }
+                return _collectorSha256;
+            }
+        }
+
+        /// <summary>
+        /// A row describing the collector itself (its process or its file), matched by the exact SHA-256 custody recorded:
+        /// an unsigned foton-collect.exe run from Downloads is the tool, not an observation about the host.
+        /// </summary>
+        internal bool IsCollector(object? row) =>
+            CollectorSha256 != null && CollectorSha256.Length == 64 && string.Equals(Ps.Str(Ps.Get(row, "SHA256")), CollectorSha256, StringComparison.OrdinalIgnoreCase);
+
         /// <summary>Add-FotonFinding. Tier is evidentiary strength (1 fact, 2 inference, 3 hypothesis), not urgency.</summary>
         public void Add(string severity, string category, int tier, string title, string observation,
             string why = "", string artifact = "", string next = "")

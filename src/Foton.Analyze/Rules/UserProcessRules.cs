@@ -46,10 +46,12 @@ namespace Foton.Analyze.Rules
             if (IsTrue(procs))
             {
                 var art = AnalysisContext.Artifact("Processes", "running_processes", "csv");
-                var unsigned = Items(procs).Where(p => Eq(Get(p, "UserWritablePath"), true) && Ne(Get(p, "SignatureStatus"), "Valid") && IsTrue(Get(p, "Path"))).ToList();
+                var candidates = Items(procs).Where(p => Eq(Get(p, "UserWritablePath"), true) && Ne(Get(p, "SignatureStatus"), "Valid") && IsTrue(Get(p, "Path"))).ToList();
+                var unsigned = candidates.Where(p => !c.IsCollector(p)).ToList();
+                var self = candidates.Count > unsigned.Count ? " The collector's own process (matched by the SHA-256 in chain_of_custody.txt) is not counted." : "";
                 if (unsigned.Count > 0)
                     c.Add("High", "Processes", 2, "Unsigned processes running from user-writable paths",
-                        F("{0} process(es): {1}.", unsigned.Count, Sample(unsigned.Select(p => (object?)$"{Str(Get(p, "Name"))} [PID {Str(Get(p, "PID"))}] {Str(Get(p, "Path"))}"))),
+                        F("{0} process(es): {1}.{2}", unsigned.Count, Sample(unsigned.Select(p => (object?)$"{Str(Get(p, "Name"))} [PID {Str(Get(p, "PID"))}] {Str(Get(p, "Path"))}")), self),
                         "Legitimate software is normally installed under Program Files and signed. Unsigned executables running from AppData, Temp, or ProgramData match common malware staging behavior, but also match some legitimate updaters and developer tooling.",
                         art, "Submit the SHA-256 values in the artifact to threat intelligence, and check parent process and creation time for each.");
 

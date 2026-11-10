@@ -11,6 +11,11 @@ namespace Foton.Analyze.Rules
     /// <summary>Findings from exported event log CSVs (Collect's selected Event IDs).</summary>
     static class EventLogRules
     {
+        // 5007 setting paths that change what Defender scans or whether it protects: local and GPO keys (Exclusions,
+        // Real-Time Protection, Spynet, Disable*), the MDM/Intune Policy Manager key (Excluded*, Allow*), and the
+        // TamperProtection value itself (not TamperProtectionSource, which only names who manages it).
+        const string DefenderProtectionSetting = @"Windows Defender\\(Exclusions|Real-Time Protection|Spynet)\\|Windows Defender\\Policy Manager\\(Excluded|Allow)[A-Za-z]*\s*=|Windows Defender\\Features\\TamperProtection\s*=|\\Disable[A-Za-z]+\s*=";
+
         static readonly Regex NamesCollector1 = new Regex(@"(?i)\b[A-Za-z]+-Foton[A-Za-z0-9]*\b");
         static readonly Regex NamesCollector2 = new Regex(@"(?i)\bFotonSession\b");
         // v2 endpoint executables: process-creation events carry them as the image or the parent of the System32 tools they start.
@@ -142,11 +147,22 @@ namespace Foton.Analyze.Rules
             if (IsTrue(defEvents))
             {
                 var art = AnalysisContext.Artifact("EventLogs", "defender_operational", "csv");
-                var cfg = Items(defEvents).Where(e => In(Get(e, "EventId"), 5001, 5007, 5010, 5012)).ToList();
+                // 5001/5010/5012 are protection being turned off. 5007 is any setting change, and Defender logs dozens of its
+                // own (Diagnostics, CoreService, Features) on every platform and intelligence update, so only a 5007 whose
+                // setting path names exclusions, real-time protection, tamper protection, or a Disable* value is High.
+                // The registry path is matched, not the message wording, so non-English hosts behave the same.
+                var cfg = Items(defEvents).Where(e => In(Get(e, "EventId"), 5001, 5010, 5012)
+                    || (Eq(Get(e, "EventId"), 5007) && Match(Get(e, "Message"), DefenderProtectionSetting))).ToList();
                 if (cfg.Count > 0)
                     c.Add("High", "EventLogs", 1, "Defender configuration or protection state was changed",
-                        F("{0} configuration-change event(s) (5001/5007/5010/5012). Most recent: {1} UTC.", cfg.Count, First(cfg, "TimeCreatedUtc")),
-                        "Event 5007 records the old and new value of a Defender setting, which is how exclusion additions and protection disables are attributed and timed.",
+                        F("{0} protection or exclusion change event(s) (5001/5010/5012, or 5007 for exclusions, real-time or tamper protection, or a Disable setting). Most recent: {1} UTC.", cfg.Count, First(cfg, "TimeCreatedUtc")),
+                        "Event 5007 records the old and new value of a Defender setting, which is how exclusion additions and protection disables are attributed and timed. Administrators and management tools (Intune, GPO, SCCM) make the same changes legitimately.",
+                        art);
+                var routine = Items(defEvents).Count(e => Eq(Get(e, "EventId"), 5007)) - cfg.Count(e => Eq(Get(e, "EventId"), 5007));
+                if (routine > 0)
+                    c.Add("Info", "EventLogs", 1, "Defender recorded routine configuration changes",
+                        F("{0} event 5007 record(s) changed settings outside exclusions and protection state (for example Diagnostics, CoreService, or Features keys).", routine),
+                        "Defender writes these itself during platform and security-intelligence updates. They are counted so the volume is visible; read the Message column if a change falls inside the incident window.",
                         art);
                 var det = Items(defEvents).Where(e => In(Get(e, "EventId"), 1116, 1117)).ToList();
                 if (det.Count > 0)

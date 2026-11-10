@@ -32,10 +32,12 @@ namespace Foton.Analyze.Rules
             var exes = c.Data["executables_in_user_writable_paths"];
             if (IsTrue(exes))
             {
-                var recent = Items(exes).Where(e => !In(Get(e, "SignatureStatus"), "Valid", "NotHashed") && Match(Get(e, "Extension"), @"\.(exe|dll|scr|com|pif|sys)$")).ToList();
+                var candidates = Items(exes).Where(e => !In(Get(e, "SignatureStatus"), "Valid", "NotHashed") && Match(Get(e, "Extension"), @"\.(exe|dll|scr|com|pif|sys)$")).ToList();
+                var recent = candidates.Where(e => !c.IsCollector(e)).ToList();
+                var self = candidates.Count > recent.Count ? " The collector's own executable (matched by the SHA-256 in chain_of_custody.txt) is not counted." : "";
                 if (recent.Count > 0)
                     c.Add(recent.Count > 25 ? "Low" : "Medium", "Filesystem", 2, "Unsigned executables present in user-writable directories",
-                        F("{0} file(s). Most recently modified: {1}.", recent.Count, Sample(recent.Select(e => (object?)$"{S(e, "Path")} ({S(e, "ModifiedUtc")})"), 5)),
+                        F("{0} file(s). Most recently modified: {1}.{2}", recent.Count, Sample(recent.Select(e => (object?)$"{S(e, "Path")} ({S(e, "ModifiedUtc")})"), 5), self),
                         "Temp and AppData accumulate unsigned files from ordinary use (installers, updaters, browser downloads), so volume alone means little. The value here is having hashes and timestamps to filter against the incident window.",
                         AnalysisContext.Artifact("Filesystem", "executables_in_user_writable_paths", "csv"),
                         "Filter the artifact by ModifiedUtc within the suspected incident window and hash-check the survivors.");
