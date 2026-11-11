@@ -4,6 +4,15 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.9.1] - 2026-11-11
+
+Fixes from the first field run of the 2.9.0 console.
+
+- Console Profile tab: each switch option is now a Default / On / Off list instead of a three-state check box, whose "not set" state Windows 11 draws as a filled box that reads as on. The status line lists every option the profile sets (for example `Deep=On`), or says it sets none.
+- Compose records the tool version for every output: a tool found on PATH (or given by explicit path) gets the version from its file, and Chainsaw, which has none, is asked for it only when it is about to run. Before, those rows had no version.
+- Compose's `NoInput` note no longer tells an elevated collection to "re-collect elevated". It points to `collection_manifest.csv` for why an input was not copied; for MFTECmd it names `-IncludeUsnJournal` / `-Deep`.
+- Analyze: a profile that left no task out gets "A collection profile was used" (and a reminder to check its options), not "A collection profile limited what was collected". The chain of custody says the profile chose what the collection ran, with not-selected tasks "if any".
+
 ## [2.9.0] - 2026-11-11
 
 ### Added

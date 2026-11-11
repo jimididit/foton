@@ -121,10 +121,10 @@ namespace Foton.Core
                     "  Categories          = " + L(string.Join(", ", profile.Categories)),
                     "  ExcludeTasks        = " + (profile.ExcludeTasks.Count == 0 ? "(none)" : L(string.Join(", ", profile.ExcludeTasks))),
                 });
-                l.Add("A collection profile limited this collection (" + CollectionProfile.FileName + " in");
-                l.Add("00_Collection, SHA-256 above). Tasks it did not select are recorded in the");
-                l.Add("manifest with Status=NotSelected and listed in collection_coverage.json. Their");
-                l.Add("absence is the operator's choice, not evidence about the host.");
+                l.Add("A collection profile chose what this collection ran (" + CollectionProfile.FileName + " in");
+                l.Add("00_Collection, SHA-256 above). Tasks it did not select, if any, are recorded in");
+                l.Add("the manifest with Status=NotSelected and listed in collection_coverage.json.");
+                l.Add("Their absence is the operator's choice, not evidence about the host.");
                 l.Add("");
             }
             if (s.IsElevated)

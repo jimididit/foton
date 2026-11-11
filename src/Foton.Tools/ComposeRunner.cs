@@ -48,6 +48,8 @@ namespace Foton.Tools
             public string NeedDir = "";
             /// <summary>A file the tool reads directly (not a folder walk); NoInput when absent.</summary>
             public string? NeedFile;
+            /// <summary>Why the input can be absent, for the NoInput note.</summary>
+            public string WhyMissing = @"The collection did not copy it: 00_Collection\collection_manifest.csv says why (a profile left the task out, the host had nothing to copy, or the account could not read it; most copies need an elevated collection).";
             public Func<string, Skip?>? Pre;
             public Func<string, string, string, List<string>> Args = (exe, input, output) => new List<string>();
         }
@@ -140,6 +142,7 @@ namespace Foton.Tools
                 {
                     Tool = "MFTECmd", Names = new[] { "MFTECmd.exe", "MFTECmd" }, NeedDir = usn,
                     NeedFile = Path.Combine(usn, "UsnJrnl_J.bin"),
+                    WhyMissing = "Collect copies the change journal only with -IncludeUsnJournal (or -Deep), on an elevated run; the usn_journal task alone records journal metadata.",
                     Args = (e, i, o) => new List<string> { "-f", Path.Combine(i, "UsnJrnl_J.bin"), "--csv", o, "--csvf", "usnjrnl.csv" },
                 },
                 new Job { Tool = "Hayabusa", Names = new[] { "hayabusa.exe", "hayabusa" }, NeedDir = evtx, Args = HayabusaArgs },
@@ -215,13 +218,13 @@ namespace Foton.Tools
                 anyTool = true;
                 if (!Directory.Exists(j.NeedDir))
                 {
-                    rows.Add(Row("NoInput", "", $"Tool found ({src}) but input folder is missing: {j.NeedDir}. Re-collect elevated if the copy task was skipped."));
+                    rows.Add(Row("NoInput", "", $"Tool found ({src}) but input folder is missing: {j.NeedDir}. {j.WhyMissing}"));
                     Retained("NoInput");
                     continue;
                 }
                 if (j.NeedFile != null && !File.Exists(j.NeedFile))
                 {
-                    rows.Add(Row("NoInput", "", $"Tool found ({src}) but input file is missing: {j.NeedFile}. Re-collect elevated if the copy task was skipped."));
+                    rows.Add(Row("NoInput", "", $"Tool found ({src}) but input file is missing: {j.NeedFile}. {j.WhyMissing}"));
                     Retained("NoInput");
                     continue;
                 }
@@ -232,6 +235,7 @@ namespace Foton.Tools
                     Retained(skip.Status);
                     continue;
                 }
+                if (ver.Length == 0) ver = ToolRegistry.CliVersion(j.Tool, exe);   // a tool with no version resource (Chainsaw), now that it runs
 
                 // Run into a staging folder; earlier output is replaced only when this run actually produces files, so
                 // a failed rerun cannot destroy the last good one.

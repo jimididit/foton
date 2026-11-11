@@ -22,22 +22,32 @@ namespace Foton.Tools
     {
         public static ResolvedTool? Resolve(string tool, IEnumerable<string> executableNames, string? toolPath, string? toolRoot, string? pathEnv = null)
         {
+            // Every output in the compose inventory names the tool version that wrote it: tools.json records it for
+            // installs and registrations; anything else is read from the executable's version resource as found
+            // (nothing is run here; compose asks a tool without one only when it is about to run it).
             if (!string.IsNullOrWhiteSpace(toolPath) && File.Exists(toolPath!.Trim()))
-                return new ResolvedTool { Path = Path.GetFullPath(toolPath.Trim()), Source = "ToolPath" };
+            {
+                var path = Path.GetFullPath(toolPath.Trim());
+                return new ResolvedTool { Path = path, Source = "ToolPath", Version = ToolRegistry.FileVersion(path) };
+            }
 
             var installed = ToolManifest.Find(tool, toolRoot);
             var exe = installed != null ? ToolManifest.Get(installed, "ExecutablePath") : "";
             if (exe.Length > 0 && File.Exists(exe))
+            {
+                var path = Path.GetFullPath(exe);
+                var recorded = ToolManifest.Get(installed!, "Version");
                 return new ResolvedTool
                 {
-                    Path = Path.GetFullPath(exe), Source = "Manifest",
-                    Version = ToolManifest.Get(installed!, "Version"), RulesVersion = ToolManifest.Get(installed!, "RulesVersion"),
+                    Path = path, Source = "Manifest",
+                    Version = recorded.Length > 0 ? recorded : ToolRegistry.FileVersion(path), RulesVersion = ToolManifest.Get(installed!, "RulesVersion"),
                 };
+            }
 
             foreach (var name in executableNames)
             {
                 var hit = OnPath(name, pathEnv ?? Environment.GetEnvironmentVariable("PATH") ?? "");
-                if (hit != null) return new ResolvedTool { Path = hit, Source = "PATH" };
+                if (hit != null) return new ResolvedTool { Path = hit, Source = "PATH", Version = ToolRegistry.FileVersion(hit) };
             }
             return null;
         }
