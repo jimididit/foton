@@ -73,7 +73,7 @@ namespace Foton.ArchitectureTests
                         Path = file,
                         Dir = System.IO.Path.GetDirectoryName(file)!,
                         AssemblyName = doc.Descendants("AssemblyName").Select(e => e.Value).FirstOrDefault() ?? name,
-                        IsExe = doc.Descendants("OutputType").Any(e => e.Value.Equals("Exe", StringComparison.OrdinalIgnoreCase)),
+                        IsExe = doc.Descendants("OutputType").Any(e => e.Value.Equals("Exe", StringComparison.OrdinalIgnoreCase) || e.Value.Equals("WinExe", StringComparison.OrdinalIgnoreCase)),
                     };
                     p.ProjectRefs.AddRange(doc.Descendants("ProjectReference").Select(e => ProjectNameFromInclude((string)e.Attribute("Include")!)));
                     p.FrameworkRefs.AddRange(doc.Descendants("Reference").Select(e => (string)e.Attribute("Include")!));

@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.9.0] - 2026-11-10
+
+### Added
+- `foton-console.exe`, a workstation window for the `foton` verbs. Open a case folder or package ZIP, then verify it, run parse, compose, and analyze (one at a time or in sequence), read the findings in a sortable list with each finding's explanation beside it, and open the report or the case folder. It runs the same code as `foton.exe`, so its outputs and log lines are the same, and like `foton.exe` it works only on collected packages; it never reads the live host. One file, like the other executables.
+
 ## [2.8.0] - 2026-11-10
 
 ### Added
