@@ -158,11 +158,7 @@ namespace Foton.Gui
                 }
                 // Parse, compose, and analyze write new files into the package; show them in the Viewer. A failure here
                 // is logged and never costs the results above.
-                if (_caseRoot != null && label != "Open")
-                {
-                    try { _viewer.Load(_caseRoot); }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log.Write("Viewer not refreshed: " + ex.Message, StatusLevel.Warn); }
-                }
+                if (_caseRoot != null && label != "Open") RefreshViewer(_caseRoot, log);
             }
             catch (Exception ex)
             {
@@ -196,7 +192,7 @@ namespace Foton.Gui
                     _caseRoot = p.CaseRoot;
                     _summary.Text = $"{Path.GetFileName(p.CaseRoot)} - {p.Kind}, {p.Artifacts.Count} artifacts";
                     ShowFindings(findings);
-                    _viewer.Load(p.CaseRoot);
+                    RefreshViewer(p.CaseRoot, log);
                     UpdateButtons();
                 }));
                 return null;
@@ -304,6 +300,20 @@ namespace Foton.Gui
                 if (!BuiltReportUnchanged()) { _status.Text = "Report not opened: Analyze did not build it."; return; }
             }
             Process.Start(new ProcessStartInfo(_builtReport!) { UseShellExecute = true });
+        }
+
+        /// <summary>
+        /// UI thread: reloads the Viewer for a case root. Package files are untrusted input (a malformed hash list, an
+        /// unreadable folder); a failure is a log warning and never ends an open or costs an action's results.
+        /// </summary>
+        void RefreshViewer(string caseRoot, StatusLog log)
+        {
+            try { _viewer.Load(caseRoot); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException
+                || ex is ArgumentException || ex is NotSupportedException || ex is FormatException)
+            {
+                log.Write("Viewer not loaded: " + ex.Message, StatusLevel.Warn);
+            }
         }
 
         void ShowArtifact()

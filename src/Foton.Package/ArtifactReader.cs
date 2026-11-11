@@ -125,9 +125,11 @@ namespace Foton.Package
             if (!Present) return;
             foreach (var row in Csv.Read(csv))
             {
-                var rel = (row.TryGetValue("RelativePath", out var r) ? r ?? "" : "").Replace('/', '\\');
-                if (rel.StartsWith(@".\", StringComparison.Ordinal)) rel = rel.Substring(2);
-                rel = rel.TrimStart('\\');
+                // hashes.csv may use either separator (older packages wrote /); compare on this system's.
+                var sep = Path.DirectorySeparatorChar;
+                var rel = (row.TryGetValue("RelativePath", out var r) ? r ?? "" : "").Replace('/', sep).Replace('\\', sep);
+                if (rel.StartsWith("." + sep, StringComparison.Ordinal)) rel = rel.Substring(2);
+                rel = rel.TrimStart(sep);
                 if (rel.Length > 0 && row.TryGetValue("SHA256", out var h) && h != null) _sha[rel] = h;
             }
         }
