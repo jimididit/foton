@@ -24,8 +24,14 @@ namespace Foton.Gui
 
         void Append(string text)
         {
-            if (_box.IsDisposed) return;
-            if (_box.InvokeRequired) { _box.BeginInvoke(new Action<string>(Append), text); return; }
+            // A run can outlive the window: once the pane is gone its lines are dropped, never thrown at the worker.
+            if (_box.IsDisposed || !_box.IsHandleCreated) return;
+            if (_box.InvokeRequired)
+            {
+                try { _box.BeginInvoke(new Action<string>(Append), text); }
+                catch (Exception ex) when (ex is InvalidOperationException || ex is ObjectDisposedException) { }
+                return;
+            }
             if (_box.TextLength + text.Length > MaxChars) _box.Text = _box.Text.Substring(_box.TextLength / 2);
             _box.AppendText(text);
         }

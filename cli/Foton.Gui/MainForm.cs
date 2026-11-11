@@ -74,18 +74,33 @@ namespace Foton.Gui
             actions.Controls.Add(AddButton("Show case folder", ShowFolder, needsPackage: true));
             actions.Controls.Add(_summary);
 
-            var findingsSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 800 };
+            var findingsSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
             findingsSplit.Panel1.Controls.Add(_findings);
             findingsSplit.Panel2.Controls.Add(_details);
-            var main = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 430 };
+            var main = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
             main.Panel1.Controls.Add(findingsSplit);
             main.Panel2.Controls.Add(_log);
+            // A splitter position is checked against the control's current size, so set it once the window has its real
+            // size, as a share of it (any window size or display scaling).
+            Load += (s, e) =>
+            {
+                SetSplit(findingsSplit, 0.68);
+                SetSplit(main, 0.62);
+            };
 
             page.Controls.Add(main);
             page.Controls.Add(actions);
             page.Controls.Add(open);
             UpdateButtons();
             return page;
+        }
+
+        static void SetSplit(SplitContainer split, double share)
+        {
+            var extent = split.Orientation == Orientation.Vertical ? split.ClientSize.Width : split.ClientSize.Height;
+            var max = extent - split.Panel2MinSize - split.SplitterWidth;
+            if (max <= split.Panel1MinSize) return;
+            split.SplitterDistance = Math.Max(split.Panel1MinSize, Math.Min(max, (int)(extent * share)));
         }
 
         Button AddButton(string text, Func<Task> click, bool needsPackage = false)

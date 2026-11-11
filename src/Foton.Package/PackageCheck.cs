@@ -51,13 +51,22 @@ namespace Foton.Package
             if (p.NotExtracted.Count > 0)
                 log.Write($"{p.NotExtracted.Count} file(s) in the ZIP have paths too long to extract under {p.ExtractedTo} (packages from Foton 2.2.0 and earlier can hold long shortcut names). Their hashes were checked in the ZIP, but parse, compose, and analyze do not see them. Move the ZIP to a folder with a shorter path, delete {Path.GetFileName(p.ExtractedTo)}, and run again.", StatusLevel.Warn);
             var e = p.VerifyExtraction();
-            // hashes.csv paths are relative to the case root; older packages may prefix them with .\ or \.
-            var drift = e.Mismatched.Concat(e.Missing).Concat(e.Unreadable)
-                .Where(f => !string.Equals(f.TrimStart('.', '\\'), CaseTree.ReportFileName, StringComparison.OrdinalIgnoreCase)).ToList();
+            var drift = e.Mismatched.Concat(e.Missing).Concat(e.Unreadable).Where(f => !IsCaseRootReport(f)).ToList();
             if (drift.Count == 0) return true;
             log.Write($"The extraction no longer matches hashes.csv for {drift.Count} file(s) that parse, compose, and analyze read. Delete {p.ExtractedTo} and run again to extract a fresh copy from the ZIP.", StatusLevel.Warn);
             foreach (var f in drift.Take(20)) log.Write("Changed in the extraction: " + f, StatusLevel.Warn);
             return false;
+        }
+
+        /// <summary>
+        /// The report in the case root, as hashes.csv lists it: bare, or with one leading .\ or \ (older packages). Nothing
+        /// else matches, so ..\Foton_Report.html or a report in a subfolder is still drift.
+        /// </summary>
+        public static bool IsCaseRootReport(string relativePath)
+        {
+            var p = relativePath.StartsWith(@".\", StringComparison.Ordinal) ? relativePath.Substring(2)
+                : relativePath.StartsWith(@"\", StringComparison.Ordinal) ? relativePath.Substring(1) : relativePath;
+            return string.Equals(p, CaseTree.ReportFileName, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

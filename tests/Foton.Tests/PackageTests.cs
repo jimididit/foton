@@ -137,6 +137,17 @@ namespace Foton.Tests
             }
         }
 
+        [Theory]
+        [InlineData("Foton_Report.html", true)]
+        [InlineData(@".\Foton_Report.html", true)]
+        [InlineData(@"\Foton_Report.html", true)]
+        [InlineData(@"..\Foton_Report.html", false)]
+        [InlineData(@".\.\Foton_Report.html", false)]
+        [InlineData(@"01_System\Foton_Report.html", false)]
+        [InlineData("Foton_Report.html.bak", false)]
+        public void Only_the_case_root_report_is_exempt_from_extraction_drift(string path, bool exempt) =>
+            Assert.Equal(exempt, PackageCheck.IsCaseRootReport(path));
+
         [Fact]
         public void Package_check_passes_an_intact_package_and_a_rewritten_report_but_not_a_changed_file()
         {
