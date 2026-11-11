@@ -52,11 +52,14 @@ namespace Foton.Tests
                 var o = new SessionOptions { OutputPath = t.Path, NoZip = true, Deep = true, IncludeFileTimeline = true, IncludeUsnJournal = true, Profile = CollectionProfile.FromCategories("Users") };
                 var s = CollectRun.NewSession(o, Quiet());
                 CollectRun.Run(s);
-                Assert.Equal(Categories.TaskNames.OrderBy(n => n, StringComparer.Ordinal), s.Manifest.Select(m => m.Task).OrderBy(n => n, StringComparer.Ordinal));
+                var listed = CollectTasks.ByCategory.SelectMany(kv => kv.Value.Where(t => t != CollectionProfile.EvtxExport).Select(t => kv.Key + "/" + t));
+                Assert.Equal(listed.OrderBy(n => n, StringComparer.Ordinal), s.Manifest.Select(m => m.Category + "/" + m.Task).OrderBy(n => n, StringComparer.Ordinal));
                 Assert.All(s.Manifest.Where(m => m.Category != "Users"), m => Assert.Equal(TaskStatus.NotSelected, m.Status));
             }
-            Assert.Empty(Categories.UnknownTaskNames(new[] { "bits_jobs", "EVTX_EXPORT", "Named_Pipes" }));
-            Assert.Equal(new[] { "bits_jobz" }, Categories.UnknownTaskNames(new[] { "bits_jobz", "bits_jobs" }));
+            Assert.Equal(CollectionProfile.AllCategories.OrderBy(k => k), CollectTasks.ByCategory.Keys.OrderBy(k => k));
+            Assert.Equal("EventLogs", CollectTasks.CategoryOf(CollectionProfile.EvtxExport));
+            Assert.Empty(CollectTasks.Unknown(new[] { "bits_jobs", "EVTX_EXPORT", "Named_Pipes" }));
+            Assert.Equal(new[] { "bits_jobz" }, CollectTasks.Unknown(new[] { "bits_jobz", "bits_jobs" }));
         }
 
         [Fact]

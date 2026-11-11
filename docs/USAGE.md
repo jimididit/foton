@@ -125,6 +125,8 @@ Every key is optional. Without `Categories` every category is collected. `Exclud
 
 A task the profile leaves out is not run. Its artifact holds a one-line note, the manifest records `NotSelected`, `collection_coverage.json` lists it, and the profile is copied into the package as `00_Collection\collection_profile.json` with its SHA-256 in the chain of custody. `analyze` names the profile in an Info finding and draws no conclusion from what it left out. The custody record, coverage, manifest, hashing, and the end-of-run report always run.
 
+To build a profile without writing JSON, use the **Profile** tab of `foton-console.exe` ([section 3](#3-workstation-window-foton-consoleexe)); it can also package the profile with `foton-collect.exe` for an endpoint.
+
 ### Baseline (known-state snapshot)
 
 Writes `FotonBaseline_<HOSTNAME>_<UTC>Z\` with `baseline.json`, `coverage.json`, `Foton_Baseline.html`, hashes, and an optional ZIP. Not a triage collect: volatile state (PIDs, live connections, sessions) is out of scope.
@@ -303,6 +305,10 @@ A window for the same workstation work, for when you would rather click than typ
 The log pane under the tabs shows the same lines `foton.exe` prints. One action runs at a time; the buttons come back when it finishes.
 
 The **Tools** tab lists the tools compose can find: the catalog-pinned releases (installed or not) and installs registered from a folder, with where each one is. **Install Hayabusa...** and **Install Chainsaw...** show the pinned version, license, and SHA-256, then download the release or take an archive you already downloaded (for a workstation without internet). Either way it is installed only when its SHA-256 matches the pin, as with `foton tools`. **Register existing** records an install you already have (choose `EZTools` for the Eric Zimmerman tools folder, or one tool) without downloading anything. **Compose runs** picks the tools **Compose** runs; a tool left unchecked is listed as `NotSelected` in the inventory, and its earlier output is kept as `Retained`. PATH is never changed.
+
+The **Profile** tab builds a [collection profile](#collection-profiles). Check the categories and tasks to collect (a category is collected while any of its tasks is checked; its unchecked tasks become `ExcludeTasks`) and set the options to carry; a shaded option is left to the collector's default. The JSON below is checked after every change by the same rules `foton-collect -Profile` applies, and **Save profile...** and **Build bundle...** work only while it is valid. **Load profile...** opens an existing profile; one that `foton-collect` would refuse is refused here too.
+
+**Build bundle...** asks for a `foton-collect.exe` (2.8.0 or later) and a destination, and creates `Foton_Bundle_<profile>_<UTC>` holding `foton-collect.exe`, `profile.json`, `SHA256SUMS.txt` for both, and `RUN.txt` with the command to run on the endpoint. When a `SHA256SUMS.txt` sits beside the chosen executable (as in a release download), the executable must match it or no bundle is built; without one, `RUN.txt` says the executable was not verified.
 
 The **Viewer** tab lists the package's files. A CSV opens as a table, 1,000 rows a page, with **Find** filtering every loaded row (up to 500,000; a larger file says so); JSON opens as a tree; text and logs open as text (up to 5 MB). Binary artifacts such as `.evtx`, hives, and Prefetch show their size and hash only, because parse and compose read those. Every file shows its SHA-256 and whether it matches `00_Collection\hashes.csv`, changed since hashing, or is not listed (written later, such as `analysis\` outputs). Links and junctions inside a package are listed but never followed.
 
