@@ -137,7 +137,9 @@ namespace Foton.Core
         /// </summary>
         public static IEnumerable<List<string>> StreamRecords(string path)
         {
-            using (var reader = new StreamReader(path, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true))
+            // Shared, so a file another process still has open for writing can be viewed.
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(fs, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true))
             {
                 bool first = true, header = false;
                 foreach (var r in Records(reader))

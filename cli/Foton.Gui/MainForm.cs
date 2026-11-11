@@ -58,7 +58,7 @@ namespace Foton.Gui
 
             _findings.SelectionChanged += (s, e) => ShowDetails();
             // Double-click a finding (or use Show artifact) to read its source artifact in the Viewer.
-            _findings.CellDoubleClick += (s, e) => ShowArtifact();
+            _findings.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) ShowArtifact(); };   // not on a header (that sorts)
             if (openPath != null) Shown += async (s, e) => await Open(openPath);
         }
 
@@ -150,13 +150,18 @@ namespace Foton.Gui
             {
                 var result = await Task.Run(() => work(log));
                 _status.Text = label + " finished";
-                // Parse, compose, and analyze write new files into the package; show them in the Viewer.
-                if (_caseRoot != null && label != "Open") _viewer.Load(_caseRoot);
                 if (result is AnalysisRun run)
                 {
                     ShowFindings(run.Findings.Select(FindingRow));
                     _status.Text += $" - {run.Findings.Count} finding(s)";
                     RememberBuiltReport(run.ReportPath);
+                }
+                // Parse, compose, and analyze write new files into the package; show them in the Viewer. A failure here
+                // is logged and never costs the results above.
+                if (_caseRoot != null && label != "Open")
+                {
+                    try { _viewer.Load(_caseRoot); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log.Write("Viewer not refreshed: " + ex.Message, StatusLevel.Warn); }
                 }
             }
             catch (Exception ex)

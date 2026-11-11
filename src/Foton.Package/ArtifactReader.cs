@@ -98,7 +98,9 @@ namespace Foton.Package
         /// <summary>The first <paramref name="maxChars"/> characters (UTF-8, BOM honored).</summary>
         public static string ReadText(string path, int maxChars, out bool truncated)
         {
-            using (var reader = new StreamReader(path, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true))
+            // Shared like every other Foton read, so a file another process still has open for writing can be viewed.
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(fs, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true))
             {
                 var buffer = new char[maxChars + 1];
                 int read = 0, n;
@@ -117,7 +119,7 @@ namespace Foton.Package
 
         public PackageHashes(string caseRoot)
         {
-            _root = Path.GetFullPath(caseRoot).TrimEnd('\\') + "\\";
+            _root = Path.GetFullPath(caseRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
             var csv = Path.Combine(caseRoot, CaseTree.CollectionFolder, "hashes.csv");
             Present = File.Exists(csv);
             if (!Present) return;
@@ -140,7 +142,7 @@ namespace Foton.Package
             if (!full.StartsWith(_root, StringComparison.OrdinalIgnoreCase)) return "Outside the case folder.";
             var rel = full.Substring(_root.Length);
             // Only the package's own hash list is exempt; a file of the same name anywhere else is checked like any other.
-            if (rel.Equals(CaseTree.CollectionFolder + @"\hashes.csv", StringComparison.OrdinalIgnoreCase) || rel.Equals(CaseTree.CollectionFolder + @"\hashes.txt", StringComparison.OrdinalIgnoreCase))
+            if (rel.Equals(Path.Combine(CaseTree.CollectionFolder, "hashes.csv"), StringComparison.OrdinalIgnoreCase) || rel.Equals(Path.Combine(CaseTree.CollectionFolder, "hashes.txt"), StringComparison.OrdinalIgnoreCase))
                 return "The hash list itself (not listed in it).";
             if (!_sha.TryGetValue(rel, out var expected))
                 return "Not in hashes.csv: written after collection (workstation output) or added later.";

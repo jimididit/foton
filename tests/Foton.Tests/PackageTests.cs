@@ -155,6 +155,13 @@ namespace Foton.Tests
                 Assert.Equal(new[] { "1", "2", "3", "4" }, wide.Rows[0]);
                 Assert.All(wide.Rows, r => Assert.True(r.Length <= wide.Columns.Count));
 
+                // A file another process still holds open for writing can be viewed.
+                using (new FileStream(t.File("a.csv"), FileMode.Append, FileAccess.Write, FileShare.Read))
+                {
+                    Assert.Equal(3, ArtifactReader.ReadCsv(t.File("a.csv"), 10).Rows.Count);
+                    Assert.StartsWith("#TYPE", ArtifactReader.ReadText(t.File("a.csv"), 5, out _));
+                }
+
                 // The cancellable hash matches the shared one, and a cancelled read stops.
                 Assert.Equal(Hashing.Sha256Hex(t.File("a.csv")), ArtifactReader.Sha256Hex(t.File("a.csv"), System.Threading.CancellationToken.None));
                 using (var cts = new System.Threading.CancellationTokenSource())
