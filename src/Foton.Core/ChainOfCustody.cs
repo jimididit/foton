@@ -110,6 +110,23 @@ namespace Foton.Core
                 "Which ones ran depends on the token and options (collection.log).",
                 "",
             };
+            var profile = o.Profile;
+            if (profile != null)
+            {
+                // Profile values are operator input: one line each, inside Parameters Used.
+                l.InsertRange(l.FindIndex(x => x.StartsWith("  RequireAdministrator", StringComparison.Ordinal)) + 1, new[]
+                {
+                    "  Profile             = " + L(profile.Name),
+                    "  ProfileSha256       = " + profile.Sha256,
+                    "  Categories          = " + L(string.Join(", ", profile.Categories)),
+                    "  ExcludeTasks        = " + (profile.ExcludeTasks.Count == 0 ? "(none)" : L(string.Join(", ", profile.ExcludeTasks))),
+                });
+                l.Add("A collection profile limited this collection (" + CollectionProfile.FileName + " in");
+                l.Add("00_Collection, SHA-256 above). Tasks it did not select are recorded in the");
+                l.Add("manifest with Status=NotSelected and listed in collection_coverage.json. Their");
+                l.Add("absence is the operator's choice, not evidence about the host.");
+                l.Add("");
+            }
             if (s.IsElevated)
             {
                 l.Add("Loaded registry hives (SYSTEM, SOFTWARE, DEFAULT, and signed-in users");

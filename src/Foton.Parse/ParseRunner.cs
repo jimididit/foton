@@ -181,6 +181,8 @@ namespace Foton.Parse
         {
             var pf = pkg.Manifest.FirstOrDefault(m => m.TryGetValue("Task", out var t) && t == "prefetch_files");
             var status = pf != null && pf.TryGetValue("Status", out var s) ? s : null;
+            if (status == "NotSelected")
+                return "prefetch_files was not selected by this collection's profile, so the package has no copied .pf files. Collect again with the Filesystem category to parse Prefetch.";
             if (status == "SkippedNotElevated")
                 return "prefetch_files was skipped (not elevated). This package has no copied .pf files. Re-collect elevated with Foton-Collect.ps1 that includes Collect schema 1.2.0.";
             if (status == "NoData")

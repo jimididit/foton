@@ -4,6 +4,16 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.8.0] - 2026-11-10
+
+### Added
+- Collection profiles. `foton-collect -Profile "\path\to\profile.json"` collects only the categories the profile lists, leaves out the tasks in its `ExcludeTasks`, and applies its `Options` (event log window, `LoadUserHives`, `Deep`, and the other switches) as defaults that command-line switches override. `-Category System,Persistence` selects categories without a file, or replaces the profile's list when both are given. A profile with an unknown key, an unknown category or task name, a wrong value type, or no categories is refused before anything runs. Keys are not case-sensitive.
+- A task the profile leaves out is never run. It is recorded with the new status `NotSelected` (a sentinel artifact and a manifest row), the profile file is copied into the package as `00_Collection\collection_profile.json` (so it is hashed), and the chain of custody records the profile name, SHA-256, categories, and excluded tasks. `collection_coverage.json` lists the tasks not selected, and an excluded task these options do not run (such as a `-Deep`-only task) is listed there too. Collect schema 1.15.0; a collection without a profile has the 1.14.0 layout.
+- `analyze` adds an Info finding naming the profile and the tasks it left out. No finding is drawn from their absence.
+
+### Fixed
+- "No process creation events (4688) were collected" fired when the Security log was never read (a standard-user collection skips it), claiming the log returned no events. It now fires only when the task ran.
+
 ## [2.7.1] - 2026-11-10
 
 ### Fixed

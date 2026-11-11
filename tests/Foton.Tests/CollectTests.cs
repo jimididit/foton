@@ -44,6 +44,22 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Every_task_a_Deep_collection_records_is_in_the_profile_task_list()
+        {
+            using (var t = new TempDir())
+            {
+                // Only Users runs; every other task is recorded NotSelected, so the manifest names every task cheaply.
+                var o = new SessionOptions { OutputPath = t.Path, NoZip = true, Deep = true, IncludeFileTimeline = true, IncludeUsnJournal = true, Profile = CollectionProfile.FromCategories("Users") };
+                var s = CollectRun.NewSession(o, Quiet());
+                CollectRun.Run(s);
+                Assert.Equal(Categories.TaskNames.OrderBy(n => n, StringComparer.Ordinal), s.Manifest.Select(m => m.Task).OrderBy(n => n, StringComparer.Ordinal));
+                Assert.All(s.Manifest.Where(m => m.Category != "Users"), m => Assert.Equal(TaskStatus.NotSelected, m.Status));
+            }
+            Assert.Empty(Categories.UnknownTaskNames(new[] { "bits_jobs", "EVTX_EXPORT", "Named_Pipes" }));
+            Assert.Equal(new[] { "bits_jobz" }, Categories.UnknownTaskNames(new[] { "bits_jobz", "bits_jobs" }));
+        }
+
+        [Fact]
         public void System_and_Users_run_every_task_on_this_host_without_task_errors()
         {
             using (var t = new TempDir())

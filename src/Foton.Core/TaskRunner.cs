@@ -34,6 +34,16 @@ namespace Foton.Core
 
         public const string SkippedReason = "Requires an Administrator token; skipped in standard-user coverage.";
 
+        public static string NotSelectedText(string name, string profile) => string.Join("\r\n", new[]
+        {
+            "Foton: task '" + name + "' was not run.",
+            "Status: NotSelected",
+            NotSelectedReason(profile),
+            "This is a choice made for this collection. Do not treat a missing or empty artifact as proof the underlying data was absent on the host.",
+        });
+
+        public static string NotSelectedReason(string profile) => "Not selected by the collection profile '" + TextFile.OneLine(profile) + "'.";
+
         public static string NoDataText(string name, string status, string error) =>
             "Foton: no data returned for '" + name + "'. Status: " + status + ". " + error;
 
@@ -47,6 +57,18 @@ namespace Foton.Core
             string status = TaskStatus.Success, error = "";
             object? data = null;
             int count = 0;
+
+            // Not requested at all, so it is recorded as NotSelected even where it would also need elevation.
+            var profile = session.Options.Profile;
+            if (profile != null && !profile.Selects(spec.Category, spec.Name))
+            {
+                try { TextFile.Write(file, NotSelectedText(spec.Name, profile.Name)); } catch (Exception) { }
+                sw.Stop();
+                session.Manifest.Add(Row(spec, manifestFile, 0, TaskStatus.NotSelected, (int)sw.ElapsedMilliseconds, NotSelectedReason(profile.Name)));
+                if (!spec.NoCache) session.Data[spec.Name] = null;
+                session.Status.Write(spec.Name + " - not selected", StatusLevel.Info);
+                return null;
+            }
 
             if (spec.RequiresElevation && !session.IsElevated)
             {

@@ -20,6 +20,8 @@ namespace Foton.Core
         public bool Deep { get; set; }
         public bool NoZip { get; set; }
         public bool RequireAdministrator { get; set; }
+        /// <summary>-Profile / -Category selection; null collects every category.</summary>
+        public CollectionProfile? Profile { get; set; }
     }
 
     /// <summary>

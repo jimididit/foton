@@ -22,10 +22,18 @@ namespace Foton.Collect.Cli
                 Examiner = Environment.UserName,
             };
             bool defaultOutput = true;
+            string? profilePath = null, categories = null;
+            // Switches given here win over the same option in a profile.
+            var explicitSwitches = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
-                bool Is(string name) => string.Equals(a, name, StringComparison.OrdinalIgnoreCase);
+                bool Is(string name)
+                {
+                    if (!string.Equals(a, name, StringComparison.OrdinalIgnoreCase)) return false;
+                    explicitSwitches.Add(name.TrimStart('-'));
+                    return true;
+                }
                 // A following switch is never taken as a value ("-OutputPath -NoZip" is a missing folder, not a folder named -NoZip).
                 string? Next() => i + 1 < args.Length && !args[i + 1].StartsWith("-", StringComparison.Ordinal) ? args[++i] : null;
                 if (Is("-Version") || Is("--version") || Is("version"))
@@ -46,7 +54,33 @@ namespace Foton.Collect.Cli
                 else if (Is("-Deep")) o.Deep = true;
                 else if (Is("-NoZip")) o.NoZip = true;
                 else if (Is("-RequireAdministrator")) o.RequireAdministrator = true;
+                else if (Is("-Profile")) { profilePath = Next(); if (profilePath == null) return Usage("-Profile needs a profile file."); }
+                else if (Is("-Category"))
+                {
+                    // PowerShell passes "-Category A,B" to a native program as separate values, so take every value up to the next switch.
+                    var parts = new System.Collections.Generic.List<string>();
+                    for (var v = Next(); v != null; v = Next()) parts.Add(v);
+                    if (parts.Count == 0) return Usage("-Category needs one or more category names.");
+                    categories = string.Join(",", parts);
+                }
                 else return Usage("Unknown argument: " + a);
+            }
+            if (profilePath != null || categories != null)
+            {
+                CollectionProfile profile;
+                try
+                {
+                    profile = profilePath != null ? CollectionProfile.Load(profilePath) : CollectionProfile.FromCategories(categories!);
+                    if (profilePath != null && categories != null) profile = profile.WithCategories(categories);
+                }
+                catch (Exception ex) when (ex is InvalidDataException || ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+                {
+                    return Usage("Collection profile not used: " + ex.Message);
+                }
+                var unknown = Categories.UnknownTaskNames(profile.ExcludeTasks);
+                if (unknown.Length > 0)
+                    return Usage($"Collection profile not used: ExcludeTasks names no Collect task: {string.Join(", ", unknown)}. Task names are the Task column of collection_manifest.csv, or {CollectionProfile.EvtxExport}.");
+                profile.ApplyTo(o, explicitSwitches);
             }
             // -Deep turns on the depth switches; they still work alone without it.
             if (o.Deep) { o.IncludeFileTimeline = true; o.IncludeUsnJournal = true; }
@@ -119,7 +153,8 @@ namespace Foton.Collect.Cli
             Console.Error.WriteLine("Usage: foton-collect [-OutputPath <folder>] [-CaseNumber <id>] [-Examiner <name>]");
             Console.Error.WriteLine("                     [-EventLogDays <n>] [-MaxEventsPerLog <n>] [-SkipEvtxExport] [-SkipHashing]");
             Console.Error.WriteLine("                     [-LoadUserHives] [-IncludeFileTimeline] [-IncludeUsnJournal] [-Deep] [-NoZip]");
-            Console.Error.WriteLine("                     [-RequireAdministrator]");
+            Console.Error.WriteLine("                     [-RequireAdministrator] [-Profile <profile.json>] [-Category <name,name>]");
+            Console.Error.WriteLine("Categories: " + string.Join(", ", CollectionProfile.AllCategories));
             Console.Error.WriteLine("       foton-collect -Version");
             Console.Error.WriteLine("Default -OutputPath: " + OutputFolder.Default("Cases") + " (must be private to SYSTEM, Administrators, and this account)");
             return 1;
