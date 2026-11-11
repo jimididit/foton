@@ -2,7 +2,7 @@
 
 Thank you for contributing. Foton is structured so you can add a **collection task**, **baseline provider**, **parser**, or **analysis rule** without rewriting the core.
 
-Foton 2 is C#: three single-file executables on the .NET Framework that ships with Windows (4.6.2+). The PowerShell 1.38.x line takes security fixes only (see [SECURITY.md](../SECURITY.md)); new work targets v2. Open an issue before starting a large feature.
+Foton 2 is C#: four single-file executables on the .NET Framework that ships with Windows (4.6.2+). The PowerShell 1.38.x line takes security fixes only (see [SECURITY.md](../SECURITY.md)); new work targets v2. Open an issue before starting a large feature.
 
 ## Development setup
 
@@ -29,7 +29,7 @@ Use a throwaway Windows VM for live Collect and Baseline runs. Collection change
 | `src/Foton.Analyze`, `Foton.Report` | Rules (`Rules/*.cs`), findings, HTML reports | No |
 | `src/Foton.Parse`, `Foton.Carve`, `Foton.Package` | Parsers, carve, package open/verify | No |
 | `src/Foton.Tools`, `Foton.Patterns` | Tool catalog / compose, workstation pattern lists | No (only `foton tools` downloads, on request) |
-| `cli/*` | `foton-collect.exe`, `foton-baseline.exe`, `foton.exe` | |
+| `cli/*` | `foton-collect.exe`, `foton-baseline.exe`, `foton.exe`, `foton-console.exe` (`cli/Foton.Gui`) | Collect and baseline yes; `foton.exe` and the console no |
 
 | Rule | Enforced by |
 |------|-------------|

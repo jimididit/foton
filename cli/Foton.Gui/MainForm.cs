@@ -52,6 +52,7 @@ namespace Foton.Gui
             _tabs.TabPages.Add(_viewer.Page);
             _tabs.TabPages.Add(ToolsTab());
             _tabs.TabPages.Add(ProfileTab());
+            _tabs.TabPages.Add(CompareTab());
             // The log sits under every tab: an install or register is followed there as much as a parse.
             var outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
             outer.Panel1.Controls.Add(_tabs);
@@ -63,7 +64,7 @@ namespace Foton.Gui
             strip.Items.Add(_progress);
             Controls.Add(strip);
 
-            _findings.SelectionChanged += (s, e) => ShowDetails();
+            FindingGrid(_findings, _details);
             // Double-click a finding (or use Show artifact) to read its source artifact in the Viewer.
             _findings.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) ShowArtifact(); };   // not on a header (that sorts)
             if (openPath != null) Shown += async (s, e) => await Open(openPath);
@@ -160,7 +161,7 @@ namespace Foton.Gui
                 {
                     ShowFindings(run.Findings.Select(FindingRow));
                     _status.Text += $" - {run.Findings.Count} finding(s)";
-                    RememberBuiltReport(run.ReportPath);
+                    _report.Remember(run.ReportPath);
                 }
                 // Parse, compose, and analyze write new files into the package; show them in the Viewer. A failure here
                 // is logged and never costs the results above.
@@ -188,7 +189,7 @@ namespace Foton.Gui
         {
             _path.Text = path;
             _caseRoot = null;
-            RememberBuiltReport(null);
+            _report.Remember(null);
             _findings.DataSource = null;
             _details.Clear();
             _summary.Text = "";
@@ -271,28 +272,40 @@ namespace Foton.Gui
 
         static readonly string[] SeverityOrder = { "High", "Medium", "Low", "Info" };
 
-        void ShowFindings(IEnumerable<Dictionary<string, string?>> rows)
+        void ShowFindings(IEnumerable<Dictionary<string, string?>> rows) => ShowFindings(_findings, rows);
+
+        /// <summary>Findings in a grid, most severe first; column layout is applied when binding completes (FindingGrid).</summary>
+        static void ShowFindings(DataGridView grid, IEnumerable<Dictionary<string, string?>> rows)
         {
             string V(Dictionary<string, string?> r, string k) => r.TryGetValue(k, out var v) ? v ?? "" : "";
             var table = new System.Data.DataTable();
             foreach (var c in new[] { "Severity", "Tier", "Category", "Title", "Observation", "WhyItMatters", "Artifact", "NextStep" }) table.Columns.Add(c);
             foreach (var r in rows.OrderBy(r => Array.IndexOf(SeverityOrder, V(r, "Severity")) is int i && i >= 0 ? i : SeverityOrder.Length))
                 table.Rows.Add(V(r, "Severity"), V(r, "Tier"), V(r, "Category"), V(r, "Title"), V(r, "Observation"), V(r, "WhyItMatters"), V(r, "Artifact"), V(r, "NextStep"));
-            _findings.DataSource = table;
-            foreach (var hidden in new[] { "WhyItMatters", "Artifact", "NextStep" }) _findings.Columns[hidden].Visible = false;
-            _findings.Columns["Severity"].FillWeight = 8;
-            _findings.Columns["Tier"].FillWeight = 5;
-            _findings.Columns["Category"].FillWeight = 12;
-            _findings.Columns["Title"].FillWeight = 35;
-            _findings.Columns["Observation"].FillWeight = 60;
+            grid.DataSource = table;
         }
 
-        void ShowDetails()
+        /// <summary>Wires a findings grid: column layout once bound (columns exist only then), details on selection.</summary>
+        static void FindingGrid(DataGridView grid, TextBox details)
         {
-            if (_findings.CurrentRow?.DataBoundItem is System.Data.DataRowView row)
+            grid.DataBindingComplete += (s, e) =>
+            {
+                var weights = new Dictionary<string, float> { ["Severity"] = 8, ["Tier"] = 5, ["Category"] = 12, ["Title"] = 35, ["Observation"] = 60 };
+                foreach (DataGridViewColumn c in grid.Columns)
+                {
+                    if (weights.TryGetValue(c.Name, out var w)) c.FillWeight = w;
+                    else c.Visible = false;
+                }
+            };
+            grid.SelectionChanged += (s, e) => ShowDetails(grid, details);
+        }
+
+        static void ShowDetails(DataGridView grid, TextBox details)
+        {
+            if (grid.CurrentRow?.DataBoundItem is System.Data.DataRowView row)
             {
                 string V(string k) => Convert.ToString(row[k], System.Globalization.CultureInfo.InvariantCulture) ?? "";
-                _details.Text = string.Join(Environment.NewLine + Environment.NewLine, new[]
+                details.Text = string.Join(Environment.NewLine + Environment.NewLine, new[]
                 {
                     $"{V("Severity")} - Tier {V("Tier")} - {V("Category")}", V("Title"),
                     "What was observed" + Environment.NewLine + V("Observation"),
@@ -303,29 +316,13 @@ namespace Foton.Gui
             }
         }
 
-        /// <summary>
-        /// The report this console last built with Analyze, and its SHA-256 then. A package's own Foton_Report.html was
-        /// written on the endpoint, which may be compromised, and a browser runs whatever an HTML file holds; so only a
-        /// report built here, unchanged since, is opened.
-        /// </summary>
-        string? _builtReport, _builtReportSha256;
-
-        void RememberBuiltReport(string? path)
-        {
-            _builtReport = path != null && File.Exists(path) ? path : null;
-            _builtReportSha256 = _builtReport != null ? Hashing.Sha256Hex(_builtReport) : null;
-        }
-
-        bool BuiltReportUnchanged()
-        {
-            try { return _builtReport != null && File.Exists(_builtReport) && string.Equals(Hashing.Sha256Hex(_builtReport), _builtReportSha256, StringComparison.OrdinalIgnoreCase); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return false; }
-        }
+        /// <summary>The report this console last built with Analyze.</summary>
+        readonly BuiltReport _report = new BuiltReport();
 
         async Task OpenReport()
         {
             if (_caseRoot == null) return;
-            if (!BuiltReportUnchanged())
+            if (!_report.Unchanged())
             {
                 var answer = MessageBox.Show(this,
                     "The report in this package was written on the endpoint during collection, or has changed since this console built it. " +
@@ -333,9 +330,9 @@ namespace Foton.Gui
                     "Open report", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (answer != DialogResult.Yes) return;
                 await Run("Analyze", Analyze);
-                if (!BuiltReportUnchanged()) { _status.Text = "Report not opened: Analyze did not build it."; return; }
+                if (!_report.Unchanged()) { _status.Text = "Report not opened: Analyze did not build it."; return; }
             }
-            Process.Start(new ProcessStartInfo(_builtReport!) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(_report.Path!) { UseShellExecute = true });
         }
 
         /// <summary>

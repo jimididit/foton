@@ -4,7 +4,7 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
-## [2.9.0] - 2026-11-10
+## [2.9.0] - 2026-11-11
 
 ### Added
 - `foton-console.exe`, a workstation window for the `foton` verbs. Open a case folder or package ZIP, then verify it, run parse, compose, and analyze (one at a time or in sequence), read the findings in a sortable list with each finding's explanation beside it, and open the report or the case folder. It runs the same code as `foton.exe`, so its outputs and log lines are the same, and like `foton.exe` it works only on collected packages; it never reads the live host. One file, like the other executables.
@@ -12,6 +12,8 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 - The console's Tools tab lists the tools compose can find, installs the pinned Hayabusa and Chainsaw releases (downloaded, or from an archive already on disk; refused unless the SHA-256 matches the pin), registers an existing install such as the EZ Tools folder, and picks which tools Compose runs.
 - The console's Package tab has **Match IOCs...**: it runs `foton ioc` on the open package with an indicator list you choose and opens `analysis\ioc_matches.csv` in the Viewer.
 - The console's Profile tab builds a collection profile from checkboxes, validated after every change by the same rules as `foton-collect -Profile`, and saves it or builds a bundle for an endpoint: `foton-collect.exe` (checked against the release `SHA256SUMS.txt` beside it, refused when it differs or predates profiles), `profile.json`, their hashes, and `RUN.txt` with the command to run.
+- The console's Compare tab runs `foton compare` on two baselines and shows the findings and every field-level change; it writes the same `baseline_diff.csv` and compare report as the verb.
+- Releases now include `foton-console.exe`, listed in `SHA256SUMS.txt` and covered by the build provenance attestation like the other executables.
 - Compose can run a subset of its tools. A tool left out gets a `NotSelected` row in `external_parse_inventory.csv`, and its earlier output is kept and listed as `Retained`. `foton compose` still runs every tool.
 
 ## [2.8.0] - 2026-11-10

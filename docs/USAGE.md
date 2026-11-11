@@ -32,7 +32,8 @@ Each [GitHub Release](https://github.com/jimididit/foton/releases) tagged `v2.*`
 | `foton-collect.exe` | Endpoint live triage |
 | `foton-baseline.exe` | Endpoint baseline capture |
 | `foton.exe` | Analyst workstation |
-| `SHA256SUMS.txt` | Hashes of the three executables |
+| `foton-console.exe` | Analyst workstation, in a window ([section 3](#3-workstation-window-foton-consoleexe)) |
+| `SHA256SUMS.txt` | Hashes of the four executables |
 
 They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is installed, and nothing is fetched at run time except by `foton tools`, which downloads a pinned, hash-checked Hayabusa or Chainsaw release only when you ask.
 
@@ -309,6 +310,8 @@ The **Tools** tab lists the tools compose can find: the catalog-pinned releases 
 The **Profile** tab builds a [collection profile](#collection-profiles). Check the categories and tasks to collect (a category is collected while any of its tasks is checked; its unchecked tasks become `ExcludeTasks`) and set the options to carry; a shaded option is left to the collector's default. The JSON below is checked after every change by the same rules `foton-collect -Profile` applies, and **Save profile...** and **Build bundle...** work only while it is valid. **Load profile...** opens an existing profile; one that `foton-collect` would refuse is refused here too.
 
 **Build bundle...** asks for a `foton-collect.exe` (2.8.0 or later) and a destination, and creates `Foton_Bundle_<profile>_<UTC>` holding `foton-collect.exe`, `profile.json`, `SHA256SUMS.txt` for both, and `RUN.txt` with the command to run on the endpoint. When a `SHA256SUMS.txt` sits beside the chosen executable (as in a release download), the executable must match it or no bundle is built; without one, `RUN.txt` says the executable was not verified.
+
+The **Compare** tab runs `foton compare`: choose the reference `baseline.json` (the earlier one, or the golden image) and the difference `baseline.json` (the later one, or the host), or type or paste a baseline folder, then **Compare**. As with the verb, `baseline_diff.csv` and `Foton_BaselineCompare.html` are written beside the difference baseline. The findings are listed with their explanation, and the table below them shows every field-level change (the first 50,000; all of them are in `baseline_diff.csv`). **Open compare report** opens only the report this window built, unchanged since.
 
 The **Viewer** tab lists the package's files. A CSV opens as a table, 1,000 rows a page, with **Find** filtering every loaded row (up to 500,000; a larger file says so); JSON opens as a tree; text and logs open as text (up to 5 MB). Binary artifacts such as `.evtx`, hives, and Prefetch show their size and hash only, because parse and compose read those. Every file shows its SHA-256 and whether it matches `00_Collection\hashes.csv`, changed since hashing, or is not listed (written later, such as `analysis\` outputs). Links and junctions inside a package are listed but never followed.
 
