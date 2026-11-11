@@ -57,6 +57,17 @@ namespace Foton.ArchitectureTests
         }
 
         [Fact]
+        public void The_console_is_a_workstation_tool_that_never_touches_a_live_host()
+        {
+            // foton-console.exe works on collected packages only: no live-host access, no collector or baseline capture code.
+            Assert.True(Repo.Projects.ContainsKey("Foton.Gui"), "Foton.Gui project not found.");
+            var closure = Repo.Closure("Foton.Gui");
+            foreach (var banned in new[] { "Foton.Win", "Foton.Collect", "Foton.Baseline.Capture" })
+                Assert.False(closure.Contains(banned), "Foton.Gui must not reference " + banned + ".");
+            Assert.False(Repo.AssemblyRefsOf(closure).Any(r => r.StartsWith("System.Management", StringComparison.OrdinalIgnoreCase)), "Foton.Gui must not reference System.Management (WMI).");
+        }
+
+        [Fact]
         public void Analyze_takes_pattern_lists_as_input_so_the_endpoint_can_run_it()
         {
             // Collect runs analysis at the end of a triage; the suspicious-command list must never ride along.

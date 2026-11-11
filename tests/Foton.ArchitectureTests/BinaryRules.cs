@@ -65,7 +65,8 @@ namespace Foton.ArchitectureTests
                     Assert.True(Repo.InBoxAssemblyNames.Contains(r.Name) && FrameworkKeys.Contains(Token(r)),
                         p.AssemblyName + " references " + r.FullName + ", which is not an in-box .NET Framework 4.6.2 assembly.");
                 }
-                if (p.Name != "Foton.Cli")
+                // Only the workstation executables carry Foton.Tools' pinned, hash-checked tool download; endpoints never do.
+                if (p.Name != "Foton.Cli" && p.Name != "Foton.Gui")
                     Assert.DoesNotContain(asm.GetReferencedAssemblies(), r => r.Name.Equals("System.Net.Http", StringComparison.OrdinalIgnoreCase));
             }
         }

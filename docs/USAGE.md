@@ -289,6 +289,19 @@ EZ Tools registered with Foton 2.4.0 or earlier list six tools; run `.\foton.exe
 
 ---
 
+## 3. Workstation window: `foton-console.exe`
+
+A window for the same workstation work, for when you would rather click than type. It runs the same code as `foton.exe`, writes the same files, and never reads the live host.
+
+1. Start `foton-console.exe`, or pass a package on its command line: `.\foton-console.exe "\path\to\Foton_case.zip"`.
+2. **Open folder...** or **Open ZIP...** loads a case folder or package ZIP (a ZIP is extracted beside it, as with `foton.exe`). Findings already in the package are listed.
+3. **Verify** checks every file against `hashes.csv`, as `foton package` does. **Parse**, **Compose**, and **Analyze** run those verbs; **Parse, compose, analyze** runs all three in order.
+4. Select a finding to read why it matters, the source artifact, and the next step. **Open report** opens `Foton_Report.html`; **Show case folder** opens the folder in Explorer.
+
+The log pane shows the same lines `foton.exe` prints. One action runs at a time; the buttons come back when it finishes.
+
+---
+
 ## Formats and compatibility
 
 - **Collect schema 1.14.0.** The same files, tasks, and columns as 1.38.x (1.13.0), with timestamps in UTC, explicit statuses where 1.38.x wrote empty or misleading values (for example `AccessDenied` instead of `NotPresent` for an unreadable event log), and rows 1.38.x missed. `foton analyze` reads both.

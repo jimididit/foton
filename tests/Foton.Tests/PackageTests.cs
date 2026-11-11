@@ -138,6 +138,34 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Package_check_passes_an_intact_package_and_a_rewritten_report_but_not_a_changed_file()
+        {
+            using (var t = new TempDir())
+            {
+                var s = Sessions.New(Directory.CreateDirectory(t.File("cases")).FullName);
+                File.WriteAllText(Path.Combine(s.Dir("System"), "os.json"), "{}");
+                File.WriteAllText(Path.Combine(s.CaseRoot!, CaseTree.ReportFileName), "<html>collect</html>");
+                PackageFiles.WriteArtifactHashes(s);
+                var quiet = new StatusLog(new StringWriter());
+                Assert.Equal(0, PackageCheck.Report(quiet, FotonPackage.Open(s.CaseRoot!)));
+
+                var zip = t.File("case.zip");
+                ZipFile.CreateFromDirectory(s.CaseRoot!, zip, CompressionLevel.Fastest, includeBaseDirectory: true);
+                var p = FotonPackage.Open(zip);
+                File.WriteAllText(Path.Combine(p.CaseRoot, CaseTree.ReportFileName), "<html>analyze</html>");
+                Assert.Equal(0, PackageCheck.Report(quiet, FotonPackage.Open(zip)));   // analyze rewrites the report by design
+
+                File.WriteAllText(Path.Combine(p.CaseRoot, "01_System", "os.json"), "{\"edited\":true}");
+                var log = new StringWriter();
+                Assert.Equal(2, PackageCheck.Report(new StatusLog(log), FotonPackage.Open(zip)));
+                Assert.Contains("Changed in the extraction: " + @"01_System\os.json", log.ToString());
+
+                File.Delete(Path.Combine(s.CaseRoot!, "00_Collection", "hashes.csv"));
+                Assert.Equal(2, PackageCheck.Report(quiet, FotonPackage.Open(s.CaseRoot!)));
+            }
+        }
+
+        [Fact]
         public void A_zip_is_verified_from_its_entries_whatever_was_written_into_the_extraction()
         {
             using (var t = new TempDir())

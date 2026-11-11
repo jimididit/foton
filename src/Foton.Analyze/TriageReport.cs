@@ -31,7 +31,7 @@ namespace Foton.Analyze
     /// </summary>
     public static class TriageReport
     {
-        public const string FileName = "Foton_Report.html";
+        public const string FileName = CaseTree.ReportFileName;
 
         static readonly Dictionary<string, int> SevOrder = new Dictionary<string, int> { ["High"] = 0, ["Medium"] = 1, ["Low"] = 2, ["Info"] = 3 };
 

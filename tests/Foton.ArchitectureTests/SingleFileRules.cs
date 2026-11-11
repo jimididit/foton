@@ -11,6 +11,7 @@ namespace Foton.ArchitectureTests
         [InlineData("Foton.Collect.Cli", "foton-collect.exe")]
         [InlineData("Foton.Baseline.Cli", "foton-baseline.exe")]
         [InlineData("Foton.Cli", "foton.exe")]
+        [InlineData("Foton.Gui", "foton-console.exe")]
         public void Build_output_is_one_exe(string project, string exe)
         {
             // ILRepack merges in every configuration (cli\ILRepack.targets), so this holds for Debug too.

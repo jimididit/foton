@@ -8,6 +8,8 @@ namespace Foton.Core
     public static class CaseTree
     {
         public const string CollectionFolder = "00_Collection";
+        /// <summary>The triage report in the case root (Collect writes it; analyze rewrites it).</summary>
+        public const string ReportFileName = "Foton_Report.html";
 
         /// <summary>The folder itself if it holds 00_Collection, else the first child that does; null if none.</summary>
         public static string? FindCaseRoot(string searchRoot)
