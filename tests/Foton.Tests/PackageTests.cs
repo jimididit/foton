@@ -137,6 +137,58 @@ namespace Foton.Tests
             }
         }
 
+        [Fact]
+        public void The_artifact_reader_keeps_columns_as_written_caps_rows_and_filters()
+        {
+            using (var t = new TempDir())
+            {
+                File.WriteAllText(t.File("a.csv"), "#TYPE x\r\n\"Name\",\"Name\",\"Path\"\r\n\"one\",\"1\",\"C:\\a\"\r\n\r\n\"two\",\"2\",\"C:\\B\\x\"\r\n\"three\",\"3\"\r\n");
+                var all = ArtifactReader.ReadCsv(t.File("a.csv"), 10);
+                Assert.Equal(new[] { "Name", "Name", "Path" }, all.Columns);   // duplicate header kept, file order
+                Assert.Equal(3, all.Rows.Count);
+                Assert.Equal("", all.Rows[2][2]);                               // short row padded
+                Assert.False(all.Truncated);
+                Assert.Equal(new[] { 1 }, all.Filter("c:\\b"));                // case-insensitive, any cell
+                Assert.Equal(new[] { 0, 1, 2 }, all.Filter(""));
+
+                var capped = ArtifactReader.ReadCsv(t.File("a.csv"), 2);
+                Assert.Equal(2, capped.Rows.Count);
+                Assert.True(capped.Truncated);
+
+                File.WriteAllText(t.File("long.txt"), new string('x', 50));
+                Assert.Equal(10, ArtifactReader.ReadText(t.File("long.txt"), 10, out var cut).Length);
+                Assert.True(cut);
+
+                File.WriteAllBytes(t.File("blob.bin"), new byte[] { 0x4D, 0x5A, 0, 1, 2 });
+                File.WriteAllText(t.File("notes.unknown"), "plain text");
+                Assert.Equal(ArtifactShape.Binary, ArtifactReader.ShapeOf(t.File("blob.bin")));
+                Assert.Equal(ArtifactShape.Text, ArtifactReader.ShapeOf(t.File("notes.unknown")));
+                Assert.Equal(ArtifactShape.Json, ArtifactReader.ShapeOf(t.File("x.JSON")));
+            }
+        }
+
+        [Fact]
+        public void Package_hashes_say_whether_a_file_matches_changed_or_is_unlisted()
+        {
+            using (var t = new TempDir())
+            {
+                var s = Sessions.New(Directory.CreateDirectory(t.File("cases")).FullName);
+                var os = Path.Combine(s.Dir("System"), "os.json");
+                File.WriteAllText(os, "{}");
+                PackageFiles.WriteArtifactHashes(s);
+                var h = new PackageHashes(s.CaseRoot!);
+                Assert.True(h.Present);
+                Assert.Equal("Matches hashes.csv.", h.Status(os, Hashing.Sha256Hex(os)));
+                Assert.StartsWith("Changed since hashing", h.Status(os, new string('0', 64)));
+                var later = Path.Combine(s.CaseRoot!, "analysis.txt");
+                File.WriteAllText(later, "x");
+                Assert.StartsWith("Not in hashes.csv", h.Status(later, Hashing.Sha256Hex(later)));
+                Assert.StartsWith("The hash list itself", h.Status(Path.Combine(s.Dir("Collection"), "hashes.csv"), ""));
+                Assert.Equal("Outside the case folder.", h.Status(t.File("elsewhere.txt"), ""));
+                Assert.False(new PackageHashes(t.Path).Present);
+            }
+        }
+
         [Theory]
         [InlineData("Foton_Report.html", true)]
         [InlineData(@".\Foton_Report.html", true)]

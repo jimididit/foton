@@ -131,6 +131,26 @@ namespace Foton.Core
             }
         }
 
+        /// <summary>
+        /// The header record, then each data record, as cells in file order: for a viewer that must show a file exactly as
+        /// written (duplicate column names included). Same parsing rules as <see cref="Stream"/>.
+        /// </summary>
+        public static IEnumerable<List<string>> StreamRecords(string path)
+        {
+            using (var reader = new StreamReader(path, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true))
+            {
+                bool first = true, header = false;
+                foreach (var r in Records(reader))
+                {
+                    if (first && r.Count == 1 && r[0].StartsWith("#TYPE", StringComparison.Ordinal)) { first = false; continue; }
+                    first = false;
+                    if (header && r.Count == 1 && r[0].Length == 0) continue; // blank line
+                    header = true;
+                    yield return r;
+                }
+            }
+        }
+
         /// <summary>The record state machine of <see cref="Parse"/> over a reader.</summary>
         static IEnumerable<List<string>> Records(TextReader reader)
         {

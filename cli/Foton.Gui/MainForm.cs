@@ -32,6 +32,8 @@ namespace Foton.Gui
         readonly ToolStripStatusLabel _status = new ToolStripStatusLabel("Ready") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
         readonly ToolStripProgressBar _progress = new ToolStripProgressBar { Style = ProgressBarStyle.Marquee, Visible = false };
         readonly List<Control> _actions = new List<Control>();
+        readonly TabControl _tabs = new TabControl { Dock = DockStyle.Fill };
+        readonly ViewerTab _viewer = new ViewerTab();
         /// <summary>One writer for the log pane, shared by every action (each action gets its own StatusLog over it).</summary>
         readonly LogWriter _logWriter;
         string? _caseRoot;
@@ -46,15 +48,17 @@ namespace Foton.Gui
             StartPosition = FormStartPosition.CenterScreen;
             _logWriter = new LogWriter(_log);
 
-            var tabs = new TabControl { Dock = DockStyle.Fill };
-            tabs.TabPages.Add(PackageTab());
-            Controls.Add(tabs);
+            _tabs.TabPages.Add(PackageTab());
+            _tabs.TabPages.Add(_viewer.Page);
+            Controls.Add(_tabs);
             var strip = new StatusStrip();
             strip.Items.Add(_status);
             strip.Items.Add(_progress);
             Controls.Add(strip);
 
             _findings.SelectionChanged += (s, e) => ShowDetails();
+            // Double-click a finding (or use Show artifact) to read its source artifact in the Viewer.
+            _findings.CellDoubleClick += (s, e) => ShowArtifact();
             if (openPath != null) Shown += async (s, e) => await Open(openPath);
         }
 
@@ -73,6 +77,7 @@ namespace Foton.Gui
             actions.Controls.Add(AddButton("Compose", () => Run("Compose", Compose), needsPackage: true));
             actions.Controls.Add(AddButton("Analyze", () => Run("Analyze", Analyze), needsPackage: true));
             actions.Controls.Add(AddButton("Parse, compose, analyze", () => Run("Parse, compose, analyze", (log, path) => { Parse(log, path); Compose(log, path); return Analyze(log, path); }), needsPackage: true));
+            actions.Controls.Add(AddButton("Show artifact", ShowArtifact, needsPackage: true));
             actions.Controls.Add(AddButton("Open report", OpenReport, needsPackage: true));
             actions.Controls.Add(AddButton("Show case folder", ShowFolder, needsPackage: true));
             actions.Controls.Add(_summary);
@@ -184,6 +189,7 @@ namespace Foton.Gui
                     _caseRoot = p.CaseRoot;
                     _summary.Text = $"{Path.GetFileName(p.CaseRoot)} - {p.Kind}, {p.Artifacts.Count} artifacts";
                     ShowFindings(findings);
+                    _viewer.Load(p.CaseRoot);
                     UpdateButtons();
                 }));
                 return null;
@@ -291,6 +297,15 @@ namespace Foton.Gui
                 if (!BuiltReportUnchanged()) { _status.Text = "Report not opened: Analyze did not build it."; return; }
             }
             Process.Start(new ProcessStartInfo(_builtReport!) { UseShellExecute = true });
+        }
+
+        void ShowArtifact()
+        {
+            var art = _findings.CurrentRow?.DataBoundItem is System.Data.DataRowView row
+                ? Convert.ToString(row["Artifact"], System.Globalization.CultureInfo.InvariantCulture) ?? "" : "";
+            if (art.Length == 0) { _status.Text = "Select a finding that names a source artifact."; return; }
+            _tabs.SelectedTab = _viewer.Page;
+            if (!_viewer.Select(art)) _status.Text = "Not in this package: " + art;
         }
 
         void ShowFolder()

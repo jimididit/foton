@@ -8,6 +8,7 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 
 ### Added
 - `foton-console.exe`, a workstation window for the `foton` verbs. Open a case folder or package ZIP, then verify it, run parse, compose, and analyze (one at a time or in sequence), read the findings in a sortable list with each finding's explanation beside it, and open the report or the case folder. It runs the same code as `foton.exe`, so its outputs and log lines are the same, and like `foton.exe` it works only on collected packages; it never reads the live host. One file, like the other executables.
+- The console's Viewer tab shows any file in a package: CSVs as a searchable, paged table, JSON as a tree, text as text, and binary artifacts as size and hash. Each file shows its SHA-256 and whether it matches `hashes.csv`. **Show artifact**, or double-clicking a finding, opens the artifact the finding cites. The console opens only a report it built itself with Analyze, because a package's own report was written on the endpoint.
 
 ## [2.8.0] - 2026-11-10
 

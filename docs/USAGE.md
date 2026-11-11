@@ -296,10 +296,12 @@ A window for the same workstation work, for when you would rather click than typ
 1. Start `foton-console.exe`, or pass a package on its command line: `.\foton-console.exe "\path\to\Foton_case.zip"`.
 2. **Open folder...** or **Open ZIP...** loads a case folder or package ZIP (a ZIP is extracted beside it, as with `foton.exe`). Findings already in the package are listed.
 3. **Verify** checks every file against `hashes.csv`, as `foton package` does. **Parse**, **Compose**, and **Analyze** run those verbs; **Parse, compose, analyze** runs all three in order.
-4. Select a finding to read why it matters, the source artifact, and the next step. **Show case folder** opens the folder in Explorer.
+4. Select a finding to read why it matters, the source artifact, and the next step. **Show artifact** (or double-clicking the finding) opens that artifact in the **Viewer** tab. **Show case folder** opens the folder in Explorer.
 5. **Open report** opens `Foton_Report.html` in your browser only when this window built it with **Analyze** and the file has not changed since. The report already in a package was written on the endpoint, and a browser runs whatever an HTML file contains, so for that one the console asks to run **Analyze** first and opens the rebuilt report.
 
 The log pane shows the same lines `foton.exe` prints. One action runs at a time; the buttons come back when it finishes.
+
+The **Viewer** tab lists the package's files. A CSV opens as a table, 1,000 rows a page, with **Find** filtering every loaded row (up to 500,000; a larger file says so); JSON opens as a tree; text and logs open as text (up to 5 MB). Binary artifacts such as `.evtx`, hives, and Prefetch show their size and hash only, because parse and compose read those. Every file shows its SHA-256 and whether it matches `00_Collection\hashes.csv`, changed since hashing, or is not listed (written later, such as `analysis\` outputs). Links and junctions inside a package are listed but never followed.
 
 ---
 
