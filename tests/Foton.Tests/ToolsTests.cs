@@ -335,6 +335,25 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Compose_tools_match_compose_jobs_and_unselected_tools_are_NotSelected()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"));
+                Write(Path.Combine(pkg, @"analysis\external\pecmd\pecmd.csv"), "old");
+                var all = Compose(pkg, t.File("empty")).Rows.Where(r => r.Status != "Retained" && r.Tool != "*").Select(r => r.Tool).ToList();
+                Assert.Equal(ComposeTools.All.Select(c => c.Name), all);
+
+                var rows = ComposeRunner.Run(pkg, Quiet(), t.File("empty"), null, System32Only, new[] { "hayabusa" }).Rows;
+                Assert.Equal("NotOnPath", rows.Single(r => r.Tool == "Hayabusa").Status);
+                var pecmd = rows.Where(r => r.Tool == "PECmd").ToList();
+                Assert.Equal("NotSelected", pecmd[0].Status);
+                Assert.EndsWith(@"pecmd\pecmd.csv", Assert.Single(pecmd, r => r.Status == "Retained").DestRelative);
+                Assert.Equal(ComposeTools.All.Count - 1, rows.Count(r => r.Status == "NotSelected"));
+            }
+        }
+
+        [Fact]
         public void Runs_RECmd_with_a_batch_Hayabusa_in_UTC_and_records_Chainsaw_NoRules()
         {
             using (var t = new TempDir())

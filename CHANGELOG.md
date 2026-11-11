@@ -9,6 +9,9 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 ### Added
 - `foton-console.exe`, a workstation window for the `foton` verbs. Open a case folder or package ZIP, then verify it, run parse, compose, and analyze (one at a time or in sequence), read the findings in a sortable list with each finding's explanation beside it, and open the report or the case folder. It runs the same code as `foton.exe`, so its outputs and log lines are the same, and like `foton.exe` it works only on collected packages; it never reads the live host. One file, like the other executables.
 - The console's Viewer tab shows any file in a package: CSVs as a searchable, paged table, JSON as a tree, text as text, and binary artifacts as size and hash. Each file shows its SHA-256 and whether it matches `hashes.csv`. **Show artifact**, or double-clicking a finding, opens the artifact the finding cites. The console opens only a report it built itself with Analyze, because a package's own report was written on the endpoint.
+- The console's Tools tab lists the tools compose can find, installs the pinned Hayabusa and Chainsaw releases (downloaded, or from an archive already on disk; refused unless the SHA-256 matches the pin), registers an existing install such as the EZ Tools folder, and picks which tools Compose runs.
+- The console's Package tab has **Match IOCs...**: it runs `foton ioc` on the open package with an indicator list you choose and opens `analysis\ioc_matches.csv` in the Viewer.
+- Compose can run a subset of its tools. A tool left out gets a `NotSelected` row in `external_parse_inventory.csv`, and its earlier output is kept and listed as `Retained`. `foton compose` still runs every tool.
 
 ## [2.8.0] - 2026-11-10
 

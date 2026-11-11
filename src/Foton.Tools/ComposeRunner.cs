@@ -54,8 +54,10 @@ namespace Foton.Tools
 
         /// <param name="toolPaths">Explicit executable per tool name; wins over tools.json and PATH.</param>
         /// <param name="pathEnv">PATH to search (tests); the process PATH when null.</param>
+        /// <param name="onlyTools">Tools to run; null runs every tool. A tool left out gets a NotSelected inventory row
+        /// and its earlier output stays, listed as Retained.</param>
         public static ComposeRun Run(string packagePath, StatusLog log, string? toolRoot = null,
-            IDictionary<string, string>? toolPaths = null, string? pathEnv = null)
+            IDictionary<string, string>? toolPaths = null, string? pathEnv = null, IReadOnlyCollection<string>? onlyTools = null)
         {
             var full = Path.GetFullPath(packagePath);
             if (File.Exists(full) && !full.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
@@ -195,6 +197,12 @@ namespace Foton.Tools
                         });
                 }
 
+                if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase))
+                {
+                    rows.Add(Row("NotSelected", "", $"{j.Tool} was not selected for this compose run."));
+                    Retained("not selected");
+                    continue;
+                }
                 if (exe == null)
                 {
                     var hint = j.Tool == "Hayabusa"
