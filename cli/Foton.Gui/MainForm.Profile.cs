@@ -64,7 +64,8 @@ namespace Foton.Gui
             {
                 var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
                 var set = new CheckBox { Text = name, AutoSize = true };
-                var value = new NumericUpDown { Minimum = 0, Maximum = 1000000, Width = 90, Enabled = false };
+                // The parser's whole range (0 to int.MaxValue), so a loaded value is shown and saved unchanged.
+                var value = new NumericUpDown { Minimum = 0, Maximum = int.MaxValue, Width = 100, Enabled = false };
                 set.CheckedChanged += (s, e) => { value.Enabled = set.Checked; ProfileChanged(); };
                 value.ValueChanged += (s, e) => ProfileChanged();
                 row.Controls.Add(set);
@@ -117,7 +118,7 @@ namespace Foton.Gui
                 {
                     bool set = p != null && p.Options.TryGetValue(kv.Key, out var v) && v is int;
                     kv.Value.Key.Checked = set;
-                    kv.Value.Value.Value = set ? Math.Min(kv.Value.Value.Maximum, (int)p!.Options[kv.Key]) : 0;
+                    kv.Value.Value.Value = set ? (int)p!.Options[kv.Key] : 0;
                 }
             }
             finally { _filling = false; }
