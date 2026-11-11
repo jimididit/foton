@@ -169,6 +169,15 @@ namespace Foton.Tests
             var info = findings.Single(f => f.Title == "A collection profile limited what was collected");
             Assert.StartsWith("Profile '(unnamed)' left out 2 task(s): security_process_creation ; bits_jobs", info.Observation);
             Assert.Equal("Info", info.Severity);
+
+            // A profile that left nothing out is named, but not said to have limited the collection.
+            var data = new PackageData();
+            data.Set("collection_coverage", PackageData.FromJson(Json.Parse("{\"ProfileName\":\"Everything\",\"NotSelectedTasks\":[]}")));
+            var all = new AnalysisContext(data, new List<Dictionary<string, string?>> { Row("os_info", "Success") }, null, new string[0], PatternLists.UserWritable);
+            Analyzer.Run(all);
+            Assert.DoesNotContain(all.Findings, f => f.Title == "A collection profile limited what was collected");
+            Assert.Equal("Profile 'Everything' was used and left out no task this run carried.", all.Findings.Single(f => f.Title == "A collection profile was used").Observation);
+            Assert.DoesNotContain(Run(Row("os_info", "Success")), f => f.Title.StartsWith("A collection profile", StringComparison.Ordinal));
         }
 
         [Fact]

@@ -121,14 +121,18 @@ namespace Foton.Analyze.Rules
             if (profileCov != null && profileCov.Has("NotSelectedTasks"))
                 foreach (var t in Items(profileCov["NotSelectedTasks"]).Select(Str))
                     if (!notSelected.Contains(t, System.StringComparer.OrdinalIgnoreCase)) notSelected.Add(t);
-            if (notSelected.Count > 0 || profileName.Length > 0)
+            if (notSelected.Count > 0)
                 c.Add("Info", "Collection", 1, "A collection profile limited what was collected",
-                    notSelected.Count == 0
-                        ? F("Profile '{0}' was used and left out no task this run carried.", profileName)
-                        : F("Profile '{0}' left out {1} task(s): {2}.", profileName.Length > 0 ? profileName : "(unnamed)", notSelected.Count, Sample(notSelected.Select(t => (object?)t), 12)),
+                    F("Profile '{0}' left out {1} task(s): {2}.", profileName.Length > 0 ? profileName : "(unnamed)", notSelected.Count, Sample(notSelected.Select(t => (object?)t), 12)),
                     "Tasks the profile did not select were not run, so their artifacts are absent by the operator's choice. No finding in this report is based on their absence; rules that need them did not evaluate. Collect again without the profile, or with those categories, if the case needs them.",
                     AnalysisContext.Artifact("Collection", "collection_profile", "json"),
                     "Compare the profile's categories with the questions this case has to answer.");
+            else if (profileName.Length > 0)
+                c.Add("Info", "Collection", 1, "A collection profile was used",
+                    F("Profile '{0}' was used and left out no task this run carried.", profileName),
+                    "The profile selected every task this run carried, so no artifact is absent because of it. Its options (event log window and caps, -Deep and the other switches) still shaped what was collected; they are listed under Parameters Used in the chain of custody.",
+                    AnalysisContext.Artifact("Collection", "collection_profile", "json"),
+                    "Check the options in the chain of custody against what the case needs (for example -Deep, -IncludeUsnJournal, -LoadUserHives).");
 
             // Profile scans skip earlier Foton packages; the name and marker files that identify one can be forged.
             var cov = c.Data["collection_coverage"];

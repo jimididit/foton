@@ -25,7 +25,8 @@ namespace Foton.Gui
         readonly TextBox _profileName = new TextBox { Width = 220 };
         readonly TextBox _profileDescription = new TextBox { Width = 420 };
         readonly TreeView _profileTasks = new TreeView { Dock = DockStyle.Fill, CheckBoxes = true, HideSelection = false };
-        readonly Dictionary<string, CheckBox> _boolOptions = new Dictionary<string, CheckBox>(StringComparer.Ordinal);
+        const string OptionDefault = "Default", OptionOn = "On", OptionOff = "Off";
+        readonly Dictionary<string, ComboBox> _boolOptions = new Dictionary<string, ComboBox>(StringComparer.Ordinal);
         readonly Dictionary<string, KeyValuePair<CheckBox, NumericUpDown>> _intOptions = new Dictionary<string, KeyValuePair<CheckBox, NumericUpDown>>(StringComparer.Ordinal);
         readonly Label _profileStatus = new Label { Dock = DockStyle.Top, AutoSize = false, Height = 40, Padding = new Padding(4) };
         readonly TextBox _profileJson = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Font = new Font(FontFamily.GenericMonospace, 9f) };
@@ -52,13 +53,19 @@ namespace Foton.Gui
             bar.Controls.Add(_profileDescription);
 
             var options = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(6) };
-            options.Controls.Add(new Label { Text = "Options (shaded: not set, the collector default applies)", AutoSize = true });
+            options.Controls.Add(new Label { Text = "Options (Default: the profile leaves it to the collector, which is Off for these)", AutoSize = true });
+            // A named three-way choice, not a three-state check box: Windows draws "not set" as a filled box that reads as on.
             foreach (var name in BoolOptions)
             {
-                var box = new CheckBox { Text = name, ThreeState = true, CheckState = CheckState.Indeterminate, AutoSize = true };
-                box.CheckStateChanged += (s, e) => ProfileChanged();
-                _boolOptions[name] = box;
-                options.Controls.Add(box);
+                var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+                var choice = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 80, AccessibleName = name };
+                choice.Items.AddRange(new object[] { OptionDefault, OptionOn, OptionOff });
+                choice.SelectedIndex = 0;
+                choice.SelectedIndexChanged += (s, e) => ProfileChanged();
+                row.Controls.Add(choice);
+                row.Controls.Add(new Label { Text = name, AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
+                _boolOptions[name] = choice;
+                options.Controls.Add(row);
             }
             foreach (var name in new[] { "EventLogDays", "MaxEventsPerLog" })
             {
@@ -113,7 +120,7 @@ namespace Foton.Gui
                 }
                 _profileTasks.EndUpdate();
                 foreach (var kv in _boolOptions)
-                    kv.Value.CheckState = p != null && p.Options.TryGetValue(kv.Key, out var v) && v is bool b ? (b ? CheckState.Checked : CheckState.Unchecked) : CheckState.Indeterminate;
+                    kv.Value.SelectedItem = p != null && p.Options.TryGetValue(kv.Key, out var v) && v is bool b ? (b ? OptionOn : OptionOff) : OptionDefault;
                 foreach (var kv in _intOptions)
                 {
                     bool set = p != null && p.Options.TryGetValue(kv.Key, out var v) && v is int;
@@ -158,7 +165,7 @@ namespace Foton.Gui
             }
             var options = new SortedDictionary<string, object?>(StringComparer.Ordinal);
             foreach (var kv in _boolOptions)
-                if (kv.Value.CheckState != CheckState.Indeterminate) options[kv.Key] = kv.Value.CheckState == CheckState.Checked;
+                if ((string)kv.Value.SelectedItem != OptionDefault) options[kv.Key] = (string)kv.Value.SelectedItem == OptionOn;
             foreach (var kv in _intOptions)
                 if (kv.Value.Key.Checked) options[kv.Key] = (int)kv.Value.Value.Value;
 
@@ -180,7 +187,9 @@ namespace Foton.Gui
                 if (unknown.Length > 0) throw new InvalidDataException("ExcludeTasks names no Collect task: " + string.Join(", ", unknown));
                 _profile = p;
                 _profileStatus.ForeColor = Color.DarkGreen;
-                _profileStatus.Text = $"Valid: {p.Categories.Count} of {CollectionProfile.AllCategories.Count} categories, {p.ExcludeTasks.Count} task(s) excluded, {p.Options.Count} option(s) set. SHA-256 {p.Sha256}";
+                var set = p.Options.Count == 0 ? "none (collector defaults)"
+                    : string.Join(", ", p.Options.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + (kv.Value is bool b ? (b ? "On" : "Off") : Convert.ToString(kv.Value, System.Globalization.CultureInfo.InvariantCulture))));
+                _profileStatus.Text = $"Valid: {p.Categories.Count} of {CollectionProfile.AllCategories.Count} categories, {p.ExcludeTasks.Count} task(s) excluded. Options: {set}. SHA-256 {p.Sha256}";
             }
             catch (InvalidDataException ex)
             {

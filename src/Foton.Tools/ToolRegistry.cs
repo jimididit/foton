@@ -52,9 +52,7 @@ namespace Foton.Tools
                     continue;
                 }
 
-                var ver = "";
-                try { ver = FileVersionInfo.GetVersionInfo(exe).FileVersion ?? ""; } catch (Exception ex) when (ex is IOException || ex is ArgumentException) { }
-                if (ver.Trim().Length == 0) ver = CliVersion(tool.Name, exe);
+                var ver = VersionOf(tool.Name, exe);
                 var dir = Path.GetDirectoryName(exe)!;
                 var rulesPath = new[] { "rules", "sigma" }.Select(leaf => Path.Combine(dir, leaf))
                     .FirstOrDefault(p => Directory.Exists(p) || File.Exists(p)) ?? "";
@@ -77,6 +75,20 @@ namespace Foton.Tools
                 rows.Add(new RegistrationRow { Name = tool.Name, Status = "Registered", Version = ver, ExecutablePath = exe, ObservedSha256 = sha });
             }
             return rows;
+        }
+
+        /// <summary>The executable's file version, else the version the tool prints (Chainsaw); "" when neither is known.</summary>
+        public static string VersionOf(string tool, string exe)
+        {
+            var ver = FileVersion(exe);
+            return ver.Length > 0 ? ver : CliVersion(tool, exe);
+        }
+
+        /// <summary>The version resource only; runs nothing. "" when the file has none.</summary>
+        public static string FileVersion(string exe)
+        {
+            try { return (FileVersionInfo.GetVersionInfo(exe).FileVersion ?? "").Trim(); }
+            catch (Exception ex) when (ex is IOException || ex is ArgumentException) { return ""; }
         }
 
         /// <summary>

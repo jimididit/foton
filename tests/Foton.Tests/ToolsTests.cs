@@ -335,6 +335,25 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_tool_found_on_PATH_is_recorded_with_its_file_version_and_a_missing_journal_names_the_switch()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"08_Filesystem\usn");
+                var bin = Directory.CreateDirectory(t.File("bin")).FullName;
+                var source = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "whoami.exe");
+                File.Copy(source, Path.Combine(bin, "MFTECmd.exe"));
+                var row = ComposeRunner.Run(pkg, Quiet(), t.File("empty"), null, bin, new[] { "MFTECmd" }).Rows.Single(r => r.Tool == "MFTECmd");
+                Assert.Equal("NoInput", row.Status);
+                var expected = System.Diagnostics.FileVersionInfo.GetVersionInfo(Path.Combine(bin, "MFTECmd.exe")).FileVersion;
+                Assert.False(string.IsNullOrEmpty(expected));
+                Assert.Equal(expected, row.Version);
+                Assert.Contains("-IncludeUsnJournal", row.Note);
+                Assert.DoesNotContain("Re-collect elevated", row.Note);
+            }
+        }
+
+        [Fact]
         public void Compose_tools_match_compose_jobs_and_unselected_tools_are_NotSelected()
         {
             using (var t = new TempDir())
