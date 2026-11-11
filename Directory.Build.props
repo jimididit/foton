@@ -5,14 +5,16 @@
     Schema numbers start where 1.38.x left them; the port changes them only with a disclosed reason.
   -->
   <PropertyGroup>
-    <FotonVersion>2.7.1</FotonVersion>
+    <FotonVersion>2.8.0</FotonVersion>
     <!-- Empty for a release (tag v$(FotonVersion)); set it (alpha.1, beta.1) for a prerelease tag v$(FotonVersion)-$(FotonPrerelease). -->
     <FotonPrerelease></FotonPrerelease>
     <!-- UTC date of the change that set FotonVersion; the banner shows it as Updated. -->
     <FotonReleaseDate>2026-11-10</FotonReleaseDate>
     <!-- 1.14.0: same files, tasks, and columns as 1.13.0; values change (UTC timestamps, AccessDenied / SkippedUnc /
-         SupersededBySave statuses, rows 1.38.x missed such as user-hive autoruns and Active WDAC policies). -->
-    <FotonCollectSchemaVersion>1.14.0</FotonCollectSchemaVersion>
+         SupersededBySave statuses, rows 1.38.x missed such as user-hive autoruns and Active WDAC policies).
+         1.15.0: collection profiles add the NotSelected task status, 00_Collection\collection_profile.json, and profile
+         fields in collection_coverage.json; a package collected without a profile has the 1.14.0 layout. -->
+    <FotonCollectSchemaVersion>1.15.0</FotonCollectSchemaVersion>
     <!-- 1.15.0-1.18.0 keep identity keys, so Compare accepts 1.14.0 and later against each other (BaselineSchema). 1.16.0:
          WinsockLsp Namespace64. 1.17.0: Service ServiceDll compared (skipped against older baselines that lack it).
          1.18.0: SystemBinary pwsh.exe from Program Files\PowerShell\7. -->

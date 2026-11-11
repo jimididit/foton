@@ -34,6 +34,8 @@ namespace Foton.Core
         public const string Error = "Error";
         public const string WriteError = "WriteError";
         public const string SkippedNotElevated = "SkippedNotElevated";
+        /// <summary>Left out by the collection profile: absent by the operator's choice, not because the host lacked it.</summary>
+        public const string NotSelected = "NotSelected";
         public const string Partial = "Partial";
         public const string Failed = "Failed";
     }

@@ -33,6 +33,12 @@ namespace Foton.Collect
             s.Status.Write($"Examiner: {TextFile.OneLine(o.Examiner)} | Case: {(string.IsNullOrWhiteSpace(o.CaseNumber) ? "not supplied" : TextFile.OneLine(o.CaseNumber))} | Coverage: {Coverage.Profile(s.IsElevated)}", StatusLevel.Info);
             // From here on nothing ends the run: only creating the case folder above can.
             Guard(s, "chain_of_custody", () => ChainOfCustody.Write(s, HostFacts.Custody()));
+            if (o.Profile != null)
+            {
+                var p = o.Profile;
+                s.Status.Write($"Collection profile: {TextFile.OneLine(p.Name)} ({p.Categories.Count} of {CollectionProfile.AllCategories.Count} categories, {p.ExcludeTasks.Count} task(s) excluded)", StatusLevel.Info);
+                Guard(s, "collection_profile", () => System.IO.File.WriteAllBytes(System.IO.Path.Combine(s.Dir("Collection"), CollectionProfile.FileName), p.Bytes));
+            }
 
             // Every mounted hive is in this list the moment it loads, so the finally block unloads it whatever fails.
             var mounted = new List<string>();
@@ -52,6 +58,9 @@ namespace Foton.Collect
                 // Tasks catch their own failures; a guard catches a category that breaks between tasks.
                 foreach (var c in Categories.InOrder.Where(c => only == null || only.Contains(c.Key, StringComparer.OrdinalIgnoreCase)))
                     Guard(s, c.Key, () => c.Run(s));
+                var unknown = Coverage.UnknownExcluded(s);
+                if (unknown.Length > 0)
+                    s.Status.Write($"Profile ExcludeTasks name(s) matched no task in this run (typo, or a task these options do not run): {TextFile.OneLine(string.Join(", ", unknown))}", StatusLevel.Warn);
                 Guard(s, "collection_coverage", () => Coverage.Write(s));
             }
             finally

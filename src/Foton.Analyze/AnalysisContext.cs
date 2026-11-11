@@ -32,6 +32,15 @@ namespace Foton.Analyze
         public int EventLogDays { get; set; } = 14;
         public List<Finding> Findings { get; } = new List<Finding>();
 
+        /// <summary>A task's manifest Status (Success, NoData, NotSelected, SkippedNotElevated, ...); null when the manifest lacks it.</summary>
+        internal string? TaskStatus(string task)
+        {
+            foreach (var m in Manifest)
+                if (m.TryGetValue("Task", out var t) && string.Equals(t, task, StringComparison.OrdinalIgnoreCase))
+                    return m.TryGetValue("Status", out var s) ? s : null;
+            return null;
+        }
+
         string? _collectorSha256;
         bool _collectorRead;
         /// <summary>The collector's own SHA-256 from chain_of_custody.txt (null when not recorded).</summary>

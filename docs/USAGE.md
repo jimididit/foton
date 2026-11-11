@@ -85,6 +85,8 @@ Writes `Foton_<HOSTNAME>_<UTC>Z\` (and a ZIP beside it). Alters the host. Findin
 | `-Deep` | Opt-in extended Collect. Forces `-IncludeFileTimeline` and `-IncludeUsnJournal`, and adds task-referenced script copies, PnP inventory, DriverStore FileRepository inventory (hashes for `.sys`/`.inf`/`.cat` only, not a full binary tree), and elevated `gpresult /h` HTML. Task-script copies use raised caps (10k files / 1 GiB), are skipped when the output volume has under 2 GiB free, refuse non-local paths (`SkippedUnc`, no remote authentication), and keep drive letters in package paths so `C:\` and `D:\` copies do not collide. |
 | `-NoZip` | Folder only |
 | `-RequireAdministrator` | Exit if not elevated |
+| `-Profile <file>` | Collect what a profile file selects, with its switch defaults ([Collection profiles](#collection-profiles)) |
+| `-Category <names>` | Collect only these categories, comma-separated (replaces a profile's list when both are given) |
 | `-Version` | Print version and schemas, collect nothing |
 
 A standard-user run skips the Security log, Prefetch/Amcache/SRUM copies, registry hive exports, VSS, auditpol/secedit, and other users' files. Each skip is recorded (`SkippedNotElevated` in the manifest, `collection_coverage.json`). That is a **visibility gap**, not a clean host.
@@ -99,6 +101,29 @@ Each line below is a separate example; run the one you need, not the whole block
 ```
 
 Open `Foton_Report.html` **inside** the new folder. Send the **ZIP + `*_PACKAGE_HASH.txt`** (or the whole folder). The HTML alone is not the package.
+
+#### Collection profiles
+
+A profile limits a collection to the categories a case needs and can carry the switches you would otherwise type. Categories: `Processes`, `Network`, `Users`, `System`, `Persistence`, `Security`, `Software`, `EventLogs`, `Filesystem`.
+
+```json
+{
+  "Name": "Persistence review",
+  "Description": "Autoruns, services, tasks, and the logs that record their changes",
+  "Categories": ["System", "Persistence", "Security", "EventLogs"],
+  "ExcludeTasks": ["security_policy_and_log_changes"],
+  "Options": { "EventLogDays": 30, "LoadUserHives": true }
+}
+```
+
+Every key is optional. Without `Categories` every category is collected. `ExcludeTasks` takes task names from `collection_manifest.csv`, plus `evtx_export` for the raw `.evtx` copies. `Options` accepts `EventLogDays`, `MaxEventsPerLog`, `SkipEvtxExport`, `SkipHashing`, `LoadUserHives`, `IncludeFileTimeline`, `IncludeUsnJournal`, `Deep`, `NoZip`, and `RequireAdministrator`; a switch on the command line overrides the same option in the profile. A key, category, or value Foton does not recognise stops the run before anything is collected.
+
+```powershell
+.\foton-collect.exe -CaseNumber CASE-0001 -Profile "\path\to\profile.json"     # the profile's selection and switches
+.\foton-collect.exe -CaseNumber CASE-0001 -Category "System,Persistence"       # two categories, every task in them
+```
+
+A task the profile leaves out is not run. Its artifact holds a one-line note, the manifest records `NotSelected`, `collection_coverage.json` lists it, and the profile is copied into the package as `00_Collection\collection_profile.json` with its SHA-256 in the chain of custody. `analyze` names the profile in an Info finding and draws no conclusion from what it left out. The custody record, coverage, manifest, hashing, and the end-of-run report always run.
 
 ### Baseline (known-state snapshot)
 

@@ -191,6 +191,12 @@ namespace Foton.Collect
         static void ExportEvtx(FotonSession s, int days)
         {
             if (s.Options.SkipEvtxExport) { s.Status.Write("EVTX export skipped by parameter", StatusLevel.Info); return; }
+            var profile = s.Options.Profile;
+            if (profile != null && !profile.Selects(Cat, CollectionProfile.EvtxExport))
+            {
+                s.Status.Write("EVTX export not selected by the collection profile", StatusLevel.Info);
+                return;
+            }
             s.Status.Write("Exporting raw EVTX files (time-filtered)", StatusLevel.Step);
             string dir;
             try { dir = Directory.CreateDirectory(Path.Combine(s.Dirs[Cat], "evtx")).FullName; }
