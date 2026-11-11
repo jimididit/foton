@@ -17,7 +17,7 @@ namespace Foton.Gui
     /// the log pane. The console writes only where those runners write (analysis\, a ZIP's -extracted folder).
     /// To add a tab, build it in its own method and add it in the constructor.
     /// </summary>
-    sealed class MainForm : Form
+    sealed partial class MainForm : Form
     {
         readonly TextBox _path = new TextBox { ReadOnly = true, Width = 640 };
         readonly Label _summary = new Label { AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
@@ -50,7 +50,13 @@ namespace Foton.Gui
 
             _tabs.TabPages.Add(PackageTab());
             _tabs.TabPages.Add(_viewer.Page);
-            Controls.Add(_tabs);
+            _tabs.TabPages.Add(ToolsTab());
+            // The log sits under every tab: an install or register is followed there as much as a parse.
+            var outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
+            outer.Panel1.Controls.Add(_tabs);
+            outer.Panel2.Controls.Add(_log);
+            Load += (s, e) => SetSplit(outer, 0.68);
+            Controls.Add(outer);
             var strip = new StatusStrip();
             strip.Items.Add(_status);
             strip.Items.Add(_progress);
@@ -74,9 +80,14 @@ namespace Foton.Gui
             var actions = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(4) };
             actions.Controls.Add(AddButton("Verify", () => Run("Verify", Verify), needsPackage: true));
             actions.Controls.Add(AddButton("Parse", () => Run("Parse", Parse), needsPackage: true));
-            actions.Controls.Add(AddButton("Compose", () => Run("Compose", Compose), needsPackage: true));
+            actions.Controls.Add(AddButton("Compose", () => Run("Compose", ComposeStep()), needsPackage: true));
             actions.Controls.Add(AddButton("Analyze", () => Run("Analyze", Analyze), needsPackage: true));
-            actions.Controls.Add(AddButton("Parse, compose, analyze", () => Run("Parse, compose, analyze", (log, path) => { Parse(log, path); Compose(log, path); return Analyze(log, path); }), needsPackage: true));
+            actions.Controls.Add(AddButton("Parse, compose, analyze", () =>
+            {
+                var compose = ComposeStep();
+                return Run("Parse, compose, analyze", (log, path) => { Parse(log, path); compose(log, path); return Analyze(log, path); });
+            }, needsPackage: true));
+            actions.Controls.Add(AddButton("Match IOCs...", MatchIocs, needsPackage: true));
             actions.Controls.Add(AddButton("Show artifact", ShowArtifact, needsPackage: true));
             actions.Controls.Add(AddButton("Open report", OpenReport, needsPackage: true));
             actions.Controls.Add(AddButton("Show case folder", ShowFolder, needsPackage: true));
@@ -85,18 +96,11 @@ namespace Foton.Gui
             var findingsSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
             findingsSplit.Panel1.Controls.Add(_findings);
             findingsSplit.Panel2.Controls.Add(_details);
-            var main = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
-            main.Panel1.Controls.Add(findingsSplit);
-            main.Panel2.Controls.Add(_log);
             // A splitter position is checked against the control's current size, so set it once the window has its real
             // size, as a share of it (any window size or display scaling).
-            Load += (s, e) =>
-            {
-                SetSplit(findingsSplit, 0.68);
-                SetSplit(main, 0.62);
-            };
+            Load += (s, e) => SetSplit(findingsSplit, 0.68);
 
-            page.Controls.Add(main);
+            page.Controls.Add(findingsSplit);
             page.Controls.Add(actions);
             page.Controls.Add(open);
             UpdateButtons();
@@ -159,6 +163,11 @@ namespace Foton.Gui
                 // Parse, compose, and analyze write new files into the package; show them in the Viewer. A failure here
                 // is logged and never costs the results above.
                 if (_caseRoot != null && label != "Open") RefreshViewer(_caseRoot, log);
+                if (result is IocRun ioc)
+                {
+                    _status.Text += $" - {ioc.Hits.Count} match(es)";
+                    _viewer.Select(Path.Combine("analysis", "ioc_matches.csv"));
+                }
             }
             catch (Exception ex)
             {
@@ -208,9 +217,9 @@ namespace Foton.Gui
 
         static object Parse(StatusLog log, string path) => Foton.Parse.ParseRunner.Run(path, log);
 
-        static object Compose(StatusLog log, string path)
+        static object Compose(StatusLog log, string path, IReadOnlyCollection<string>? onlyTools)
         {
-            var run = Foton.Tools.ComposeRunner.Run(path, log);
+            var run = Foton.Tools.ComposeRunner.Run(path, log, onlyTools: onlyTools);
             foreach (var r in run.Rows)
                 log.WriteConsole($"   {r.Tool,-14} {(r.Version.Length > 0 ? r.Version : "-"),-12} {r.Status,-14} {(r.DestRelative.Length > 0 ? r.DestRelative : r.Note)}");
             log.Write("Inventory: " + run.InventoryPath, StatusLevel.Good);
@@ -218,6 +227,31 @@ namespace Foton.Gui
         }
 
         static object Analyze(StatusLog log, string path) => Analyzer.RunPackage(path, log, Foton.Patterns.WorkstationPatterns.SuspiciousCommands);
+
+        /// <summary>foton ioc: match an indicator list (text, CSV, or JSON) against the package; hits go to analysis\ioc_matches.csv.</summary>
+        async Task MatchIocs()
+        {
+            string iocFile;
+            using (var d = new OpenFileDialog
+            {
+                Title = "Choose an IOC list",
+                Filter = "IOC list (*.txt;*.csv;*.json)|*.txt;*.csv;*.json|All files (*.*)|*.*",
+                CheckFileExists = true,
+            })
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                iocFile = d.FileName;
+            }
+            await Run("Match IOCs", (log, path) =>
+            {
+                var run = Analyzer.RunIoc(path, iocFile, log);
+                foreach (var h in run.Hits.Take(50))
+                    log.WriteConsole($"   {h.IocKind,-7} {h.IocValue}  ->  {h.Artifact}.{h.Property}: {TextFile.OneLine(h.Sample)}");
+                if (run.Hits.Count > 50) log.WriteConsole($"   ... {run.Hits.Count - 50} more in the CSV");
+                log.Write("Matches: " + run.HitsPath, StatusLevel.Good);
+                return run;
+            });
+        }
 
         /// <summary>The latest findings in the package: a workstation analyze, else the ones Collect wrote.</summary>
         static List<Dictionary<string, string?>> ExistingFindings(string caseRoot)
