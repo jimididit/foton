@@ -70,12 +70,24 @@ namespace Foton.Tools
         /// <summary>The executable's version when it is foton-collect 2.8.0 or later; otherwise InvalidDataException naming why.</summary>
         internal static Version CheckCollect(string? originalFilename, string? fileVersion)
         {
-            if (!string.Equals(originalFilename, CollectFileName, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException($"This is not foton-collect.exe (its version resource names '{originalFilename}').");
+            if (Version.TryParse(fileVersion ?? "", out var v) && v < ProfileSupport
+                && string.Equals(originalFilename, CollectFileName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"foton-collect {v.ToString(3)} does not read collection profiles; use {ProfileSupport.ToString(3)} or later.");
+            return CheckExecutable(CollectFileName, ProfileSupport, originalFilename, fileVersion);
+        }
+
+        /// <summary>
+        /// The executable's version when its version resource names <paramref name="expected"/> and it is at least
+        /// <paramref name="minimum"/>; otherwise InvalidDataException naming why.
+        /// </summary>
+        internal static Version CheckExecutable(string expected, Version minimum, string? originalFilename, string? fileVersion)
+        {
+            if (!string.Equals(originalFilename, expected, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"This is not {expected} (its version resource names '{originalFilename}').");
             if (!Version.TryParse(fileVersion ?? "", out var version))
-                throw new InvalidDataException($"foton-collect.exe has no readable version ('{fileVersion}').");
-            if (version < ProfileSupport)
-                throw new InvalidDataException($"foton-collect {version.ToString(3)} does not read collection profiles; use {ProfileSupport.ToString(3)} or later.");
+                throw new InvalidDataException($"{expected} has no readable version ('{fileVersion}').");
+            if (version < minimum)
+                throw new InvalidDataException($"{expected} {version.ToString(3)} is too old for the console; use {minimum.ToString(3)} or later.");
             return version;
         }
 
