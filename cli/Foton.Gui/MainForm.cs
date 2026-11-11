@@ -32,6 +32,8 @@ namespace Foton.Gui
         readonly ToolStripStatusLabel _status = new ToolStripStatusLabel("Ready") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
         readonly ToolStripProgressBar _progress = new ToolStripProgressBar { Style = ProgressBarStyle.Marquee, Visible = false };
         readonly List<Control> _actions = new List<Control>();
+        /// <summary>One writer for the log pane, shared by every action (each action gets its own StatusLog over it).</summary>
+        readonly LogWriter _logWriter;
         string? _caseRoot;
         bool _busy;
 
@@ -42,6 +44,7 @@ namespace Foton.Gui
             Size = new Size(1280, 820);
             MinimumSize = new Size(900, 600);
             StartPosition = FormStartPosition.CenterScreen;
+            _logWriter = new LogWriter(_log);
 
             var tabs = new TabControl { Dock = DockStyle.Fill };
             tabs.TabPages.Add(PackageTab());
@@ -135,7 +138,7 @@ namespace Foton.Gui
             UpdateButtons();
             _status.Text = label + "...";
             _progress.Visible = true;
-            var log = new StatusLog(new LogWriter(_log));
+            var log = new StatusLog(_logWriter);
             log.WriteConsole("");
             log.WriteConsole("== " + label + " (" + FotonTime.Format(DateTime.UtcNow) + " UTC)");
             try

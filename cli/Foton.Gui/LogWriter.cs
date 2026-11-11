@@ -19,7 +19,12 @@ namespace Foton.Gui
         readonly ConcurrentQueue<string> _pending = new ConcurrentQueue<string>();
         int _flushQueued;
 
-        public LogWriter(TextBox box) { _box = box; }
+        public LogWriter(TextBox box)
+        {
+            _box = box;
+            // Text written before the pane has a window handle waits in the queue; show it as soon as the handle exists.
+            _box.HandleCreated += (s, e) => Drain();
+        }
 
         public override Encoding Encoding => Encoding.UTF8;
 
