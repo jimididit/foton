@@ -41,6 +41,32 @@ namespace Foton.Analyze
             return null;
         }
 
+        static readonly Regex SentinelStatus = new Regex(@"^\s*Status:\s*(\w+)|Status:\s*(\w+)\.?\s*$", RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// Whether a task ran, from its manifest row, else its artifact (a Foton/WinFoton sentinel names its status in its
+        /// first lines; any other content means it ran). Null when neither exists, so the caller decides what an unknown means.
+        /// </summary>
+        internal string? TaskStatusFromPackage(string task, string category, string format)
+        {
+            var status = TaskStatus(task);
+            if (status != null || string.IsNullOrEmpty(CaseRoot)) return status;
+            var path = System.IO.Path.Combine(CaseRoot!, Artifact(category, task, format).Replace('/', '\\'));
+            try
+            {
+                if (!System.IO.File.Exists(path)) return null;
+                var head = TextFile.ReadLines(path).Take(2).ToArray();
+                if (head.Length == 0 || !Regex.IsMatch(head[0], "^(Win)?Foton:")) return Foton.Core.TaskStatus.Success;
+                foreach (var line in head)
+                {
+                    var m = SentinelStatus.Match(line);
+                    if (m.Success) return m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
+                }
+                return null;
+            }
+            catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { return null; }
+        }
+
         string? _collectorSha256;
         bool _collectorRead;
         /// <summary>The collector's own SHA-256 from chain_of_custody.txt (null when not recorded).</summary>

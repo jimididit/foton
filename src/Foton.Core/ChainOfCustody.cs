@@ -118,7 +118,7 @@ namespace Foton.Core
                 {
                     "  Profile             = " + L(profile.Name),
                     "  ProfileSha256       = " + profile.Sha256,
-                    "  Categories          = " + string.Join(", ", profile.Categories),
+                    "  Categories          = " + L(string.Join(", ", profile.Categories)),
                     "  ExcludeTasks        = " + (profile.ExcludeTasks.Count == 0 ? "(none)" : L(string.Join(", ", profile.ExcludeTasks))),
                 });
                 l.Add("A collection profile limited this collection (" + CollectionProfile.FileName + " in");

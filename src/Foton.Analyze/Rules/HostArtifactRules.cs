@@ -123,7 +123,9 @@ namespace Foton.Analyze.Rules
                     if (!notSelected.Contains(t, System.StringComparer.OrdinalIgnoreCase)) notSelected.Add(t);
             if (notSelected.Count > 0 || profileName.Length > 0)
                 c.Add("Info", "Collection", 1, "A collection profile limited what was collected",
-                    F("Profile '{0}' left out {1} task(s): {2}.", profileName.Length > 0 ? profileName : "(unnamed)", notSelected.Count, Sample(notSelected.Select(t => (object?)t), 12)),
+                    notSelected.Count == 0
+                        ? F("Profile '{0}' was used and left out no task this run carried.", profileName)
+                        : F("Profile '{0}' left out {1} task(s): {2}.", profileName.Length > 0 ? profileName : "(unnamed)", notSelected.Count, Sample(notSelected.Select(t => (object?)t), 12)),
                     "Tasks the profile did not select were not run, so their artifacts are absent by the operator's choice. No finding in this report is based on their absence; rules that need them did not evaluate. Collect again without the profile, or with those categories, if the case needs them.",
                     AnalysisContext.Artifact("Collection", "collection_profile", "json"),
                     "Compare the profile's categories with the questions this case has to answer.");
@@ -138,10 +140,13 @@ namespace Foton.Analyze.Rules
                     AnalysisContext.Artifact("Collection", "collection_coverage", "json"),
                     "Confirm each listed folder is a collection the operator or host owner ran. Inspect any unfamiliar one directly.");
 
-            // Not selected by a profile, or skipped on a standard token, means the log was never read: say nothing about it.
-            var procCreateStatus = c.TaskStatus("security_process_creation");
+            // Only a read that happened can report no events. Not selected, skipped on a standard token, or neither a manifest
+            // row nor an artifact (the task never started) means the log was not read. A package with no manifest at all
+            // keeps the old reading.
+            var procCreateStatus = c.TaskStatusFromPackage("security_process_creation", "EventLogs", "csv");
             var procCreate = c.Data["security_process_creation"];
-            if ((procCreateStatus == null || In(procCreateStatus, "Success", "NoData")) && (!IsTrue(procCreate) || Items(procCreate).Count == 0))
+            var procCreateRan = procCreateStatus == null ? c.Manifest.Count == 0 : In(procCreateStatus, "Success", "NoData");
+            if (procCreateRan && (!IsTrue(procCreate) || Items(procCreate).Count == 0))
                 c.Add("Info", "EventLogs", 1, "No process creation events (4688) were collected",
                     "The Security log returned no 4688 events for the collection window.",
                     "Process creation auditing is off by default. The absence of these events is a logging gap, not evidence that no processes were created.",

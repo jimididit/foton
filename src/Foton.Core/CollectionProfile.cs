@@ -85,7 +85,8 @@ namespace Foton.Core
             object? root;
             try { root = Json.Parse(json); }
             catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException) { throw new InvalidDataException("Profile is not valid JSON: " + ex.Message); }
-            if (!(root is Dictionary<string, object> d)) throw new InvalidDataException("Profile must be a JSON object.");
+            if (!(root is Dictionary<string, object> parsed)) throw new InvalidDataException("Profile must be a JSON object.");
+            var d = CaseInsensitive(parsed, "profile");
             Unknown(d.Keys, TopNames, "profile");
 
             var p = new CollectionProfile
@@ -98,7 +99,8 @@ namespace Foton.Core
             var options = new Dictionary<string, object>(StringComparer.Ordinal);
             if (d.TryGetValue("Options", out var o))
             {
-                if (!(o is Dictionary<string, object> od)) throw new InvalidDataException("Profile Options must be a JSON object.");
+                if (!(o is Dictionary<string, object> parsedOptions)) throw new InvalidDataException("Profile Options must be a JSON object.");
+                var od = CaseInsensitive(parsedOptions, "Options");
                 Unknown(od.Keys, OptionNames, "Options");
                 foreach (var kv in od)
                 {
@@ -157,6 +159,21 @@ namespace Foton.Core
             if (list.Count == 0) throw new InvalidDataException("The profile selects no categories, so it would collect nothing.");
             // Package order and canonical spelling, whatever order and case the file used.
             return AllCategories.Where(a => list.Contains(a, StringComparer.OrdinalIgnoreCase)).ToArray();
+        }
+
+        /// <summary>
+        /// Keys matched without regard to case, as validated: "categories" must select, not be skipped as unknown-but-valid.
+        /// The same key twice in different case is refused, since only one of the two would apply.
+        /// </summary>
+        static Dictionary<string, object> CaseInsensitive(Dictionary<string, object> parsed, string where)
+        {
+            var d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in parsed)
+            {
+                if (d.ContainsKey(kv.Key)) throw new InvalidDataException($"The {where} key {kv.Key} appears more than once (keys are not case-sensitive).");
+                d[kv.Key] = kv.Value;
+            }
+            return d;
         }
 
         static void Unknown(IEnumerable<string> keys, string[] known, string where)

@@ -46,6 +46,12 @@ namespace Foton.Tests
                 Assert.Equal(new[] { "System", "Users" }, narrowed.Categories);
                 Assert.Equal(new[] { "evtx_export" }, narrowed.ExcludeTasks);
                 Assert.Contains("\"Users\"", System.Text.Encoding.UTF8.GetString(narrowed.Bytes));
+
+                // Keys match without regard to case, as they are validated: lowercase still selects.
+                var lower = Profile(t, "{\"categories\":[\"Users\"],\"excludetasks\":[\"local_users\"],\"options\":{\"eventlogdays\":5}}");
+                Assert.Equal(new[] { "Users" }, lower.Categories);
+                Assert.Equal(new[] { "local_users" }, lower.ExcludeTasks);
+                Assert.Equal(5, lower.Options["EventLogDays"]);
             }
         }
 
@@ -59,6 +65,8 @@ namespace Foton.Tests
         [InlineData("{\"Options\":{\"Deep\":\"yes\"}}", "true or false")]
         [InlineData("{\"Options\":{\"OutputPath\":\"x\"}}", "Unknown Options key")]
         [InlineData("not json", "not valid JSON")]
+        [InlineData("{\"Categories\":[\"System\"],\"categories\":[\"Users\"]}", "appears more than once")]
+        [InlineData("{\"Options\":{\"Deep\":true,\"deep\":false}}", "appears more than once")]
         public void A_profile_with_a_mistake_is_refused_before_anything_runs(string json, string message)
         {
             using (var t = new TempDir())
@@ -137,6 +145,24 @@ namespace Foton.Tests
             Assert.Contains(Run(Row("security_process_creation", "NoData")), f => f.Title == noEvents);
             Assert.Contains(Run(), f => f.Title == noEvents);   // older packages without a manifest row keep the old behavior
             Assert.DoesNotContain(Run(Row("security_process_creation", "SkippedNotElevated")), f => f.Title == noEvents);
+            Assert.DoesNotContain(Run(Row("os_info", "Success")), f => f.Title == noEvents);   // a manifest without the task's row: it never started
+
+            // No manifest row: the artifact's own sentinel says whether the task ran.
+            using (var t = new TempDir())
+            {
+                var file = Path.Combine(t.Path, "07_Event_Logs", "security_process_creation.csv");
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                List<Finding> RunIn(string firstLines)
+                {
+                    File.WriteAllText(file, firstLines);
+                    var c = new AnalysisContext(new PackageData(), new List<Dictionary<string, string?>> { Row("os_info", "Success") }, t.Path, new string[0], PatternLists.UserWritable);
+                    Analyzer.Run(c);
+                    return c.Findings;
+                }
+                Assert.Contains(RunIn(TaskRunner.NoDataText("security_process_creation", "NoData", "")), f => f.Title == noEvents);
+                Assert.DoesNotContain(RunIn(TaskRunner.NotSelectedText("security_process_creation", "p")), f => f.Title == noEvents);
+                Assert.DoesNotContain(RunIn(TaskRunner.SkippedText("security_process_creation")), f => f.Title == noEvents);
+            }
 
             var findings = Run(Row("security_process_creation", "NotSelected"), Row("bits_jobs", "NotSelected"));
             Assert.DoesNotContain(findings, f => f.Title == noEvents);
