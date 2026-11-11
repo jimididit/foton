@@ -12,7 +12,8 @@ namespace Foton.Package
     /// <summary>A CSV read for display: columns in file order and up to a row cap.</summary>
     public sealed class CsvTable
     {
-        public IReadOnlyList<string> Columns { get; internal set; } = new string[0];
+        /// <summary>The header, plus "(extra N)" for cells a row has beyond it, so every cell in the file is shown.</summary>
+        public List<string> Columns { get; } = new List<string>();
         public List<string[]> Rows { get; } = new List<string[]>();
         /// <summary>True when the file holds more rows than were read.</summary>
         public bool Truncated { get; internal set; }
@@ -23,7 +24,7 @@ namespace Foton.Package
             if (string.IsNullOrEmpty(text)) return Enumerable.Range(0, Rows.Count).ToList();
             var hits = new List<int>();
             for (int i = 0; i < Rows.Count; i++)
-                if (Rows[i].Any(c => c.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)) hits.Add(i);
+                if (Rows[i].Any(c => c != null && c.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)) hits.Add(i);
             return hits;
         }
     }
@@ -57,18 +58,41 @@ namespace Foton.Package
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return ArtifactShape.Binary; }
         }
 
-        public static CsvTable ReadCsv(string path, int maxRows)
+        /// <summary>
+        /// Up to <paramref name="maxRows"/> data rows. A row with more cells than the header adds "(extra N)" columns;
+        /// rows are never wider than <see cref="CsvTable.Columns"/> (shorter rows are padded when shown).
+        /// </summary>
+        public static CsvTable ReadCsv(string path, int maxRows, System.Threading.CancellationToken cancel = default)
         {
             var t = new CsvTable();
+            bool header = true;
             foreach (var r in Csv.StreamRecords(path))
             {
-                if (t.Columns.Count == 0) { t.Columns = r.ToArray(); continue; }
+                cancel.ThrowIfCancellationRequested();
+                if (header) { t.Columns.AddRange(r); header = false; continue; }
                 if (t.Rows.Count >= maxRows) { t.Truncated = true; break; }
-                var row = new string[t.Columns.Count];
-                for (int c = 0; c < row.Length; c++) row[c] = c < r.Count ? r[c] : "";
-                t.Rows.Add(row);
+                while (t.Columns.Count < r.Count) t.Columns.Add("(extra " + (t.Columns.Count + 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + ")");
+                t.Rows.Add(r.ToArray());
             }
             return t;
+        }
+
+        /// <summary>SHA-256 as Hashing.Sha256Hex returns it, stopping early when <paramref name="cancel"/> fires.</summary>
+        public static string Sha256Hex(string path, System.Threading.CancellationToken cancel)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            {
+                var buffer = new byte[1 << 20];
+                int n;
+                while ((n = fs.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    cancel.ThrowIfCancellationRequested();
+                    sha.TransformBlock(buffer, 0, n, null, 0);
+                }
+                sha.TransformFinalBlock(buffer, 0, 0);
+                return Hashing.ToHex(sha.Hash);
+            }
         }
 
         /// <summary>The first <paramref name="maxChars"/> characters (UTF-8, BOM honored).</summary>

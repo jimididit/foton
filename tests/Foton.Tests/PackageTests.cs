@@ -146,7 +146,23 @@ namespace Foton.Tests
                 var all = ArtifactReader.ReadCsv(t.File("a.csv"), 10);
                 Assert.Equal(new[] { "Name", "Name", "Path" }, all.Columns);   // duplicate header kept, file order
                 Assert.Equal(3, all.Rows.Count);
-                Assert.Equal("", all.Rows[2][2]);                               // short row padded
+                Assert.Equal(2, all.Rows[2].Length);                            // short row kept as written (padded when shown)
+
+                // A row wider than the header adds columns, so no cell is dropped.
+                File.WriteAllText(t.File("wide.csv"), "\"A\",\"B\"\r\n\"1\",\"2\",\"3\",\"4\"\r\n\"5\"\r\n");
+                var wide = ArtifactReader.ReadCsv(t.File("wide.csv"), 10);
+                Assert.Equal(new[] { "A", "B", "(extra 3)", "(extra 4)" }, wide.Columns);
+                Assert.Equal(new[] { "1", "2", "3", "4" }, wide.Rows[0]);
+                Assert.All(wide.Rows, r => Assert.True(r.Length <= wide.Columns.Count));
+
+                // The cancellable hash matches the shared one, and a cancelled read stops.
+                Assert.Equal(Hashing.Sha256Hex(t.File("a.csv")), ArtifactReader.Sha256Hex(t.File("a.csv"), System.Threading.CancellationToken.None));
+                using (var cts = new System.Threading.CancellationTokenSource())
+                {
+                    cts.Cancel();
+                    Assert.ThrowsAny<OperationCanceledException>(() => ArtifactReader.ReadCsv(t.File("a.csv"), 10, cts.Token));
+                    Assert.ThrowsAny<OperationCanceledException>(() => ArtifactReader.Sha256Hex(t.File("a.csv"), cts.Token));
+                }
                 Assert.False(all.Truncated);
                 Assert.Equal(new[] { 1 }, all.Filter("c:\\b"));                // case-insensitive, any cell
                 Assert.Equal(new[] { 0, 1, 2 }, all.Filter(""));

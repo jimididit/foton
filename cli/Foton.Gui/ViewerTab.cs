@@ -44,6 +44,8 @@ namespace Foton.Gui
         List<int> _rows = new List<int>();
         int _pageIndex;
         int _loadVersion;
+        /// <summary>Cancels the read for the previous selection, so quick clicks through large files do not pile up reads.</summary>
+        System.Threading.CancellationTokenSource? _readCancel;
 
         public TabPage Page { get; }
 
@@ -77,6 +79,7 @@ namespace Foton.Gui
         public void Load(string caseRoot)
         {
             _loadVersion++;   // a read still running for the previous package must not land here
+            _readCancel?.Cancel();
             _root = Path.GetFullPath(caseRoot);
             _hashes = new PackageHashes(_root);
             _files.Nodes.Clear();
@@ -142,11 +145,13 @@ namespace Foton.Gui
         {
             // Any new selection, a folder included, makes a read still running for the previous one stale.
             var version = ++_loadVersion;
+            _readCancel?.Cancel();
             if (path == null || path.StartsWith("dir:", StringComparison.Ordinal) || _root == null) return;
             _header.Text = Path.GetFileName(path) + Environment.NewLine + "Reading...";
             var hashes = _hashes;
-            var loaded = await Task.Run(() => Read(path, hashes));
-            if (version != _loadVersion) return;   // a newer selection won
+            var cancel = _readCancel = new System.Threading.CancellationTokenSource();
+            var loaded = await Task.Run(() => Read(path, hashes, cancel.Token));
+            if (loaded == null || version != _loadVersion) return;   // cancelled, or a newer selection won
             _header.Text = loaded.Header;
             _table = loaded.Table;
             _csvBar.Visible = _table != null;
@@ -184,14 +189,17 @@ namespace Foton.Gui
             public string? Text;
         }
 
-        /// <summary>Worker thread: reads, shapes, and hashes one file. Every failure becomes a message, never a throw.</summary>
-        static Loaded Read(string path, PackageHashes? hashes)
+        /// <summary>
+        /// Worker thread: reads, shapes, and hashes one file. Every failure becomes a message, never a throw; null when a
+        /// newer selection cancelled it.
+        /// </summary>
+        static Loaded? Read(string path, PackageHashes? hashes, System.Threading.CancellationToken cancel)
         {
             var l = new Loaded();
             try
             {
                 var info = new FileInfo(path);
-                var sha = Hashing.Sha256Hex(path);
+                var sha = ArtifactReader.Sha256Hex(path, cancel);
                 var status = hashes?.Status(path, sha) ?? "";
                 var shape = ArtifactReader.ShapeOf(path);
                 l.Header = $"{info.Name}  -  {info.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes  -  {shape}{Environment.NewLine}SHA-256 {sha}  -  {status}";
@@ -201,7 +209,7 @@ namespace Foton.Gui
                 switch (shape)
                 {
                     case ArtifactShape.Csv:
-                        l.Table = ArtifactReader.ReadCsv(path, MaxCsvRows);
+                        l.Table = ArtifactReader.ReadCsv(path, MaxCsvRows, cancel);
                         break;
                     case ArtifactShape.Json:
                         var raw = ArtifactReader.ReadText(path, MaxTextChars, out var jsonCut);
@@ -218,6 +226,7 @@ namespace Foton.Gui
                         break;
                 }
             }
+            catch (OperationCanceledException) { return null; }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException || ex is ArgumentException)
             {
                 l.Header = Path.GetFileName(path) + Environment.NewLine + "Could not read: " + TextFile.OneLine(ex.Message);
@@ -237,7 +246,14 @@ namespace Foton.Gui
                 while (!names.Add(name)) name += " ";   // duplicate headers stay visible as separate columns
                 dt.Columns.Add(name);
             }
-            foreach (var i in _rows.Skip(_pageIndex * PageRows).Take(PageRows)) dt.Rows.Add(_table.Rows[i].Cast<object>().ToArray());
+            foreach (var i in _rows.Skip(_pageIndex * PageRows).Take(PageRows))
+            {
+                // Shorter rows are padded; ReadCsv never yields a row wider than the columns.
+                var cells = new object[_table.Columns.Count];
+                var row = _table.Rows[i];
+                for (int c = 0; c < cells.Length; c++) cells[c] = c < row.Length ? row[c] : "";
+                dt.Rows.Add(cells);
+            }
             _grid.DataSource = dt;
             _grid.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             foreach (DataGridViewColumn c in _grid.Columns) if (c.Width > 400) c.Width = 400;
