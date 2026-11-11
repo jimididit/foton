@@ -40,6 +40,7 @@ namespace Foton.Gui
 
         string? _root;
         PackageHashes? _hashes;
+        string _hashesNote = "";
         CsvTable? _table;
         List<int> _rows = new List<int>();
         int _pageIndex;
@@ -80,9 +81,19 @@ namespace Foton.Gui
         {
             _loadVersion++;   // a read still running for the previous package must not land here
             _readCancel?.Cancel();
-            _root = Path.GetFullPath(caseRoot);
-            _hashes = new PackageHashes(_root);
+            // Clear first, so a failure below never leaves the previous package's files on screen.
+            _root = null;
+            _hashes = null;
             _files.Nodes.Clear();
+            Clear("Loading...");
+            var root = Path.GetFullPath(caseRoot);
+            // An unreadable hash list is a stated limitation of this view, not a reason to hide the files.
+            try { _hashes = new PackageHashes(root); _hashesNote = ""; }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException || ex is ArgumentException)
+            {
+                _hashesNote = "hashes.csv could not be read (" + TextFile.OneLine(ex.Message) + "): integrity not checked.";
+            }
+            _root = root;
             var top = new TreeNode(Path.GetFileName(_root)) { Tag = null };
             _files.Nodes.Add(top);
             Fill(top, _root);
@@ -149,8 +160,9 @@ namespace Foton.Gui
             if (path == null || path.StartsWith("dir:", StringComparison.Ordinal) || _root == null) return;
             _header.Text = Path.GetFileName(path) + Environment.NewLine + "Reading...";
             var hashes = _hashes;
+            var note = _hashesNote;
             var cancel = _readCancel = new System.Threading.CancellationTokenSource();
-            var loaded = await Task.Run(() => Read(path, hashes, cancel.Token));
+            var loaded = await Task.Run(() => Read(path, hashes, note, cancel.Token));
             if (loaded == null || version != _loadVersion) return;   // cancelled, or a newer selection won
             _header.Text = loaded.Header;
             _table = loaded.Table;
@@ -193,14 +205,14 @@ namespace Foton.Gui
         /// Worker thread: reads, shapes, and hashes one file. Every failure becomes a message, never a throw; null when a
         /// newer selection cancelled it.
         /// </summary>
-        static Loaded? Read(string path, PackageHashes? hashes, System.Threading.CancellationToken cancel)
+        static Loaded? Read(string path, PackageHashes? hashes, string hashesNote, System.Threading.CancellationToken cancel)
         {
             var l = new Loaded();
             try
             {
                 var info = new FileInfo(path);
                 var sha = ArtifactReader.Sha256Hex(path, cancel);
-                var status = hashes?.Status(path, sha) ?? "";
+                var status = hashes != null ? hashes.Status(path, sha) : hashesNote;
                 var shape = ArtifactReader.ShapeOf(path);
                 l.Header = $"{info.Name}  -  {info.Length.ToString("N0", CultureInfo.InvariantCulture)} bytes  -  {shape}{Environment.NewLine}SHA-256 {sha}  -  {status}";
                 // A task with no data leaves a one-line "Foton: ..." note in place of its CSV or JSON: show it as text.

@@ -155,6 +155,14 @@ namespace Foton.Tests
                 Assert.Equal(new[] { "1", "2", "3", "4" }, wide.Rows[0]);
                 Assert.All(wide.Rows, r => Assert.True(r.Length <= wide.Columns.Count));
 
+                // Field length, fields per row, and total characters are bounded, not only the row count.
+                File.WriteAllText(t.File("hostile.csv"), "\"A\"\r\n\"" + new string('x', 100) + "\"," + string.Join(",", Enumerable.Repeat("\"y\"", 10)) + "\r\n\"z\"\r\n\"w\"\r\n");
+                var bounded = ArtifactReader.ReadCsv(t.File("hostile.csv"), 10, default, maxFieldChars: 20, maxFields: 4, maxTotalChars: 29);
+                Assert.Equal(new string('x', 20) + " [...]", bounded.Rows[0][0]);
+                Assert.Equal(4, bounded.Rows[0].Length);       // 11 fields in the file, 4 kept
+                Assert.True(bounded.Truncated);
+                Assert.Single(bounded.Rows);   // row one is 29 characters (26 + 3); the next would pass the budget
+
                 // A file another process still holds open for writing can be viewed.
                 using (new FileStream(t.File("a.csv"), FileMode.Append, FileAccess.Write, FileShare.Read))
                 {

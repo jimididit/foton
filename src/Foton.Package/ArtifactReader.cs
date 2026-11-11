@@ -62,15 +62,20 @@ namespace Foton.Package
         /// Up to <paramref name="maxRows"/> data rows. A row with more cells than the header adds "(extra N)" columns;
         /// rows are never wider than <see cref="CsvTable.Columns"/> (shorter rows are padded when shown).
         /// </summary>
-        public static CsvTable ReadCsv(string path, int maxRows, System.Threading.CancellationToken cancel = default)
+        public static CsvTable ReadCsv(string path, int maxRows, System.Threading.CancellationToken cancel = default,
+            int maxFieldChars = 32768, int maxFields = 2000, long maxTotalChars = 64L * 1024 * 1024)
         {
+            // Rows, field length, fields per row, and total characters are all bounded: a hostile CSV (one huge field,
+            // or a million columns) cannot exhaust memory. A cut field ends in " [...]".
             var t = new CsvTable();
             bool header = true;
-            foreach (var r in Csv.StreamRecords(path))
+            long total = 0;
+            foreach (var r in Csv.StreamRecords(path, maxFieldChars, maxFields))
             {
                 cancel.ThrowIfCancellationRequested();
                 if (header) { t.Columns.AddRange(r); header = false; continue; }
-                if (t.Rows.Count >= maxRows) { t.Truncated = true; break; }
+                foreach (var cell in r) total += cell.Length;
+                if (t.Rows.Count >= maxRows || total > maxTotalChars) { t.Truncated = true; break; }
                 while (t.Columns.Count < r.Count) t.Columns.Add("(extra " + (t.Columns.Count + 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + ")");
                 t.Rows.Add(r.ToArray());
             }
