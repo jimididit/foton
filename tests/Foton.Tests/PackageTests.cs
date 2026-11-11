@@ -137,6 +137,93 @@ namespace Foton.Tests
             }
         }
 
+        [Fact]
+        public void The_artifact_reader_keeps_columns_as_written_caps_rows_and_filters()
+        {
+            using (var t = new TempDir())
+            {
+                File.WriteAllText(t.File("a.csv"), "#TYPE x\r\n\"Name\",\"Name\",\"Path\"\r\n\"one\",\"1\",\"C:\\a\"\r\n\r\n\"two\",\"2\",\"C:\\B\\x\"\r\n\"three\",\"3\"\r\n");
+                var all = ArtifactReader.ReadCsv(t.File("a.csv"), 10);
+                Assert.Equal(new[] { "Name", "Name", "Path" }, all.Columns);   // duplicate header kept, file order
+                Assert.Equal(3, all.Rows.Count);
+                Assert.Equal(2, all.Rows[2].Length);                            // short row kept as written (padded when shown)
+
+                // A row wider than the header adds columns, so no cell is dropped.
+                File.WriteAllText(t.File("wide.csv"), "\"A\",\"B\"\r\n\"1\",\"2\",\"3\",\"4\"\r\n\"5\"\r\n");
+                var wide = ArtifactReader.ReadCsv(t.File("wide.csv"), 10);
+                Assert.Equal(new[] { "A", "B", "(extra 3)", "(extra 4)" }, wide.Columns);
+                Assert.Equal(new[] { "1", "2", "3", "4" }, wide.Rows[0]);
+                Assert.All(wide.Rows, r => Assert.True(r.Length <= wide.Columns.Count));
+
+                // Field length, fields per row, and total characters are bounded, not only the row count.
+                File.WriteAllText(t.File("hostile.csv"), "\"A\"\r\n\"" + new string('x', 100) + "\"," + string.Join(",", Enumerable.Repeat("\"y\"", 10)) + "\r\n\"z\"\r\n\"w\"\r\n");
+                var bounded = ArtifactReader.ReadCsv(t.File("hostile.csv"), 10, default, maxFieldChars: 20, maxFields: 4, maxTotalChars: 29);
+                Assert.Equal(new string('x', 20) + " [...]", bounded.Rows[0][0]);
+                Assert.Equal(4, bounded.Rows[0].Length);       // 11 fields in the file, 4 kept
+                Assert.True(bounded.Truncated);
+                Assert.Single(bounded.Rows);   // row one is 29 characters (26 + 3); the next would pass the budget
+
+                // A file another process still holds open for writing can be viewed.
+                using (new FileStream(t.File("a.csv"), FileMode.Append, FileAccess.Write, FileShare.Read))
+                {
+                    Assert.Equal(3, ArtifactReader.ReadCsv(t.File("a.csv"), 10).Rows.Count);
+                    Assert.StartsWith("#TYPE", ArtifactReader.ReadText(t.File("a.csv"), 5, out _));
+                }
+
+                // The cancellable hash matches the shared one, and a cancelled read stops.
+                Assert.Equal(Hashing.Sha256Hex(t.File("a.csv")), ArtifactReader.Sha256Hex(t.File("a.csv"), System.Threading.CancellationToken.None));
+                using (var cts = new System.Threading.CancellationTokenSource())
+                {
+                    cts.Cancel();
+                    Assert.ThrowsAny<OperationCanceledException>(() => ArtifactReader.ReadCsv(t.File("a.csv"), 10, cts.Token));
+                    Assert.ThrowsAny<OperationCanceledException>(() => ArtifactReader.Sha256Hex(t.File("a.csv"), cts.Token));
+                }
+                Assert.False(all.Truncated);
+                Assert.Equal(new[] { 1 }, all.Filter("c:\\b"));                // case-insensitive, any cell
+                Assert.Equal(new[] { 0, 1, 2 }, all.Filter(""));
+
+                var capped = ArtifactReader.ReadCsv(t.File("a.csv"), 2);
+                Assert.Equal(2, capped.Rows.Count);
+                Assert.True(capped.Truncated);
+
+                File.WriteAllText(t.File("long.txt"), new string('x', 50));
+                Assert.Equal(10, ArtifactReader.ReadText(t.File("long.txt"), 10, out var cut).Length);
+                Assert.True(cut);
+
+                File.WriteAllBytes(t.File("blob.bin"), new byte[] { 0x4D, 0x5A, 0, 1, 2 });
+                File.WriteAllText(t.File("notes.unknown"), "plain text");
+                Assert.Equal(ArtifactShape.Binary, ArtifactReader.ShapeOf(t.File("blob.bin")));
+                Assert.Equal(ArtifactShape.Text, ArtifactReader.ShapeOf(t.File("notes.unknown")));
+                Assert.Equal(ArtifactShape.Json, ArtifactReader.ShapeOf(t.File("x.JSON")));
+            }
+        }
+
+        [Fact]
+        public void Package_hashes_say_whether_a_file_matches_changed_or_is_unlisted()
+        {
+            using (var t = new TempDir())
+            {
+                var s = Sessions.New(Directory.CreateDirectory(t.File("cases")).FullName);
+                var os = Path.Combine(s.Dir("System"), "os.json");
+                File.WriteAllText(os, "{}");
+                PackageFiles.WriteArtifactHashes(s);
+                var h = new PackageHashes(s.CaseRoot!);
+                Assert.True(h.Present);
+                Assert.Equal("Matches hashes.csv.", h.Status(os, Hashing.Sha256Hex(os)));
+                Assert.StartsWith("Changed since hashing", h.Status(os, new string('0', 64)));
+                var later = Path.Combine(s.CaseRoot!, "analysis.txt");
+                File.WriteAllText(later, "x");
+                Assert.StartsWith("Not in hashes.csv", h.Status(later, Hashing.Sha256Hex(later)));
+                Assert.StartsWith("The hash list itself", h.Status(Path.Combine(s.Dir("Collection"), "hashes.csv"), ""));
+                // A same-named file elsewhere is checked like any other file, not exempted.
+                var planted = Path.Combine(s.Dir("Filesystem"), "hashes.csv");
+                File.WriteAllText(planted, "x");
+                Assert.StartsWith("Not in hashes.csv", h.Status(planted, Hashing.Sha256Hex(planted)));
+                Assert.Equal("Outside the case folder.", h.Status(t.File("elsewhere.txt"), ""));
+                Assert.False(new PackageHashes(t.Path).Present);
+            }
+        }
+
         [Theory]
         [InlineData("Foton_Report.html", true)]
         [InlineData(@".\Foton_Report.html", true)]

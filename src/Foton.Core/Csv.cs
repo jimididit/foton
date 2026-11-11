@@ -131,12 +131,43 @@ namespace Foton.Core
             }
         }
 
+        /// <summary>
+        /// The header record, then each data record, as cells in file order: for a viewer that must show a file exactly as
+        /// written (duplicate column names included). Same parsing rules as <see cref="Stream"/>.
+        /// </summary>
+        /// <param name="maxFieldChars">Characters kept per field; a longer field ends in " [...]" (a viewer's bound on hostile input).</param>
+        /// <param name="maxFields">Fields kept per record; further fields are dropped.</param>
+        public static IEnumerable<List<string>> StreamRecords(string path, int maxFieldChars = int.MaxValue, int maxFields = int.MaxValue)
+        {
+            // Shared, so a file another process still has open for writing can be viewed.
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(fs, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true))
+            {
+                bool first = true, header = false;
+                foreach (var r in Records(reader, maxFieldChars, maxFields))
+                {
+                    if (first && r.Count == 1 && r[0].StartsWith("#TYPE", StringComparison.Ordinal)) { first = false; continue; }
+                    first = false;
+                    if (header && r.Count == 1 && r[0].Length == 0) continue; // blank line
+                    header = true;
+                    yield return r;
+                }
+            }
+        }
+
         /// <summary>The record state machine of <see cref="Parse"/> over a reader.</summary>
-        static IEnumerable<List<string>> Records(TextReader reader)
+        static IEnumerable<List<string>> Records(TextReader reader, int maxFieldChars = int.MaxValue, int maxFields = int.MaxValue)
         {
             var record = new List<string>();
             var field = new StringBuilder();
-            bool quoted = false, any = false;
+            bool quoted = false, any = false, cut = false;
+            void Append(char c) { if (field.Length < maxFieldChars) field.Append(c); else cut = true; }
+            void EndField()
+            {
+                if (record.Count < maxFields) record.Add(cut ? field.ToString() + " [...]" : field.ToString());
+                field.Clear();
+                cut = false;
+            }
             int next;
             while ((next = reader.Read()) >= 0)
             {
@@ -145,26 +176,26 @@ namespace Foton.Core
                 {
                     if (ch == '"')
                     {
-                        if (reader.Peek() == '"') { field.Append('"'); reader.Read(); }
+                        if (reader.Peek() == '"') { Append('"'); reader.Read(); }
                         else quoted = false;
                     }
-                    else field.Append(ch);
+                    else Append(ch);
                     continue;
                 }
                 switch (ch)
                 {
                     case '"': quoted = true; any = true; break;
-                    case ',': record.Add(field.ToString()); field.Clear(); any = true; break;
+                    case ',': EndField(); any = true; break;
                     case '\r': break;
                     case '\n':
-                        record.Add(field.ToString()); field.Clear();
+                        EndField();
                         yield return record;
                         record = new List<string>(); any = false;
                         break;
-                    default: field.Append(ch); any = true; break;
+                    default: Append(ch); any = true; break;
                 }
             }
-            if (any || field.Length > 0) { record.Add(field.ToString()); yield return record; }
+            if (any || field.Length > 0) { EndField(); yield return record; }
         }
 
         static List<List<string>> Parse(string text)

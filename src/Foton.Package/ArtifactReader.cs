@@ -1,0 +1,161 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using Foton.Core;
+
+namespace Foton.Package
+{
+    public enum ArtifactShape { Csv, Json, Text, Binary }
+
+    /// <summary>A CSV read for display: columns in file order and up to a row cap.</summary>
+    public sealed class CsvTable
+    {
+        /// <summary>The header, plus "(extra N)" for cells a row has beyond it, so every cell in the file is shown.</summary>
+        public List<string> Columns { get; } = new List<string>();
+        public List<string[]> Rows { get; } = new List<string[]>();
+        /// <summary>True when the file holds more rows than were read.</summary>
+        public bool Truncated { get; internal set; }
+
+        /// <summary>Row indexes whose cells contain <paramref name="text"/> (case-insensitive); every row for empty text.</summary>
+        public List<int> Filter(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return Enumerable.Range(0, Rows.Count).ToList();
+            var hits = new List<int>();
+            for (int i = 0; i < Rows.Count; i++)
+                if (Rows[i].Any(c => c != null && c.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)) hits.Add(i);
+            return hits;
+        }
+    }
+
+    /// <summary>
+    /// Reads package files for a viewer, with caps so a large artifact cannot exhaust memory: display only, offline,
+    /// never interpreted. Binary artifacts (EVTX, hives, Prefetch) are for parse and compose, not this reader.
+    /// </summary>
+    public static class ArtifactReader
+    {
+        static readonly HashSet<string> TextExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".txt", ".log", ".md", ".xml", ".html", ".htm", ".ps1", ".psm1", ".bat", ".cmd", ".vbs", ".js", ".reg", ".inf", ".ini",
+            ".cfg", ".conf", ".yml", ".yaml", ".tsv",
+        };
+
+        /// <summary>By extension, then by content: a file with no NUL in its first 4 KB reads as text.</summary>
+        public static ArtifactShape ShapeOf(string path)
+        {
+            var ext = Path.GetExtension(path);
+            if (string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase)) return ArtifactShape.Csv;
+            if (string.Equals(ext, ".json", StringComparison.OrdinalIgnoreCase)) return ArtifactShape.Json;
+            if (TextExtensions.Contains(ext)) return ArtifactShape.Text;
+            try
+            {
+                var head = new byte[4096];
+                int n;
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) n = fs.Read(head, 0, head.Length);
+                return n > 0 && Array.IndexOf(head, (byte)0, 0, n) < 0 ? ArtifactShape.Text : ArtifactShape.Binary;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return ArtifactShape.Binary; }
+        }
+
+        /// <summary>
+        /// Up to <paramref name="maxRows"/> data rows. A row with more cells than the header adds "(extra N)" columns;
+        /// rows are never wider than <see cref="CsvTable.Columns"/> (shorter rows are padded when shown).
+        /// </summary>
+        public static CsvTable ReadCsv(string path, int maxRows, System.Threading.CancellationToken cancel = default,
+            int maxFieldChars = 32768, int maxFields = 2000, long maxTotalChars = 64L * 1024 * 1024)
+        {
+            // Rows, field length, fields per row, and total characters are all bounded: a hostile CSV (one huge field,
+            // or a million columns) cannot exhaust memory. A cut field ends in " [...]".
+            var t = new CsvTable();
+            bool header = true;
+            long total = 0;
+            foreach (var r in Csv.StreamRecords(path, maxFieldChars, maxFields))
+            {
+                cancel.ThrowIfCancellationRequested();
+                if (header) { t.Columns.AddRange(r); header = false; continue; }
+                foreach (var cell in r) total += cell.Length;
+                if (t.Rows.Count >= maxRows || total > maxTotalChars) { t.Truncated = true; break; }
+                while (t.Columns.Count < r.Count) t.Columns.Add("(extra " + (t.Columns.Count + 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + ")");
+                t.Rows.Add(r.ToArray());
+            }
+            return t;
+        }
+
+        /// <summary>SHA-256 as Hashing.Sha256Hex returns it, stopping early when <paramref name="cancel"/> fires.</summary>
+        public static string Sha256Hex(string path, System.Threading.CancellationToken cancel)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            {
+                var buffer = new byte[1 << 20];
+                int n;
+                while ((n = fs.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    cancel.ThrowIfCancellationRequested();
+                    sha.TransformBlock(buffer, 0, n, null, 0);
+                }
+                sha.TransformFinalBlock(buffer, 0, 0);
+                return Hashing.ToHex(sha.Hash);
+            }
+        }
+
+        /// <summary>The first <paramref name="maxChars"/> characters (UTF-8, BOM honored).</summary>
+        public static string ReadText(string path, int maxChars, out bool truncated)
+        {
+            // Shared like every other Foton read, so a file another process still has open for writing can be viewed.
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(fs, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true))
+            {
+                var buffer = new char[maxChars + 1];
+                int read = 0, n;
+                while (read < buffer.Length && (n = reader.Read(buffer, read, buffer.Length - read)) > 0) read += n;
+                truncated = read > maxChars;
+                return new string(buffer, 0, Math.Min(read, maxChars));
+            }
+        }
+    }
+
+    /// <summary>What 00_Collection\hashes.csv recorded for each file, for a per-file integrity line in a viewer.</summary>
+    public sealed class PackageHashes
+    {
+        readonly string _root;
+        readonly Dictionary<string, string> _sha = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        public PackageHashes(string caseRoot)
+        {
+            _root = Path.GetFullPath(caseRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var csv = Path.Combine(caseRoot, CaseTree.CollectionFolder, "hashes.csv");
+            Present = File.Exists(csv);
+            if (!Present) return;
+            foreach (var row in Csv.Read(csv))
+            {
+                // hashes.csv may use either separator (older packages wrote /); compare on this system's.
+                var sep = Path.DirectorySeparatorChar;
+                var rel = (row.TryGetValue("RelativePath", out var r) ? r ?? "" : "").Replace('/', sep).Replace('\\', sep);
+                if (rel.StartsWith("." + sep, StringComparison.Ordinal)) rel = rel.Substring(2);
+                rel = rel.TrimStart(sep);
+                if (rel.Length > 0 && row.TryGetValue("SHA256", out var h) && h != null) _sha[rel] = h;
+            }
+        }
+
+        public bool Present { get; }
+
+        /// <summary>The integrity line for one file: matches, changed since hashing, or not in hashes.csv.</summary>
+        public string Status(string fullPath, string actualSha256)
+        {
+            if (!Present) return "No hashes.csv in this package: integrity cannot be checked.";
+            var full = Path.GetFullPath(fullPath);
+            if (!full.StartsWith(_root, StringComparison.OrdinalIgnoreCase)) return "Outside the case folder.";
+            var rel = full.Substring(_root.Length);
+            // Only the package's own hash list is exempt; a file of the same name anywhere else is checked like any other.
+            if (rel.Equals(Path.Combine(CaseTree.CollectionFolder, "hashes.csv"), StringComparison.OrdinalIgnoreCase) || rel.Equals(Path.Combine(CaseTree.CollectionFolder, "hashes.txt"), StringComparison.OrdinalIgnoreCase))
+                return "The hash list itself (not listed in it).";
+            if (!_sha.TryGetValue(rel, out var expected))
+                return "Not in hashes.csv: written after collection (workstation output) or added later.";
+            return string.Equals(expected, actualSha256, StringComparison.OrdinalIgnoreCase)
+                ? "Matches hashes.csv."
+                : "Changed since hashing: does not match hashes.csv.";
+        }
+    }
+}
