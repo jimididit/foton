@@ -19,8 +19,9 @@ namespace Foton.Gui
         /// <summary>Rows shown in the change table; the full list is in baseline_diff.csv.</summary>
         const int MaxChangeRows = 50000;
 
-        readonly TextBox _reference = new TextBox { ReadOnly = true, Width = 520 };
-        readonly TextBox _difference = new TextBox { ReadOnly = true, Width = 520 };
+        // Editable: a baseline folder (or its baseline.json) can be typed or pasted, as foton compare accepts either.
+        readonly TextBox _reference = new TextBox { Width = 520 };
+        readonly TextBox _difference = new TextBox { Width = 520 };
         readonly Label _compareSummary = new Label { AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
         readonly DataGridView _compareFindings = Grid();
         readonly TextBox _compareDetails = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, WordWrap = true };
@@ -73,8 +74,8 @@ namespace Foton.Gui
 
         async Task Compare()
         {
-            var reference = _reference.Text;
-            var difference = _difference.Text;
+            var reference = _reference.Text.Trim().Trim('"');
+            var difference = _difference.Text.Trim().Trim('"');
             if (reference.Length == 0 || difference.Length == 0) { _status.Text = "Choose both baselines first."; return; }
             _compareReport.Remember(null);
             CompareResult? result = null;

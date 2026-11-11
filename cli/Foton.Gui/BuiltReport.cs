@@ -15,10 +15,19 @@ namespace Foton.Gui
 
         public string? Path { get; private set; }
 
+        /// <summary>Records a report just built; one that cannot be hashed (locked, removed) is not recorded, so it is not opened.</summary>
         public void Remember(string? path)
         {
-            Path = path != null && File.Exists(path) ? path : null;
-            _sha256 = Path != null ? Hashing.Sha256Hex(Path) : null;
+            Path = null;
+            _sha256 = null;
+            if (path == null) return;
+            try
+            {
+                if (!File.Exists(path)) return;
+                _sha256 = Hashing.Sha256Hex(path);
+                Path = path;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { _sha256 = null; }
         }
 
         public bool Unchanged()
