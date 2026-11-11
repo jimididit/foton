@@ -33,13 +33,14 @@ Windows 10 / Server 2016 or newer; nothing to install.
 
 [Getting started](docs/GETTING-STARTED.md) covers analyzing the package on another computer with `foton.exe`, baselines, and the stronger provenance check for casework.
 
-## Three executables
+## Four executables
 
 | Executable | Runs on | Does |
 |------------|---------|------|
 | `foton-collect.exe` | Endpoint | Live triage into a hashed case package: custody, coverage, manifest, findings, `Foton_Report.html`, ZIP |
 | `foton-baseline.exe` | Endpoint | Snapshot of stable configuration (37 record types) for later temporal or fleet comparison |
 | `foton.exe` | Workstation | `parse`, `compose` (EZ Tools / Hayabusa / Chainsaw), `analyze`, `ioc`, `compare` baselines, `carve`, `tools`, `package` (verify hashes) |
+| `foton-console.exe` | Workstation | A window for the same workstation work, plus building collection profiles and endpoint bundles |
 
 Each is one file. Copy only the endpoint executable to a target; parse, compose, and analyze run on the analyst workstation.
 
