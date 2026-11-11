@@ -115,7 +115,8 @@ namespace Foton.Package
             var full = Path.GetFullPath(fullPath);
             if (!full.StartsWith(_root, StringComparison.OrdinalIgnoreCase)) return "Outside the case folder.";
             var rel = full.Substring(_root.Length);
-            if (Path.GetFileName(rel).Equals("hashes.csv", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(rel).Equals("hashes.txt", StringComparison.OrdinalIgnoreCase))
+            // Only the package's own hash list is exempt; a file of the same name anywhere else is checked like any other.
+            if (rel.Equals(CaseTree.CollectionFolder + @"\hashes.csv", StringComparison.OrdinalIgnoreCase) || rel.Equals(CaseTree.CollectionFolder + @"\hashes.txt", StringComparison.OrdinalIgnoreCase))
                 return "The hash list itself (not listed in it).";
             if (!_sha.TryGetValue(rel, out var expected))
                 return "Not in hashes.csv: written after collection (workstation output) or added later.";

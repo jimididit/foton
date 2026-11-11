@@ -150,6 +150,8 @@ namespace Foton.Gui
             {
                 var result = await Task.Run(() => work(log));
                 _status.Text = label + " finished";
+                // Parse, compose, and analyze write new files into the package; show them in the Viewer.
+                if (_caseRoot != null && label != "Open") _viewer.Load(_caseRoot);
                 if (result is AnalysisRun run)
                 {
                     ShowFindings(run.Findings.Select(FindingRow));

@@ -76,6 +76,7 @@ namespace Foton.Gui
         /// <summary>Shows a package's files. Reparse points (junctions, links) are listed but never followed.</summary>
         public void Load(string caseRoot)
         {
+            _loadVersion++;   // a read still running for the previous package must not land here
             _root = Path.GetFullPath(caseRoot);
             _hashes = new PackageHashes(_root);
             _files.Nodes.Clear();
@@ -123,7 +124,12 @@ namespace Foton.Gui
                 if (!link) child.Nodes.Add(new TreeNode("..."));   // filled on expand
                 node.Nodes.Add(child);
             }
-            foreach (var f in files) node.Nodes.Add(new TreeNode(f.Name) { Tag = f.FullName });
+            foreach (var f in files)
+            {
+                // A file symlink can point outside the case folder: list it, never open or hash its target.
+                var link = (f.Attributes & FileAttributes.ReparsePoint) != 0;
+                node.Nodes.Add(new TreeNode(f.Name + (link ? "  (link, not followed)" : "")) { Tag = link ? null : f.FullName });
+            }
         }
 
         static void Expand(TreeNode node)
@@ -134,8 +140,9 @@ namespace Foton.Gui
 
         async Task Show(string? path)
         {
-            if (path == null || path.StartsWith("dir:", StringComparison.Ordinal) || _root == null) return;
+            // Any new selection, a folder included, makes a read still running for the previous one stale.
             var version = ++_loadVersion;
+            if (path == null || path.StartsWith("dir:", StringComparison.Ordinal) || _root == null) return;
             _header.Text = Path.GetFileName(path) + Environment.NewLine + "Reading...";
             var hashes = _hashes;
             var loaded = await Task.Run(() => Read(path, hashes));

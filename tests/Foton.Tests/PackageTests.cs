@@ -184,6 +184,10 @@ namespace Foton.Tests
                 File.WriteAllText(later, "x");
                 Assert.StartsWith("Not in hashes.csv", h.Status(later, Hashing.Sha256Hex(later)));
                 Assert.StartsWith("The hash list itself", h.Status(Path.Combine(s.Dir("Collection"), "hashes.csv"), ""));
+                // A same-named file elsewhere is checked like any other file, not exempted.
+                var planted = Path.Combine(s.Dir("Filesystem"), "hashes.csv");
+                File.WriteAllText(planted, "x");
+                Assert.StartsWith("Not in hashes.csv", h.Status(planted, Hashing.Sha256Hex(planted)));
                 Assert.Equal("Outside the case folder.", h.Status(t.File("elsewhere.txt"), ""));
                 Assert.False(new PackageHashes(t.Path).Present);
             }
