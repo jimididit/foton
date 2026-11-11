@@ -51,6 +51,7 @@ namespace Foton.Gui
             _tabs.TabPages.Add(PackageTab());
             _tabs.TabPages.Add(_viewer.Page);
             _tabs.TabPages.Add(ToolsTab());
+            _tabs.TabPages.Add(ProfileTab());
             // The log sits under every tab: an install or register is followed there as much as a parse.
             var outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
             outer.Panel1.Controls.Add(_tabs);
@@ -127,7 +128,8 @@ namespace Foton.Gui
 
         void UpdateButtons()
         {
-            foreach (var c in _actions) c.Enabled = !_busy && (!(c.Tag is bool needs && needs) || _caseRoot != null);
+            foreach (var c in _actions)
+                c.Enabled = !_busy && (!(c.Tag is bool needs && needs) || _caseRoot != null) && (_profile != null || !(c is Button b && _needsValidProfile.Contains(b)));
         }
 
         /// <summary>

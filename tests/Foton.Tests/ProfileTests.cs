@@ -170,5 +170,79 @@ namespace Foton.Tests
             Assert.StartsWith("Profile '(unnamed)' left out 2 task(s): security_process_creation ; bits_jobs", info.Observation);
             Assert.Equal("Info", info.Severity);
         }
+
+        [Fact]
+        public void Profile_text_from_the_editor_is_validated_like_a_profile_file()
+        {
+            var json = "{\"Name\":\"Quick\",\"Categories\":[\"Persistence\"],\"ExcludeTasks\":[\"bits_jobs\"],\"Options\":{\"Deep\":true}}";
+            var p = CollectionProfile.FromJson(json, "profile");
+            Assert.Equal(System.Text.Encoding.UTF8.GetBytes(json), p.Bytes);
+            Assert.Equal(new[] { "Persistence" }, p.Categories);
+            Assert.Throws<InvalidDataException>(() => CollectionProfile.FromJson("{\"Categorys\":[\"Users\"]}", "profile"));
+            Assert.Throws<InvalidDataException>(() => CollectionProfile.FromJson("{\"Description\":\"" + new string('x', 70000) + "\"}", "profile"));
+        }
+
+        /// <summary>The foton-collect.exe this build produced (same configuration as the tests).</summary>
+        static string BuiltCollect()
+        {
+            var config = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\')).Parent!.Name;
+            var exe = Path.Combine(TestPaths.Root, "cli", "Foton.Collect.Cli", "bin", config, "net462", "foton-collect.exe");
+            Assert.True(File.Exists(exe), "Build the solution first: " + exe);
+            return exe;
+        }
+
+        [Fact]
+        public void A_bundle_holds_collect_the_profile_the_command_and_their_hashes()
+        {
+            using (var t = new TempDir())
+            {
+                var src = Directory.CreateDirectory(t.File("release")).FullName;
+                var exe = Path.Combine(src, "foton-collect.exe");
+                File.Copy(BuiltCollect(), exe);
+                var sha = Hashing.Sha256Hex(exe).ToLowerInvariant();
+                File.WriteAllText(Path.Combine(src, "SHA256SUMS.txt"), "0000000000000000000000000000000000000000000000000000000000000000  foton.exe\n" + sha.ToUpperInvariant() + " *foton-collect.exe\n");
+                var profile = CollectionProfile.FromJson("{\"Name\":\"Quick triage / RMM\",\"Categories\":[\"Persistence\"],\"Options\":{\"EventLogDays\":3}}", "profile");
+                var when = new DateTime(2026, 11, 11, 9, 30, 0, DateTimeKind.Utc);
+
+                var b = Foton.Tools.DeploymentBundle.Build(exe, profile, t.File("out"), when);
+                Assert.Equal(t.File(@"out\Foton_Bundle_Quick_triage_RMM_20261111-093000Z"), b.Folder);
+                Assert.True(b.CollectVerified);
+                Assert.Equal(new[] { "RUN.txt", "SHA256SUMS.txt", "foton-collect.exe", "profile.json" }, Directory.GetFiles(b.Folder).Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal));
+                Assert.Equal(File.ReadAllBytes(exe), File.ReadAllBytes(Path.Combine(b.Folder, "foton-collect.exe")));
+                Assert.Equal(profile.Bytes, File.ReadAllBytes(Path.Combine(b.Folder, "profile.json")));
+                Assert.Equal(new[] { sha + "  foton-collect.exe", profile.Sha256.ToLowerInvariant() + "  profile.json" }, File.ReadAllLines(Path.Combine(b.Folder, "SHA256SUMS.txt")));
+                var run = File.ReadAllText(Path.Combine(b.Folder, "RUN.txt"));
+                Assert.Contains(@".\foton-collect.exe -Profile .\profile.json", run);
+                Assert.Contains("Matches SHA256SUMS.txt", run);
+                Assert.Contains("Options:      EventLogDays=3", run);
+                Assert.Throws<IOException>(() => Foton.Tools.DeploymentBundle.Build(exe, profile, t.File("out"), when));
+
+                // Without a release list it is built but says it is not verified; a list with another hash is refused.
+                File.Delete(Path.Combine(src, "SHA256SUMS.txt"));
+                var unverified = Foton.Tools.DeploymentBundle.Build(exe, profile, t.File("out2"), when);
+                Assert.False(unverified.CollectVerified);
+                Assert.Contains("NOT verified", File.ReadAllText(Path.Combine(unverified.Folder, "RUN.txt")));
+                File.WriteAllText(Path.Combine(src, "SHA256SUMS.txt"), new string('a', 64) + "  foton-collect.exe\n");
+                Assert.Contains("does not match", Assert.Throws<InvalidDataException>(() => Foton.Tools.DeploymentBundle.Build(exe, profile, t.File("out3"), when)).Message);
+                File.WriteAllText(Path.Combine(src, "SHA256SUMS.txt"), new string('a', 64) + "  foton.exe\n");
+                Assert.Contains("does not list", Assert.Throws<InvalidDataException>(() => Foton.Tools.DeploymentBundle.Build(exe, profile, t.File("out3"), when)).Message);
+                Assert.False(Directory.Exists(t.File("out3")));
+            }
+        }
+
+        [Fact]
+        public void A_bundle_refuses_a_file_that_is_not_foton_collect_2_8_or_later()
+        {
+            Assert.Contains("not foton-collect.exe", Assert.Throws<InvalidDataException>(() => Foton.Tools.DeploymentBundle.CheckCollect("foton.exe", "2.9.0.0")).Message);
+            Assert.Contains("does not read collection profiles", Assert.Throws<InvalidDataException>(() => Foton.Tools.DeploymentBundle.CheckCollect("foton-collect.exe", "2.7.1.0")).Message);
+            Assert.Throws<InvalidDataException>(() => Foton.Tools.DeploymentBundle.CheckCollect("foton-collect.exe", ""));
+            Assert.Equal(new Version(2, 8, 0, 0), Foton.Tools.DeploymentBundle.CheckCollect("FOTON-COLLECT.EXE", "2.8.0.0"));
+            Assert.Equal("profile", Foton.Tools.DeploymentBundle.SafeName(" .. "));
+            using (var t = new TempDir())
+            {
+                File.WriteAllText(t.File("foton.exe"), "not a program");
+                Assert.Throws<InvalidDataException>(() => Foton.Tools.DeploymentBundle.Build(t.File("foton.exe"), CollectionProfile.FromCategories("Users"), t.File("out"), DateTime.UtcNow));
+            }
+        }
     }
 }

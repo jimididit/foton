@@ -60,6 +60,16 @@ namespace Foton.Core
             return p;
         }
 
+        /// <summary>Validates profile text as Load does (the console's editor); the bytes recorded are that text in UTF-8.</summary>
+        public static CollectionProfile FromJson(string json, string defaultName)
+        {
+            var bytes = Encoding.UTF8.GetBytes(json);
+            if (bytes.Length > MaxBytes) throw new InvalidDataException($"Profile is larger than {MaxBytes} bytes.");
+            var p = Parse(json, defaultName);
+            p.Bytes = bytes;
+            return p;
+        }
+
         /// <summary>A profile for -Category a,b,c alone (every task in those categories).</summary>
         public static CollectionProfile FromCategories(string list)
         {
