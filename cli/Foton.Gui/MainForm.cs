@@ -126,8 +126,12 @@ namespace Foton.Gui
             try
             {
                 var result = await Task.Run(() => work(log));
-                if (result is AnalysisRun run) ShowFindings(run.Findings.Select(FindingRow));
                 _status.Text = label + " finished";
+                if (result is AnalysisRun run)
+                {
+                    ShowFindings(run.Findings.Select(FindingRow));
+                    _status.Text += $" - {run.Findings.Count} finding(s)";
+                }
             }
             catch (Exception ex)
             {
@@ -216,7 +220,6 @@ namespace Foton.Gui
             _findings.Columns["Category"].FillWeight = 12;
             _findings.Columns["Title"].FillWeight = 35;
             _findings.Columns["Observation"].FillWeight = 60;
-            _status.Text = $"{table.Rows.Count} finding(s)";
         }
 
         void ShowDetails()
