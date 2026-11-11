@@ -77,6 +77,9 @@ namespace Foton.Collect.Cli
                 {
                     return Usage("Collection profile not used: " + ex.Message);
                 }
+                var unknown = Categories.UnknownTaskNames(profile.ExcludeTasks);
+                if (unknown.Length > 0)
+                    return Usage($"Collection profile not used: ExcludeTasks names no Collect task: {string.Join(", ", unknown)}. Task names are the Task column of collection_manifest.csv, or {CollectionProfile.EvtxExport}.");
                 profile.ApplyTo(o, explicitSwitches);
             }
             // -Deep turns on the depth switches; they still work alone without it.

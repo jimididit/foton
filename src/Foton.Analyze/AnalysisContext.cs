@@ -51,7 +51,7 @@ namespace Foton.Analyze
         {
             var status = TaskStatus(task);
             if (status != null || string.IsNullOrEmpty(CaseRoot)) return status;
-            var path = System.IO.Path.Combine(CaseRoot!, Artifact(category, task, format).Replace('/', '\\'));
+            var path = System.IO.Path.Combine(new[] { CaseRoot! }.Concat(Artifact(category, task, format).Split('/')).ToArray());
             try
             {
                 if (!System.IO.File.Exists(path)) return null;

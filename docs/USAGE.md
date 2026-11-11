@@ -116,7 +116,7 @@ A profile limits a collection to the categories a case needs and can carry the s
 }
 ```
 
-Every key is optional. Without `Categories` every category is collected. `ExcludeTasks` takes task names from `collection_manifest.csv`, plus `evtx_export` for the raw `.evtx` copies. `Options` accepts `EventLogDays`, `MaxEventsPerLog`, `SkipEvtxExport`, `SkipHashing`, `LoadUserHives`, `IncludeFileTimeline`, `IncludeUsnJournal`, `Deep`, `NoZip`, and `RequireAdministrator`; a switch on the command line overrides the same option in the profile. A key, category, or value Foton does not recognise stops the run before anything is collected.
+Every key is optional. Without `Categories` every category is collected. `ExcludeTasks` takes task names from the Task column of `collection_manifest.csv`, plus `evtx_export` for the raw `.evtx` copies; a name that is not a Collect task stops the run before anything is collected. `Options` accepts `EventLogDays`, `MaxEventsPerLog`, `SkipEvtxExport`, `SkipHashing`, `LoadUserHives`, `IncludeFileTimeline`, `IncludeUsnJournal`, `Deep`, `NoZip`, and `RequireAdministrator`; a switch on the command line overrides the same option in the profile. A key, category, or value Foton does not recognise stops the run before anything is collected.
 
 ```powershell
 .\foton-collect.exe -CaseNumber CASE-0001 -Profile "\path\to\profile.json"     # the profile's selection and switches
