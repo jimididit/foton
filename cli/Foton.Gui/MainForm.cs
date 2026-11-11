@@ -146,6 +146,7 @@ namespace Foton.Gui
                 {
                     ShowFindings(run.Findings.Select(FindingRow));
                     _status.Text += $" - {run.Findings.Count} finding(s)";
+                    RememberBuiltReport(run.ReportPath);
                 }
             }
             catch (Exception ex)
@@ -165,6 +166,7 @@ namespace Foton.Gui
         {
             _path.Text = path;
             _caseRoot = null;
+            RememberBuiltReport(null);
             _findings.DataSource = null;
             _details.Clear();
             _summary.Text = "";
@@ -253,11 +255,39 @@ namespace Foton.Gui
             }
         }
 
-        void OpenReport()
+        /// <summary>
+        /// The report this console last built with Analyze, and its SHA-256 then. A package's own Foton_Report.html was
+        /// written on the endpoint, which may be compromised, and a browser runs whatever an HTML file holds; so only a
+        /// report built here, unchanged since, is opened.
+        /// </summary>
+        string? _builtReport, _builtReportSha256;
+
+        void RememberBuiltReport(string? path)
         {
-            var report = _caseRoot == null ? null : Path.Combine(_caseRoot, CaseTree.ReportFileName);
-            if (report == null || !File.Exists(report)) { _status.Text = "No report yet: run Analyze."; return; }
-            Process.Start(new ProcessStartInfo(report) { UseShellExecute = true });
+            _builtReport = path != null && File.Exists(path) ? path : null;
+            _builtReportSha256 = _builtReport != null ? Hashing.Sha256Hex(_builtReport) : null;
+        }
+
+        bool BuiltReportUnchanged()
+        {
+            try { return _builtReport != null && File.Exists(_builtReport) && string.Equals(Hashing.Sha256Hex(_builtReport), _builtReportSha256, StringComparison.OrdinalIgnoreCase); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return false; }
+        }
+
+        async Task OpenReport()
+        {
+            if (_caseRoot == null) return;
+            if (!BuiltReportUnchanged())
+            {
+                var answer = MessageBox.Show(this,
+                    "The report in this package was written on the endpoint during collection, or has changed since this console built it. " +
+                    "A browser runs whatever an HTML file contains, so it is not opened as it is.\r\n\r\nRun Analyze now to rebuild the report on this workstation, then open it?",
+                    "Open report", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (answer != DialogResult.Yes) return;
+                await Run("Analyze", Analyze);
+                if (!BuiltReportUnchanged()) { _status.Text = "Report not opened: Analyze did not build it."; return; }
+            }
+            Process.Start(new ProcessStartInfo(_builtReport!) { UseShellExecute = true });
         }
 
         void ShowFolder()

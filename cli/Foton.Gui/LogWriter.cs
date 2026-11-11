@@ -30,10 +30,10 @@ namespace Foton.Gui
 
         void Append(string text)
         {
-            if (text.Length == 0) return;
+            // A run can outlive the window: once the pane is gone its lines are dropped, never queued or thrown at the worker.
+            if (text.Length == 0 || _box.IsDisposed) return;
             _pending.Enqueue(text);
             if (Interlocked.CompareExchange(ref _flushQueued, 1, 0) != 0) return;
-            // A run can outlive the window: once the pane is gone its lines are dropped, never thrown at the worker.
             if (_box.IsDisposed || !_box.IsHandleCreated) { Interlocked.Exchange(ref _flushQueued, 0); return; }
             if (!_box.InvokeRequired) { Drain(); return; }
             try { _box.BeginInvoke(new Action(Drain)); }
@@ -48,8 +48,14 @@ namespace Foton.Gui
             var sb = new StringBuilder();
             while (_pending.TryDequeue(out var s)) sb.Append(s);
             if (sb.Length == 0) return;
-            if (_box.TextLength + sb.Length > MaxChars) _box.Text = _box.Text.Substring(_box.TextLength / 2);
-            _box.AppendText(sb.ToString());
+            // Keep the newest MaxChars: an oversized batch is cut to its tail, otherwise older pane text makes room.
+            var text = sb.Length > MaxChars ? sb.ToString(sb.Length - MaxChars, MaxChars) : sb.ToString();
+            if (_box.TextLength + text.Length > MaxChars)
+            {
+                var keep = Math.Max(0, MaxChars - text.Length);
+                _box.Text = keep == 0 ? "" : _box.Text.Substring(_box.TextLength - Math.Min(keep, _box.TextLength));
+            }
+            _box.AppendText(text);
         }
     }
 }
