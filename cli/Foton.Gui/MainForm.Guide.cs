@@ -66,7 +66,7 @@ namespace Foton.Gui
             bool? verified = _packageVerified.TryGetValue(path, out var v) ? v
                 : _verified.TryGetValue(path, out var c) ? c.StartsWith("Matches", StringComparison.Ordinal) : (bool?)null;
             var findings = _allFindings.Count;
-            var reviewed = _allFindings.Count(r => NoteFor(Foton.Package.ExaminerNote.FindingKind, ExaminerNotes.FindingKey(r)) != null);
+            var reviewed = _allFindings.Count(HasStatus);
             return new List<Step>
             {
                 // Checked is done either way: a package that does not verify stays red here, and the steps go on (they work on it as it is).

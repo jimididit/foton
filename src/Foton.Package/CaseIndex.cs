@@ -279,13 +279,13 @@ namespace Foton.Package
         public static CaseStages Stages(string root)
         {
             var analysisPlain = Plain(root, "analysis");
-            bool Has(string relative) => analysisPlain && File.Exists(System.IO.Path.Combine(root, relative));
+            bool Has(params string[] parts) => analysisPlain && File.Exists(System.IO.Path.Combine(new[] { root, "analysis" }.Concat(parts).ToArray()));
             return new CaseStages
             {
-                Parsed = Has(@"analysis\parsed_records.csv"),
-                Composed = Plain(root, @"analysis\external") && Has(@"analysis\external\external_parse_inventory.csv"),
-                Analyzed = Has(@"analysis\findings.csv"),
-                Timeline = Has(@"analysis\timeline.csv"),
+                Parsed = Has("parsed_records.csv"),
+                Composed = Plain(root, System.IO.Path.Combine("analysis", "external")) && Has("external", "external_parse_inventory.csv"),
+                Analyzed = Has("findings.csv"),
+                Timeline = Has("timeline.csv"),
             };
         }
 

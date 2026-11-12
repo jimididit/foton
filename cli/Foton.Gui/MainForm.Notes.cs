@@ -100,6 +100,10 @@ namespace Foton.Gui
             }
         }
 
+        /// <summary>A finding the examiner has given a status (a note left at Not reviewed, text or not, does not count).</summary>
+        bool HasStatus(Dictionary<string, string?> finding) =>
+            (NoteFor(ExaminerNote.FindingKind, ExaminerNotes.FindingKey(finding))?.Status ?? NoteStatus.NotReviewed) != NoteStatus.NotReviewed;
+
         ExaminerNote? NoteFor(string kind, string key) =>
             _notes?.Notes.FirstOrDefault(n => n.Kind == kind && string.Equals(n.Key, key, StringComparison.OrdinalIgnoreCase));
 
@@ -129,7 +133,7 @@ namespace Foton.Gui
                 table.Rows.Add(V(r, "Severity"), NoteStatus.Label(status), V(r, "Tier"), V(r, "Category"), V(r, "Title"), V(r, "Observation"), V(r, "WhyItMatters"), V(r, "Artifact"), V(r, "NextStep"), key);
             }
             _findings.DataSource = table;
-            var withStatus = _allFindings.Count(r => NoteFor(ExaminerNote.FindingKind, ExaminerNotes.FindingKey(r)) != null);
+            var withStatus = _allFindings.Count(HasStatus);
             _findingsShown.Text = $"{table.Rows.Count} of {_allFindings.Count} shown; {withStatus} with an examiner status";
             if (keep != null) SelectFinding(keep);
             // Selecting during a rebind does not always raise SelectionChanged: show the selected finding's details here.
