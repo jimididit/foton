@@ -15,6 +15,9 @@ namespace Foton.Package
     public static class XmlTree
     {
         public const string More = "(more elements not shown)";
+        public const string Deeper = "(nested deeper than 64 levels; see Show source)";
+        /// <summary>Endpoint XML can nest without limit; the walk below recurses, so it stops here (as Json does).</summary>
+        const int MaxDepth = 64;
 
         public static object Read(string path, int maxNodes)
         {
@@ -33,13 +36,14 @@ namespace Foton.Package
             catch (XmlException ex) { throw new InvalidDataException("Not readable XML: " + ex.Message, ex); }
             var root = doc.Root ?? throw new InvalidDataException("The XML has no root element.");
             var budget = maxNodes;
-            return new Dictionary<string, object> { [root.Name.LocalName] = Convert(root, ref budget) };
+            return new Dictionary<string, object> { [root.Name.LocalName] = Convert(root, ref budget, 1) };
         }
 
-        static object Convert(XElement e, ref int budget)
+        static object Convert(XElement e, ref int budget, int depth)
         {
             budget--;
             if (!e.HasAttributes && !e.HasElements) return e.Value;
+            if (depth > MaxDepth) return new Dictionary<string, object> { [Deeper] = "true" };
             var map = new Dictionary<string, object>();
             foreach (var a in e.Attributes()) map["@" + a.Name.LocalName] = a.Value;
             var text = string.Concat(e.Nodes().OfType<XText>().Select(t => t.Value)).Trim();
@@ -50,7 +54,7 @@ namespace Foton.Package
                 foreach (var c in group)
                 {
                     if (budget <= 0) { map[More] = "true"; break; }
-                    items.Add(Convert(c, ref budget));
+                    items.Add(Convert(c, ref budget, depth + 1));
                 }
                 if (items.Count > 0) map[group.Key] = items.Count == 1 ? items[0] : items.ToArray();
                 if (map.ContainsKey(More)) break;

@@ -460,6 +460,14 @@ namespace Foton.Tests
                 var many = (System.Collections.Generic.IDictionary<string, object>)((System.Collections.Generic.IDictionary<string, object>)XmlTree.Read(t.File("many.xml"), 10))["r"];
                 Assert.True(many.ContainsKey(XmlTree.More));
                 Assert.Equal(9, ((object[])many["i"]).Length);
+
+                // Hostile nesting (deep enough to overflow a recursive walk) stops at the depth cap instead.
+                File.WriteAllText(t.File("deep.xml"), string.Concat(Enumerable.Repeat("<a>", 20000)) + "x" + string.Concat(Enumerable.Repeat("</a>", 20000)));
+                object node = XmlTree.Read(t.File("deep.xml"), 1000000);
+                int levels = 0;
+                while (node is System.Collections.Generic.IDictionary<string, object> map && map.ContainsKey("a")) { node = map["a"]; levels++; }
+                Assert.Equal(1 + 64, levels);   // the root wrapper, then 64 element levels
+                Assert.True(((System.Collections.Generic.IDictionary<string, object>)node).ContainsKey(XmlTree.Deeper));
             }
         }
     }
