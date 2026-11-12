@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.11.0] - 2026-11-12
+
+- Console **Cases** tab, first when the console opens: the case and baseline packages in `C:\Foton\Cases`, `C:\Foton\Baselines`, and folders you add, with host, time, case number, examiner, account, profile, finding counts, and which of parse, compose, and analyze have run. Open a case, verify selected cases (results kept for the session), show the folder, or send baselines to Compare. Read-only: it never deletes, moves, or renames a package.
+- `foton cases [-Path <folder>]... [-Json]` prints the same listing.
+
 ## [2.10.0] - 2026-11-12
 
 - Console Acquire tab: collect or baseline this PC without a command prompt. The console runs the `foton-collect.exe` / `foton-baseline.exe` beside it as its own process, only after checking it against `SHA256SUMS.txt` (a mismatch is refused; with no list it asks first), through the Windows administrator prompt when asked, and shows the collector's own log as it runs. The console itself never runs elevated. A finished collection opens in the Package tab and is verified; a finished baseline is set up in Compare against this host's previous baseline.
