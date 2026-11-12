@@ -73,7 +73,9 @@ namespace Foton.Analyze.Timeline
         public const string SourcesFileName = "timeline_sources.csv";
         const int MaxSummary = 300;
         const long MaxFileBytes = 2L * 1024 * 1024 * 1024;
-        static readonly Regex TimeText = new Regex(@"^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(\.\d{1,7})?\s*(Z|[+-]\d{2}:\d{2})?$");
+        // ASCII digits only ([0-9], not \d, which also matches other scripts' digits that the parsers below refuse), and
+        // at most 7 fraction digits (100 ns), so anything else is "not a time" rather than an exception.
+        static readonly Regex TimeText = new Regex(@"^([0-9]{4}-[0-9]{2}-[0-9]{2})[ T]([0-9]{2}:[0-9]{2}:[0-9]{2})(\.[0-9]{1,7})?[ ]*(Z|[+-][0-9]{2}:[0-9]{2})?$");
 
         /// <summary>Opens the package (folder or ZIP), builds the timeline, and writes timeline.csv and timeline_sources.csv into analysis\.</summary>
         public static TimelineRun Run(string packagePath, StatusLog log, TimelineOptions options)

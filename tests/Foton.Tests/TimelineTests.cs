@@ -143,6 +143,9 @@ namespace Foton.Tests
         [InlineData("2026-11-09 08:00:00 +15:00")]
         [InlineData("0001-01-01 00:00:00 +05:00")]
         [InlineData("9999-12-31 23:59:59 -05:00")]
+        [InlineData("2026-11-09 08:00:00.12345678")]
+        [InlineData("2026-11-09 08:00:00.\u0661\u0662")]
+        [InlineData("\u0662\u0660\u0662\u0666-11-09 08:00:00")]
         public void Values_that_are_not_times_are_not_guessed(string text) => Assert.False(TimelineBuilder.TryTime(text, out _));
 
         [Fact]
