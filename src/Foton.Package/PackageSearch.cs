@@ -135,7 +135,7 @@ namespace Foton.Package
                 if (cancel.IsCancellationRequested) { run.Stopped = true; break; }
                 var rel = file.Substring(caseRoot.Length + 1);
                 // Earlier searches' own results would match every later search for the same text.
-                if (rel.StartsWith(@"analysis\" + FilePrefix, StringComparison.OrdinalIgnoreCase)) continue;
+                if (rel.StartsWith(Path.Combine("analysis", FilePrefix), StringComparison.OrdinalIgnoreCase)) continue;
                 long length;
                 try { length = new FileInfo(file).Length; }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { run.NotSearched.Add(rel + " (unreadable: " + TextFile.OneLine(ex.Message) + ")"); continue; }
