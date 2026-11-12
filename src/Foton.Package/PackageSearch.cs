@@ -79,6 +79,9 @@ namespace Foton.Package
             var stem = Path.Combine(analysis, FilePrefix + FotonTime.Stamp(now) + "Z");
             run.ResultsPath = stem + ".csv";
             run.SummaryPath = stem + ".txt";
+            // Never written over or through: a file already there (a planted link included) stops the write.
+            foreach (var target in new[] { run.ResultsPath, run.SummaryPath })
+                if (Occupied(target)) throw new IOException("Already exists, or is a link: " + target + "; search results not written");
             if (run.Hits.Count > 0) Csv.Write(run.ResultsPath, run.Hits);
             else TextFile.Write(run.ResultsPath, "\"Artifact\",\"Row\",\"Line\",\"Column\",\"Snippet\"");
             TextFile.WriteLines(run.SummaryPath, Summary(run, now));
@@ -89,6 +92,17 @@ namespace Foton.Package
             if (run.Stopped) log.Write("Stopped before every file was searched; the results cover the files searched so far.", StatusLevel.Warn);
             log.Write("Results: " + run.ResultsPath, StatusLevel.Good);
             return run;
+        }
+
+        /// <summary>
+        /// True when anything is at the path, a link whose target is missing included (File.Exists is false for those,
+        /// and a write would follow them); attributes are read from the entry itself, never its target.
+        /// </summary>
+        internal static bool Occupied(string path)
+        {
+            try { File.GetAttributes(path); return true; }
+            catch (Exception ex) when (ex is FileNotFoundException || ex is DirectoryNotFoundException) { return false; }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return true; }
         }
 
         static IEnumerable<string> Summary(SearchRun run, DateTime now)

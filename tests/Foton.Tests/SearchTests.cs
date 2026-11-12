@@ -92,6 +92,12 @@ namespace Foton.Tests
 
                 var none = PackageSearch.Run(c, "no-such-value", new SearchOptions(), new StatusLog(new StringWriter()), default, new DateTime(2026, 11, 12, 12, 0, 1, DateTimeKind.Utc));
                 Assert.StartsWith("\"Artifact\"", File.ReadAllText(none.ResultsPath!).TrimStart('\uFEFF'));
+
+                // A results name already taken (a file, or a link planted in the package) is never written over or through.
+                var before = File.ReadAllText(run.ResultsPath!);
+                Assert.Throws<IOException>(() => PackageSearch.Run(c, "other", new SearchOptions(), new StatusLog(new StringWriter()), default, new DateTime(2026, 11, 12, 12, 0, 0, DateTimeKind.Utc)));
+                Assert.Equal(before, File.ReadAllText(run.ResultsPath!));
+                Assert.False(PackageSearch.Occupied(Path.Combine(c, "analysis", "nothing-here.csv")));
             }
         }
 

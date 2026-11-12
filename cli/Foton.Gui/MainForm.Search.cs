@@ -70,6 +70,7 @@ namespace Foton.Gui
             var options = new SearchOptions { Regex = _searchRegex.Checked };   // read on the UI thread
             var cancel = _searchCancel = new System.Threading.CancellationTokenSource();
             SearchRun? run = null;
+            _searchHits.DataSource = null;   // never leave an earlier search's hits under a new query
             _searchStop.Enabled = true;
             _searchSummary.Text = "Searching...";
             try { await Run("Search", (log, path) => run = PackageSearch.Run(path, query, options, log, cancel.Token)); }
