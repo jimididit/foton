@@ -38,7 +38,16 @@ namespace Foton.Gui
         readonly TextBox _text = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Font = new Font(FontFamily.GenericMonospace, 9f) };
         readonly Panel _content = new Panel { Dock = DockStyle.Fill };
         readonly CheckBox _source = new CheckBox { Text = "Show source (the file's markup, as text)", AutoSize = true, Padding = new Padding(4, 2, 0, 2) };
+        readonly Button _toTimeline = new Button { Text = "Show in timeline", AutoSize = true };
         Loaded? _loaded;
+        /// <summary>A file and data row (1-based) to show once that file has loaded (Select with a row).</summary>
+        string? _pendingPath;
+        int _pendingRow;
+
+        /// <summary>Show in timeline on a row: its artifact (relative to the case root), its data row, and its time.</summary>
+        public event Action<string, int, DateTime>? ShowInTimeline;
+        /// <summary>A one-line note for the status bar.</summary>
+        public event Action<string>? Message;
 
         string? _root;
         PackageHashes? _hashes;
@@ -60,6 +69,8 @@ namespace Foton.Gui
             _csvBar.Controls.Add(_prev);
             _csvBar.Controls.Add(_next);
             _csvBar.Controls.Add(_page);
+            _csvBar.Controls.Add(_toTimeline);
+            _toTimeline.Click += (s, e) => TimelineJump();
             var right = new Panel { Dock = DockStyle.Fill };
             right.Controls.Add(_content);
             right.Controls.Add(_csvBar);
@@ -108,8 +119,12 @@ namespace Foton.Gui
         }
 
         /// <summary>Selects a package file by its path relative to the case root (forward or back slashes); false when absent.</summary>
-        public bool Select(string relativePath)
+        public bool Select(string relativePath) => Select(relativePath, 0);
+
+        /// <summary>Selects a package file and, for a CSV, shows its data row <paramref name="row"/> (1 is the first after the header; 0 for none).</summary>
+        public bool Select(string relativePath, int row)
         {
+            _pendingPath = null;
             if (_root == null || _files.Nodes.Count == 0) return false;
             var node = _files.Nodes[0];
             foreach (var part in relativePath.Replace('/', '\\').Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries))
@@ -120,9 +135,70 @@ namespace Foton.Gui
                 if (next == null) return false;
                 node = next;
             }
+            if (row > 0 && node.Tag is string file && !file.StartsWith("dir:", StringComparison.Ordinal))
+            {
+                // Already shown: go to the row now. Otherwise Display goes there once the file has loaded.
+                if (_files.SelectedNode == node && _loaded?.Path == file)
+                {
+                    if (_table != null) GoToRow(row);
+                    else Message?.Invoke("That file is not shown as a table here, so its row cannot be selected.");
+                }
+                else { _pendingPath = file; _pendingRow = row; }
+            }
             _files.SelectedNode = node;
             node.EnsureVisible();
             return true;
+        }
+
+        /// <summary>UI thread: shows data row <paramref name="row"/> (1-based) of the CSV on screen, clearing Find.</summary>
+        void GoToRow(int row)
+        {
+            if (_table == null) return;
+            var index = row - 1;
+            if (index < 0 || index >= _table.Rows.Count)
+            {
+                Message?.Invoke($"Row {row} is not among the {_table.Rows.Count:N0} rows read here" + (_table.Truncated ? $" (the first {MaxCsvRows:N0} of the file)." : "."));
+                return;
+            }
+            if (_filter.Text.Length > 0) _filter.Text = "";   // raises TextChanged: every row, first page
+            _pageIndex = index / PageRows;
+            ShowPage();
+            // Found by its data row, not its position, so a sort the grid applies cannot select a different row.
+            if (!(_grid.DataSource is DataTable dt) || index % PageRows >= dt.Rows.Count) return;
+            var wanted = dt.Rows[index % PageRows];
+            var target = _grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(g => g.DataBoundItem is DataRowView v && ReferenceEquals(v.Row, wanted));
+            if (target == null) return;
+            var first = _grid.Columns.Cast<DataGridViewColumn>().FirstOrDefault(c => c.Visible);
+            if (first != null) _grid.CurrentCell = target.Cells[first.Index];
+            target.Selected = true;
+            _grid.FirstDisplayedScrollingRowIndex = target.Index;
+        }
+
+        /// <summary>The selected CSV row's time, handed to the Timeline tab with its artifact and row.</summary>
+        void TimelineJump()
+        {
+            var loaded = _loaded;
+            if (_table == null || loaded == null || _root == null) return;
+            if (!(_grid.CurrentRow?.DataBoundItem is DataRowView view) || !(_grid.DataSource is DataTable dt)) { Message?.Invoke("Select a row first."); return; }
+            var position = _pageIndex * PageRows + dt.Rows.IndexOf(view.Row);   // the page's own order, whatever the grid is sorted by
+            if (position < 0 || position >= _rows.Count) return;
+            var index = _rows[position];
+            var relative = Relative(loaded.Path);
+            if (relative == null) return;
+            if (!Foton.Analyze.Timeline.TimelineReader.TimeOfRow(relative, _table.Columns, _table.Rows[index], out var utc))
+            {
+                Message?.Invoke("This row has no time the timeline reads.");
+                return;
+            }
+            ShowInTimeline?.Invoke(relative, index + 1, utc);
+        }
+
+        /// <summary>A file under the loaded case root, relative to it; null for anything else.</summary>
+        string? Relative(string path)
+        {
+            if (_root == null) return null;
+            var root = _root.TrimEnd('\\') + "\\";
+            return path.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? path.Substring(root.Length) : null;
         }
 
         static void Fill(TreeNode node, string dir)
@@ -163,6 +239,7 @@ namespace Foton.Gui
             // Any new selection, a folder included, makes a read still running for the previous one stale.
             var version = ++_loadVersion;
             _readCancel?.Cancel();
+            if (!string.Equals(_pendingPath, path, StringComparison.OrdinalIgnoreCase)) _pendingPath = null;   // a row asked for in another file
             if (path == null || path.StartsWith("dir:", StringComparison.Ordinal) || _root == null) return;
             _header.Text = Path.GetFileName(path) + Environment.NewLine + "Reading...";
             var hashes = _hashes;
@@ -184,6 +261,8 @@ namespace Foton.Gui
             if (loaded == null) return;
             _table = loaded.Table;
             _csvBar.Visible = _table != null;
+            var relative = Relative(loaded.Path);
+            _toTimeline.Visible = _table != null && relative != null && Foton.Analyze.Timeline.TimelineReader.ReadsFile(relative);
             _content.Controls.Clear();
             if (_source.Checked && loaded.Source != null)
             {
@@ -197,6 +276,11 @@ namespace Foton.Gui
                 _pageIndex = 0;
                 _content.Controls.Add(_grid);
                 ShowPage();
+                if (_pendingPath != null && string.Equals(_pendingPath, loaded.Path, StringComparison.OrdinalIgnoreCase))
+                {
+                    _pendingPath = null;
+                    GoToRow(_pendingRow);
+                }
             }
             else if (loaded.Json != null)
             {
@@ -221,6 +305,7 @@ namespace Foton.Gui
 
         sealed class Loaded
         {
+            public string Path = "";
             public string Header = "";
             public CsvTable? Table;
             public object? Json;
@@ -235,7 +320,7 @@ namespace Foton.Gui
         /// </summary>
         static Loaded? Read(string path, PackageHashes? hashes, string hashesNote, System.Threading.CancellationToken cancel)
         {
-            var l = new Loaded();
+            var l = new Loaded { Path = path };
             try
             {
                 var info = new FileInfo(path);

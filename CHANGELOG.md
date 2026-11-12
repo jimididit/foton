@@ -7,6 +7,8 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 ## [2.12.0] - 2026-11-12
 
 - `foton timeline <package> [-From <utc>] [-To <utc>] [-All]`: one list of the package's recorded times, sorted by UTC, from the compose outputs (PECmd, EvtxECmd, Hayabusa, Chainsaw, LECmd, JLECmd, SBECmd, AppCompatCacheParser, AmcacheParser, RECmd, SrumECmd, MFTECmd) and Foton's own CSVs. Each row says what its time means (a Prefetch run is a run; a Shimcache time is a file modified time, not a run), where it came from, and whether it falls in the collection window. Writes `analysis\timeline.csv` and `analysis\timeline_sources.csv`, which records what was read and why anything was left out.
+- Console **Timeline** tab: **Build timeline** runs the same builder, then the timeline can be filtered by UTC window, source, and text (the first 10,000 matching rows are shown, with the full match count). **Around selected row** shows every source within the chosen minutes of a row, and **Show source row** opens the row it came from in the Viewer. Rows in the collection window are greyed.
+- Console Viewer: **Show in timeline** on a row of a CSV the timeline reads opens the Timeline tab around that row's time.
 
 ## [2.11.0] - 2026-11-12
 

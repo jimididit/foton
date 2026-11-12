@@ -51,6 +51,7 @@ namespace Foton.Gui
             _tabs.TabPages.Add(_casesPage = CasesTab());
             _tabs.TabPages.Add(_packagePage = PackageTab());
             _tabs.TabPages.Add(_viewer.Page);
+            _tabs.TabPages.Add(_timelinePage = TimelineTab());
             _tabs.TabPages.Add(ToolsTab());
             _tabs.TabPages.Add(ProfileTab());
             _tabs.TabPages.Add(_comparePage = CompareTab());
@@ -196,6 +197,7 @@ namespace Foton.Gui
             _path.Text = path;
             _caseRoot = null;
             _report.Remember(null);
+            ClearTimeline();
             _findings.DataSource = null;
             _details.Clear();
             _summary.Text = "";
