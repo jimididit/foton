@@ -28,6 +28,12 @@ namespace Foton.Tests
             Assert.Contains("2.6.0 or later", Assert.Throws<InvalidDataException>(() => DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.5.0.0")).Message);
             Assert.Equal(new Version(2, 10, 0, 0), DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "FOTON-BASELINE.EXE", "2.10.0.0"));
             Assert.Equal(new Version(2, 8, 0), CollectorLauncher.MinimumVersion(CollectorKind.Collect));
+            // A two-part version resource is compared and named without throwing anything but InvalidDataException.
+            Assert.Equal(new Version(2, 9), DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.9"));
+            Assert.Contains("2.5 is too old", Assert.Throws<InvalidDataException>(() => DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.5")).Message);
+            Assert.Contains("foton-collect 2.7 does not read", Assert.Throws<InvalidDataException>(() => DeploymentBundle.CheckCollect("foton-collect.exe", "2.7")).Message);
+            foreach (var full in new[] { @"D:\Cases", @"\\server\share\Cases" }) Assert.True(CollectorLauncher.IsFullPath(full), full);
+            foreach (var rel in new[] { "Cases", @".\Cases", @"C:Cases", @"\Cases" }) Assert.False(CollectorLauncher.IsFullPath(rel), rel);
             using (var t = new TempDir())
             {
                 File.WriteAllText(t.File("foton-collect.exe"), "not a program");
@@ -109,7 +115,21 @@ namespace Foton.Tests
                     writer.Write(bytes, 0, bytes.Length);
                     writer.Flush();
                     Assert.Equal(new[] { "four" }, tail.ReadNewLines());   // readable while the writer holds it open
+
+                    // A UTF-8 character written in two pieces is decoded once it is whole.
+                    var word = System.Text.Encoding.UTF8.GetBytes("caf\u00e9\r\n");
+                    writer.Write(word, 0, 4); writer.Write(word, 4, 1); writer.Flush();   // "caf" + the first byte of the e-acute
+                    Assert.Empty(tail.ReadNewLines());
+                    writer.Write(word, 5, word.Length - 5); writer.Flush();
+                    Assert.Equal(new[] { "caf\u00e9" }, tail.ReadNewLines());
                 }
+
+                // A log replaced by a new file (here as long as the old one) is read from its start.
+                File.Delete(path);
+                System.Threading.Thread.Sleep(50);
+                File.WriteAllText(path, new string('x', 30) + "\r\nnew\r\n");
+                File.SetCreationTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+                Assert.Equal(new[] { new string('x', 30), "new" }, tail.ReadNewLines());
             }
         }
     }

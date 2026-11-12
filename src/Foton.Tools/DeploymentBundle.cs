@@ -64,7 +64,7 @@ namespace Foton.Tools
                 try { Directory.Delete(folder, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 throw;
             }
-            return new DeploymentBundle { Folder = folder, CollectVersion = version.ToString(3), CollectSha256 = sha, CollectVerified = verified };
+            return new DeploymentBundle { Folder = folder, CollectVersion = Show(version), CollectSha256 = sha, CollectVerified = verified };
         }
 
         /// <summary>The executable's version when it is foton-collect 2.8.0 or later; otherwise InvalidDataException naming why.</summary>
@@ -72,9 +72,12 @@ namespace Foton.Tools
         {
             if (Version.TryParse(fileVersion ?? "", out var v) && v < ProfileSupport
                 && string.Equals(originalFilename, CollectFileName, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException($"foton-collect {v.ToString(3)} does not read collection profiles; use {ProfileSupport.ToString(3)} or later.");
+                throw new InvalidDataException($"foton-collect {Show(v)} does not read collection profiles; use {Show(ProfileSupport)} or later.");
             return CheckExecutable(CollectFileName, ProfileSupport, originalFilename, fileVersion);
         }
+
+        /// <summary>A version as major.minor.build, or as many parts as it has (a version resource can hold "2.9").</summary>
+        public static string Show(Version v) => v.ToString(v.Build >= 0 ? 3 : 2);
 
         /// <summary>
         /// The executable's version when its version resource names <paramref name="expected"/> and it is at least
@@ -87,7 +90,7 @@ namespace Foton.Tools
             if (!Version.TryParse(fileVersion ?? "", out var version))
                 throw new InvalidDataException($"{expected} has no readable version ('{fileVersion}').");
             if (version < minimum)
-                throw new InvalidDataException($"{expected} {version.ToString(3)} is too old for the console; use {minimum.ToString(3)} or later.");
+                throw new InvalidDataException($"{expected} {Show(version)} is too old for the console; use {Show(minimum)} or later.");
             return version;
         }
 
@@ -135,7 +138,7 @@ namespace Foton.Tools
                 "  Options:      " + options,
                 $"  {ProfileFileName} SHA-256 {profileSha}",
                 "",
-                $"{CollectFileName} {version.ToString(3)} SHA-256 {sha}",
+                $"{CollectFileName} {Show(version)} SHA-256 {sha}",
                 verified
                     ? "  Matches SHA256SUMS.txt from the folder it was copied from."
                     : "  NOT verified: there was no SHA256SUMS.txt beside the source. Compare this hash with the release's SHA256SUMS.txt before use.",

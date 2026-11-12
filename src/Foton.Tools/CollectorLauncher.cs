@@ -45,6 +45,13 @@ namespace Foton.Tools
         /// <summary>Collect 2.8.0 reads -Profile; baseline 2.6.0 reads -LoadUserHives.</summary>
         public static Version MinimumVersion(CollectorKind kind) => kind == CollectorKind.Collect ? new Version(2, 8, 0) : new Version(2, 6, 0);
 
+        /// <summary>
+        /// A drive path (C:\...) or a UNC path (\\server\share); not relative or drive-relative (C:folder). The console and
+        /// the collector start in different folders, so a relative output folder would name two places.
+        /// </summary>
+        public static bool IsFullPath(string path) =>
+            path.StartsWith(@"\\", StringComparison.Ordinal) || (path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':' && path[2] == '\\');
+
         public static string DefaultOutput(CollectorKind kind) => CaseTree.DefaultOutput(kind == CollectorKind.Collect ? "Cases" : "Baselines");
 
         /// <summary>
@@ -59,7 +66,7 @@ namespace Foton.Tools
             var version = DeploymentBundle.CheckExecutable(FileName(kind), MinimumVersion(kind), v.OriginalFilename, v.FileVersion);
             var sha = Hashing.Sha256Hex(info.FullName).ToLowerInvariant();
             var verified = DeploymentBundle.Verify(System.IO.Path.Combine(info.DirectoryName!, DeploymentBundle.SumsFileName), info.Name, sha);
-            return new CollectorCheck { Path = info.FullName, Version = version.ToString(3), Sha256 = sha, Verified = verified };
+            return new CollectorCheck { Path = info.FullName, Version = DeploymentBundle.Show(version), Sha256 = sha, Verified = verified };
         }
 
         /// <summary>The collector's command line. Values with quotes, control characters, or a leading '-' are refused.</summary>

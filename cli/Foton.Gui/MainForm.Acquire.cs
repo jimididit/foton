@@ -108,10 +108,18 @@ namespace Foton.Gui
                 _status.Text = "Not started: the Profile tab's profile is not valid.";
                 return;
             }
+            // The collector and the console start in different folders, so a relative path would name two places.
+            var typedOut = (collect ? _caseOutput : _baselineOutput).Text.Trim().Trim('"');
+            if (typedOut.Length > 0 && !CollectorLauncher.IsFullPath(typedOut))
+            {
+                _status.Text = "Not started: the output folder must be a full path, such as D:\\Cases.";
+                MessageBox.Show(this, "The output folder must be a full path, such as D:\\Cases or \\\\server\\share\\Cases.", "Not started", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
             // Everything the worker needs is read here, on the UI thread.
             var defaultOut = CollectorLauncher.DefaultOutput(kind);
-            var outText = (collect ? _caseOutput : _baselineOutput).Text.Trim().Trim('"');
+            var outText = typedOut;
             var request = new AcquireRequest
             {
                 Kind = kind,
