@@ -44,6 +44,18 @@ namespace Foton.Cli
                     return ToolsListCommand();
                 if (rest.Count <= 2) return ToolsCommand(rest[0], rest.Count == 2 ? rest[1] : null, force);
             }
+            if (args.Length >= 1 && string.Equals(args[0], "cases", StringComparison.OrdinalIgnoreCase))
+            {
+                var folders = new System.Collections.Generic.List<string> { CaseTree.DefaultOutput("Cases"), CaseTree.DefaultOutput("Baselines") };
+                bool json = false;
+                for (int i = 1; i < args.Length; i++)
+                {
+                    if (string.Equals(args[i], "-Json", StringComparison.OrdinalIgnoreCase)) json = true;
+                    else if (string.Equals(args[i], "-Path", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) folders.Add(args[++i]);
+                    else return Usage();
+                }
+                return CasesCommand(folders, json);
+            }
             if (args.Length >= 3 && string.Equals(args[0], "compare", StringComparison.OrdinalIgnoreCase))
             {
                 bool noCsv = false, noHtml = false;
@@ -88,12 +100,33 @@ namespace Foton.Cli
             Console.WriteLine("                                        diff two baselines (baseline.json or package folder);");
             Console.WriteLine("                                        writes baseline_diff.csv and Foton_BaselineCompare.html");
             Console.WriteLine("                                        beside the difference baseline");
+            Console.WriteLine("  foton cases [-Path <folder>]... [-Json]");
+            Console.WriteLine("                                        list case and baseline packages in C:\\Foton\\Cases, C:\\Foton\\Baselines,");
+            Console.WriteLine("                                        and each -Path folder (read-only; Verify with foton package)");
             Console.WriteLine("  foton carve <blob> [-MaxBytes <n>] [-MaxHits <n>]");
             Console.WriteLine("                                        MZ/PE signature scan of a copied blob (Tier 3; not NTFS carving);");
             Console.WriteLine("                                        defaults 8 MiB and 50 hits");
             Console.WriteLine();
             Console.WriteLine("Operator guide: https://github.com/jimididit/foton/blob/main/docs/USAGE.md");
             return 1;
+        }
+
+        /// <summary>Lists packages; JSON alone with -Json (for scripts), otherwise the banner and a text listing. Exit 0.</summary>
+        static int CasesCommand(System.Collections.Generic.List<string> folders, bool json)
+        {
+            var list = CaseIndex.Scan(folders);
+            if (json)
+            {
+                Console.WriteLine(Json.Indented(new System.Collections.Generic.Dictionary<string, object?>
+                {
+                    ["Cases"] = list.Cases, ["Baselines"] = list.Baselines, ["Notes"] = list.Notes,
+                }));
+                return 0;
+            }
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            foreach (var line in CaseIndex.Lines(list)) log.WriteConsole(line);
+            return 0;
         }
 
         /// <summary>Exit 0 when every listed hash matches, 2 when any listed file changed or is missing, 1 on open failure.</summary>

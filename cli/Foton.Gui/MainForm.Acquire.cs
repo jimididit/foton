@@ -226,7 +226,7 @@ namespace Foton.Gui
                 if (exit != 0 && MessageBox.Show(this, "The collector did not report success. Open what it wrote?", "Collect this PC",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                     return;
-                _tabs.SelectedIndex = 0;
+                if (_packagePage != null) _tabs.SelectedTab = _packagePage;
                 await Open(root);
                 if (_caseRoot != null) await Run("Verify", Verify);
             }

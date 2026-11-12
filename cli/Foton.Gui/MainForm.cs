@@ -48,7 +48,8 @@ namespace Foton.Gui
             StartPosition = FormStartPosition.CenterScreen;
             _logWriter = new LogWriter(_log);
 
-            _tabs.TabPages.Add(PackageTab());
+            _tabs.TabPages.Add(_casesPage = CasesTab());
+            _tabs.TabPages.Add(_packagePage = PackageTab());
             _tabs.TabPages.Add(_viewer.Page);
             _tabs.TabPages.Add(ToolsTab());
             _tabs.TabPages.Add(ProfileTab());
@@ -68,7 +69,11 @@ namespace Foton.Gui
             FindingGrid(_findings, _details);
             // Double-click a finding (or use Show artifact) to read its source artifact in the Viewer.
             _findings.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) ShowArtifact(); };   // not on a header (that sorts)
-            if (openPath != null) Shown += async (s, e) => await Open(openPath);
+            // A package on the command line opens in the Package tab; otherwise the window starts on Cases.
+            if (openPath != null) Shown += async (s, e) => { _tabs.SelectedTab = _packagePage; await Open(openPath); };
+            else Shown += async (s, e) => await RefreshCases();
+            // The list is cheap to re-read (no hashing), so it is current whenever the tab is shown.
+            _tabs.Selected += async (s, e) => { if (e.TabPage == _casesPage && !_busy) await RefreshCases(); };
         }
 
         TabPage PackageTab()
