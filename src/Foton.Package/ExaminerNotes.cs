@@ -70,8 +70,10 @@ namespace Foton.Package
     {
         public string Key { get; set; } = "";
         public string Severity { get; set; } = "";
+        public string Tier { get; set; } = "";
         public string Category { get; set; } = "";
         public string Title { get; set; } = "";
+        public string Observation { get; set; } = "";
         public string Artifact { get; set; } = "";
         public string Status { get; set; } = NoteStatus.NotReviewed;
         public string Text { get; set; } = "";
@@ -287,7 +289,11 @@ namespace Foton.Package
             {
                 var key = FindingKey(r);
                 seen.Add(key);
-                var f = new ReviewedFinding { Key = key, Severity = V(r, "Severity"), Category = V(r, "Category"), Title = V(r, "Title"), Artifact = V(r, "Artifact") };
+                var f = new ReviewedFinding
+                {
+                    Key = key, Severity = V(r, "Severity"), Tier = V(r, "Tier"), Category = V(r, "Category"), Title = V(r, "Title"),
+                    Observation = V(r, "Observation"), Artifact = V(r, "Artifact"),
+                };
                 if (byKey.TryGetValue(key, out var n)) { f.Status = n.Status; f.Text = n.Text; f.Examiner = n.Examiner; f.UpdatedUtc = n.UpdatedUtc; }
                 review.Findings.Add(f);
             }

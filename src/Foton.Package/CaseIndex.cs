@@ -306,6 +306,8 @@ namespace Foton.Package
         /// True when no folder or file from <paramref name="root"/> down to root\<paramref name="relative"/> is a link or
         /// junction (parts that do not exist are fine). Fails closed: an attribute that cannot be read counts as a link.
         /// </summary>
+        public static bool IsPlain(string root, string relative) => Plain(root, relative);
+
         internal static bool Plain(string root, string relative)
         {
             var current = root;

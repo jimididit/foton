@@ -66,6 +66,11 @@ namespace Foton.Cli
             }
             if (args.Length >= 2 && string.Equals(args[0], "notes", StringComparison.OrdinalIgnoreCase))
                 return NotesCommand.Run(args);
+            if ((args.Length == 2 || args.Length == 4) && string.Equals(args[0], "handoff", StringComparison.OrdinalIgnoreCase))
+            {
+                if (args.Length == 4 && !string.Equals(args[2], "-OutputPath", StringComparison.OrdinalIgnoreCase)) return Usage();
+                return HandoffCommand(args[1], args.Length == 4 ? args[3] : null);
+            }
             if (args.Length >= 1 && string.Equals(args[0], "cases", StringComparison.OrdinalIgnoreCase))
             {
                 var folders = new System.Collections.Generic.List<string> { CaseTree.DefaultOutput("Cases"), CaseTree.DefaultOutput("Baselines") };
@@ -132,6 +137,10 @@ namespace Foton.Cli
             Console.WriteLine("  foton notes <case-folder-or-zip> (-Key <key> | -Artifact <file> -Row <n>) [-Status <status>]");
             Console.WriteLine("              [-Text <note>] [-Examiner <name>]");
             Console.WriteLine("                                        set one; status: Not reviewed, Reviewed, Relevant, Not relevant, Follow up");
+            Console.WriteLine("  foton handoff <case-folder-or-zip> [-OutputPath <folder>]");
+            Console.WriteLine("                                        Foton_Handoff_<case>_<UTC> (default under C:\\Foton\\Handoffs): findings,");
+            Console.WriteLine("                                        examiner notes, Foton_Handoff.html, custody and hashes.csv copies,");
+            Console.WriteLine("                                        HANDOFF.txt, SHA256SUMS.txt; the package is referenced by hash, not copied");
             Console.WriteLine("  foton cases [-Path <folder>]... [-Json]");
             Console.WriteLine("                                        list case and baseline packages in C:\\Foton\\Cases, C:\\Foton\\Baselines,");
             Console.WriteLine("                                        and each -Path folder (read-only; Verify with foton package)");
@@ -141,6 +150,24 @@ namespace Foton.Cli
             Console.WriteLine();
             Console.WriteLine("Operator guide: https://github.com/jimididit/foton/blob/main/docs/USAGE.md");
             return 1;
+        }
+
+        /// <summary>Exit 0 when the handoff is written and the package verified, 2 when written but the package did not verify, 1 when not written.</summary>
+        static int HandoffCommand(string package, string? outputParent)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            try
+            {
+                var run = Foton.Analyze.Handoff.HandoffExport.Run(package, log, outputParent);
+                log.WriteConsole("     The automated report is not copied by foton handoff (its origin cannot be checked here); the console's Export handoff adds one it built.", ConsoleColor.DarkGray);
+                return run.Verified ? 0 : 2;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException || ex is ArgumentException || ex is NotSupportedException)
+            {
+                log.Write("Handoff not written: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
         }
 
         /// <summary>Exit 0 after the timeline is written (an empty one included), 1 when the package cannot be opened.</summary>
