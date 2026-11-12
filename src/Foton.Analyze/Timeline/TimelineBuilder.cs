@@ -36,6 +36,8 @@ namespace Foton.Analyze.Timeline
         /// <summary>Time cells that were empty, "(not set)", or not a time.</summary>
         public int TimesWithoutValue { get; set; }
         public int OutsideWindow { get; set; }
+        /// <summary>Time columns this source reads that the file does not have (the others were still read).</summary>
+        public string MissingColumns { get; set; } = "";
         /// <summary>Why nothing was taken (bulk table, missing columns, older package, unreadable), or empty.</summary>
         public string LeftOut { get; set; } = "";
     }
@@ -102,7 +104,7 @@ namespace Foton.Analyze.Timeline
         public static TimelineRun Build(string caseRoot, TimelineOptions options)
         {
             // One spelling of the root (backslashes, no trailing separator), so artifact paths are always relative to it.
-            caseRoot = Path.GetFullPath(caseRoot).TrimEnd('\\', '/');
+            caseRoot = Path.GetFullPath(caseRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             var run = new TimelineRun();
             var window = CollectionWindow.FromCase(caseRoot);
             bool foton2 = IsFoton2(caseRoot);
@@ -154,6 +156,7 @@ namespace Foton.Analyze.Timeline
                     for (int i = 0; i < header.Count; i++) if (!index.ContainsKey(header[i])) index[header[i]] = i;
                     var missing = source.Times.Where(t => !index.ContainsKey(t.Column)).Select(t => t.Column).ToList();
                     if (missing.Count == source.Times.Length) { stat.LeftOut = "columns not found: " + string.Join(", ", missing); return; }
+                    stat.MissingColumns = string.Join(", ", missing);
                     timeIndex = source.Times.Select(t => index.TryGetValue(t.Column, out var i) ? i : -1).ToArray();
                     continue;
                 }
@@ -247,7 +250,7 @@ namespace Foton.Analyze.Timeline
         static string Relative(string caseRoot, string file)
         {
             var full = Path.GetFullPath(file);
-            return full.StartsWith(caseRoot + "\\", StringComparison.OrdinalIgnoreCase) ? full.Substring(caseRoot.Length + 1) : full;
+            return full.StartsWith(caseRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ? full.Substring(caseRoot.Length + 1) : full;
         }
 
         /// <summary>Whether Foton 2 wrote the collection (its log's first line): earlier packages hold some times in local time.</summary>

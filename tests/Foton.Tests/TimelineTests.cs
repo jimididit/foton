@@ -34,6 +34,8 @@ namespace Foton.Tests
             Write(Path.Combine(c, @"analysis\external\srumecmd\20261110_SrumECmd_AppResourceUseInfo_Output.csv"),
                 "Id,Timestamp,ExeInfo\r\n1,2026-11-09 08:00:00,a.exe\r\n");
             Write(Path.Combine(c, @"analysis\external\lecmd\lecmd.csv"), "NotTheColumns,Other\r\nx,y\r\n");
+            // Only one of SBECmd's two time columns: the other is named as missing, the present one still read.
+            Write(Path.Combine(c, @"analysis\external\sbecmd\u_NTUSER.csv"), "AbsolutePath,LastInteracted\r\nC:\\Data,2026-11-02 00:00:00\r\n");
             Write(Path.Combine(c, @"05_Persistence\scheduled_tasks.csv"),
                 "\"TaskPath\",\"TaskName\",\"State\",\"Author\",\"RunAsUser\",\"RunLevel\",\"Triggers\",\"Actions\",\"LastRunTime\"\r\n\"\\\",\"T1\",\"Ready\",\"\",\"\",\"\",\"\",\"x.exe\",\"2026-11-09 08:00:00\"\r\n");
             Write(Path.Combine(c, @"07_Event_Logs\security_logon_events.csv"),
@@ -51,6 +53,7 @@ namespace Foton.Tests
                 Assert.Equal(new[]
                 {
                     "2026-11-01 00:00:00|AppCompatCacheParser|File modified (Shimcache entry; not a run time)|C:\\x\\a.exe",
+                    "2026-11-02 00:00:00|SBECmd|Folder last interacted with (shellbag)|C:\\Data",
                     "2026-11-09 07:59:59|EvtxECmd|Event logged|4624 Security:  Successful logon  Target: alice",
                     "2026-11-09 08:00:00|Chainsaw|Rule hit (Chainsaw)|Rule B  (event 4688)",
                     "2026-11-09 08:00:00|Foton|Scheduled task last ran|\\T1  x.exe",
@@ -58,7 +61,8 @@ namespace Foton.Tests
                     "2026-11-09 08:00:00|PECmd|Ran (Prefetch run time)|\\VOLUME{x}\\TOOL.EXE",
                     "2026-11-10 12:01:00|PECmd|Ran (Prefetch run time)|\\VOLUME{x}\\CMD.EXE",
                 }, run.Rows.Select(r => string.Join("|", r.TimeUtc, r.Source, r.Meaning, r.Summary)));
-                Assert.Equal(new[] { false, false, false, false, false, false, true }, run.Rows.Select(r => r.DuringCollection));
+                Assert.Equal(new[] { false, false, false, false, false, false, false, true }, run.Rows.Select(r => r.DuringCollection));
+                Assert.Equal("FirstInteracted", run.Sources.Single(s => s.Artifact.EndsWith("u_NTUSER.csv")).MissingColumns);
                 Assert.Equal(@"analysis\external\pecmd\pecmd_Timeline.csv", run.Rows.Last().Artifact);
                 // The root spelled with forward slashes or a trailing separator gives the same relative artifact paths.
                 var c = run.Rows.Last();

@@ -49,10 +49,18 @@ namespace Foton.Cli
                 var o = new Foton.Analyze.Timeline.TimelineOptions();
                 for (int i = 2; i < args.Length; i++)
                 {
-                    if (string.Equals(args[i], "-All", StringComparison.OrdinalIgnoreCase)) o.All = true;
-                    else if (string.Equals(args[i], "-From", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && UtcArgument(args[++i], endOfDay: false, out var from)) o.FromUtc = from;
-                    else if (string.Equals(args[i], "-To", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && UtcArgument(args[++i], endOfDay: true, out var to)) o.ToUtc = to;
-                    else return Usage();
+                    var a = args[i];
+                    if (string.Equals(a, "-All", StringComparison.OrdinalIgnoreCase)) { o.All = true; continue; }
+                    bool from = string.Equals(a, "-From", StringComparison.OrdinalIgnoreCase), to = string.Equals(a, "-To", StringComparison.OrdinalIgnoreCase);
+                    if (!from && !to) return Usage();
+                    // The value is checked here and named in the error; it is never re-read as another switch.
+                    if (i + 1 >= args.Length || !UtcArgument(args[i + 1], endOfDay: to, out var utc))
+                    {
+                        Console.Error.WriteLine($"{a} needs a UTC time as yyyy-MM-dd or \"yyyy-MM-dd HH:mm:ss\".");
+                        return 1;
+                    }
+                    i++;
+                    if (from) o.FromUtc = utc; else o.ToUtc = utc;
                 }
                 return TimelineCommand(args[1], o);
             }
