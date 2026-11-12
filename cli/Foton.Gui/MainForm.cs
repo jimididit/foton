@@ -68,10 +68,15 @@ namespace Foton.Gui
             strip.Items.Add(_status);
             strip.Items.Add(_progress);
             Controls.Add(strip);
+            _statusStrip = strip;
             var menu = MenuBar();   // after the tabs, which it lists
             Controls.Add(menu);
             MainMenuStrip = menu;
             ApplySettings();
+            Theme.Watch(this);
+            ApplyAppearance();
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnWindowsPreferenceChanged;
+            FormClosed += (s, e) => Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnWindowsPreferenceChanged;
 
             FindingGrid(_findings, _details);
             // Double-click a finding (or use Show artifact) to read its source artifact in the Viewer.
