@@ -8,6 +8,10 @@ namespace Foton.Core
     public static class CaseTree
     {
         public const string CollectionFolder = "00_Collection";
+
+        /// <summary>C:\Foton\Cases, C:\Foton\Baselines on the Windows drive: the collectors' defaults (the console shows and watches them).</summary>
+        public static string DefaultOutput(string leaf) =>
+            Path.Combine(Path.GetPathRoot(System.Environment.SystemDirectory) ?? @"C:\", "Foton", leaf);
         /// <summary>The triage report in the case root (Collect writes it; analyze rewrites it).</summary>
         public const string ReportFileName = "Foton_Report.html";
 

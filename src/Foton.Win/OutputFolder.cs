@@ -16,8 +16,7 @@ namespace Foton.Win
     /// </summary>
     public static class OutputFolder
     {
-        public static string Default(string leaf) =>
-            Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\", "Foton", leaf);
+        public static string Default(string leaf) => CaseTree.DefaultOutput(leaf);
 
         /// <summary>
         /// Creates any missing folder from below the drive root down to <paramref name="path"/> with the private ACL,

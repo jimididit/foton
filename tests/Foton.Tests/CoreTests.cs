@@ -10,6 +10,14 @@ namespace Foton.Tests
 {
     public class CoreTests
     {
+        [Fact]
+        public void Default_output_folders_sit_under_Foton_on_the_Windows_drive()
+        {
+            var root = Path.GetPathRoot(Environment.SystemDirectory);
+            Assert.Equal(Path.Combine(root!, "Foton", "Cases"), CaseTree.DefaultOutput("Cases"));
+            Assert.Equal(Foton.Win.OutputFolder.Default("Baselines"), CaseTree.DefaultOutput("Baselines"));
+        }
+
         public sealed class Item
         {
             public string Name { get; set; } = "";
