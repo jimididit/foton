@@ -146,6 +146,14 @@ namespace Foton.Tests
         public void Values_that_are_not_times_are_not_guessed(string text) => Assert.False(TimelineBuilder.TryTime(text, out _));
 
         [Fact]
+        public void An_artifact_that_fails_partway_says_how_far_it_got()
+        {
+            var partly = new TimelineSourceStat { RowsRead = 5, TimesUsed = 3 };
+            Assert.Equal("partly read: 3 time(s) from its first 5 row(s) are in the timeline, then: disk error", TimelineBuilder.Stopped(partly, new IOException("disk error")));
+            Assert.Equal("unreadable: locked", TimelineBuilder.Stopped(new TimelineSourceStat(), new IOException("locked")));
+        }
+
+        [Fact]
         public void Fractions_keep_every_100ns_tick()
         {
             Assert.True(TimelineBuilder.TryTime("2026-11-09 08:00:00.0000001", out var one));

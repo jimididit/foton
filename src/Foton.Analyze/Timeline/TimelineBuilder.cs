@@ -120,11 +120,11 @@ namespace Foton.Analyze.Timeline
                     if (source.UnlessEvtxECmd && evtxECmd) { stat.LeftOut = "EvtxECmd output covers the same events"; continue; }
                     if (run.Capped) { stat.LeftOut = "row cap reached"; continue; }
                     try { Read(source, file, stat, run, options, window); }
-                    // Package files are untrusted: anything one of them makes the reader trip on leaves that artifact out, named.
+                    // Package files are untrusted: anything one of them makes the reader trip on stops that artifact, named (Stopped).
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException
                         || ex is FormatException || ex is OverflowException || ex is ArgumentException)
                     {
-                        stat.LeftOut = "unreadable: " + TextFile.OneLine(ex.Message);
+                        stat.LeftOut = Stopped(stat, ex);
                     }
                 }
             }
@@ -138,6 +138,15 @@ namespace Foton.Analyze.Timeline
             });
             return run;
         }
+
+        /// <summary>
+        /// Why an artifact stopped being read. Rows taken before the error are valid and stay in the timeline, so the
+        /// reason says how far it got rather than calling the whole artifact unreadable.
+        /// </summary>
+        internal static string Stopped(TimelineSourceStat stat, Exception ex) =>
+            stat.TimesUsed > 0
+                ? $"partly read: {stat.TimesUsed} time(s) from its first {stat.RowsRead} row(s) are in the timeline, then: {TextFile.OneLine(ex.Message)}"
+                : "unreadable: " + TextFile.OneLine(ex.Message);
 
         static void Read(TimelineSource source, string file, TimelineSourceStat stat, TimelineRun run, TimelineOptions options, CollectionWindow? window)
         {
