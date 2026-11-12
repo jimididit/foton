@@ -168,6 +168,7 @@ A baseline taken after an incident is a picture of **that** state. Compare prove
 | `compare <reference> <difference>` | Field-level baseline diff: `baseline_diff.csv` + `Foton_BaselineCompare.html` beside the difference baseline. `-NoCsv`, `-NoHtml`, `-OutputPath <html>` |
 | `tools` | List pinned and registered tools, and where compose finds them |
 | `carve <blob>` | MZ/PE signature scan of a copied blob (Tier 3, not NTFS carving). `-MaxBytes`, `-MaxHits` (defaults 8 MiB / 50 hits) |
+| `timeline <case-folder-or-zip>` | One list of the package's recorded times, sorted by UTC, each with what that time means: `analysis\timeline.csv` + `timeline_sources.csv`. `-From`, `-To` (UTC date or `"yyyy-MM-dd HH:mm:ss"`), `-All` ([Timeline](#timeline)) |
 | `cases` | List the case and baseline packages in `C:\Foton\Cases`, `C:\Foton\Baselines`, and each `-Path <folder>`: host, time, case number, examiner, elevated, profile, finding counts, and which of parse, compose, and analyze have run. `-Json` for scripts. Read-only and does not hash; use `package` to verify |
 
 `package`, `parse`, `compose`, `analyze`, and `ioc` take the package ZIP or a case folder (the `Foton_...` folder that holds `00_Collection`). The first of them run on a ZIP extracts it once, beside the ZIP, into a folder named like the ZIP with `-extracted` at the end. Later verbs reuse that folder and write their outputs into it, so the report ends up in `...-extracted\Foton_...\Foton_Report.html`. Foton needs write access to the folder holding the ZIP.
@@ -279,6 +280,27 @@ Each tool writes into a staging folder first. Compose replaces that tool's earli
 Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are inventory rows (`NotOnPath`), not failures; a tool unchecked in the console's **Compose runs** list is `NotSelected`. Hayabusa hits are that engine's inferences (Tier 2) and name the tool. PECmd and EvtxECmd CSVs also feed `analyze` (coverage, user-writable path references, and a short list of high-attention Event IDs such as 1102 and 7045). RECmd batch output feeds it too: an Info overview (rows by hive type and category, Threat Hunting entries), a Medium finding when Autoruns, Services, or Threat Hunting values name user-writable paths, and an Info finding for keys or values RECmd recovered as deleted. RECmd reads every copied hive, including users whose hives were not loaded at collection time. Chainsaw hunt CSVs become one Info overview (detection rows and top rule titles, with rows the collection itself caused counted apart); Chainsaw's CSV carries no rule level, so read the rule before treating a title as severe. LECmd and JLECmd CSVs each become an Info overview (rows, distinct targets, and targets on removable media or network paths), a Medium finding when an executable or script target sits in a user-writable path, and a Medium finding when a target's arguments match a suspicious-command pattern. Documents in Downloads or AppData are not flagged. AmcacheParser CSVs become an Info overview (rows by CSV kind), a Medium finding for executables or scripts inventoried under user-writable paths (rows marked `IsOsComponent` are left out), and a Medium finding for drivers recorded as unsigned and not shipped with Windows. On Windows 10 and later an Amcache entry shows a file was present, not that it ran. AppCompatCacheParser (Shimcache) CSVs become an Info overview (entries per control set, how many are marked Executed) and a Medium finding for executables or scripts in user-writable paths; the Executed flag is the tool's reading of an insert flag, not proof of execution. SBECmd (shellbags) CSVs become one Info overview: folders browsed per user hive, phone and camera (MTP) entries, network paths, archive contents, and drive letters other than the system drive. A drive letter alone does not say whether the volume was removable. SrumECmd (SRUM) CSVs become an Info overview (rows per table, distinct apps, the dates covered) and a Medium finding for executables in user-writable paths that used the network, with bytes sent and received; SRUM counts bytes per app per hour, not destinations. MFTECmd (USN journal) CSVs become an Info overview (creates, deletes, and renames in the period covered) and an Info list of executables or scripts created, by name only: without `$MFT` the journal has no folder paths. Journal rows inside the collection window are counted apart, because the collector writes its own output to the volume.
 
 EZ Tools registered with Foton 2.4.0 or earlier list six tools; run `.\foton.exe tools EZTools "\path\to\EZTools"` again so AppCompatCacheParser, SBECmd, SrumECmd, and MFTECmd are found too.
+
+### Timeline
+
+`foton timeline` puts the package's recorded times in one list, sorted by UTC, so you can read what happened around a moment. Run it after `compose` to include the EZ Tools, Hayabusa, and Chainsaw outputs; without compose it still reads Foton's own CSVs.
+
+```powershell
+.\foton.exe timeline "\path\to\Foton_case.zip"
+.\foton.exe timeline "\path\to\case-folder" -From 2026-11-01 -To "2026-11-09 18:00:00"
+```
+
+Each row of `analysis\timeline.csv` has the time (UTC), the source, what that time means, a summary, the artifact and row it came from, and `DuringCollection` when it falls inside the collection window (the collector's own activity, such as its file writes in the USN journal, shows up there). A time means only what its source recorded: a Prefetch run time is a run, a Shimcache time is the file's modified time (not a run), an Amcache entry shows a file was present, and times a shortcut or jump list holds about its target are labelled as recorded in it.
+
+| Source | Times |
+|--------|-------|
+| PECmd, EvtxECmd, Hayabusa, Chainsaw | Prefetch run times; events; rule hits (the engine named) |
+| LECmd, JLECmd, SBECmd | Shortcut and jump-list times, and target times they record; shellbag folder interactions |
+| AppCompatCacheParser, AmcacheParser | Shimcache file modified times; Amcache file, driver, and shortcut entries written |
+| RECmd, SrumECmd, MFTECmd | Registry keys last written; SRUM network connections and network use per hour; USN journal changes |
+| Foton's own CSVs | Process starts, scheduled-task last runs, Defender detections, BAM last runs, Recycle Bin deletions, recently modified system files; exported event logs only when there is no EvtxECmd output (the same events) |
+
+SRUM's hourly counter tables (resource use, app timeline, energy, push notifications) are left out unless you add `-All`. Scheduled-task and Defender status times come only from Foton 2 packages; earlier packages wrote them in local time. `analysis\timeline_sources.csv` lists every artifact read: rows read, times used, cells without a usable time, times outside `-From`/`-To`, and why an artifact was left out. The timeline stops at 2,000,000 rows and says so; narrow it with `-From` and `-To`. It is a reading aid: it raises no findings.
 
 ### Analysis notes
 

@@ -44,6 +44,26 @@ namespace Foton.Cli
                     return ToolsListCommand();
                 if (rest.Count <= 2) return ToolsCommand(rest[0], rest.Count == 2 ? rest[1] : null, force);
             }
+            if (args.Length >= 2 && string.Equals(args[0], "timeline", StringComparison.OrdinalIgnoreCase))
+            {
+                var o = new Foton.Analyze.Timeline.TimelineOptions();
+                for (int i = 2; i < args.Length; i++)
+                {
+                    var a = args[i];
+                    if (string.Equals(a, "-All", StringComparison.OrdinalIgnoreCase)) { o.All = true; continue; }
+                    bool from = string.Equals(a, "-From", StringComparison.OrdinalIgnoreCase), to = string.Equals(a, "-To", StringComparison.OrdinalIgnoreCase);
+                    if (!from && !to) return Usage();
+                    // The value is checked here and named in the error; it is never re-read as another switch.
+                    if (i + 1 >= args.Length || !UtcArgument(args[i + 1], endOfDay: to, out var utc))
+                    {
+                        Console.Error.WriteLine($"{a} needs a UTC time as yyyy-MM-dd or \"yyyy-MM-dd HH:mm:ss\".");
+                        return 1;
+                    }
+                    i++;
+                    if (from) o.FromUtc = utc; else o.ToUtc = utc;
+                }
+                return TimelineCommand(args[1], o);
+            }
             if (args.Length >= 1 && string.Equals(args[0], "cases", StringComparison.OrdinalIgnoreCase))
             {
                 var folders = new System.Collections.Generic.List<string> { CaseTree.DefaultOutput("Cases"), CaseTree.DefaultOutput("Baselines") };
@@ -100,6 +120,10 @@ namespace Foton.Cli
             Console.WriteLine("                                        diff two baselines (baseline.json or package folder);");
             Console.WriteLine("                                        writes baseline_diff.csv and Foton_BaselineCompare.html");
             Console.WriteLine("                                        beside the difference baseline");
+            Console.WriteLine("  foton timeline <case-folder-or-zip> [-From <utc>] [-To <utc>] [-All]");
+            Console.WriteLine("                                        one sorted list of the package's times, each with what it means;");
+            Console.WriteLine("                                        writes analysis\\timeline.csv and timeline_sources.csv. Times as");
+            Console.WriteLine("                                        yyyy-MM-dd or \"yyyy-MM-dd HH:mm:ss\" (UTC); -All adds SRUM hourly counters");
             Console.WriteLine("  foton cases [-Path <folder>]... [-Json]");
             Console.WriteLine("                                        list case and baseline packages in C:\\Foton\\Cases, C:\\Foton\\Baselines,");
             Console.WriteLine("                                        and each -Path folder (read-only; Verify with foton package)");
@@ -109,6 +133,33 @@ namespace Foton.Cli
             Console.WriteLine();
             Console.WriteLine("Operator guide: https://github.com/jimididit/foton/blob/main/docs/USAGE.md");
             return 1;
+        }
+
+        /// <summary>A UTC date or date-time; a date alone for -To means the end of that day (the whole day is included).</summary>
+        static bool UtcArgument(string text, bool endOfDay, out DateTime utc)
+        {
+            if (DateTime.TryParseExact(text, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out utc)) return true;
+            if (!DateTime.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out utc)) return false;
+            // The last representable day has no next day; its end is the largest DateTime.
+            if (endOfDay) utc = utc.Date == DateTime.MaxValue.Date ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc) : utc.AddDays(1).AddTicks(-1);
+            return true;
+        }
+
+        /// <summary>Exit 0 after the timeline is written (an empty one included), 1 when the package cannot be opened.</summary>
+        static int TimelineCommand(string package, Foton.Analyze.Timeline.TimelineOptions options)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            try { Foton.Analyze.Timeline.TimelineBuilder.Run(package, log, options); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException || ex is ArgumentException || ex is NotSupportedException)
+            {
+                log.Write("Cannot build the timeline: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
+            log.WriteConsole("     A timeline orders recorded times. It shows what each source recorded and when, not who did it or why.", ConsoleColor.DarkGray);
+            return 0;
         }
 
         /// <summary>Lists packages; JSON alone with -Json (for scripts), otherwise the banner and a text listing. Exit 0.</summary>
