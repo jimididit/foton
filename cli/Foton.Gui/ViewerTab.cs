@@ -37,6 +37,8 @@ namespace Foton.Gui
         readonly TreeView _json = new TreeView { Dock = DockStyle.Fill };
         readonly TextBox _text = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Font = new Font(FontFamily.GenericMonospace, 9f) };
         readonly Panel _content = new Panel { Dock = DockStyle.Fill };
+        readonly CheckBox _source = new CheckBox { Text = "Show source (the file's markup, as text)", AutoSize = true, Padding = new Padding(4, 2, 0, 2) };
+        Loaded? _loaded;
 
         string? _root;
         PackageHashes? _hashes;
@@ -61,7 +63,11 @@ namespace Foton.Gui
             var right = new Panel { Dock = DockStyle.Fill };
             right.Controls.Add(_content);
             right.Controls.Add(_csvBar);
+            right.Controls.Add(_source);
             right.Controls.Add(_header);
+            _source.Dock = DockStyle.Top;
+            _source.Visible = false;
+            _source.CheckedChanged += (s, e) => Display();
             var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
             split.Panel1.Controls.Add(_files);
             split.Panel2.Controls.Add(right);
@@ -165,10 +171,26 @@ namespace Foton.Gui
             var loaded = await Task.Run(() => Read(path, hashes, note, cancel.Token));
             if (loaded == null || version != _loadVersion) return;   // cancelled, or a newer selection won
             _header.Text = loaded.Header;
+            _loaded = loaded;
+            _source.Visible = loaded.Source != null;
+            if (_source.Checked) _source.Checked = false;   // raises Display
+            else Display();
+        }
+
+        /// <summary>UI thread: shows the loaded file, or its markup when Show source is on (HTML and XML only).</summary>
+        void Display()
+        {
+            var loaded = _loaded;
+            if (loaded == null) return;
             _table = loaded.Table;
             _csvBar.Visible = _table != null;
             _content.Controls.Clear();
-            if (_table != null)
+            if (_source.Checked && loaded.Source != null)
+            {
+                _text.Text = loaded.Source;
+                _content.Controls.Add(_text);
+            }
+            else if (_table != null)
             {
                 _filter.Text = "";
                 _rows = _table.Filter("");
@@ -182,7 +204,11 @@ namespace Foton.Gui
                 _json.Nodes.Clear();
                 int budget = MaxJsonNodes;
                 AddJson(_json.Nodes, "(root)", loaded.Json, ref budget);
-                if (_json.Nodes.Count > 0) _json.Nodes[0].Expand();
+                if (_json.Nodes.Count > 0)
+                {
+                    _json.Nodes[0].Expand();
+                    if (_json.Nodes[0].Nodes.Count == 1) _json.Nodes[0].Nodes[0].Expand();   // XML: open the document element too
+                }
                 _json.EndUpdate();
                 _content.Controls.Add(_json);
             }
@@ -199,6 +225,8 @@ namespace Foton.Gui
             public CsvTable? Table;
             public object? Json;
             public string? Text;
+            /// <summary>The raw markup of an HTML or XML file, for Show source.</summary>
+            public string? Source;
         }
 
         /// <summary>
@@ -228,6 +256,21 @@ namespace Foton.Gui
                         if (jsonCut) { l.Text = raw + Environment.NewLine + "[Shown as text: larger than " + MaxTextChars.ToString("N0", CultureInfo.InvariantCulture) + " characters.]"; break; }
                         try { l.Json = Json.Parse(raw.TrimStart('\uFEFF')); }
                         catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException) { l.Text = "[Not valid JSON: " + ex.Message + "]" + Environment.NewLine + raw; }
+                        break;
+                    case ArtifactShape.Html:
+                        // Never rendered: HTML written on an endpoint can contain anything, and the in-box browser control is
+                        // not a sandbox. Reports this console builds open in the browser from the Package or Compare tab.
+                        var html = ArtifactReader.ReadText(path, MaxTextChars, out var htmlCut);
+                        var htmlNote = htmlCut ? Environment.NewLine + "[Truncated: the first " + MaxTextChars.ToString("N0", CultureInfo.InvariantCulture) + " characters.]" : "";
+                        l.Source = html + htmlNote;
+                        l.Text = "[HTML from the package, shown as text. It is not rendered: HTML written on an endpoint can contain anything.]"
+                            + Environment.NewLine + Environment.NewLine + HtmlText.ToText(html) + htmlNote;
+                        break;
+                    case ArtifactShape.Xml:
+                        l.Source = ArtifactReader.ReadText(path, MaxTextChars, out var xmlCut)
+                            + (xmlCut ? Environment.NewLine + "[Truncated: the first " + MaxTextChars.ToString("N0", CultureInfo.InvariantCulture) + " characters.]" : "");
+                        try { l.Json = XmlTree.Read(path, MaxJsonNodes); }
+                        catch (InvalidDataException ex) { l.Text = "[" + ex.Message + "]" + Environment.NewLine + l.Source; }
                         break;
                     case ArtifactShape.Text:
                         l.Text = ArtifactReader.ReadText(path, MaxTextChars, out var cut);
@@ -310,6 +353,8 @@ namespace Foton.Gui
         {
             _header.Text = message;
             _table = null;
+            _loaded = null;
+            _source.Visible = false;
             _csvBar.Visible = false;
             _content.Controls.Clear();
         }
