@@ -60,6 +60,10 @@ namespace Foton.Tests
                 }, run.Rows.Select(r => string.Join("|", r.TimeUtc, r.Source, r.Meaning, r.Summary)));
                 Assert.Equal(new[] { false, false, false, false, false, false, true }, run.Rows.Select(r => r.DuringCollection));
                 Assert.Equal(@"analysis\external\pecmd\pecmd_Timeline.csv", run.Rows.Last().Artifact);
+                // The root spelled with forward slashes or a trailing separator gives the same relative artifact paths.
+                var c = run.Rows.Last();
+                foreach (var spelling in new[] { Case(t).Replace('\\', '/'), Case(t) + "\\" })
+                    Assert.Equal(c.Artifact, TimelineBuilder.Build(spelling, new TimelineOptions()).Rows.Last().Artifact);
                 Assert.Equal(2, run.Rows.Last().Row);
 
                 string Left(string artifactEnd) => run.Sources.Single(s => s.Artifact.EndsWith(artifactEnd, StringComparison.OrdinalIgnoreCase)).LeftOut;

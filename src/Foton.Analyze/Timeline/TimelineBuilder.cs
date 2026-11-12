@@ -101,6 +101,8 @@ namespace Foton.Analyze.Timeline
         /// <summary>The timeline of a case root, in memory.</summary>
         public static TimelineRun Build(string caseRoot, TimelineOptions options)
         {
+            // One spelling of the root (backslashes, no trailing separator), so artifact paths are always relative to it.
+            caseRoot = Path.GetFullPath(caseRoot).TrimEnd('\\', '/');
             var run = new TimelineRun();
             var window = CollectionWindow.FromCase(caseRoot);
             bool foton2 = IsFoton2(caseRoot);
@@ -241,8 +243,12 @@ namespace Foton.Analyze.Timeline
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return new string[0]; }
         }
 
-        static string Relative(string caseRoot, string file) =>
-            file.StartsWith(caseRoot.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase) ? file.Substring(caseRoot.TrimEnd('\\').Length + 1) : Path.GetFileName(file);
+        /// <summary>The file relative to the (normalised) case root; its full path if it is somehow not under it, never a bare name.</summary>
+        static string Relative(string caseRoot, string file)
+        {
+            var full = Path.GetFullPath(file);
+            return full.StartsWith(caseRoot + "\\", StringComparison.OrdinalIgnoreCase) ? full.Substring(caseRoot.Length + 1) : full;
+        }
 
         /// <summary>Whether Foton 2 wrote the collection (its log's first line): earlier packages hold some times in local time.</summary>
         static bool IsFoton2(string caseRoot)
