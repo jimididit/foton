@@ -138,7 +138,11 @@ namespace Foton.Gui
             if (row > 0 && node.Tag is string file && !file.StartsWith("dir:", StringComparison.Ordinal))
             {
                 // Already shown: go to the row now. Otherwise Display goes there once the file has loaded.
-                if (_files.SelectedNode == node && _loaded?.Path == file && _table != null) GoToRow(row);
+                if (_files.SelectedNode == node && _loaded?.Path == file)
+                {
+                    if (_table != null) GoToRow(row);
+                    else Message?.Invoke("That file is not shown as a table here, so its row cannot be selected.");
+                }
                 else { _pendingPath = file; _pendingRow = row; }
             }
             _files.SelectedNode = node;
@@ -159,12 +163,15 @@ namespace Foton.Gui
             if (_filter.Text.Length > 0) _filter.Text = "";   // raises TextChanged: every row, first page
             _pageIndex = index / PageRows;
             ShowPage();
-            var r = index % PageRows;
-            if (r >= _grid.Rows.Count) return;
+            // Found by its data row, not its position, so a sort the grid applies cannot select a different row.
+            if (!(_grid.DataSource is DataTable dt) || index % PageRows >= dt.Rows.Count) return;
+            var wanted = dt.Rows[index % PageRows];
+            var target = _grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(g => g.DataBoundItem is DataRowView v && ReferenceEquals(v.Row, wanted));
+            if (target == null) return;
             var first = _grid.Columns.Cast<DataGridViewColumn>().FirstOrDefault(c => c.Visible);
-            if (first != null) _grid.CurrentCell = _grid.Rows[r].Cells[first.Index];
-            _grid.Rows[r].Selected = true;
-            _grid.FirstDisplayedScrollingRowIndex = r;
+            if (first != null) _grid.CurrentCell = target.Cells[first.Index];
+            target.Selected = true;
+            _grid.FirstDisplayedScrollingRowIndex = target.Index;
         }
 
         /// <summary>The selected CSV row's time, handed to the Timeline tab with its artifact and row.</summary>

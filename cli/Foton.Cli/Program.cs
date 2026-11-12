@@ -135,7 +135,6 @@ namespace Foton.Cli
             return 1;
         }
 
-        /// <summary>A UTC date or date-time; a date alone for -To means the end of that day (the whole day is included).</summary>
         /// <summary>Exit 0 after the timeline is written (an empty one included), 1 when the package cannot be opened.</summary>
         static int TimelineCommand(string package, Foton.Analyze.Timeline.TimelineOptions options)
         {
