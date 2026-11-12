@@ -157,6 +157,67 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void The_reader_filters_a_written_timeline_and_counts_every_match()
+        {
+            using (var t = new TempDir())
+            {
+                var run = TimelineBuilder.Run(Case(t), new StatusLog(new StringWriter()), new TimelineOptions());
+                var all = TimelineReader.Read(run.TimelinePath!, new TimelineFilter(), 100);
+                Assert.Null(all.Problem);
+                Assert.Equal(run.Rows.Count, all.Matches);
+                Assert.Equal(run.Rows.Select(r => r.TimeUtc + "|" + r.Artifact + "|" + r.Row + "|" + r.DuringCollection),
+                    all.Rows.Select(r => r.TimeUtc + "|" + r.Artifact + "|" + r.Row + "|" + r.DuringCollection));
+                Assert.Equal(new[] { "AppCompatCacheParser", "Chainsaw", "EvtxECmd", "Foton", "Hayabusa", "PECmd", "SBECmd" }, all.Sources);
+
+                Assert.Equal(2, TimelineReader.Read(run.TimelinePath!, new TimelineFilter { Source = "pecmd" }, 100).Matches);
+                Assert.Equal("EvtxECmd", TimelineReader.Read(run.TimelinePath!, new TimelineFilter { Text = "ALICE" }, 100).Rows.Single().Source);
+                var window = TimelineReader.Read(run.TimelinePath!, new TimelineFilter
+                {
+                    FromUtc = new DateTime(2026, 11, 9, 8, 0, 0, DateTimeKind.Utc), ToUtc = new DateTime(2026, 11, 9, 8, 0, 0, DateTimeKind.Utc),
+                }, 100);
+                Assert.Equal(4, window.Matches);
+                // Only the first rows are kept; the count is still every match, and the source list still every source.
+                var few = TimelineReader.Read(run.TimelinePath!, new TimelineFilter(), 3);
+                Assert.Equal(3, few.Rows.Count);
+                Assert.Equal(run.Rows.Count, few.Matches);
+                Assert.Equal(all.Sources, TimelineReader.Read(run.TimelinePath!, new TimelineFilter { Source = "SBECmd" }, 100).Sources);
+
+                var other = t.File("other.csv");
+                File.WriteAllText(other, "A,B\r\n1,2\r\n");
+                Assert.StartsWith("not a timeline file", TimelineReader.Read(other, new TimelineFilter(), 100).Problem);
+            }
+        }
+
+        [Fact]
+        public void Filter_times_are_UTC_and_a_bare_To_date_includes_that_day()
+        {
+            Assert.True(TimelineReader.ParseUtc(" 2026-11-09 08:00:00 ", false, out var exact));
+            Assert.Equal(new DateTime(2026, 11, 9, 8, 0, 0, DateTimeKind.Utc), exact);
+            Assert.True(TimelineReader.ParseUtc("2026-11-09", true, out var end));
+            Assert.Equal(new DateTime(2026, 11, 10, 0, 0, 0, DateTimeKind.Utc).AddTicks(-1), end);
+            Assert.True(TimelineReader.ParseUtc("9999-12-31", true, out var last));
+            Assert.Equal(DateTime.MaxValue.Ticks, last.Ticks);
+            Assert.False(TimelineReader.ParseUtc("11/9/2026", false, out _));
+        }
+
+        [Fact]
+        public void A_viewer_row_gives_the_time_the_timeline_takes_from_it()
+        {
+            var header = new[] { "RunTime", "ExecutableName" };
+            Assert.True(TimelineReader.TimeOfRow(@"analysis\external\pecmd\x_Timeline.csv", header, new[] { "2026-11-09 08:00:00.5", "A.EXE" }, out var utc));
+            Assert.Equal("2026-11-09 08:00:00", FotonTime.Format(utc));
+            Assert.False(TimelineReader.TimeOfRow(@"analysis\external\pecmd\x_Timeline.csv", header, new[] { "", "A.EXE" }, out _));
+            Assert.False(TimelineReader.TimeOfRow(@"analysis\external\pecmd\x.csv", header, new[] { "2026-11-09 08:00:00", "A.EXE" }, out _));
+            Assert.True(TimelineReader.ReadsFile("05_Persistence/scheduled_tasks.csv"));
+            Assert.False(TimelineReader.ReadsFile(@"05_Persistence\scheduled_tasks.json"));
+            Assert.False(TimelineReader.ReadsFile(@"analysis\findings.csv"));
+            // SBECmd: the first time column the row has a value in.
+            Assert.True(TimelineReader.TimeOfRow(@"analysis\external\sbecmd\u_NTUSER.csv", new[] { "AbsolutePath", "FirstInteracted", "LastInteracted" },
+                new[] { "C:\\Data", "", "2026-11-02 00:00:00" }, out var sb));
+            Assert.Equal("2026-11-02 00:00:00", FotonTime.Format(sb));
+        }
+
+        [Fact]
         public void Fractions_keep_every_100ns_tick()
         {
             Assert.True(TimelineBuilder.TryTime("2026-11-09 08:00:00.0000001", out var one));

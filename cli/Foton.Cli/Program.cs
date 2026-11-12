@@ -54,7 +54,7 @@ namespace Foton.Cli
                     bool from = string.Equals(a, "-From", StringComparison.OrdinalIgnoreCase), to = string.Equals(a, "-To", StringComparison.OrdinalIgnoreCase);
                     if (!from && !to) return Usage();
                     // The value is checked here and named in the error; it is never re-read as another switch.
-                    if (i + 1 >= args.Length || !UtcArgument(args[i + 1], endOfDay: to, out var utc))
+                    if (i + 1 >= args.Length || !Foton.Analyze.Timeline.TimelineReader.ParseUtc(args[i + 1], endOfDay: to, out var utc))
                     {
                         Console.Error.WriteLine($"{a} needs a UTC time as yyyy-MM-dd or \"yyyy-MM-dd HH:mm:ss\".");
                         return 1;
@@ -136,17 +136,6 @@ namespace Foton.Cli
         }
 
         /// <summary>A UTC date or date-time; a date alone for -To means the end of that day (the whole day is included).</summary>
-        static bool UtcArgument(string text, bool endOfDay, out DateTime utc)
-        {
-            if (DateTime.TryParseExact(text, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out utc)) return true;
-            if (!DateTime.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out utc)) return false;
-            // The last representable day has no next day; its end is the largest DateTime.
-            if (endOfDay) utc = utc.Date == DateTime.MaxValue.Date ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc) : utc.AddDays(1).AddTicks(-1);
-            return true;
-        }
-
         /// <summary>Exit 0 after the timeline is written (an empty one included), 1 when the package cannot be opened.</summary>
         static int TimelineCommand(string package, Foton.Analyze.Timeline.TimelineOptions options)
         {
