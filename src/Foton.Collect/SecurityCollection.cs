@@ -55,7 +55,7 @@ namespace Foton.Collect
             Task(s, Cat, "non_microsoft_root_certificates", "Every LocalMachine Root, intermediate CA, and TrustedPublisher certificate (rogue CA check; not filtered by issuer name)", TaskFormat.Csv, Certificates);
             Task(s, Cat, "applocker_wdac_and_policy", "Application control policy and applied group policy summary", TaskFormat.Txt, AppControl);
             if (s.Options.Deep)
-                Task(s, Cat, "gpresult_html", "Deep: gpresult /h HTML report into the package (requires elevation).", TaskFormat.Csv, () => GpResultHtml(s), elevated: true);
+                Task(s, Cat, "gpresult_html", "Deep: gpresult /h HTML and /x XML reports into the package (requires elevation).", TaskFormat.Csv, () => GpResultHtml(s), elevated: true);
         }
 
         /// <summary>A WMI datetime as UTC text (1.38.x [string]-cast these in the machine's culture and local time).</summary>
@@ -308,27 +308,37 @@ namespace Foton.Collect
             return lines;
         }
 
-        static object GpResultHtml(FotonSession s)
+        /// <summary>
+        /// The Resultant Set of Policy twice: HTML for a person, XML for tools and the console's tree view. Both come from
+        /// the endpoint, so the console shows the HTML as text and never renders it.
+        /// </summary>
+        static object GpResultHtml(FotonSession s) => new[]
         {
-            var dest = Path.Combine(s.Dir(Cat), "gpresult.html");
+            GpResult(s, "/h", "gpresult.html", "gpresult /h written into package. Applied GPO HTML, not Intune MDM report."),
+            GpResult(s, "/x", "gpresult.xml", "gpresult /x written into package. The same Resultant Set of Policy as the HTML, as XML."),
+        };
+
+        static ToolOutputRow GpResult(FotonSession s, string format, string fileName, string copiedNote)
+        {
+            var dest = Path.Combine(s.Dir(Cat), fileName);
             var row = new ToolOutputRow
             {
-                SourcePath = "gpresult.exe /h", DestRelative = Path.Combine(CaseCategories.FolderOf(Cat), "gpresult.html"), Status = "CopyError",
+                SourcePath = "gpresult.exe " + format, DestRelative = Path.Combine(CaseCategories.FolderOf(Cat), fileName), Status = "CopyError",
             };
-            Exec.System32("gpresult.exe", $"/h \"{dest}\" /f");
+            Exec.System32("gpresult.exe", $"{format} \"{dest}\" /f");
             if (File.Exists(dest))
             {
                 row.SizeBytes = new FileInfo(dest).Length;
                 row.SHA256 = Hashing.SafeHash(dest, s.Options.SkipHashing);
                 row.Status = "Copied";
-                row.Note = "gpresult /h written into package. Applied GPO HTML, not Intune MDM report.";
+                row.Note = copiedNote;
             }
             else
             {
                 row.Status = "Missing";
-                row.Note = "gpresult produced no HTML. Visibility gap (policy, elevation, or gpresult failure).";
+                row.Note = $"gpresult {format} produced no file. Visibility gap (policy, elevation, or gpresult failure).";
             }
-            return new[] { row };
+            return row;
         }
     }
 }
