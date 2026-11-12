@@ -53,6 +53,7 @@ namespace Foton.Gui
             _tabs.TabPages.Add(_viewer.Page);
             _tabs.TabPages.Add(_timelinePage = TimelineTab());
             _tabs.TabPages.Add(_notesPage = NotesTab());
+            _tabs.TabPages.Add(SearchTab());
             _tabs.TabPages.Add(ToolsTab());
             _tabs.TabPages.Add(ProfileTab());
             _tabs.TabPages.Add(_comparePage = CompareTab());
@@ -204,6 +205,8 @@ namespace Foton.Gui
             LoadNotes(null);
             _notesGrid.DataSource = null;
             _notesSummary.Text = "";
+            _searchHits.DataSource = null;
+            _searchSummary.Text = "";
             ShowFindings(new List<Dictionary<string, string?>>());
             _details.Clear();
             _summary.Text = "";
