@@ -66,6 +66,7 @@ namespace Foton.Gui
             filters.Controls.Add(L("minutes"));
             filters.Controls.Add(AddButton("Around selected row", AroundSelectedRow, needsPackage: true));
             filters.Controls.Add(AddButton("Show source row", ShowTimelineSource, needsPackage: true));
+            filters.Controls.Add(AddButton("Note on source row...", NoteOnTimelineRow, needsPackage: true));
             filters.Controls.Add(_timelineMatches);
 
             var note = new Label
@@ -91,6 +92,7 @@ namespace Foton.Gui
             _timeline.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) ShowTimelineSource(); };
             _viewer.ShowInTimeline += async (artifact, row, utc) => await TimelineAround(utc, artifact, row);
             _viewer.Message += text => _status.Text = text;
+            _viewer.NoteOnRow += async (artifact, row) => await NoteOnRow(artifact, row);
             _tabs.Selected += async (s, e) => { if (e.TabPage == _timelinePage && _caseRoot != null && _timelineFor != _caseRoot) await ShowTimeline(new TimelineFilter(), null, 0); };
 
             page.Controls.Add(_timeline);
@@ -184,6 +186,14 @@ namespace Foton.Gui
             if (row == null) { _status.Text = "Select a timeline row first."; return; }
             _tabs.SelectedTab = _viewer.Page;
             if (!_viewer.Select(row.Artifact, row.Row)) _status.Text = "Not in this package: " + row.Artifact;
+        }
+
+        /// <summary>A note on the artifact row a timeline row came from (more lasting than the timeline row, which a rebuild renumbers).</summary>
+        Task NoteOnTimelineRow()
+        {
+            var row = SelectedTimelineRow();
+            if (row == null || row.Row < 1) { _status.Text = "Select a timeline row first."; return Task.FromResult(0); }
+            return NoteOnRow(row.Artifact, row.Row);
         }
 
         TimelineRow? SelectedTimelineRow()

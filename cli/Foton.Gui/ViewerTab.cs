@@ -48,6 +48,9 @@ namespace Foton.Gui
         public event Action<string, int, DateTime>? ShowInTimeline;
         /// <summary>A one-line note for the status bar.</summary>
         public event Action<string>? Message;
+        /// <summary>Note on row: the artifact (relative to the case root) and data row (1-based).</summary>
+        public event Action<string, int>? NoteOnRow;
+        readonly Button _noteRow = new Button { Text = "Note on row...", AutoSize = true };
 
         string? _root;
         PackageHashes? _hashes;
@@ -71,6 +74,8 @@ namespace Foton.Gui
             _csvBar.Controls.Add(_page);
             _csvBar.Controls.Add(_toTimeline);
             _toTimeline.Click += (s, e) => TimelineJump();
+            _csvBar.Controls.Add(_noteRow);
+            _noteRow.Click += (s, e) => NoteRow();
             var right = new Panel { Dock = DockStyle.Fill };
             right.Controls.Add(_content);
             right.Controls.Add(_csvBar);
@@ -174,17 +179,32 @@ namespace Foton.Gui
             _grid.FirstDisplayedScrollingRowIndex = target.Index;
         }
 
+        /// <summary>The selected CSV row: its file relative to the case root and its index in the table (0 is data row 1).</summary>
+        bool SelectedRow(out string relative, out int index)
+        {
+            relative = "";
+            index = -1;
+            var loaded = _loaded;
+            if (_table == null || loaded == null || _root == null) return false;
+            if (!(_grid.CurrentRow?.DataBoundItem is DataRowView view) || !(_grid.DataSource is DataTable dt)) { Message?.Invoke("Select a row first."); return false; }
+            var position = _pageIndex * PageRows + dt.Rows.IndexOf(view.Row);   // the page's own order, whatever the grid is sorted by
+            if (position < 0 || position >= _rows.Count) return false;
+            var rel = Relative(loaded.Path);
+            if (rel == null) return false;
+            relative = rel;
+            index = _rows[position];
+            return true;
+        }
+
+        void NoteRow()
+        {
+            if (SelectedRow(out var relative, out var index)) NoteOnRow?.Invoke(relative, index + 1);
+        }
+
         /// <summary>The selected CSV row's time, handed to the Timeline tab with its artifact and row.</summary>
         void TimelineJump()
         {
-            var loaded = _loaded;
-            if (_table == null || loaded == null || _root == null) return;
-            if (!(_grid.CurrentRow?.DataBoundItem is DataRowView view) || !(_grid.DataSource is DataTable dt)) { Message?.Invoke("Select a row first."); return; }
-            var position = _pageIndex * PageRows + dt.Rows.IndexOf(view.Row);   // the page's own order, whatever the grid is sorted by
-            if (position < 0 || position >= _rows.Count) return;
-            var index = _rows[position];
-            var relative = Relative(loaded.Path);
-            if (relative == null) return;
+            if (_table == null || !SelectedRow(out var relative, out var index)) return;
             if (!Foton.Analyze.Timeline.TimelineReader.TimeOfRow(relative, _table.Columns, _table.Rows[index], out var utc))
             {
                 Message?.Invoke("This row has no time the timeline reads.");

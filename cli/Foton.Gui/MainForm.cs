@@ -52,6 +52,7 @@ namespace Foton.Gui
             _tabs.TabPages.Add(_packagePage = PackageTab());
             _tabs.TabPages.Add(_viewer.Page);
             _tabs.TabPages.Add(_timelinePage = TimelineTab());
+            _tabs.TabPages.Add(_notesPage = NotesTab());
             _tabs.TabPages.Add(ToolsTab());
             _tabs.TabPages.Add(ProfileTab());
             _tabs.TabPages.Add(_comparePage = CompareTab());
@@ -104,7 +105,9 @@ namespace Foton.Gui
 
             var findingsSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
             findingsSplit.Panel1.Controls.Add(_findings);
+            findingsSplit.Panel1.Controls.Add(FindingsFilterBar());
             findingsSplit.Panel2.Controls.Add(_details);
+            findingsSplit.Panel2.Controls.Add(NoteEditor());
             // A splitter position is checked against the control's current size, so set it once the window has its real
             // size, as a share of it (any window size or display scaling).
             Load += (s, e) => SetSplit(findingsSplit, 0.68);
@@ -198,7 +201,10 @@ namespace Foton.Gui
             _caseRoot = null;
             _report.Remember(null);
             ClearTimeline();
-            _findings.DataSource = null;
+            LoadNotes(null);
+            _notesGrid.DataSource = null;
+            _notesSummary.Text = "";
+            ShowFindings(new List<Dictionary<string, string?>>());
             _details.Clear();
             _summary.Text = "";
             await Run("Open", log =>
@@ -211,6 +217,7 @@ namespace Foton.Gui
                 {
                     _caseRoot = p.CaseRoot;
                     _summary.Text = $"{Path.GetFileName(p.CaseRoot)} - {p.Kind}, {p.Artifacts.Count} artifacts";
+                    LoadNotes(p.CaseRoot);
                     ShowFindings(findings);
                     RefreshViewer(p.CaseRoot, log);
                     UpdateButtons();
@@ -280,8 +287,6 @@ namespace Foton.Gui
 
         static readonly string[] SeverityOrder = { "High", "Medium", "Low", "Info" };
 
-        void ShowFindings(IEnumerable<Dictionary<string, string?>> rows) => ShowFindings(_findings, rows);
-
         /// <summary>Findings in a grid, most severe first; column layout is applied when binding completes (FindingGrid).</summary>
         static void ShowFindings(DataGridView grid, IEnumerable<Dictionary<string, string?>> rows)
         {
@@ -298,7 +303,7 @@ namespace Foton.Gui
         {
             grid.DataBindingComplete += (s, e) =>
             {
-                var weights = new Dictionary<string, float> { ["Severity"] = 8, ["Tier"] = 5, ["Category"] = 12, ["Title"] = 35, ["Observation"] = 60 };
+                var weights = new Dictionary<string, float> { ["Severity"] = 8, ["Status"] = 9, ["Tier"] = 5, ["Category"] = 12, ["Title"] = 35, ["Observation"] = 60 };
                 foreach (DataGridViewColumn c in grid.Columns)
                 {
                     if (weights.TryGetValue(c.Name, out var w)) c.FillWeight = w;
