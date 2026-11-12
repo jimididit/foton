@@ -271,6 +271,7 @@ namespace Foton.Gui
             try { review = await Task.Run(() => ExaminerNotes.Review(root)); }
             catch (Exception ex) when (ex is InvalidDataException || ex is IOException || ex is UnauthorizedAccessException)
             {
+                if (root != _caseRoot) return;   // another case was opened meanwhile; its notes stay on screen
                 _notesGrid.DataSource = null;
                 _notesSummary.Text = "Examiner notes cannot be read: " + TextFile.OneLine(ex.Message);
                 return;

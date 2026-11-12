@@ -21,15 +21,21 @@ namespace Foton.Cli
             for (int i = 2; i < args.Length; i++)
             {
                 var a = args[i];
-                string? Value() => i + 1 < args.Length ? args[++i] : null;
-                if (string.Equals(a, "-Json", StringComparison.OrdinalIgnoreCase)) json = true;
-                else if (string.Equals(a, "-Key", StringComparison.OrdinalIgnoreCase)) key = Value();
-                else if (string.Equals(a, "-Artifact", StringComparison.OrdinalIgnoreCase)) artifact = Value();
-                else if (string.Equals(a, "-Row", StringComparison.OrdinalIgnoreCase)) { if (!int.TryParse(Value(), out row) || row < 1) return Fail("-Row needs a data row number (1 is the first row after the header)."); }
-                else if (string.Equals(a, "-Status", StringComparison.OrdinalIgnoreCase)) status = Value();
-                else if (string.Equals(a, "-Text", StringComparison.OrdinalIgnoreCase)) text = Value();
-                else if (string.Equals(a, "-Examiner", StringComparison.OrdinalIgnoreCase)) examiner = Value();
-                else return Fail("Unknown argument: " + a);
+                if (string.Equals(a, "-Json", StringComparison.OrdinalIgnoreCase)) { json = true; continue; }
+                var known = new[] { "-Key", "-Artifact", "-Row", "-Status", "-Text", "-Examiner" }.FirstOrDefault(k => string.Equals(k, a, StringComparison.OrdinalIgnoreCase));
+                if (known == null) return Fail("Unknown argument: " + a);
+                // A switch without its value stops here, so a set request never falls through to a listing.
+                if (i + 1 >= args.Length) return Fail(known + " needs a value.");
+                var value = args[++i];
+                switch (known)
+                {
+                    case "-Key": key = value; break;
+                    case "-Artifact": artifact = value; break;
+                    case "-Row": if (!int.TryParse(value, out row) || row < 1) return Fail("-Row needs a data row number (1 is the first row after the header)."); break;
+                    case "-Status": status = value; break;
+                    case "-Text": text = value; break;
+                    default: examiner = value; break;
+                }
             }
             FotonPackage pkg;
             try { pkg = FotonPackage.Open(args[1]); }
@@ -130,6 +136,8 @@ namespace Foton.Cli
             Console.WriteLine(stored == null
                 ? "Note removed (Not reviewed, no text)."
                 : $"Saved: {NoteStatus.Label(stored.Status)}  {TextFile.OneLine(stored.Label)}");
+            // For a ZIP this is the -extracted folder beside it, where every verb writes its outputs.
+            Console.WriteLine("Notes file: " + ExaminerNotes.PathOf(caseRoot));
             return 0;
         }
 
