@@ -240,6 +240,8 @@ namespace Foton.Gui
             bar.Controls.Add(AddButton("Refresh", RefreshNotes, needsPackage: true));
             bar.Controls.Add(AddButton("Go to", GoToNote, needsPackage: true));
             bar.Controls.Add(AddButton("Edit note...", EditSelectedNote, needsPackage: true));
+            bar.Controls.Add(AddButton("Export handoff", () => ExportHandoff(CaseTree.DefaultOutput("Handoffs")), needsPackage: true));
+            bar.Controls.Add(AddButton("Export handoff to...", ExportHandoffTo, needsPackage: true));
             bar.Controls.Add(_notesSummary);
             var note = new Label
             {
@@ -261,6 +263,31 @@ namespace Foton.Gui
             page.Controls.Add(note);
             page.Controls.Add(bar);
             return page;
+        }
+
+        Task ExportHandoffTo()
+        {
+            using (var d = new FolderBrowserDialog { Description = "Choose the folder to create the handoff folder in", ShowNewFolderButton = true })
+            {
+                var standard = CaseTree.DefaultOutput("Handoffs");
+                if (Directory.Exists(standard)) d.SelectedPath = standard;
+                return d.ShowDialog(this) == DialogResult.OK ? ExportHandoff(d.SelectedPath) : Task.FromResult(0);
+            }
+        }
+
+        /// <summary>foton handoff into <paramref name="parent"/>, plus Foton_Report.html when this console built it and it is unchanged.</summary>
+        async Task ExportHandoff(string parent)
+        {
+            var report = _report.Unchanged() ? _report.Path : null;   // read on the UI thread
+            Foton.Analyze.Handoff.HandoffRun? run = null;
+            await Run("Export handoff", (log, path) =>
+            {
+                run = Foton.Analyze.Handoff.HandoffExport.Run(path, log, parent, report);
+                if (report == null) log.Write("Foton_Report.html is not included: this console has not built it with Analyze (or it changed since). The handoff's own page lists the findings.", StatusLevel.Info);
+                return null;
+            });
+            if (run == null) return;
+            _status.Text = (run.Verified ? "Handoff written: " : "Handoff written, but the package did not verify: ") + run.Folder;
         }
 
         async Task RefreshNotes()

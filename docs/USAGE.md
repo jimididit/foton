@@ -170,6 +170,7 @@ A baseline taken after an incident is a picture of **that** state. Compare prove
 | `carve <blob>` | MZ/PE signature scan of a copied blob (Tier 3, not NTFS carving). `-MaxBytes`, `-MaxHits` (defaults 8 MiB / 50 hits) |
 | `timeline <case-folder-or-zip>` | One list of the package's recorded times, sorted by UTC, each with what that time means: `analysis\timeline.csv` + `timeline_sources.csv`. `-From`, `-To` (UTC date or `"yyyy-MM-dd HH:mm:ss"`), `-All` ([Timeline](#timeline)) |
 | `notes <case-folder-or-zip>` | List each finding's review status and the examiner notes in `analysis\examiner_notes.json` (`-Json` for scripts), or set one: `-Key <key>` (a finding or note key it lists, or at least 8 characters of one) or `-Artifact <file> -Row <n>`, with `-Status`, `-Text`, `-Examiner` ([Examiner notes](#examiner-notes)) |
+| `handoff <case-folder-or-zip>` | Write the review for another examiner: `Foton_Handoff_<case>_<UTC>` under `C:\Foton\Handoffs` (or `-OutputPath <folder>`) with findings, examiner notes, `Foton_Handoff.html`, custody and `hashes.csv` copies, `HANDOFF.txt`, and `SHA256SUMS.txt`. Exit 2 when the package does not verify ([Handoff](#handoff)) |
 | `cases` | List the case and baseline packages in `C:\Foton\Cases`, `C:\Foton\Baselines`, and each `-Path <folder>`: host, time, case number, examiner, elevated, profile, finding counts, and which of parse, compose, and analyze have run. `-Json` for scripts. Read-only and does not hash; use `package` to verify |
 
 `package`, `parse`, `compose`, `analyze`, and `ioc` take the package ZIP or a case folder (the `Foton_...` folder that holds `00_Collection`). The first of them run on a ZIP extracts it once, beside the ZIP, into a folder named like the ZIP with `-extracted` at the end. Later verbs reuse that folder and write their outputs into it, so the report ends up in `...-extracted\Foton_...\Foton_Report.html`. Foton needs write access to the folder holding the ZIP.
@@ -315,6 +316,17 @@ SRUM's hourly counter tables (resource use, app timeline, energy, push notificat
 
 The listing shows every finding, most severe first, with its status and key (the first 12 characters; any unique 8 or more work with `-Key`). A finding's key comes from its category, title, artifact, and observation, so its note follows it when `analyze` runs again and produces the same finding. When a later analyze no longer produces it (new data, or a rule that words it differently), the note is kept and listed under notes on findings the latest analyze does not produce. A row note records the row's SHA-256, and the listing says when the row reads differently. A status of Not reviewed with no text removes the note. The examiner defaults to the one in the case's chain of custody. A notes file Foton cannot read is refused, never overwritten.
 
+### Handoff
+
+`foton handoff` puts the review of one package in a folder another examiner can read and check:
+
+```powershell
+.\foton.exe handoff "\path\to\case-folder"
+.\foton.exe handoff "\path\to\Foton_case.zip" -OutputPath "D:\Cases\Handoffs"
+```
+
+`Foton_Handoff_<case>_<UTC>` holds `findings.csv`, `examiner_notes.json` and `examiner_notes.csv` (every finding with its status, then the other notes), `Foton_Handoff.html` (findings and the examiner's review side by side, labelled apart, with offline search), `package\chain_of_custody.txt` and `package\hashes.csv`, `HANDOFF.txt`, and `SHA256SUMS.txt` listing every other file. The package is not copied: `HANDOFF.txt` names it by the SHA-256 of its `hashes.csv` (and of the ZIP, when opened from one) and says whether it verified when the handoff was written; a package that does not verify still gets a handoff that says so, and the exit code is 2. A notes file Foton cannot read stops the handoff. `foton handoff` does not copy `Foton_Report.html`, because it cannot tell where that file was written; the console's **Export handoff** adds the report it built with **Analyze**, when unchanged.
+
 ### Analysis notes
 
 - Suspicious-command patterns are matched only on events that carry command text (4688, Sysmon 1, 4104, 4697, 7045, 4698, 4702). On 4673/4674 the `ExecutableInfo` is the calling image (often `lsass.exe`), not a command.
@@ -357,7 +369,7 @@ The **Viewer** tab lists the package's files. A CSV opens as a table, 1,000 rows
 
 The **Timeline** tab shows the package's [timeline](#timeline). **Build timeline** runs `foton timeline` on the open package (**Include SRUM hourly counters** is `-All`) and shows `analysis\timeline.csv`; a timeline already in the package is shown when you open the tab, with the time it was written, so build again after a new parse or compose. Filter it by **From** and **To** (UTC, as `yyyy-MM-dd` or `yyyy-MM-dd HH:mm:ss`; a bare **To** date includes that day), **Source**, and **Find** (text in the time, source, meaning, summary, or artifact), then **Apply** or press Enter. The first 10,000 matching rows are shown, with how many match in all. **Around selected row** shows every source within the chosen number of minutes of the selected row, and **Show source row** (or double-clicking a row) opens the artifact in the **Viewer** at the row it came from. Grey rows fall inside the collection window. **Note on source row...** notes the artifact row a timeline row came from.
 
-**Note on row...** in the **Viewer** (on a CSV) records a status and note for the selected row. The **Notes** tab lists every examiner note: on findings, on findings the latest analyze no longer produces, and on rows (with whether the row still reads as it did). **Go to** (or double-clicking) opens the finding on the **Package** tab or the row in the **Viewer**; **Edit note...** changes it. The notes are the same file `foton notes` lists and sets.
+**Note on row...** in the **Viewer** (on a CSV) records a status and note for the selected row. The **Notes** tab lists every examiner note: on findings, on findings the latest analyze no longer produces, and on rows (with whether the row still reads as it did). **Go to** (or double-clicking) opens the finding on the **Package** tab or the row in the **Viewer**; **Edit note...** changes it. The notes are the same file `foton notes` lists and sets. **Export handoff** writes a [handoff](#handoff) under `C:\Foton\Handoffs` (**Export handoff to...** asks for the folder), including `Foton_Report.html` when this window built it with **Analyze** and it has not changed.
 
 ---
 
