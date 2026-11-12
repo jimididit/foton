@@ -70,6 +70,12 @@ namespace Foton.Tests
                 Assert.Contains("  2026-11-10 12:00:00  HOST  CASE-0001  admin  profile Quick  H0 M2 L1 I0 (analysis)  parsed analyzed  Folder+zip", lines);
                 Assert.Contains(lines, l => l.StartsWith("      unreadable: coverage"));
                 Assert.Contains("Baselines (2), newest first", lines);
+
+                // A control sequence planted in package metadata (here an ANSI escape in the case number) never reaches the text.
+                Write(Path.Combine(a, @"00_Collection\chain_of_custody.txt"), "Case Number          : CASE\u001b[2J\u009b31m-9\r\n");
+                var planted = CaseIndex.Lines(CaseIndex.Scan(new[] { t.Path })).ToList();
+                Assert.Contains(planted, l => l.Contains("CASE [2J 31m-9"));
+                Assert.DoesNotContain(planted, l => l.Any(ch => char.IsControl(ch)));
             }
         }
 

@@ -159,29 +159,34 @@ namespace Foton.Package
             return root.Length > drive.Length ? root.TrimEnd('\\') : root;
         }
 
-        /// <summary>The listing as text lines (foton cases).</summary>
+        /// <summary>
+        /// The listing as text lines (foton cases). Values from package files are already one line (TextFile.OneLine);
+        /// names and paths from the file system are flattened here too, so nothing can reach a terminal as a control
+        /// sequence. The entries keep exact paths for Open; -Json escapes control characters itself.
+        /// </summary>
         public static IEnumerable<string> Lines(CaseList list)
         {
             string Who(bool? elevated) => elevated == null ? "unknown" : elevated.Value ? "admin" : "standard";
+            string T(string? s) => TextFile.OneLine(s);
             yield return $"Cases ({list.Cases.Count}), newest first";
             foreach (var c in list.Cases)
             {
                 var stages = string.Join(" ", new[] { c.Parsed ? "parsed" : null, c.Composed ? "composed" : null, c.Analyzed ? "analyzed" : null }.Where(s => s != null));
                 var findings = c.FindingsSource.Length == 0 ? "no findings" : $"H{c.High} M{c.Medium} L{c.Low} I{c.Info} ({c.FindingsSource})";
-                yield return $"  {c.CollectedUtc}  {c.Host}  {(c.CaseNumber.Length > 0 ? c.CaseNumber : "(no case number)")}  {Who(c.Elevated)}" +
-                    $"{(c.Profile.Length > 0 ? "  profile " + c.Profile : "")}  {findings}{(stages.Length > 0 ? "  " + stages : "")}  {c.Kind}{(c.HasZip && c.Kind == "Folder" ? "+zip" : "")}";
-                yield return "      " + c.Path;
-                if (c.Problem.Length > 0) yield return "      unreadable: " + c.Problem;
+                yield return $"  {T(c.CollectedUtc)}  {T(c.Host)}  {(c.CaseNumber.Length > 0 ? T(c.CaseNumber) : "(no case number)")}  {Who(c.Elevated)}" +
+                    $"{(c.Profile.Length > 0 ? "  profile " + T(c.Profile) : "")}  {findings}{(stages.Length > 0 ? "  " + stages : "")}  {c.Kind}{(c.HasZip && c.Kind == "Folder" ? "+zip" : "")}";
+                yield return "      " + T(c.Path);
+                if (c.Problem.Length > 0) yield return "      unreadable: " + T(c.Problem);
             }
             yield return "";
             yield return $"Baselines ({list.Baselines.Count}), newest first";
             foreach (var b in list.Baselines)
             {
-                yield return $"  {b.CapturedUtc}  {b.Host}  {Who(b.Elevated)}{(b.LoadUserHives == true ? "  user hives" : "")}  Foton {b.ToolVersion}  payload {b.PayloadSha256}";
-                yield return "      " + b.Path;
-                if (b.Problem.Length > 0) yield return "      unreadable: " + b.Problem;
+                yield return $"  {T(b.CapturedUtc)}  {T(b.Host)}  {Who(b.Elevated)}{(b.LoadUserHives == true ? "  user hives" : "")}  Foton {T(b.ToolVersion)}  payload {T(b.PayloadSha256)}";
+                yield return "      " + T(b.Path);
+                if (b.Problem.Length > 0) yield return "      unreadable: " + T(b.Problem);
             }
-            foreach (var n in list.Notes) yield return "Note: " + n;
+            foreach (var n in list.Notes) yield return "Note: " + T(n);
         }
 
         static int Newest(string at, string an, string bt, string bn)
