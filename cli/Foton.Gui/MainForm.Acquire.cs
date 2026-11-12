@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Foton.Core;
@@ -196,6 +197,17 @@ namespace Foton.Gui
                     }
                     log.Write(exit == 0 ? "Finished." : exit == null ? "Finished (exit code not available)." : "Finished with exit code " + exit + ".",
                         exit == 0 ? StatusLevel.Good : StatusLevel.Warn);
+                    // Another collection writing to the same folder at the same time leaves two new folders; neither is
+                    // assumed to be this run's (the log lines above may also be the other run's).
+                    var runs = CollectorLauncher.NewRuns(parent, kind, startedUtc);
+                    if (runs.Count > 1)
+                    {
+                        log.Write($"{runs.Count} new package folders appeared under {parent} during this run, so the console cannot tell which is this one: " +
+                            string.Join("; ", runs.Select(Path.GetFileName)) + ". Open the right one yourself (Package tab for a collection, Compare for a baseline).", StatusLevel.Warn);
+                        root = null;
+                        return null;
+                    }
+                    if (runs.Count == 1) root = runs[0];
                     if (root == null)
                         log.Write("No new package folder could be read under " + parent + ". If Windows asked for another account's password, the collector ran as that account " +
                             "and its output is private to that account and Administrators: open it while signed in as that account.", StatusLevel.Warn);

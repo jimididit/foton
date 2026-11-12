@@ -121,13 +121,19 @@ namespace Foton.Tools
         /// exists yet or the folder cannot be listed (a collector elevated as another account writes into a folder private
         /// to that account and Administrators).
         /// </summary>
-        public static string? FindNewRun(string parent, CollectorKind kind, DateTime startedUtc)
+        public static string? FindNewRun(string parent, CollectorKind kind, DateTime startedUtc) => NewRuns(parent, kind, startedUtc).FirstOrDefault();
+
+        /// <summary>
+        /// Every package folder created at or after the start, newest first. More than one means another collection wrote
+        /// to the same folder at the same time: the console then cannot tell which is its own and says so.
+        /// </summary>
+        public static IReadOnlyList<string> NewRuns(string parent, CollectorKind kind, DateTime startedUtc)
         {
             var pattern = kind == CollectorKind.Collect ? CaseFolder : BaselineFolder;
             return Folders(parent)
                 .Where(d => pattern.IsMatch(d.Name) && d.CreationTimeUtc >= startedUtc.AddSeconds(-2))
                 .OrderByDescending(d => d.CreationTimeUtc).ThenByDescending(d => d.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(d => d.FullName).FirstOrDefault();
+                .Select(d => d.FullName).ToList();
         }
 
         static DirectoryInfo[] Folders(string parent)

@@ -88,6 +88,10 @@ namespace Foton.Tests
                 Directory.CreateDirectory(t.File("FotonBaseline_HOST_20261111-120000Z"));
                 Directory.CreateDirectory(t.File("Foton_HOST_20261111-120000Z-extracted"));
                 Assert.Equal(t.File("Foton_HOST_20261111-120000Z"), CollectorLauncher.FindNewRun(t.Path, CollectorKind.Collect, started));
+                Assert.Equal(new[] { t.File("Foton_HOST_20261111-120000Z") }, CollectorLauncher.NewRuns(t.Path, CollectorKind.Collect, started));
+                // A second collection writing to the same folder during the run: both are listed, none is picked silently.
+                Directory.CreateDirectory(t.File("Foton_HOST_20261111-120005Z"));
+                Assert.Equal(2, CollectorLauncher.NewRuns(t.Path, CollectorKind.Collect, started).Count);
                 Assert.Equal(t.File("FotonBaseline_HOST_20261111-120000Z"), CollectorLauncher.FindNewRun(t.Path, CollectorKind.Baseline, started));
                 Assert.Null(CollectorLauncher.FindNewRun(t.File("missing"), CollectorKind.Collect, started));
                 Assert.Null(CollectorLauncher.FindNewRun(@"\\?\nonexistent-volume\x", CollectorKind.Collect, started));   // unlistable: none, not a throw
