@@ -92,7 +92,8 @@ namespace Foton.Analyze.Timeline
             // One line per reason; timeline_sources.csv lists every artifact.
             foreach (var g in run.Sources.Where(s => s.LeftOut.Length > 0).GroupBy(s => s.LeftOut, StringComparer.Ordinal))
                 log.Write(g.Count() == 1 ? $"Not in the timeline: {g.First().Artifact} ({g.Key})" : $"Not in the timeline ({g.Key}): {g.Count()} artifacts, for example {g.First().Artifact}", StatusLevel.Info);
-            if (run.Capped) log.Write($"Stopped at {options.MaxRows} rows; narrow it with -From and -To.", StatusLevel.Warn);
+            if (run.Capped)
+                log.Write($"Stopped at {options.MaxRows} rows: sources read later are missing or cut short (timeline_sources.csv says which), so the rows kept are not the earliest times. Narrow it with -From and -To.", StatusLevel.Warn);
             log.Write("Timeline: " + run.TimelinePath, StatusLevel.Good);
             return run;
         }
@@ -115,7 +116,9 @@ namespace Foton.Analyze.Timeline
                     if (source.UnlessEvtxECmd && evtxECmd) { stat.LeftOut = "EvtxECmd output covers the same events"; continue; }
                     if (run.Capped) { stat.LeftOut = "row cap reached"; continue; }
                     try { Read(source, file, stat, run, options, window); }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException)
+                    // Package files are untrusted: anything one of them makes the reader trip on leaves that artifact out, named.
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException
+                        || ex is FormatException || ex is OverflowException || ex is ArgumentException)
                     {
                         stat.LeftOut = "unreadable: " + TextFile.OneLine(ex.Message);
                     }
@@ -162,7 +165,12 @@ namespace Foton.Analyze.Timeline
                     if (i < 0) continue;
                     if (i >= cells.Count || !TryTime(cells[i], out var utc)) { stat.TimesWithoutValue++; continue; }
                     if ((options.FromUtc.HasValue && utc < options.FromUtc.Value) || (options.ToUtc.HasValue && utc > options.ToUtc.Value)) { stat.OutsideWindow++; continue; }
-                    if (run.Rows.Count >= options.MaxRows) { run.Capped = true; return; }
+                    if (run.Rows.Count >= options.MaxRows)
+                    {
+                        run.Capped = true;
+                        stat.LeftOut = $"row cap reached after {row - 1} of its rows (the cap keeps sources in reading order, not the earliest times)";
+                        return;
+                    }
                     if (summary == null)
                     {
                         summary = TextFile.OneLine(source.Summary(Field)).Trim();
@@ -192,13 +200,19 @@ namespace Foton.Analyze.Timeline
             if (!DateTime.TryParseExact(m.Groups[1].Value + " " + m.Groups[2].Value, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture,
                     DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var t))
                 return false;
-            if (m.Groups[3].Success) t = t.AddTicks((long)(double.Parse("0" + m.Groups[3].Value, CultureInfo.InvariantCulture) * TimeSpan.TicksPerSecond));
-            var offset = m.Groups[4].Value;
-            if (offset.Length > 1)
+            try
             {
-                var span = TimeSpan.ParseExact(offset.Substring(1), @"hh\:mm", CultureInfo.InvariantCulture);
-                t = offset[0] == '+' ? t - span : t + span;
+                // Fractions to whole 100 ns ticks (up to 7 digits), never through floating point.
+                if (m.Groups[3].Success) t = t.AddTicks(long.Parse(m.Groups[3].Value.Substring(1).PadRight(7, '0'), CultureInfo.InvariantCulture));
+                var offset = m.Groups[4].Value;
+                if (offset.Length > 1)
+                {
+                    // Real UTC offsets only (at most 14:00); a malformed one is not a time, never an exception.
+                    if (!TimeSpan.TryParseExact(offset.Substring(1), @"hh\:mm", CultureInfo.InvariantCulture, out var span) || span > TimeSpan.FromHours(14)) return false;
+                    t = offset[0] == '+' ? t - span : t + span;
+                }
             }
+            catch (ArgumentOutOfRangeException) { return false; }   // an offset past the first or last representable date
             if (t.Year < 1980 || t.Year > 2100) return false;   // zero FILETIMEs and placeholder dates are not events
             utc = DateTime.SpecifyKind(t, DateTimeKind.Utc);
             return true;

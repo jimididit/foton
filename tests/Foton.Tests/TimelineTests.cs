@@ -86,6 +86,8 @@ namespace Foton.Tests
                 Assert.True(capped.Capped);
                 Assert.Equal(2, capped.Rows.Count);
                 Assert.Contains(capped.Sources, s => s.LeftOut == "row cap reached");
+                // The source being read when the cap hit says it was cut short.
+                Assert.Single(capped.Sources, s => s.LeftOut.StartsWith("row cap reached after "));
             }
         }
 
@@ -129,6 +131,21 @@ namespace Foton.Tests
         [InlineData("(not set)")]
         [InlineData("1601-01-01 00:00:00")]
         [InlineData("11/9/2026 8:00 AM")]
+        [InlineData("2026-11-09 08:00:00 +99:99")]
+        [InlineData("2026-11-09 08:00:00 +15:00")]
+        [InlineData("0001-01-01 00:00:00 +05:00")]
+        [InlineData("9999-12-31 23:59:59 -05:00")]
         public void Values_that_are_not_times_are_not_guessed(string text) => Assert.False(TimelineBuilder.TryTime(text, out _));
+
+        [Fact]
+        public void Fractions_keep_every_100ns_tick()
+        {
+            Assert.True(TimelineBuilder.TryTime("2026-11-09 08:00:00.0000001", out var one));
+            Assert.Equal(new DateTime(2026, 11, 9, 8, 0, 0, DateTimeKind.Utc).Ticks + 1, one.Ticks);
+            Assert.True(TimelineBuilder.TryTime("2026-11-09 08:00:00.9999999", out var last));
+            Assert.Equal(new DateTime(2026, 11, 9, 8, 0, 0, DateTimeKind.Utc).Ticks + 9999999, last.Ticks);
+            Assert.True(TimelineBuilder.TryTime("2026-11-09 08:00:00.12", out var two));
+            Assert.Equal(1200000, two.Ticks % TimeSpan.TicksPerSecond);
+        }
     }
 }
