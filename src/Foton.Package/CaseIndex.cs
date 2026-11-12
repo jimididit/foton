@@ -84,7 +84,7 @@ namespace Foton.Package
             foreach (var folder in folders.Where(f => !string.IsNullOrWhiteSpace(f)))
             {
                 string root;
-                try { root = System.IO.Path.GetFullPath(folder.Trim()).TrimEnd('\\'); }
+                try { root = Normalize(folder); }
                 catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { list.Notes.Add("Not a folder path: " + folder); continue; }
                 if (!seen.Add(root)) continue;
                 DirectoryInfo[] dirs;
@@ -101,25 +101,45 @@ namespace Foton.Package
                     list.Notes.Add("Cannot read " + root + ": " + TextFile.OneLine(ex.Message));
                     continue;
                 }
-                var folderNames = new HashSet<string>(dirs.Select(d => d.Name), StringComparer.OrdinalIgnoreCase);
+                // Only a folder listed as a case stands in for the ZIP beside it; any other folder of that name does not hide the ZIP.
+                var listedCases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var d in dirs)
                 {
                     bool caseName = CaseName.IsMatch(d.Name), baselineName = BaselineName.IsMatch(d.Name);
                     if (!caseName && !baselineName) continue;
                     if ((d.Attributes & FileAttributes.ReparsePoint) != 0) { list.Notes.Add("Link or junction not followed: " + d.FullName); continue; }
+                    if (caseName && !Plain(d.FullName, CaseTree.CollectionFolder))
+                    {
+                        list.Notes.Add("Link or junction not followed: " + System.IO.Path.Combine(d.FullName, CaseTree.CollectionFolder));
+                        continue;
+                    }
                     if (caseName && Directory.Exists(System.IO.Path.Combine(d.FullName, CaseTree.CollectionFolder)))
+                    {
                         list.Cases.Add(ReadCase(d.FullName, d.Name, "Folder", hasZip: File.Exists(d.FullName + ".zip")));
-                    else if (baselineName && File.Exists(System.IO.Path.Combine(d.FullName, "baseline.json")))
+                        listedCases.Add(d.Name);
+                    }
+                    else if (baselineName && Plain(d.FullName, "baseline.json") && File.Exists(System.IO.Path.Combine(d.FullName, "baseline.json")))
                         list.Baselines.Add(ReadBaseline(d.FullName, d.Name));
                 }
                 foreach (var z in zips)
                 {
                     var m = CaseZip.Match(z.Name);
-                    if (!m.Success || folderNames.Contains(m.Groups[1].Value)) continue;   // the folder beside it is listed instead
+                    if (!m.Success || listedCases.Contains(m.Groups[1].Value)) continue;   // the case folder beside it is listed instead
                     var extracted = z.FullName.Substring(0, z.FullName.Length - 4) + ZipExtraction.Suffix;
                     string? caseRoot = null;
-                    try { if (Directory.Exists(extracted) && (new DirectoryInfo(extracted).Attributes & FileAttributes.ReparsePoint) == 0) caseRoot = CaseTree.FindCaseRoot(extracted); }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                    try
+                    {
+                        if (Directory.Exists(extracted) && (new DirectoryInfo(extracted).Attributes & FileAttributes.ReparsePoint) == 0)
+                            caseRoot = CaseTree.FindCaseRoot(extracted);
+                        // The case folder inside the extraction must not be a link either.
+                        if (caseRoot != null && !string.Equals(caseRoot, extracted, StringComparison.OrdinalIgnoreCase)
+                            && !Plain(extracted, System.IO.Path.GetFileName(caseRoot)))
+                        {
+                            list.Notes.Add("Link or junction not followed: " + caseRoot);
+                            caseRoot = null;
+                        }
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { caseRoot = null; }
                     var e = caseRoot != null ? ReadCase(caseRoot, m.Groups[1].Value, "ZipExtracted", hasZip: true) : Named(m.Groups[1].Value, "Zip");
                     e.Path = z.FullName;
                     e.HasZip = true;
@@ -129,6 +149,14 @@ namespace Foton.Package
             list.Cases.Sort((a, b) => Newest(a.CollectedUtc, a.Name, b.CollectedUtc, b.Name));
             list.Baselines.Sort((a, b) => Newest(a.CapturedUtc, a.Name, b.CapturedUtc, b.Name));
             return list;
+        }
+
+        /// <summary>A full path without a trailing backslash, except a drive root: "D:\" stays, since "D:" means the current folder on D.</summary>
+        internal static string Normalize(string folder)
+        {
+            var root = System.IO.Path.GetFullPath(folder.Trim());
+            var drive = System.IO.Path.GetPathRoot(root) ?? "";
+            return root.Length > drive.Length ? root.TrimEnd('\\') : root;
         }
 
         /// <summary>The listing as text lines (foton cases).</summary>
@@ -182,15 +210,25 @@ namespace Foton.Package
             e.HasZip = hasZip;
             var problems = new List<string>();
             var col = System.IO.Path.Combine(root, CaseTree.CollectionFolder);
+            // A file is read only when no folder between the case root and it, and not the file itself, is a link.
+            bool Usable(string relative)
+            {
+                if (Plain(root, relative)) return true;
+                problems.Add(relative + " is reached through a link or junction: not followed");
+                return false;
+            }
 
-            var custody = ChainOfCustody.ReadHeader(root);
-            e.CaseNumber = TextFile.OneLine(custody.CaseNumber ?? "");
-            e.Examiner = TextFile.OneLine(custody.Examiner ?? "");
+            if (Usable(@"00_Collection\chain_of_custody.txt"))
+            {
+                var custody = ChainOfCustody.ReadHeader(root);
+                e.CaseNumber = TextFile.OneLine(custody.CaseNumber ?? "");
+                e.Examiner = TextFile.OneLine(custody.Examiner ?? "");
+            }
 
             try
             {
                 var coverage = System.IO.Path.Combine(col, "collection_coverage.json");
-                if (File.Exists(coverage))
+                if (Usable(@"00_Collection\collection_coverage.json") && File.Exists(coverage))
                 {
                     if (Json.Parse(Small(coverage)) is IDictionary c)
                     {
@@ -201,15 +239,19 @@ namespace Foton.Package
             }
             catch (Exception ex) when (Readable(ex)) { problems.Add("coverage: " + TextFile.OneLine(ex.Message)); }
 
-            var analysis = System.IO.Path.Combine(root, "analysis");
-            e.Parsed = File.Exists(System.IO.Path.Combine(analysis, "parsed_records.csv"));
-            e.Composed = File.Exists(System.IO.Path.Combine(analysis, "external", "external_parse_inventory.csv"));
-            var workstation = System.IO.Path.Combine(analysis, "findings.csv");
-            e.Analyzed = File.Exists(workstation);
-            var findings = e.Analyzed ? workstation : System.IO.Path.Combine(col, "findings.csv");
+            // Stages are existence checks only; a linked analysis folder counts as not done.
+            var analysisPlain = Plain(root, "analysis");
+            e.Parsed = analysisPlain && File.Exists(System.IO.Path.Combine(root, @"analysis\parsed_records.csv"));
+            e.Composed = analysisPlain && Plain(root, @"analysis\external") && File.Exists(System.IO.Path.Combine(root, @"analysis\external\external_parse_inventory.csv"));
+            e.Analyzed = analysisPlain && File.Exists(System.IO.Path.Combine(root, @"analysis\findings.csv"));
+            var findings = e.Analyzed ? @"analysis\findings.csv" : @"00_Collection\findings.csv";
             try
             {
-                if (File.Exists(findings)) { CountFindings(findings, e); e.FindingsSource = e.Analyzed ? "analysis" : "collect"; }
+                if (File.Exists(System.IO.Path.Combine(root, findings)) && Usable(findings))
+                {
+                    CountFindings(System.IO.Path.Combine(root, findings), e);
+                    e.FindingsSource = e.Analyzed ? "analysis" : "collect";
+                }
             }
             catch (Exception ex) when (Readable(ex)) { problems.Add("findings: " + TextFile.OneLine(ex.Message)); }
 
@@ -253,6 +295,26 @@ namespace Foton.Package
             }
             catch (Exception ex) when (Readable(ex)) { e.Problem = "baseline.json: " + TextFile.OneLine(ex.Message); }
             return e;
+        }
+
+        /// <summary>
+        /// True when no folder or file from <paramref name="root"/> down to root\<paramref name="relative"/> is a link or
+        /// junction (parts that do not exist are fine). Fails closed: an attribute that cannot be read counts as a link.
+        /// </summary>
+        static bool Plain(string root, string relative)
+        {
+            var current = root;
+            foreach (var part in relative.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                current = System.IO.Path.Combine(current, part);
+                try
+                {
+                    if (!File.Exists(current) && !Directory.Exists(current)) return true;
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return false;
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException) { return false; }
+            }
+            return true;
         }
 
         static string Small(string path)

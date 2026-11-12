@@ -36,7 +36,9 @@ namespace Foton.Gui
                     foreach (var f in list.OfType<string>().Where(f => f.Trim().Length > 0))
                         if (!s.CaseFolders.Contains(f.Trim(), StringComparer.OrdinalIgnoreCase)) s.CaseFolders.Add(f.Trim());
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException) { }
+            // Anything wrong with the file (unreadable, not JSON, nested too deep, wrong types) means no extra folders.
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException
+                || ex is NotSupportedException || ex is System.Security.SecurityException || ex is FormatException || ex is InvalidCastException) { }
             return s;
         }
 

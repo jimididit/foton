@@ -73,21 +73,57 @@ namespace Foton.Tests
             }
         }
 
+        static bool Junction(string link, string target)
+        {
+            var p = Process.Start(new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"") { UseShellExecute = false, CreateNoWindow = true });
+            p!.WaitForExit(30000);
+            return Directory.Exists(link);
+        }
+
         [Fact]
-        public void A_junction_named_like_a_case_is_not_followed()
+        public void Links_inside_or_named_like_a_package_are_not_followed()
         {
             using (var t = new TempDir())
             {
                 var outside = t.File("outside");
                 Write(Path.Combine(outside, @"00_Collection\chain_of_custody.txt"), "Case Number          : SECRET\r\n");
+                Write(Path.Combine(outside, @"00_Collection\findings.csv"), "\"Severity\"\r\n\"High\"\r\n");
+                Write(Path.Combine(outside, "findings.csv"), "\"Severity\"\r\n\"High\"\r\n");
                 var root = Directory.CreateDirectory(t.File("cases")).FullName;
-                var link = Path.Combine(root, "Foton_HOST_20261110-120000Z");
-                var p = Process.Start(new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{outside}\"") { UseShellExecute = false, CreateNoWindow = true });
-                p!.WaitForExit(30000);
-                if (!Directory.Exists(link)) return;   // junctions unavailable here
+                // The package folder itself is a junction.
+                if (!Junction(Path.Combine(root, "Foton_HOST_20261110-120000Z"), outside)) return;   // junctions unavailable here
+                // A real package folder whose 00_Collection is a junction.
+                Directory.CreateDirectory(Path.Combine(root, "Foton_HOST_20261111-000000Z"));
+                Junction(Path.Combine(root, @"Foton_HOST_20261111-000000Z\00_Collection"), Path.Combine(outside, "00_Collection"));
+                // A real package whose analysis folder is a junction: its findings are not read from there.
+                var c = Path.Combine(root, "Foton_HOST_20261112-000000Z");
+                Write(Path.Combine(c, @"00_Collection\findings.csv"), "\"Severity\"\r\n\"Info\"\r\n");
+                Junction(Path.Combine(c, "analysis"), outside);
+
                 var list = CaseIndex.Scan(new[] { root });
-                Assert.Empty(list.Cases);
-                Assert.Contains(list.Notes, n => n.StartsWith("Link or junction not followed"));
+                var only = Assert.Single(list.Cases);
+                Assert.Equal(c, only.Path);
+                Assert.False(only.Analyzed);
+                Assert.Equal("collect|0|1", string.Join("|", only.FindingsSource, only.High, only.Info));
+                Assert.Equal(2, list.Notes.Count(n => n.StartsWith("Link or junction not followed")));
+                Assert.DoesNotContain(list.Cases, x => x.CaseNumber == "SECRET");
+            }
+        }
+
+        [Fact]
+        public void A_zip_beside_a_folder_that_is_not_a_case_is_listed_and_a_drive_root_is_the_drive()
+        {
+            using (var t = new TempDir())
+            {
+                Directory.CreateDirectory(t.File("Foton_Y_20261107-000000Z"));   // no 00_Collection: not a case
+                File.WriteAllText(t.File("Foton_Y_20261107-000000Z.zip"), "zip");
+                var zip = Assert.Single(CaseIndex.Scan(new[] { t.Path }).Cases);
+                Assert.Equal("Zip", zip.Kind);
+
+                // "D:\" must not become "D:" (the current folder on D:); other folders lose their trailing backslash.
+                Assert.Equal(@"D:\", CaseIndex.Normalize(@"D:\"));
+                Assert.Equal(@"D:\Cases", CaseIndex.Normalize(@"D:\Cases\"));
+                Assert.Equal(@"\\server\share\Cases", CaseIndex.Normalize(@"\\server\share\Cases\"));
             }
         }
     }
