@@ -97,6 +97,7 @@ namespace Foton.Tests
                 var before = File.ReadAllText(run.ResultsPath!);
                 Assert.Throws<IOException>(() => PackageSearch.Run(c, "other", new SearchOptions(), new StatusLog(new StringWriter()), default, new DateTime(2026, 11, 12, 12, 0, 0, DateTimeKind.Utc)));
                 Assert.Equal(before, File.ReadAllText(run.ResultsPath!));
+                Assert.Empty(Directory.GetFiles(Path.Combine(c, "analysis"), "*.tmp"));
                 Assert.False(PackageSearch.Occupied(Path.Combine(c, "analysis", "nothing-here.csv")));
             }
         }

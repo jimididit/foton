@@ -79,12 +79,17 @@ namespace Foton.Package
             var stem = Path.Combine(analysis, FilePrefix + FotonTime.Stamp(now) + "Z");
             run.ResultsPath = stem + ".csv";
             run.SummaryPath = stem + ".txt";
-            // Never written over or through: a file already there (a planted link included) stops the write.
+            // Never written over or through: each file is written under a fresh random name and then renamed into place.
+            // The rename fails when anything is already at the name (a file, or a link planted in the package, a dangling
+            // one included), with no gap between that check and the write. Occupied gives the clearer message first.
             foreach (var target in new[] { run.ResultsPath, run.SummaryPath })
                 if (Occupied(target)) throw new IOException("Already exists, or is a link: " + target + "; search results not written");
-            if (run.Hits.Count > 0) Csv.Write(run.ResultsPath, run.Hits);
-            else TextFile.Write(run.ResultsPath, "\"Artifact\",\"Row\",\"Line\",\"Column\",\"Snippet\"");
-            TextFile.WriteLines(run.SummaryPath, Summary(run, now));
+            WriteNew(run.ResultsPath, temp =>
+            {
+                if (run.Hits.Count > 0) Csv.Write(temp, run.Hits);
+                else TextFile.Write(temp, "\"Artifact\",\"Row\",\"Line\",\"Column\",\"Snippet\"");
+            });
+            WriteNew(run.SummaryPath, temp => TextFile.WriteLines(temp, Summary(run, now)));
             log.Write($"{run.Matches} match(es) in {run.FilesWithMatches} of {run.FilesSearched} file(s)" + (run.Matches > run.Hits.Count ? $"; the first {run.Hits.Count} are listed" : ""), StatusLevel.Good);
             if (run.Binary.Count > 0) log.Write($"{run.Binary.Count} binary file(s) not searched (EVTX, hives, Prefetch, databases): parse and compose turn them into CSVs that are searched.", StatusLevel.Info);
             foreach (var n in run.NotSearched.Take(20)) log.Write("Not searched: " + n, StatusLevel.Warn);
@@ -92,6 +97,20 @@ namespace Foton.Package
             if (run.Stopped) log.Write("Stopped before every file was searched; the results cover the files searched so far.", StatusLevel.Warn);
             log.Write("Results: " + run.ResultsPath, StatusLevel.Good);
             return run;
+        }
+
+        /// <summary>Writes <paramref name="path"/> through a new temporary file beside it, renamed into place; throws IOException when the name is taken.</summary>
+        static void WriteNew(string path, Action<string> write)
+        {
+            var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                // CreateNew: the random name is never an existing entry, so nothing is followed or overwritten.
+                using (new FileStream(temp, FileMode.CreateNew, FileAccess.Write)) { }
+                write(temp);
+                File.Move(temp, path);
+            }
+            finally { if (File.Exists(temp)) File.Delete(temp); }
         }
 
         /// <summary>

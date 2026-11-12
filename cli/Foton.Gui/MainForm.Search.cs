@@ -65,6 +65,7 @@ namespace Foton.Gui
 
         async Task SearchPackage()
         {
+            if (_busy) return;   // one action at a time; touch nothing a running search owns
             var query = _searchText.Text;
             if (query.Length == 0) { _status.Text = "Type a text to search for."; return; }
             var options = new SearchOptions { Regex = _searchRegex.Checked };   // read on the UI thread
