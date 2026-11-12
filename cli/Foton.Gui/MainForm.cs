@@ -68,11 +68,18 @@ namespace Foton.Gui
             strip.Items.Add(_status);
             strip.Items.Add(_progress);
             Controls.Add(strip);
+            var menu = MenuBar();   // after the tabs, which it lists
+            Controls.Add(menu);
+            MainMenuStrip = menu;
+            ApplySettings();
 
             FindingGrid(_findings, _details);
             // Double-click a finding (or use Show artifact) to read its source artifact in the Viewer.
             _findings.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) ShowArtifact(); };   // not on a header (that sorts)
             // A package on the command line opens in the Package tab; otherwise the window starts on Cases.
+            // Settings can ask for the last case instead; a missing one falls back to Cases.
+            var last = _settings.OpenOnStart == Foton.Tools.ConsoleSettings.StartOnLastCase ? _settings.RecentCases.FirstOrDefault() : null;
+            if (openPath == null && last != null && (Directory.Exists(last) || File.Exists(last))) openPath = last;
             if (openPath != null) Shown += async (s, e) => { _tabs.SelectedTab = _packagePage; await Open(openPath); };
             else Shown += async (s, e) => await RefreshCases();
             // The list is cheap to re-read (no hashing), so it is current whenever the tab is shown.
@@ -225,6 +232,8 @@ namespace Foton.Gui
                     LoadNotes(p.CaseRoot);
                     ShowFindings(findings);
                     RefreshChecklist();
+                    _settings.AddRecent(path);
+                    SaveSettings();
                     RefreshViewer(p.CaseRoot, log);
                     UpdateButtons();
                 }));

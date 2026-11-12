@@ -82,7 +82,7 @@ namespace Foton.Gui
                     State = findings == 0 ? (stages.Analyzed ? "no findings" : "no findings yet") : $"{reviewed} of {findings} findings have a status",
                     Do = () => { ReviewNextFinding(); return Task.FromResult(0); },
                 },
-                new Step { Name = "Hand off", Done = _handedOff.Contains(root), State = _handedOff.Contains(root) ? "exported" : "not exported", Do = () => ExportHandoff(Foton.Core.CaseTree.DefaultOutput("Handoffs")) },
+                new Step { Name = "Hand off", Done = _handedOff.Contains(root), State = _handedOff.Contains(root) ? "exported" : "not exported", Do = () => ExportHandoff(_settings.HandoffsFolder) },
             };
         }
 

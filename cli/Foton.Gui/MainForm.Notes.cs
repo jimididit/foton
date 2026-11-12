@@ -174,7 +174,8 @@ namespace Foton.Gui
                 : "Examiner note (examiner input, kept apart from the findings)");
         }
 
-        string DefaultExaminer() => _noteExaminerName.Length > 0 ? _noteExaminerName : ChainOfCustody.ReadHeader(_caseRoot).Examiner ?? "";
+        string DefaultExaminer() =>
+            _noteExaminerName.Length > 0 ? _noteExaminerName : _settings.Examiner.Length > 0 ? _settings.Examiner : ChainOfCustody.ReadHeader(_caseRoot).Examiner ?? "";
 
         void SaveFindingNote()
         {
@@ -245,7 +246,7 @@ namespace Foton.Gui
             bar.Controls.Add(AddButton("Refresh", RefreshNotes, needsPackage: true));
             bar.Controls.Add(AddButton("Go to", GoToNote, needsPackage: true));
             bar.Controls.Add(AddButton("Edit note...", EditSelectedNote, needsPackage: true));
-            bar.Controls.Add(AddButton("Export handoff", () => ExportHandoff(CaseTree.DefaultOutput("Handoffs")), needsPackage: true));
+            bar.Controls.Add(AddButton("Export handoff", () => ExportHandoff(_settings.HandoffsFolder), needsPackage: true));
             bar.Controls.Add(AddButton("Export handoff to...", ExportHandoffTo, needsPackage: true));
             bar.Controls.Add(_notesSummary);
             var note = new Label
@@ -274,7 +275,7 @@ namespace Foton.Gui
         {
             using (var d = new FolderBrowserDialog { Description = "Choose the folder to create the handoff folder in", ShowNewFolderButton = true })
             {
-                var standard = CaseTree.DefaultOutput("Handoffs");
+                var standard = _settings.HandoffsFolder;
                 if (Directory.Exists(standard)) d.SelectedPath = standard;
                 return d.ShowDialog(this) == DialogResult.OK ? ExportHandoff(d.SelectedPath) : Task.FromResult(0);
             }
