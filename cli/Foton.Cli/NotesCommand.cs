@@ -75,20 +75,20 @@ namespace Foton.Cli
                 : $"Findings ({review.FindingsSource}): {review.Findings.Count}, {reviewed} with a status");
             foreach (var f in review.Findings)
             {
-                log.WriteConsole($"  {f.Severity,-7} {NoteStatus.Label(f.Status),-13} {f.Key.Substring(0, 12)}  {TextFile.OneLine(f.Title)}");
+                log.WriteConsole($"  {TextFile.OneLine(f.Severity),-7} {NoteStatus.Label(f.Status),-13} {f.Key.Substring(0, 12)}  {TextFile.OneLine(f.Title)}");
                 if (f.Text.Length > 0) log.WriteConsole($"          note ({Who(f.Examiner, f.UpdatedUtc)}): {TextFile.OneLine(f.Text)}");
             }
             if (review.NotInLatestFindings.Count > 0)
             {
                 log.WriteConsole("");
                 log.WriteConsole($"Notes on findings the latest analyze does not produce: {review.NotInLatestFindings.Count}");
-                foreach (var n in review.NotInLatestFindings) WriteNote(log, n, n.Key.Substring(0, Math.Min(12, n.Key.Length)) + "  ");
+                foreach (var n in review.NotInLatestFindings) WriteNote(log, n, TextFile.OneLine(n.Key.Substring(0, Math.Min(12, n.Key.Length))) + "  ");
             }
             if (review.Rows.Count > 0)
             {
                 log.WriteConsole("");
                 log.WriteConsole($"Row notes (set with -Artifact and -Row): {review.Rows.Count}");
-                foreach (var r in review.Rows) WriteNote(log, r.Note, $"{r.Note.Artifact} row {r.Note.Row} ({r.State})  ");
+                foreach (var r in review.Rows) WriteNote(log, r.Note, $"{TextFile.OneLine(r.Note.Artifact)} row {r.Note.Row} ({TextFile.OneLine(r.State)})  ");
             }
             return 0;
         }
@@ -100,12 +100,13 @@ namespace Foton.Cli
         }
 
         static string Who(string examiner, string updatedUtc) =>
-            (examiner.Trim().Length > 0 ? TextFile.OneLine(examiner) + ", " : "") + updatedUtc + " UTC";
+            (examiner.Trim().Length > 0 ? TextFile.OneLine(examiner) + ", " : "") + TextFile.OneLine(updatedUtc) + " UTC";
 
         static int Set(string caseRoot, string? key, string? artifact, int row, string? statusText, string? text, string? examiner)
         {
             if ((key == null) == (artifact == null)) return Fail("Give either -Key (a finding or note key from foton notes) or -Artifact with -Row.");
             if (artifact != null && row < 1) return Fail("-Artifact needs -Row.");
+            if (artifact == null && row > 0) return Fail("-Row goes with -Artifact; -Key already names the finding or note.");
             if (statusText == null && text == null) return Fail("Give -Status, -Text, or both.");
             string status = "";
             if (statusText != null && !NoteStatus.TryParse(statusText, out status))
