@@ -64,6 +64,8 @@ namespace Foton.Cli
                 }
                 return TimelineCommand(args[1], o);
             }
+            if (args.Length >= 2 && string.Equals(args[0], "notes", StringComparison.OrdinalIgnoreCase))
+                return NotesCommand.Run(args);
             if (args.Length >= 1 && string.Equals(args[0], "cases", StringComparison.OrdinalIgnoreCase))
             {
                 var folders = new System.Collections.Generic.List<string> { CaseTree.DefaultOutput("Cases"), CaseTree.DefaultOutput("Baselines") };
@@ -124,6 +126,12 @@ namespace Foton.Cli
             Console.WriteLine("                                        one sorted list of the package's times, each with what it means;");
             Console.WriteLine("                                        writes analysis\\timeline.csv and timeline_sources.csv. Times as");
             Console.WriteLine("                                        yyyy-MM-dd or \"yyyy-MM-dd HH:mm:ss\" (UTC); -All adds SRUM hourly counters");
+            Console.WriteLine("  foton notes <case-folder-or-zip> [-Json]");
+            Console.WriteLine("                                        list each finding's review status and the examiner notes");
+            Console.WriteLine("                                        (analysis\\examiner_notes.json; examiner input, not findings)");
+            Console.WriteLine("  foton notes <case-folder-or-zip> (-Key <key> | -Artifact <file> -Row <n>) [-Status <status>]");
+            Console.WriteLine("              [-Text <note>] [-Examiner <name>]");
+            Console.WriteLine("                                        set one; status: Not reviewed, Reviewed, Relevant, Not relevant, Follow up");
             Console.WriteLine("  foton cases [-Path <folder>]... [-Json]");
             Console.WriteLine("                                        list case and baseline packages in C:\\Foton\\Cases, C:\\Foton\\Baselines,");
             Console.WriteLine("                                        and each -Path folder (read-only; Verify with foton package)");

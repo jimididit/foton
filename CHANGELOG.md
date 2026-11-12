@@ -4,6 +4,12 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.13.0] - 2026-11-12
+
+- Examiner notes: a review status (Not reviewed, Reviewed, Relevant, Not relevant, Follow up) and a note for each finding and for any row of a package CSV, kept in `analysis\examiner_notes.json` (notes schema 1.0.0) apart from the findings and the automated report, and labelled as examiner input. A finding's note follows it across re-analyzes while its content is the same; a note whose finding is no longer produced is kept and listed as such; a row note records the row's SHA-256 and says when the row reads differently. A notes file that cannot be read is refused, never overwritten.
+- `foton notes <package> [-Json]` lists every finding with its status and key, the notes on findings no longer produced, and the row notes; `foton notes <package> -Key <key> | -Artifact <file> -Row <n> [-Status] [-Text] [-Examiner]` sets one.
+- Console: the Package tab's findings show their status, filter by severity, status, and text, and have a note editor; **Note on row...** in the Viewer and **Note on source row...** in the Timeline note an artifact row; the **Notes** tab lists every note with **Go to** and **Edit note...**.
+
 ## [2.12.0] - 2026-11-12
 
 - `foton timeline <package> [-From <utc>] [-To <utc>] [-All]`: one list of the package's recorded times, sorted by UTC, from the compose outputs (PECmd, EvtxECmd, Hayabusa, Chainsaw, LECmd, JLECmd, SBECmd, AppCompatCacheParser, AmcacheParser, RECmd, SrumECmd, MFTECmd) and Foton's own CSVs. Each row says what its time means (a Prefetch run is a run; a Shimcache time is a file modified time, not a run), where it came from, and whether it falls in the collection window. Writes `analysis\timeline.csv` and `analysis\timeline_sources.csv`, which records what was read and why anything was left out.
