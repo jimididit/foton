@@ -356,7 +356,7 @@ It reads every CSV, JSON, text, log, XML, and HTML file in the package, the coll
 
 A window for the same workstation work, for when you would rather click than type. It runs the same code as `foton.exe`, writes the same files, and never reads the live host.
 
-1. Start `foton-console.exe`; it opens on the **Cases** tab. Or pass a package on its command line to open it straight away: `.\foton-console.exe "\path\to\Foton_case.zip"`.
+1. Start `foton-console.exe`; it opens on the **Cases** tab, where **Start here** collects or baselines this PC (the **Acquire** tab) or opens a case folder or ZIP. Or pass a package on its command line to open it straight away: `.\foton-console.exe "\path\to\Foton_case.zip"`. Once a case is open, the **Package** tab lists its next steps (verify, parse, compose, analyze, timeline, review, hand off) with what each has done; **Do this next** runs the first one not done.
 2. On **Cases**, select a case and press **Open** (or double-click it). On the **Package** tab, **Open folder...** or **Open ZIP...** loads a case folder or package ZIP (a ZIP is extracted beside it, as with `foton.exe`). Findings already in the package are listed.
 3. **Verify** checks every file against `hashes.csv`, as `foton package` does. **Parse**, **Compose**, and **Analyze** run those verbs; **Parse, compose, analyze** runs all three in order.
 4. Select a finding to read why it matters, the source artifact, and the next step. **Show artifact** (or double-clicking the finding) opens that artifact in the **Viewer** tab. **Show case folder** opens the folder in Explorer. Filter the findings by **Severity**, **Status**, and **Find**; under the details, set the finding's [examiner](#examiner-notes) status and note and press **Save note**.

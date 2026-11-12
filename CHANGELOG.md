@@ -8,6 +8,7 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 
 - `foton search <package> <text> [-Regex]`: finds a text (case-insensitive), or a regular expression, in every CSV, JSON, text, log, XML, and HTML file of a package, collected files and workstation outputs (parse, compose, analyze, timeline) alike. Each hit names the file and the CSV row and column, or the line, with the text around it. Binary artifacts (EVTX, hives, Prefetch) are listed as not searched, as are links, files over 2 GB, and unreadable files. Results go to `analysis\search_<UTC>.csv`, with what was searched in the `.txt` beside it; 10,000 hits are listed and every match is counted.
 - Console **Search** tab: the same search, with **Stop**, and each hit opens in the Viewer at its row.
+- Console guided start: **Start here** on the Cases tab (collect or baseline this PC, open a case folder or ZIP), and on the Package tab the steps for the open case (verify, parse, compose, analyze, timeline, review, hand off) with what each has done and **Do this next**, which runs the first step not done.
 
 ## [2.13.0] - 2026-11-12
 

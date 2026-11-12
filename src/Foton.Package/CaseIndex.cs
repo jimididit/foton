@@ -39,6 +39,15 @@ namespace Foton.Package
         public string Problem { get; set; } = "";
     }
 
+    /// <summary>Workstation steps whose output a case holds.</summary>
+    public sealed class CaseStages
+    {
+        public bool Parsed { get; set; }
+        public bool Composed { get; set; }
+        public bool Analyzed { get; set; }
+        public bool Timeline { get; set; }
+    }
+
     /// <summary>One baseline package found by <see cref="CaseIndex"/>, from its baseline.json header.</summary>
     public sealed class BaselineEntry
     {
@@ -244,11 +253,10 @@ namespace Foton.Package
             }
             catch (Exception ex) when (Readable(ex)) { problems.Add("coverage: " + TextFile.OneLine(ex.Message)); }
 
-            // Stages are existence checks only; a linked analysis folder counts as not done.
-            var analysisPlain = Plain(root, "analysis");
-            e.Parsed = analysisPlain && File.Exists(System.IO.Path.Combine(root, @"analysis\parsed_records.csv"));
-            e.Composed = analysisPlain && Plain(root, @"analysis\external") && File.Exists(System.IO.Path.Combine(root, @"analysis\external\external_parse_inventory.csv"));
-            e.Analyzed = analysisPlain && File.Exists(System.IO.Path.Combine(root, @"analysis\findings.csv"));
+            var stages = Stages(root);
+            e.Parsed = stages.Parsed;
+            e.Composed = stages.Composed;
+            e.Analyzed = stages.Analyzed;
             var findings = e.Analyzed ? @"analysis\findings.csv" : @"00_Collection\findings.csv";
             try
             {
@@ -262,6 +270,23 @@ namespace Foton.Package
 
             e.Problem = string.Join("; ", problems);
             return e;
+        }
+
+        /// <summary>
+        /// Which workstation steps have written their output in a case (the Cases list and the console's checklist).
+        /// Existence checks only; a linked analysis folder counts as not done.
+        /// </summary>
+        public static CaseStages Stages(string root)
+        {
+            var analysisPlain = Plain(root, "analysis");
+            bool Has(params string[] parts) => analysisPlain && File.Exists(System.IO.Path.Combine(new[] { root, "analysis" }.Concat(parts).ToArray()));
+            return new CaseStages
+            {
+                Parsed = Has("parsed_records.csv"),
+                Composed = Plain(root, System.IO.Path.Combine("analysis", "external")) && Has("external", "external_parse_inventory.csv"),
+                Analyzed = Has("findings.csv"),
+                Timeline = Has("timeline.csv"),
+            };
         }
 
         static void CountFindings(string path, CaseEntry e)
