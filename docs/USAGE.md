@@ -170,6 +170,7 @@ A baseline taken after an incident is a picture of **that** state. Compare prove
 | `carve <blob>` | MZ/PE signature scan of a copied blob (Tier 3, not NTFS carving). `-MaxBytes`, `-MaxHits` (defaults 8 MiB / 50 hits) |
 | `timeline <case-folder-or-zip>` | One list of the package's recorded times, sorted by UTC, each with what that time means: `analysis\timeline.csv` + `timeline_sources.csv`. `-From`, `-To` (UTC date or `"yyyy-MM-dd HH:mm:ss"`), `-All` ([Timeline](#timeline)) |
 | `notes <case-folder-or-zip>` | List each finding's review status and the examiner notes in `analysis\examiner_notes.json` (`-Json` for scripts), or set one: `-Key <key>` (a finding or note key it lists, or at least 8 characters of one) or `-Artifact <file> -Row <n>`, with `-Status`, `-Text`, `-Examiner` ([Examiner notes](#examiner-notes)) |
+| `search <case-folder-or-zip> <text>` | Find a text (case-insensitive) in every CSV, JSON, text, log, XML, and HTML file of the package; `-Regex` for a regular expression. Hits name the file and CSV row and column, or line: `analysis\search_<UTC>.csv` + `.txt` ([Search](#search)) |
 | `handoff <case-folder-or-zip>` | Write the review for another examiner: `Foton_Handoff_<case>_<UTC>` under `C:\Foton\Handoffs` (or `-OutputPath <folder>`) with findings, examiner notes, `Foton_Handoff.html`, custody and `hashes.csv` copies, `HANDOFF.txt`, and `SHA256SUMS.txt`. Exit 2 when the package does not verify ([Handoff](#handoff)) |
 | `cases` | List the case and baseline packages in `C:\Foton\Cases`, `C:\Foton\Baselines`, and each `-Path <folder>`: host, time, case number, examiner, elevated, profile, finding counts, and which of parse, compose, and analyze have run. `-Json` for scripts. Read-only and does not hash; use `package` to verify |
 
@@ -316,6 +317,17 @@ SRUM's hourly counter tables (resource use, app timeline, energy, push notificat
 
 The listing shows every finding, most severe first, with its status and key (the first 12 characters; any unique 8 or more work with `-Key`). A finding's key comes from its category, title, artifact, and observation, so its note follows it when `analyze` runs again and produces the same finding. When a later analyze no longer produces it (new data, or a rule that words it differently), the note is kept and listed under notes on findings the latest analyze does not produce. A row note records the row's SHA-256, and the listing says when the row reads differently. A status of Not reviewed with no text removes the note. The examiner defaults to the one in the case's chain of custody. A notes file Foton cannot read is refused, never overwritten.
 
+### Search
+
+`foton search` looks for one value across the whole package: a user name, a file name, an IP address, a hash.
+
+```powershell
+.\foton.exe search "\path\to\case-folder" "invoice.exe"
+.\foton.exe search "\path\to\Foton_case.zip" "10\.0\.0\.\d+" -Regex
+```
+
+It reads every CSV, JSON, text, log, XML, and HTML file in the package, the collected files and the outputs of parse, compose, analyze, and timeline alike, so run it after compose to include the EZ Tools, Hayabusa, and Chainsaw results. Matching ignores case. A CSV hit names the row (1 is the first row after the header) and column; a hit in another file names the line. Binary artifacts such as `.evtx`, hives, and Prefetch are not searched (compose turns them into CSVs that are), and neither are links, files over 2 GB, or files that cannot be read; the summary lists each one. A regular expression gets one second per line; a line where it runs out of time is skipped and counted. Lines longer than 65,536 characters are searched in pieces of that size, so a match split across two pieces is missed. The first 10,000 hits are written to `analysis\search_<UTC>.csv`; every match is counted, and `analysis\search_<UTC>.txt` records the search, the counts, and what was not searched. Earlier search results are not searched.
+
 ### Handoff
 
 `foton handoff` puts the review of one package in a folder another examiner can read and check:
@@ -370,6 +382,8 @@ The **Viewer** tab lists the package's files. A CSV opens as a table, 1,000 rows
 The **Timeline** tab shows the package's [timeline](#timeline). **Build timeline** runs `foton timeline` on the open package (**Include SRUM hourly counters** is `-All`) and shows `analysis\timeline.csv`; a timeline already in the package is shown when you open the tab, with the time it was written, so build again after a new parse or compose. Filter it by **From** and **To** (UTC, as `yyyy-MM-dd` or `yyyy-MM-dd HH:mm:ss`; a bare **To** date includes that day), **Source**, and **Find** (text in the time, source, meaning, summary, or artifact), then **Apply** or press Enter. The first 10,000 matching rows are shown, with how many match in all. **Around selected row** shows every source within the chosen number of minutes of the selected row, and **Show source row** (or double-clicking a row) opens the artifact in the **Viewer** at the row it came from. Grey rows fall inside the collection window. **Note on source row...** notes the artifact row a timeline row came from.
 
 **Note on row...** in the **Viewer** (on a CSV) records a status and note for the selected row. The **Notes** tab lists every examiner note: on findings, on findings the latest analyze no longer produces, and on rows (with whether the row still reads as it did). **Go to** (or double-clicking) opens the finding on the **Package** tab or the row in the **Viewer**; **Edit note...** changes it. The notes are the same file `foton notes` lists and sets. **Export handoff** writes a [handoff](#handoff) under `C:\Foton\Handoffs` (**Export handoff to...** asks for the folder), including `Foton_Report.html` when this window built it with **Analyze** and it has not changed.
+
+The **Search** tab runs [`foton search`](#search) on the open package (**Regular expression** for `-Regex`; **Stop** ends it early and keeps what was found). Double-click a hit, or **Open in Viewer**, to open its file in the **Viewer** at that row; for a text file the line is shown in the status bar.
 
 ---
 

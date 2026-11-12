@@ -66,6 +66,11 @@ namespace Foton.Cli
             }
             if (args.Length >= 2 && string.Equals(args[0], "notes", StringComparison.OrdinalIgnoreCase))
                 return NotesCommand.Run(args);
+            if ((args.Length == 3 || args.Length == 4) && string.Equals(args[0], "search", StringComparison.OrdinalIgnoreCase))
+            {
+                if (args.Length == 4 && !string.Equals(args[3], "-Regex", StringComparison.OrdinalIgnoreCase)) return Usage();
+                return SearchCommand(args[1], args[2], args.Length == 4);
+            }
             if ((args.Length == 2 || args.Length == 4) && string.Equals(args[0], "handoff", StringComparison.OrdinalIgnoreCase))
             {
                 if (args.Length == 4 && !string.Equals(args[2], "-OutputPath", StringComparison.OrdinalIgnoreCase)) return Usage();
@@ -137,6 +142,9 @@ namespace Foton.Cli
             Console.WriteLine("  foton notes <case-folder-or-zip> (-Key <key> | -Artifact <file> -Row <n>) [-Status <status>]");
             Console.WriteLine("              [-Text <note>] [-Examiner <name>]");
             Console.WriteLine("                                        set one; status: Not reviewed, Reviewed, Relevant, Not relevant, Follow up");
+            Console.WriteLine("  foton search <case-folder-or-zip> <text> [-Regex]");
+            Console.WriteLine("                                        find a text (case-insensitive) in every CSV, JSON, text, log, XML, and");
+            Console.WriteLine("                                        HTML file of the package; writes analysis\\search_<UTC>.csv and .txt");
             Console.WriteLine("  foton handoff <case-folder-or-zip> [-OutputPath <folder>]");
             Console.WriteLine("                                        Foton_Handoff_<case>_<UTC> (default under C:\\Foton\\Handoffs): findings,");
             Console.WriteLine("                                        examiner notes, Foton_Handoff.html, custody and hashes.csv copies,");
@@ -150,6 +158,26 @@ namespace Foton.Cli
             Console.WriteLine();
             Console.WriteLine("Operator guide: https://github.com/jimididit/foton/blob/main/docs/USAGE.md");
             return 1;
+        }
+
+        /// <summary>Exit 0 after the search results are written (no matches included), 1 for an invalid expression or a package that cannot be opened.</summary>
+        static int SearchCommand(string package, string query, bool regex)
+        {
+            var log = new StatusLog();
+            Banner.Write(log, Banner.Kind.Workstation);
+            try
+            {
+                var run = PackageSearch.Run(package, query, new SearchOptions { Regex = regex }, log);
+                foreach (var h in run.Hits.Take(50))
+                    log.WriteConsole("   " + h.Artifact + (h.Line > 0 ? " line " + h.Line : h.Row > 0 ? " row " + h.Row + " " + h.Column : " header") + ": " + h.Snippet);
+                if (run.Hits.Count > 50) log.WriteConsole($"   ... {run.Hits.Count - 50} more listed in the results file");
+                return 0;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException || ex is ArgumentException || ex is NotSupportedException)
+            {
+                log.Write("Search not run: " + ex.Message, StatusLevel.Error);
+                return 1;
+            }
         }
 
         /// <summary>Exit 0 when the handoff is written and the package verified, 2 when written but the package did not verify, 1 when not written.</summary>

@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.14.0] - 2026-11-12
+
+- `foton search <package> <text> [-Regex]`: finds a text (case-insensitive), or a regular expression, in every CSV, JSON, text, log, XML, and HTML file of a package, collected files and workstation outputs (parse, compose, analyze, timeline) alike. Each hit names the file and the CSV row and column, or the line, with the text around it. Binary artifacts (EVTX, hives, Prefetch) are listed as not searched, as are links, files over 2 GB, and unreadable files. Results go to `analysis\search_<UTC>.csv`, with what was searched in the `.txt` beside it; 10,000 hits are listed and every match is counted.
+- Console **Search** tab: the same search, with **Stop**, and each hit opens in the Viewer at its row.
+
 ## [2.13.0] - 2026-11-12
 
 - Examiner notes: a review status (Not reviewed, Reviewed, Relevant, Not relevant, Follow up) and a note for each finding and for any row of a package CSV, kept in `analysis\examiner_notes.json` (notes schema 1.0.0) apart from the findings and the automated report, and labelled as examiner input. A finding's note follows it across re-analyzes while its content is the same; a note whose finding is no longer produced is kept and listed as such; a row note records the row's SHA-256 and says when the row reads differently. A notes file that cannot be read is refused, never overwritten.
