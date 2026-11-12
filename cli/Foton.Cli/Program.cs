@@ -142,7 +142,8 @@ namespace Foton.Cli
                     System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out utc)) return true;
             if (!DateTime.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out utc)) return false;
-            if (endOfDay) utc = utc.AddDays(1).AddTicks(-1);
+            // The last representable day has no next day; its end is the largest DateTime.
+            if (endOfDay) utc = utc.Date == DateTime.MaxValue.Date ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc) : utc.AddDays(1).AddTicks(-1);
             return true;
         }
 
