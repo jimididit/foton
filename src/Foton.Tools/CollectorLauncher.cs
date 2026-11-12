@@ -10,14 +10,25 @@ namespace Foton.Tools
 {
     public enum CollectorKind { Collect, Baseline }
 
-    /// <summary>A collector that passed the console's checks, ready to run.</summary>
-    public sealed class CollectorCheck
+    /// <summary>
+    /// A collector that passed the console's checks, ready to run. Until disposed it holds the file open for reading
+    /// only (others may read and run it, nobody may write, replace, rename, or delete it), so the file Windows starts is
+    /// the file that was hashed. Dispose once the process has started.
+    /// </summary>
+    public sealed class CollectorCheck : IDisposable
     {
+        internal FileStream? Hold;
         public string Path { get; internal set; } = "";
         public string Version { get; internal set; } = "";
         public string Sha256 { get; internal set; } = "";
         /// <summary>True when SHA256SUMS.txt beside it listed this hash; false when there was no list (the operator is asked).</summary>
         public bool Verified { get; internal set; }
+
+        public void Dispose()
+        {
+            Hold?.Dispose();
+            Hold = null;
+        }
     }
 
     /// <summary>What the operator chose on the Acquire tab. Null values are left to the collector's defaults.</summary>
@@ -62,11 +73,23 @@ namespace Foton.Tools
         {
             var info = new FileInfo(exePath);
             if (!info.Exists) throw new FileNotFoundException(FileName(kind) + " is not beside the console: " + exePath, exePath);
-            var v = FileVersionInfo.GetVersionInfo(info.FullName);
-            var version = DeploymentBundle.CheckExecutable(FileName(kind), MinimumVersion(kind), v.OriginalFilename, v.FileVersion);
-            var sha = Hashing.Sha256Hex(info.FullName).ToLowerInvariant();
-            var verified = DeploymentBundle.Verify(System.IO.Path.Combine(info.DirectoryName!, DeploymentBundle.SumsFileName), info.Name, sha);
-            return new CollectorCheck { Path = info.FullName, Version = DeploymentBundle.Show(version), Sha256 = sha, Verified = verified };
+            // Held from the hash to the start (FileShare.Read): the version, the hash, and the launch see the same bytes.
+            var hold = new FileStream(info.FullName, FileMode.Open, FileAccess.Read, FileShare.Read);
+            try
+            {
+                var v = FileVersionInfo.GetVersionInfo(info.FullName);
+                var version = DeploymentBundle.CheckExecutable(FileName(kind), MinimumVersion(kind), v.OriginalFilename, v.FileVersion);
+                string sha;
+                using (var h = System.Security.Cryptography.SHA256.Create())
+                    sha = BitConverter.ToString(h.ComputeHash(hold)).Replace("-", "").ToLowerInvariant();
+                var verified = DeploymentBundle.Verify(System.IO.Path.Combine(info.DirectoryName!, DeploymentBundle.SumsFileName), info.Name, sha);
+                return new CollectorCheck { Hold = hold, Path = info.FullName, Version = DeploymentBundle.Show(version), Sha256 = sha, Verified = verified };
+            }
+            catch
+            {
+                hold.Dispose();
+                throw;
+            }
         }
 
         /// <summary>The collector's command line. Values with quotes, control characters, or a leading '-' are refused.</summary>
@@ -93,15 +116,24 @@ namespace Foton.Tools
             return CommandLine.Join(a);
         }
 
-        /// <summary>The package folder this run created: the newest matching folder created at or after the start.</summary>
+        /// <summary>
+        /// The package folder this run created: the newest matching folder created at or after the start. Null when none
+        /// exists yet or the folder cannot be listed (a collector elevated as another account writes into a folder private
+        /// to that account and Administrators).
+        /// </summary>
         public static string? FindNewRun(string parent, CollectorKind kind, DateTime startedUtc)
         {
-            if (!Directory.Exists(parent)) return null;
             var pattern = kind == CollectorKind.Collect ? CaseFolder : BaselineFolder;
-            return new DirectoryInfo(parent).GetDirectories()
+            return Folders(parent)
                 .Where(d => pattern.IsMatch(d.Name) && d.CreationTimeUtc >= startedUtc.AddSeconds(-2))
                 .OrderByDescending(d => d.CreationTimeUtc).ThenByDescending(d => d.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(d => d.FullName).FirstOrDefault();
+        }
+
+        static DirectoryInfo[] Folders(string parent)
+        {
+            try { return Directory.Exists(parent) ? new DirectoryInfo(parent).GetDirectories() : new DirectoryInfo[0]; }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException) { return new DirectoryInfo[0]; }
         }
 
         public static string LogPath(CollectorKind kind, string root) =>
@@ -111,9 +143,9 @@ namespace Foton.Tools
         public static string? EarlierBaseline(string parent, string newRoot)
         {
             var m = BaselineFolder.Match(System.IO.Path.GetFileName(newRoot.TrimEnd('\\')));
-            if (!m.Success || !Directory.Exists(parent)) return null;
+            if (!m.Success) return null;
             string host = m.Groups[1].Value, stamp = m.Groups[2].Value;
-            return new DirectoryInfo(parent).GetDirectories()
+            return Folders(parent)
                 .Select(d => new KeyValuePair<DirectoryInfo, Match>(d, BaselineFolder.Match(d.Name)))
                 .Where(p => p.Value.Success && string.Equals(p.Value.Groups[1].Value, host, StringComparison.OrdinalIgnoreCase)
                     && string.CompareOrdinal(p.Value.Groups[2].Value, stamp) < 0 && File.Exists(System.IO.Path.Combine(p.Key.FullName, "baseline.json")))

@@ -89,7 +89,6 @@ namespace Foton.Gui
 
         async Task StartAcquire(CollectorKind kind)
         {
-            var collect = kind == CollectorKind.Collect;
             var exe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, CollectorLauncher.FileName(kind));
             CollectorCheck check;
             try { check = CollectorLauncher.Check(exe, kind); }
@@ -99,6 +98,13 @@ namespace Foton.Gui
                 MessageBox.Show(this, ex.Message, "Not started", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
+            // The check holds the file until the collector has started (released there, or here on any other way out).
+            using (check) await RunCollector(kind, check);
+        }
+
+        async Task RunCollector(CollectorKind kind, CollectorCheck check)
+        {
+            var collect = kind == CollectorKind.Collect;
             if (!check.Verified && MessageBox.Show(this,
                     $"There is no {DeploymentBundle.SumsFileName} beside {Path.GetFileName(check.Path)}, so it cannot be checked against a release.\r\n\r\nSHA-256 {check.Sha256}\r\n\r\nRun it anyway?",
                     "Unverified collector", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
@@ -167,6 +173,7 @@ namespace Foton.Gui
                     }
                     if (p == null) { log.Write("Not started: Windows did not return the process.", StatusLevel.Error); return null; }
                     started = true;
+                    check.Dispose();   // Windows has the image now; the file no longer needs holding
                     log.Write("Running in its own minimized window; close that window to stop it.", StatusLevel.Info);
 
                     var parent = request.OutputPath ?? defaultOut;
@@ -189,7 +196,9 @@ namespace Foton.Gui
                     }
                     log.Write(exit == 0 ? "Finished." : exit == null ? "Finished (exit code not available)." : "Finished with exit code " + exit + ".",
                         exit == 0 ? StatusLevel.Good : StatusLevel.Warn);
-                    if (root == null) log.Write("No new package folder was found under " + parent + ".", StatusLevel.Warn);
+                    if (root == null)
+                        log.Write("No new package folder could be read under " + parent + ". If Windows asked for another account's password, the collector ran as that account " +
+                            "and its output is private to that account and Administrators: open it while signed in as that account.", StatusLevel.Warn);
                     return null;
                 }
                 finally

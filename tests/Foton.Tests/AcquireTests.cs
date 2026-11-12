@@ -32,6 +32,9 @@ namespace Foton.Tests
             Assert.Equal(new Version(2, 9), DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.9"));
             Assert.Contains("2.5 is too old", Assert.Throws<InvalidDataException>(() => DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.5")).Message);
             Assert.Contains("foton-collect 2.7 does not read", Assert.Throws<InvalidDataException>(() => DeploymentBundle.CheckCollect("foton-collect.exe", "2.7")).Message);
+            // Missing parts count as 0: "2.6" meets a 2.6.0 floor and "2.8" meets collect's 2.8.0.
+            Assert.Equal(new Version(2, 6), DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.6"));
+            Assert.Equal(new Version(2, 8), DeploymentBundle.CheckCollect("foton-collect.exe", "2.8"));
             foreach (var full in new[] { @"D:\Cases", @"\\server\share\Cases" }) Assert.True(CollectorLauncher.IsFullPath(full), full);
             foreach (var rel in new[] { "Cases", @".\Cases", @"C:Cases", @"\Cases" }) Assert.False(CollectorLauncher.IsFullPath(rel), rel);
             using (var t = new TempDir())
@@ -52,12 +55,24 @@ namespace Foton.Tests
             {
                 var exe = t.File("foton-collect.exe");
                 File.Copy(built, exe);
-                var unverified = CollectorLauncher.Check(exe, CollectorKind.Collect);
-                Assert.False(unverified.Verified);
-                File.WriteAllText(t.File("SHA256SUMS.txt"), unverified.Sha256 + "  foton-collect.exe\n");
-                Assert.True(CollectorLauncher.Check(exe, CollectorKind.Collect).Verified);
+                string sha;
+                using (var unverified = CollectorLauncher.Check(exe, CollectorKind.Collect))
+                {
+                    Assert.False(unverified.Verified);
+                    Assert.Equal(Foton.Core.Hashing.Sha256Hex(built).ToLowerInvariant(), unverified.Sha256);
+                    sha = unverified.Sha256;
+                    // Held from the check until disposed: it can be read (and run), not changed or replaced.
+                    Assert.Throws<IOException>(() => File.WriteAllText(exe, "swapped"));
+                    Assert.Throws<IOException>(() => File.Move(exe, t.File("moved.exe")));
+                    using (var reader = new FileStream(exe, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) Assert.True(reader.Length > 0);
+                }
+                File.WriteAllText(t.File("x.txt"), "released");   // after Dispose the file is free again
+                File.Copy(exe, t.File("copy.exe"));
+                File.WriteAllText(t.File("SHA256SUMS.txt"), sha + "  foton-collect.exe\n");
+                using (var verified = CollectorLauncher.Check(exe, CollectorKind.Collect)) Assert.True(verified.Verified);
                 File.WriteAllText(t.File("SHA256SUMS.txt"), new string('a', 64) + "  foton-collect.exe\n");
                 Assert.Throws<InvalidDataException>(() => CollectorLauncher.Check(exe, CollectorKind.Collect));
+                File.Delete(exe);   // a refused check released the file too
             }
         }
 
@@ -75,6 +90,7 @@ namespace Foton.Tests
                 Assert.Equal(t.File("Foton_HOST_20261111-120000Z"), CollectorLauncher.FindNewRun(t.Path, CollectorKind.Collect, started));
                 Assert.Equal(t.File("FotonBaseline_HOST_20261111-120000Z"), CollectorLauncher.FindNewRun(t.Path, CollectorKind.Baseline, started));
                 Assert.Null(CollectorLauncher.FindNewRun(t.File("missing"), CollectorKind.Collect, started));
+                Assert.Null(CollectorLauncher.FindNewRun(@"\\?\nonexistent-volume\x", CollectorKind.Collect, started));   // unlistable: none, not a throw
                 Assert.Equal(Path.Combine(t.File("Foton_HOST_20261111-120000Z"), "00_Collection", "collection.log"), CollectorLauncher.LogPath(CollectorKind.Collect, t.File("Foton_HOST_20261111-120000Z")));
                 Assert.Equal(Path.Combine(t.File("FotonBaseline_HOST_20261111-120000Z"), "baseline.log"), CollectorLauncher.LogPath(CollectorKind.Baseline, t.File("FotonBaseline_HOST_20261111-120000Z")));
             }

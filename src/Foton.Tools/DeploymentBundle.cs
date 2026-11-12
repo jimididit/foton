@@ -70,7 +70,7 @@ namespace Foton.Tools
         /// <summary>The executable's version when it is foton-collect 2.8.0 or later; otherwise InvalidDataException naming why.</summary>
         internal static Version CheckCollect(string? originalFilename, string? fileVersion)
         {
-            if (Version.TryParse(fileVersion ?? "", out var v) && v < ProfileSupport
+            if (Version.TryParse(fileVersion ?? "", out var v) && Full(v) < Full(ProfileSupport)
                 && string.Equals(originalFilename, CollectFileName, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException($"foton-collect {Show(v)} does not read collection profiles; use {Show(ProfileSupport)} or later.");
             return CheckExecutable(CollectFileName, ProfileSupport, originalFilename, fileVersion);
@@ -78,6 +78,9 @@ namespace Foton.Tools
 
         /// <summary>A version as major.minor.build, or as many parts as it has (a version resource can hold "2.9").</summary>
         public static string Show(Version v) => v.ToString(v.Build >= 0 ? 3 : 2);
+
+        /// <summary>Missing parts as 0, so "2.6" compares equal to 2.6.0 (Version ranks a missing part below 0).</summary>
+        static Version Full(Version v) => new Version(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
 
         /// <summary>
         /// The executable's version when its version resource names <paramref name="expected"/> and it is at least
@@ -89,7 +92,7 @@ namespace Foton.Tools
                 throw new InvalidDataException($"This is not {expected} (its version resource names '{originalFilename}').");
             if (!Version.TryParse(fileVersion ?? "", out var version))
                 throw new InvalidDataException($"{expected} has no readable version ('{fileVersion}').");
-            if (version < minimum)
+            if (Full(version) < Full(minimum))
                 throw new InvalidDataException($"{expected} {Show(version)} is too old for the console; use {Show(minimum)} or later.");
             return version;
         }
