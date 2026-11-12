@@ -4,6 +4,10 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [2.12.0] - 2026-11-12
+
+- `foton timeline <package> [-From <utc>] [-To <utc>] [-All]`: one list of the package's recorded times, sorted by UTC, from the compose outputs (PECmd, EvtxECmd, Hayabusa, Chainsaw, LECmd, JLECmd, SBECmd, AppCompatCacheParser, AmcacheParser, RECmd, SrumECmd, MFTECmd) and Foton's own CSVs. Each row says what its time means (a Prefetch run is a run; a Shimcache time is a file modified time, not a run), where it came from, and whether it falls in the collection window. Writes `analysis\timeline.csv` and `analysis\timeline_sources.csv`, which records what was read and why anything was left out.
+
 ## [2.11.0] - 2026-11-12
 
 - Console **Cases** tab, first when the console opens: the case and baseline packages in `C:\Foton\Cases`, `C:\Foton\Baselines`, and folders you add, with host, time, case number, examiner, account, profile, finding counts, and which of parse, compose, and analyze have run. Open a case, verify selected cases (results kept for the session), show the folder, or send baselines to Compare. Read-only: it never deletes, moves, or renames a package.
