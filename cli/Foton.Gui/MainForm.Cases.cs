@@ -20,7 +20,7 @@ namespace Foton.Gui
     {
         TabPage? _casesPage;
         TabPage? _packagePage;
-        readonly ConsoleSettings _settings = ConsoleSettings.Load();
+        readonly Foton.Tools.ConsoleSettings _settings = Foton.Tools.ConsoleSettings.Load();
         readonly ComboBox _addedFolders = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 360 };
         readonly Label _casesSummary = new Label { AutoSize = true, Padding = new Padding(8, 6, 0, 0) };
         readonly DataGridView _cases = CasesGrid();
@@ -80,7 +80,7 @@ namespace Foton.Gui
         }
 
         IEnumerable<string> CaseFolders() =>
-            new[] { CaseTree.DefaultOutput("Cases"), CaseTree.DefaultOutput("Baselines") }.Concat(_settings.CaseFolders);
+            new[] { _settings.CasesFolder, _settings.BaselinesFolder }.Concat(_settings.CaseFolders).Distinct(StringComparer.OrdinalIgnoreCase);
 
         void FillAddedFolders()
         {

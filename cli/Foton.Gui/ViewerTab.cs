@@ -123,6 +123,12 @@ namespace Foton.Gui
             Clear("Select a file.");
         }
 
+        /// <summary>Ctrl+F: the Find box of a CSV on screen.</summary>
+        public void FocusFind()
+        {
+            if (_csvBar.Visible) _filter.Focus();
+        }
+
         /// <summary>Selects a package file by its path relative to the case root (forward or back slashes); false when absent.</summary>
         public bool Select(string relativePath) => Select(relativePath, 0);
 
