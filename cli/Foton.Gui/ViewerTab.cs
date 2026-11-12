@@ -270,7 +270,10 @@ namespace Foton.Gui
                         l.Source = ArtifactReader.ReadText(path, MaxTextChars, out var xmlCut)
                             + (xmlCut ? Environment.NewLine + "[Truncated: the first " + MaxTextChars.ToString("N0", CultureInfo.InvariantCulture) + " characters.]" : "");
                         try { l.Json = XmlTree.Read(path, MaxJsonNodes); }
-                        catch (InvalidDataException ex) { l.Text = "[" + ex.Message + "]" + Environment.NewLine + l.Source; }
+                        catch (Exception ex) when (ex is InvalidDataException || ex is System.Xml.XmlException || ex is InvalidOperationException)
+                        {
+                            l.Text = "[Not shown as a tree: " + TextFile.OneLine(ex.Message) + "]" + Environment.NewLine + l.Source;
+                        }
                         break;
                     case ArtifactShape.Text:
                         l.Text = ArtifactReader.ReadText(path, MaxTextChars, out var cut);

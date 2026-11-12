@@ -432,6 +432,14 @@ namespace Foton.Tests
             Assert.Equal("Policy & settings\r\nLine one\r\nLine two\r\nName\tValue\r\nA\t<b>\r\n\r\nEnd", text);
             Assert.DoesNotContain("alert", text);
             Assert.DoesNotContain("color", text);
+
+            // Markup that runs the regexes into their time limit falls back to a tag stripper instead of throwing.
+            var hostile = string.Concat(Enumerable.Repeat("<script>x", 20000)) + "<script>kept(1)</script><p>tail</p>";
+            var fallback = HtmlText.ToText(hostile, TimeSpan.FromTicks(1));
+            Assert.Contains("kept(1)", fallback);   // only the fallback keeps script text (as text): the regexes did time out
+            Assert.EndsWith("tail", fallback);
+            Assert.DoesNotContain("<", fallback);
+            Assert.DoesNotContain("kept(1)", HtmlText.ToText("<script>kept(1)</script><p>tail</p>"));
         }
 
         [Fact]

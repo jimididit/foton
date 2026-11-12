@@ -2,6 +2,7 @@
   <!-- Opens an already-collected case folder or ZIP. Offline: reads package files only, never the live host. -->
   <ItemGroup>
     <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
+    <InternalsVisibleTo Include="Foton.Tests" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.IO.Compression" />
