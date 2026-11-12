@@ -57,7 +57,7 @@ namespace Foton.Gui
             _tabs.TabPages.Add(ToolsTab());
             _tabs.TabPages.Add(ProfileTab());
             _tabs.TabPages.Add(_comparePage = CompareTab());
-            _tabs.TabPages.Add(AcquireTab());
+            _tabs.TabPages.Add(_acquirePage = AcquireTab());
             // The log sits under every tab: an install or register is followed there as much as a parse.
             var outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
             outer.Panel1.Controls.Add(_tabs);
@@ -89,7 +89,7 @@ namespace Foton.Gui
             open.Controls.Add(AddButton("Open ZIP...", async () => { var p = PickZip(); if (p != null) await Open(p); }));
 
             var actions = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(4) };
-            actions.Controls.Add(AddButton("Verify", () => Run("Verify", Verify), needsPackage: true));
+            actions.Controls.Add(AddButton("Verify", VerifyOpenPackage, needsPackage: true));
             actions.Controls.Add(AddButton("Parse", () => Run("Parse", Parse), needsPackage: true));
             actions.Controls.Add(AddButton("Compose", () => Run("Compose", ComposeStep()), needsPackage: true));
             actions.Controls.Add(AddButton("Analyze", () => Run("Analyze", Analyze), needsPackage: true));
@@ -114,6 +114,7 @@ namespace Foton.Gui
             Load += (s, e) => SetSplit(findingsSplit, 0.68);
 
             page.Controls.Add(findingsSplit);
+            page.Controls.Add(Checklist());
             page.Controls.Add(actions);
             page.Controls.Add(open);
             UpdateButtons();
@@ -193,6 +194,7 @@ namespace Foton.Gui
                 _busy = false;
                 _progress.Visible = false;
                 UpdateButtons();
+                RefreshChecklist();
             }
         }
 
@@ -222,6 +224,7 @@ namespace Foton.Gui
                     _summary.Text = $"{Path.GetFileName(p.CaseRoot)} - {p.Kind}, {p.Artifacts.Count} artifacts";
                     LoadNotes(p.CaseRoot);
                     ShowFindings(findings);
+                    RefreshChecklist();
                     RefreshViewer(p.CaseRoot, log);
                     UpdateButtons();
                 }));

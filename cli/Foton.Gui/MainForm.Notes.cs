@@ -136,6 +136,7 @@ namespace Foton.Gui
             if (table.Rows.Count == 0) _details.Clear();
             else ShowDetails(_findings, _details);
             ShowSelectedNote();
+            RefreshChecklist();   // the Review step counts statuses
         }
 
         string? SelectedFindingKey() =>
@@ -287,6 +288,8 @@ namespace Foton.Gui
                 return null;
             });
             if (run == null) return;
+            if (_caseRoot != null) _handedOff.Add(_caseRoot);
+            RefreshChecklist();
             _status.Text = (run.Verified ? "Handoff written: " : "Handoff written, but the package did not verify: ") + run.Folder;
         }
 

@@ -74,6 +74,7 @@ namespace Foton.Gui
 
             page.Controls.Add(split);
             page.Controls.Add(bar);
+            page.Controls.Add(StartPanel());
             FillAddedFolders();
             return page;
         }
