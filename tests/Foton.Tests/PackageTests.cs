@@ -195,6 +195,10 @@ namespace Foton.Tests
                 Assert.Equal(ArtifactShape.Binary, ArtifactReader.ShapeOf(t.File("blob.bin")));
                 Assert.Equal(ArtifactShape.Text, ArtifactReader.ShapeOf(t.File("notes.unknown")));
                 Assert.Equal(ArtifactShape.Json, ArtifactReader.ShapeOf(t.File("x.JSON")));
+                foreach (var n in new[] { "a.html", "b.HTM", "c.xml" }) File.WriteAllText(t.File(n), "<x/>");
+                Assert.Equal(ArtifactShape.Html, ArtifactReader.ShapeOf(t.File("a.html")));
+                Assert.Equal(ArtifactShape.Html, ArtifactReader.ShapeOf(t.File("b.HTM")));
+                Assert.Equal(ArtifactShape.Xml, ArtifactReader.ShapeOf(t.File("c.xml")));
             }
         }
 
@@ -415,6 +419,56 @@ namespace Foton.Tests
             Assert.Throws<FileNotFoundException>(() => FotonPackage.Open(Path.Combine(Path.GetTempPath(), "foton-no-such-" + Guid.NewGuid().ToString("N"))));
             using (var t = new TempDir())
                 Assert.Throws<InvalidDataException>(() => FotonPackage.Open(t.Path));
+        }
+
+        [Fact]
+        public void Endpoint_HTML_becomes_plain_text_without_script_or_markup()
+        {
+            var html = "<html><head><style>p{color:red}</style><script>alert('x')</script></head><body>" +
+                       "<h1>Policy &amp; settings</h1><!-- note --><p>Line one<br>Line two</p>" +
+                       "<table><tr><td>Name</td><td>Value</td></tr><tr><td>A</td><td>&lt;b&gt;</td></tr></table>" +
+                       "<img src=\"http://example.invalid/x.png\" onerror=\"alert(1)\"><div>\n\n\n\nEnd</div></body></html>";
+            var text = HtmlText.ToText(html);
+            Assert.Equal("Policy & settings\r\nLine one\r\nLine two\r\nName\tValue\r\nA\t<b>\r\n\r\nEnd", text);
+            Assert.DoesNotContain("alert", text);
+            Assert.DoesNotContain("color", text);
+
+            // Markup that runs the regexes into their time limit falls back to a tag stripper instead of throwing.
+            var hostile = string.Concat(Enumerable.Repeat("<script>x", 20000)) + "<script>kept(1)</script><p>tail</p>";
+            var fallback = HtmlText.ToText(hostile, TimeSpan.FromTicks(1));
+            Assert.Contains("kept(1)", fallback);   // only the fallback keeps script text (as text): the regexes did time out
+            Assert.EndsWith("tail", fallback);
+            Assert.DoesNotContain("<", fallback);
+            Assert.DoesNotContain("kept(1)", HtmlText.ToText("<script>kept(1)</script><p>tail</p>"));
+        }
+
+        [Fact]
+        public void XML_reads_as_a_tree_and_refuses_DTDs()
+        {
+            using (var t = new TempDir())
+            {
+                File.WriteAllText(t.File("gp.xml"), "<Rsop><Computer name=\"PC\"><Gpo>A</Gpo><Gpo>B</Gpo></Computer></Rsop>");
+                var root = (System.Collections.Generic.IDictionary<string, object>)XmlTree.Read(t.File("gp.xml"), 100);
+                var computer = (System.Collections.Generic.IDictionary<string, object>)((System.Collections.Generic.IDictionary<string, object>)root["Rsop"])["Computer"];
+                Assert.Equal("PC", computer["@name"]);
+                Assert.Equal(new object[] { "A", "B" }, (object[])computer["Gpo"]);
+
+                File.WriteAllText(t.File("xxe.xml"), "<?xml version=\"1.0\"?><!DOCTYPE r [<!ENTITY x SYSTEM \"file:///c:/windows/win.ini\">]><r>&x;</r>");
+                Assert.Throws<InvalidDataException>(() => XmlTree.Read(t.File("xxe.xml"), 100));
+
+                File.WriteAllText(t.File("many.xml"), "<r>" + string.Concat(Enumerable.Repeat("<i>1</i>", 50)) + "</r>");
+                var many = (System.Collections.Generic.IDictionary<string, object>)((System.Collections.Generic.IDictionary<string, object>)XmlTree.Read(t.File("many.xml"), 10))["r"];
+                Assert.True(many.ContainsKey(XmlTree.More));
+                Assert.Equal(9, ((object[])many["i"]).Length);
+
+                // Hostile nesting (deep enough to overflow a recursive walk) stops at the depth cap instead.
+                File.WriteAllText(t.File("deep.xml"), string.Concat(Enumerable.Repeat("<a>", 20000)) + "x" + string.Concat(Enumerable.Repeat("</a>", 20000)));
+                object node = XmlTree.Read(t.File("deep.xml"), 1000000);
+                int levels = 0;
+                while (node is System.Collections.Generic.IDictionary<string, object> map && map.ContainsKey("a")) { node = map["a"]; levels++; }
+                Assert.Equal(1 + 64, levels);   // the root wrapper, then 64 element levels
+                Assert.True(((System.Collections.Generic.IDictionary<string, object>)node).ContainsKey(XmlTree.Deeper));
+            }
         }
     }
 }

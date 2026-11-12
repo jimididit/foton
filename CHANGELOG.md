@@ -7,6 +7,7 @@ Each `v2.*` release takes its "What's new" notes from the section whose heading 
 ## [2.10.0] - 2026-11-11
 
 - Console Acquire tab: collect or baseline this PC without a command prompt. The console runs the `foton-collect.exe` / `foton-baseline.exe` beside it as its own process, only after checking it against `SHA256SUMS.txt` (a mismatch is refused; with no list it asks first), through the Windows administrator prompt when asked, and shows the collector's own log as it runs. The console itself never runs elevated. A finished collection opens in the Package tab and is verified; a finished baseline is set up in Compare against this host's previous baseline.
+- Console Viewer: HTML files (the package's own report, `gpresult.html`) are shown as plain text with scripts and styles removed, never rendered; XML files open as a tree (a document with a DTD is not read, so nothing external is fetched). **Show source** shows the markup of either.
 
 ## [2.9.1] - 2026-11-11
 

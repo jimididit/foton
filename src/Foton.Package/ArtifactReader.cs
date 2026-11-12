@@ -7,7 +7,7 @@ using Foton.Core;
 
 namespace Foton.Package
 {
-    public enum ArtifactShape { Csv, Json, Text, Binary }
+    public enum ArtifactShape { Csv, Json, Text, Binary, Html, Xml }
 
     /// <summary>A CSV read for display: columns in file order and up to a row cap.</summary>
     public sealed class CsvTable
@@ -37,7 +37,7 @@ namespace Foton.Package
     {
         static readonly HashSet<string> TextExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            ".txt", ".log", ".md", ".xml", ".html", ".htm", ".ps1", ".psm1", ".bat", ".cmd", ".vbs", ".js", ".reg", ".inf", ".ini",
+            ".txt", ".log", ".md", ".ps1", ".psm1", ".bat", ".cmd", ".vbs", ".js", ".reg", ".inf", ".ini",
             ".cfg", ".conf", ".yml", ".yaml", ".tsv",
         };
 
@@ -47,6 +47,8 @@ namespace Foton.Package
             var ext = Path.GetExtension(path);
             if (string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase)) return ArtifactShape.Csv;
             if (string.Equals(ext, ".json", StringComparison.OrdinalIgnoreCase)) return ArtifactShape.Json;
+            if (string.Equals(ext, ".html", StringComparison.OrdinalIgnoreCase) || string.Equals(ext, ".htm", StringComparison.OrdinalIgnoreCase)) return ArtifactShape.Html;
+            if (string.Equals(ext, ".xml", StringComparison.OrdinalIgnoreCase)) return ArtifactShape.Xml;
             if (TextExtensions.Contains(ext)) return ArtifactShape.Text;
             try
             {
