@@ -19,7 +19,8 @@ namespace Foton.Gui
         {
             grid.Paint += (s, e) =>
             {
-                if (grid.Rows.Count > 0) return;
+                // Data rows only: a grid that lets the user add rows always holds the empty new-row placeholder.
+                if (grid.Rows.Count - (grid.AllowUserToAddRows ? 1 : 0) > 0) return;
                 var message = text();
                 if (string.IsNullOrEmpty(message)) return;
                 var top = grid.ColumnHeadersVisible ? grid.ColumnHeadersHeight : 0;
