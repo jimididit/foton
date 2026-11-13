@@ -22,6 +22,9 @@ namespace Foton.Gui
         readonly TextBox _baselinesOutput = new TextBox { Width = 420 };
         readonly TextBox _handoffsOutput = new TextBox { Width = 420 };
         readonly ListBox _caseFolders = new ListBox { Width = 420, Height = 120, HorizontalScrollbar = true };
+        readonly ComboBox _theme = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+        readonly ComboBox _textSize = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+        static readonly string[] Themes = { ConsoleSettings.ThemeLight, ConsoleSettings.ThemeDark, ConsoleSettings.ThemeWindows };
         bool _clearRecent;
 
         public SettingsDialog(ConsoleSettings settings)
@@ -46,6 +49,7 @@ namespace Foton.Gui
 
             var tabs = new TabControl { Dock = DockStyle.Fill };
             tabs.TabPages.Add(GeneralTab(settings));
+            tabs.TabPages.Add(AppearanceTab(settings));
             tabs.TabPages.Add(FoldersTab());
 
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(4) };
@@ -58,6 +62,23 @@ namespace Foton.Gui
             CancelButton = cancel;
             Controls.Add(tabs);
             Controls.Add(buttons);
+            Theme.Adopt(this);
+        }
+
+        TabPage AppearanceTab(ConsoleSettings settings)
+        {
+            var page = new TabPage("Appearance");
+            var p = Page();
+            _theme.Items.AddRange(new object[] { "Light", "Dark", "Follow Windows (light or dark apps)" });
+            _theme.SelectedIndex = Math.Max(0, Array.IndexOf(Themes, settings.Theme));
+            foreach (var size in ConsoleSettings.TextSizes) _textSize.Items.Add(size + " pt" + (size == 9 ? " (standard)" : ""));
+            _textSize.SelectedIndex = Math.Max(0, Array.IndexOf(ConsoleSettings.TextSizes, settings.TextSize));
+            p.Controls.Add(Row("Theme", _theme));
+            p.Controls.Add(Hint("Dark colors the window's panels, lists, grids, and menus. Windows still draws the title bar, scroll bars, check boxes, message boxes, and the open, save, and folder dialogs in its own colors."));
+            p.Controls.Add(Row("Text size", _textSize));
+            p.Controls.Add(Hint("The size of the window's text. The View menu changes both at once, too."));
+            page.Controls.Add(p);
+            return page;
         }
 
         static FlowLayoutPanel Page() => new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(10) };
@@ -152,6 +173,8 @@ namespace Foton.Gui
             _target.HandoffsOutput = handoffs;
             _target.CaseFolders.Clear();
             _target.CaseFolders.AddRange(_caseFolders.Items.Cast<string>());
+            _target.Theme = Themes[Math.Max(0, _theme.SelectedIndex)];
+            _target.TextSize = ConsoleSettings.TextSizes[Math.Max(0, _textSize.SelectedIndex)];
             return true;
         }
     }

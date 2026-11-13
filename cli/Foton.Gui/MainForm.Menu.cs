@@ -15,6 +15,11 @@ namespace Foton.Gui
     sealed partial class MainForm
     {
         readonly ToolStripMenuItem _recentMenu = new ToolStripMenuItem("&Recent cases");
+        readonly ToolStripMenuItem _themeMenu = new ToolStripMenuItem("&Theme");
+        readonly ToolStripMenuItem _sizeMenu = new ToolStripMenuItem("Text &size");
+        MenuStrip? _menu;
+        System.Drawing.Font? _logFont;
+        StatusStrip? _statusStrip;
 
         MenuStrip MenuBar()
         {
@@ -41,6 +46,19 @@ namespace Foton.Gui
             view.DropDownItems.Add(Item("&Find", Keys.Control | Keys.F, FocusFind));
             view.DropDownItems.Add(Item("&Refresh", Keys.F5, () => _ = RefreshCurrentTab()));
             view.DropDownItems.Add(new ToolStripSeparator());
+            foreach (var t in new[] { ConsoleSettings.ThemeLight, ConsoleSettings.ThemeDark, ConsoleSettings.ThemeWindows })
+            {
+                var theme = t;
+                _themeMenu.DropDownItems.Add(Item(theme == ConsoleSettings.ThemeWindows ? "&Follow Windows" : "&" + theme, Keys.None, () => { _settings.Theme = theme; SaveSettings(); ApplyAppearance(); }));
+            }
+            foreach (var size in ConsoleSettings.TextSizes)
+            {
+                var s = size;
+                _sizeMenu.DropDownItems.Add(Item(s + " pt" + (s == 9 ? " (standard)" : ""), Keys.None, () => { _settings.TextSize = s; SaveSettings(); ApplyAppearance(); }));
+            }
+            view.DropDownItems.Add(_themeMenu);
+            view.DropDownItems.Add(_sizeMenu);
+            view.DropDownItems.Add(new ToolStripSeparator());
             var keys = new[] { Keys.D1, Keys.D2, Keys.D3, Keys.D4, Keys.D5, Keys.D6, Keys.D7, Keys.D8, Keys.D9, Keys.D0 };
             for (int t = 0; t < _tabs.TabPages.Count && t < keys.Length; t++)
             {
@@ -59,7 +77,45 @@ namespace Foton.Gui
             help.DropDownItems.Add(Item("&About Foton console", Keys.None, ShowAbout));
 
             menu.Items.AddRange(new ToolStripItem[] { file, view, tools, help });
+            _menu = menu;
             return menu;
+        }
+
+        /// <summary>Applies the theme (Light, Dark, or Windows' app setting) and text size from the settings to the whole window.</summary>
+        void ApplyAppearance()
+        {
+            // Windows High Contrast wins: the console then keeps Windows' own colors whatever theme is chosen.
+            var dark = !SystemInformation.HighContrast
+                && (_settings.Theme == ConsoleSettings.ThemeDark || (_settings.Theme == ConsoleSettings.ThemeWindows && Theme.WindowsPrefersDark()));
+            SuspendLayout();
+            Theme.Apply(this, dark, _settings.TextSize);
+            if (Math.Abs(_log.Font.Size - _settings.TextSize) > 0.01f)
+            {
+                // Only a font made here is disposed; the log's first font belongs to its construction.
+                var font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, _settings.TextSize);
+                _log.Font = font;
+                _logFont?.Dispose();
+                _logFont = font;
+            }
+            if (_menu != null) Theme.StyleMenuItems(_menu.Items);
+            if (_statusStrip != null) Theme.StyleMenuItems(_statusStrip.Items);
+            foreach (ToolStripMenuItem i in _themeMenu.DropDownItems)
+                i.Checked = i.Text.Replace("&", "").StartsWith(_settings.Theme == ConsoleSettings.ThemeWindows ? "Follow" : _settings.Theme, StringComparison.Ordinal);
+            foreach (ToolStripMenuItem i in _sizeMenu.DropDownItems)
+                i.Checked = i.Text.StartsWith(_settings.TextSize + " pt", StringComparison.Ordinal);
+            ResumeLayout(true);
+        }
+
+        /// <summary>Follow Windows: re-applied when Windows' light/dark setting changes while the console is open.</summary>
+        void OnWindowsPreferenceChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+        {
+            // Follow Windows tracks the light/dark setting; High Contrast turning on or off applies to every theme.
+            var relevant = _settings.Theme == ConsoleSettings.ThemeWindows
+                || e.Category == Microsoft.Win32.UserPreferenceCategory.Accessibility || e.Category == Microsoft.Win32.UserPreferenceCategory.Color;
+            if (!relevant || IsDisposed || !IsHandleCreated) return;
+            // The window can close between the check and the call (this event arrives on another thread).
+            try { BeginInvoke(new Action(() => { if (!IsDisposed) ApplyAppearance(); })); }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is ObjectDisposedException) { }
         }
 
         void SelectTab(string text)
@@ -88,6 +144,7 @@ namespace Foton.Gui
                 item.Click += async (s, e) => { if (_busy) return; if (_packagePage != null) _tabs.SelectedTab = _packagePage; await Open(path); };
                 _recentMenu.DropDownItems.Add(item);
             }
+            Theme.StyleMenuItems(_recentMenu.DropDownItems);
         }
 
         /// <summary>Ctrl+F: the find or filter box of the tab on screen.</summary>
@@ -121,6 +178,7 @@ namespace Foton.Gui
             }
             SaveSettings();
             ApplySettings();
+            ApplyAppearance();
             if (!_busy) _ = RefreshCases();
             _status.Text = "Settings saved.";
         }

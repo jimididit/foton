@@ -62,16 +62,23 @@ namespace Foton.Gui
             var outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
             outer.Panel1.Controls.Add(_tabs);
             outer.Panel2.Controls.Add(_log);
+            outer.Panel2.Padding = new Padding(8, 2, 8, 4);   // lines the log up with the tab content above it
             Load += (s, e) => SetSplit(outer, 0.68);
             Controls.Add(outer);
             var strip = new StatusStrip();
             strip.Items.Add(_status);
             strip.Items.Add(_progress);
             Controls.Add(strip);
+            _statusStrip = strip;
             var menu = MenuBar();   // after the tabs, which it lists
             Controls.Add(menu);
             MainMenuStrip = menu;
             ApplySettings();
+            Tidy.Apply(this);
+            Theme.Watch(this);
+            ApplyAppearance();
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnWindowsPreferenceChanged;
+            FormClosed += (s, e) => Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnWindowsPreferenceChanged;
 
             FindingGrid(_findings, _details);
             // Double-click a finding (or use Show artifact) to read its source artifact in the Viewer.
@@ -113,7 +120,6 @@ namespace Foton.Gui
 
             var findingsSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
             findingsSplit.Panel1.Controls.Add(_findings);
-            findingsSplit.Panel1.Controls.Add(FindingsFilterBar());
             findingsSplit.Panel2.Controls.Add(_details);
             findingsSplit.Panel2.Controls.Add(NoteEditor());
             // A splitter position is checked against the control's current size, so set it once the window has its real
@@ -121,6 +127,8 @@ namespace Foton.Gui
             Load += (s, e) => SetSplit(findingsSplit, 0.68);
 
             page.Controls.Add(findingsSplit);
+            // Above both panes, so the findings grid and the details beside it start at the same height.
+            page.Controls.Add(FindingsFilterBar());
             page.Controls.Add(Checklist());
             page.Controls.Add(actions);
             page.Controls.Add(open);

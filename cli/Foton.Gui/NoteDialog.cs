@@ -50,6 +50,7 @@ namespace Foton.Gui
             Controls.Add(buttons);
             Controls.Add(fields);
             Controls.Add(header);
+            Theme.Adopt(this);
         }
 
         public string Status => NoteStatus.All[_status.SelectedIndex < 0 ? 0 : _status.SelectedIndex];
