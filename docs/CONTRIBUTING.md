@@ -23,7 +23,8 @@ Use a throwaway Windows VM for live Collect and Baseline runs. Collection change
 | Project | Layer | Touches the live host? |
 |---------|-------|------------------------|
 | `src/Foton.Core` | Session, task runner, CSV/JSON/text writers, hashing, custody, coverage | No (callers supply host facts) |
-| `src/Foton.Win` | The only place for P/Invoke, WMI, COM, registry, and System32 tool helpers | Yes |
+| `src/Foton.Win` | P/Invoke, WMI, COM, registry, and System32 tool helpers that read the host | Yes |
+| `src/Foton.Win.Ui` | The console's appearance only: theme palettes, contrast math, and the two Windows calls for a dark title bar and scroll bars | No (UiRules: no registry, files, processes, WMI, or network) |
 | `src/Foton.Collect` | Collect categories (`<Category>Collection.cs`) and the orchestrator | Yes |
 | `src/Foton.Baseline.Capture` / `.Compare` | Baseline providers / offline diff | Capture yes, Compare no |
 | `src/Foton.Analyze`, `Foton.Report` | Rules (`Rules/*.cs`), findings, HTML reports | No |
@@ -36,7 +37,8 @@ Use a throwaway Windows VM for live Collect and Baseline runs. Collection change
 | One `.exe` per role, no loose DLLs (project DLLs merged by ILRepack, `cli/ILRepack.targets`) | `tests/Foton.ArchitectureTests` (SingleFileRules) |
 | Offline layers never reference `Foton.Win`, WMI, or HTTP | LayerRules |
 | Endpoint executables never reference Parse, Carve, Tools, or Patterns | LayerRules |
-| P/Invoke only in `src/Foton.Win`, with a size test per struct; no `Assembly.Load(byte[])` | LayerRules, struct size tests |
+| P/Invoke only in `src/Foton.Win`, with a size test per struct, and `src/Foton.Win.Ui`, limited to `DwmSetWindowAttribute` and `SetWindowTheme`; no `Assembly.Load(byte[])` | LayerRules, BinaryRules, UiRules, struct size tests |
+| A console theme keeps WCAG contrast (4.5:1 text, 3:1 borders and accent) | PaletteTests |
 | The carried collectors are build-order references only (never code references), and their bytes equal the published executables | EmbeddedCollectorRules |
 | Runtime dependencies are in-box .NET Framework assemblies only; NuGet packages are build- or test-time | `Directory.Packages.props` review + vulnerable-package CI step |
 

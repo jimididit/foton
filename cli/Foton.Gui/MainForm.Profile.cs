@@ -29,7 +29,7 @@ namespace Foton.Gui
         readonly Dictionary<string, ComboBox> _boolOptions = new Dictionary<string, ComboBox>(StringComparer.Ordinal);
         readonly Dictionary<string, KeyValuePair<CheckBox, NumericUpDown>> _intOptions = new Dictionary<string, KeyValuePair<CheckBox, NumericUpDown>>(StringComparer.Ordinal);
         readonly Label _profileStatus = new Label { Dock = DockStyle.Top, AutoSize = false, Height = 40, Padding = new Padding(4) };
-        readonly TextBox _profileJson = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Font = new Font(FontFamily.GenericMonospace, 9f) };
+        readonly TextBox _profileJson = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Font = Theme.MonoFont(9f) };
         readonly List<Button> _needsValidProfile = new List<Button>();
         /// <summary>The profile the controls describe, when it validates; null otherwise.</summary>
         CollectionProfile? _profile;
@@ -186,14 +186,14 @@ namespace Foton.Gui
                 var unknown = CollectTasks.Unknown(p.ExcludeTasks);
                 if (unknown.Length > 0) throw new InvalidDataException("ExcludeTasks names no Collect task: " + string.Join(", ", unknown));
                 _profile = p;
-                _profileStatus.ForeColor = Color.DarkGreen;
+                Theme.SetFore(_profileStatus, Color.DarkGreen);
                 var set = p.Options.Count == 0 ? "none (collector defaults)"
                     : string.Join(", ", p.Options.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + (kv.Value is bool b ? (b ? "On" : "Off") : Convert.ToString(kv.Value, System.Globalization.CultureInfo.InvariantCulture))));
                 _profileStatus.Text = $"Valid: {p.Categories.Count} of {CollectionProfile.AllCategories.Count} categories, {p.ExcludeTasks.Count} task(s) excluded. Options: {set}. SHA-256 {p.Sha256}";
             }
             catch (InvalidDataException ex)
             {
-                _profileStatus.ForeColor = Color.DarkRed;
+                Theme.SetFore(_profileStatus, Color.DarkRed);
                 _profileStatus.Text = "Not valid: " + ex.Message;
             }
             UpdateButtons();

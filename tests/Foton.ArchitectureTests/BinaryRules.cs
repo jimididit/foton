@@ -74,8 +74,9 @@ namespace Foton.ArchitectureTests
         [Fact]
         public void PInvoke_and_COM_imports_are_compiled_only_into_Foton_Win()
         {
-            // Intermediate (pre-merge) assemblies, so a cli exe is judged on its own code only.
-            foreach (var (p, asm) in Built(p => p.IntermediateAssembly).Where(x => x.Project.Name != "Foton.Win"))
+            // Intermediate (pre-merge) assemblies, so a cli exe is judged on its own code only. Foton.Win.Ui's imports are
+            // pinned one by one in UiRules.
+            foreach (var (p, asm) in Built(p => p.IntermediateAssembly).Where(x => x.Project.Name != "Foton.Win" && x.Project.Name != "Foton.Win.Ui"))
             {
                 foreach (var t in TypesOf(asm))
                 {

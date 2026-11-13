@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    How the console's window looks, nothing else: theme palettes, contrast math, and the two Windows calls that draw
+    the title bar and scroll bars dark. It references no Foton project and never reads the host (no registry, files,
+    processes, WMI, or network); architecture tests enforce it, so foton-console.exe can use it without Foton.Win.
+  -->
+  <ItemGroup>
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+</Project>

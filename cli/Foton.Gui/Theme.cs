@@ -4,35 +4,27 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
+using Foton.Tools;
+using Foton.Win.Ui;
 
 namespace Foton.Gui
 {
     /// <summary>
-    /// The console's Light and Dark themes and text size, in managed code only: the console may not use native calls
-    /// (they live in Foton.Win, which the console never references), so the title bar, scrollbars, and check boxes keep
-    /// Windows' light drawing, as do message boxes and the file and folder dialogs. Each control's original colors are
-    /// remembered the first time it is themed, so Light restores exactly what the control had. A control that took its
-    /// colors from its parent keeps following the parent. To theme a new kind of control, add it to Style.
+    /// The console's themes and text size. Light is Windows' own drawing; every other theme is a Palette (Foton.Win.Ui),
+    /// whose roles map onto the controls here: chrome, surfaces, reading areas, inputs, buttons, grids, menus. Windows
+    /// draws the title bar and the scroll bars, tree glyphs, and drop-down buttons, so those are asked for dark through
+    /// WindowChrome. Each control's original colors are remembered the first time it is themed, so Light restores exactly
+    /// what the control had; a control that took its colors from its parent keeps following the parent. To theme a new
+    /// kind of control, add it to Style.
     /// </summary>
     static class Theme
     {
-        public static bool Dark { get; private set; }
+        /// <summary>The palette in use; null is Light (Windows' own colors), also used with Windows High Contrast.</summary>
+        public static Palette? Palette { get; private set; }
         public static float TextSize { get; private set; } = 9f;
 
-        static readonly Color Back = Color.FromArgb(32, 32, 32);
-        static readonly Color Field = Color.FromArgb(24, 24, 24);
-        static readonly Color ButtonBack = Color.FromArgb(55, 55, 55);
-        static readonly Color ButtonHover = Color.FromArgb(72, 72, 72);
-        static readonly Color ButtonPressed = Color.FromArgb(40, 40, 40);
-        static readonly Color Text = Color.FromArgb(232, 232, 232);
-        static readonly Color Gray = Color.FromArgb(160, 160, 160);
-        static readonly Color Border = Color.FromArgb(80, 80, 80);
-        static readonly Color Header = Color.FromArgb(48, 48, 50);
-        static readonly Color Grid = Color.FromArgb(64, 64, 64);
-        static readonly Color Selection = Color.FromArgb(0, 92, 170);
-        static readonly Color InfoBack = Color.FromArgb(56, 50, 28);
-        static readonly Color Good = Color.FromArgb(128, 208, 128);
-        static readonly Color Bad = Color.FromArgb(240, 128, 128);
+        /// <summary>Secondary text in the current theme (grey timeline rows, hints set after the control was themed).</summary>
+        public static Color MutedText => Palette?.Muted ?? SystemColors.GrayText;
 
         sealed class Original
         {
@@ -49,12 +41,12 @@ namespace Foton.Gui
         }
 
         static readonly ConditionalWeakTable<Control, Original> Originals = new ConditionalWeakTable<Control, Original>();
-        static readonly ToolStripProfessionalRenderer DarkRenderer = new ToolStripProfessionalRenderer(new DarkStripColors()) { RoundedEdges = false };
+        static readonly Dictionary<Palette, ToolStripRenderer> Renderers = new Dictionary<Palette, ToolStripRenderer>();
 
-        /// <summary>Sets the theme and size, then themes <paramref name="root"/> and everything under it.</summary>
-        public static void Apply(Control root, bool dark, float textSize)
+        /// <summary>Sets the palette (null for Light) and size, then themes <paramref name="root"/> and everything under it.</summary>
+        public static void Apply(Control root, Palette? palette, float textSize)
         {
-            Dark = dark;
+            Palette = palette;
             TextSize = textSize;
             Walk(root);
         }
@@ -80,6 +72,18 @@ namespace Foton.Gui
             foreach (Control c in root.Controls) Watch(c);
         }
 
+        /// <summary>
+        /// Gives a control a new text color after it was themed, as Light would show it (GrayText, DarkGreen, DarkRed):
+        /// the theme maps it to its own muted, good, or bad color, and Light shows it as given.
+        /// </summary>
+        public static void SetFore(Control c, Color lightColor)
+        {
+            var o = Remember(c);
+            o.Fore = lightColor;
+            o.ForeSet = true;
+            Style(c);
+        }
+
         /// <summary>Fonts this class created for a form; only those are disposed when replaced (a caller's font is never disposed here).</summary>
         static readonly ConditionalWeakTable<Form, Font> OwnFonts = new ConditionalWeakTable<Form, Font>();
 
@@ -91,6 +95,18 @@ namespace Foton.Gui
             form.Font = font;
             if (OwnFonts.TryGetValue(form, out var previous)) { OwnFonts.Remove(form); previous.Dispose(); }
             OwnFonts.Add(form, font);
+        }
+
+        /// <summary>A monospaced font for logs and raw text: Cascadia Mono, else Consolas, else Windows' fixed font.</summary>
+        public static Font MonoFont(float size)
+        {
+            foreach (var family in new[] { "Cascadia Mono", "Consolas" })
+            {
+                var f = new Font(family, size);
+                if (string.Equals(f.Name, family, StringComparison.OrdinalIgnoreCase)) return f;   // GDI+ substitutes a missing family
+                f.Dispose();
+            }
+            return new Font(FontFamily.GenericMonospace, size);
         }
 
         /// <summary>Records a whole tree before styling any of it, so a child's inherited colors are seen as the parent's.</summary>
@@ -137,74 +153,101 @@ namespace Foton.Gui
             return o;
         }
 
-        static Color DarkFore(Color original) =>
-            original == SystemColors.GrayText ? Gray
-            : original == Color.DarkGreen ? Good
-            : original == Color.DarkRed ? Bad
-            : Text;
+        /// <summary>A text color set for Light, in the palette's terms.</summary>
+        static Color Fore(Palette p, Color light) =>
+            light == SystemColors.GrayText ? p.Muted
+            : light == Color.DarkGreen || light == Color.Green ? p.Good
+            : light == Color.DarkRed || light == Color.Red ? p.Bad
+            : light == Color.DarkOrange || light == Color.Orange ? p.Warn
+            : p.Text;
+
+        /// <summary>Reading areas (multi-line text, lists, trees) versus single-line inputs.</summary>
+        static bool IsReadingArea(Control c) => (c is TextBoxBase t && t.Multiline) || c is ListBox || c is TreeView || c is ListView;
+
+        static bool IsField(Control c) => c is TextBoxBase || c is ListControl || c is TreeView || c is UpDownBase || c is ListView;
 
         static void Style(Control c)
         {
             var o = Remember(c);
             if (c is Form f) SetFont(f);
+            var p = Palette;
 
-            var field = c is TextBoxBase || c is ListControl || c is TreeView || c is UpDownBase;
             var pushButton = c is ButtonBase && !(c is CheckBox) && !(c is RadioButton);
-            if (!Dark)
+            if (p == null)
             {
                 if (o.BackSet) c.BackColor = o.Back; else c.ResetBackColor();
                 if (o.ForeSet) c.ForeColor = o.Fore; else c.ResetForeColor();
             }
             else
             {
-                // Surfaces that paint themselves get dark colors; everything else (panels, labels, check boxes) follows
-                // its parent, as it did in Light.
-                if (o.BackSet || field || pushButton || c is Form || c is TabPage)
-                    c.BackColor = o.BackSet && o.Back == SystemColors.Info ? InfoBack : field ? Field : pushButton ? ButtonBack : Back;
-                if (o.ForeSet || field || c is Form) c.ForeColor = o.ForeSet ? DarkFore(o.Fore) : Text;
+                // Surfaces that paint themselves get palette colors; everything else (panels, labels, check boxes) follows
+                // its parent, as it does in Light.
+                if (c is Form) c.BackColor = p.Back;
+                else if (c is TabPage) c.BackColor = p.Surface;
+                else if (IsField(c)) c.BackColor = IsReadingArea(c) ? p.List : p.Field;
+                else if (pushButton) c.BackColor = p.Raised;
+                else if (o.BackSet) c.BackColor = o.Back == SystemColors.Info ? p.Info : o.Back == SystemColors.Window ? p.List : p.Surface;
+                if (o.ForeSet) c.ForeColor = Fore(p, o.Fore);
+                else if (IsField(c) || c is Form || pushButton) c.ForeColor = p.Text;
             }
 
             switch (c)
             {
                 case CheckBox _:
                 case RadioButton _:
+                    var box = (ButtonBase)c;
+                    // Flat check boxes draw their box and mark in the control's own colors, so they follow the palette.
+                    box.FlatStyle = p != null ? FlatStyle.Flat : o.Flat ?? FlatStyle.Standard;
+                    if (p != null)
+                    {
+                        box.FlatAppearance.BorderColor = p.Border;
+                        box.FlatAppearance.CheckedBackColor = p.Field;
+                        box.FlatAppearance.MouseOverBackColor = p.Hover;
+                        box.FlatAppearance.MouseDownBackColor = p.Pressed;
+                    }
                     break;
                 case ButtonBase b:
-                    b.FlatStyle = Dark ? FlatStyle.Flat : o.Flat ?? FlatStyle.Standard;
-                    if (Dark)
+                    b.FlatStyle = p != null ? FlatStyle.Flat : o.Flat ?? FlatStyle.Standard;
+                    if (p != null)
                     {
                         // Hover and pressed feedback, which flat buttons do not draw by themselves.
-                        b.FlatAppearance.BorderColor = Border;
-                        b.FlatAppearance.MouseOverBackColor = ButtonHover;
-                        b.FlatAppearance.MouseDownBackColor = ButtonPressed;
+                        b.FlatAppearance.BorderColor = p.Border;
+                        b.FlatAppearance.MouseOverBackColor = p.Hover;
+                        b.FlatAppearance.MouseDownBackColor = p.Pressed;
                     }
-                    if (!Dark) b.UseVisualStyleBackColor = o.VisualStyleBack ?? true;   // as the button had it
+                    else b.UseVisualStyleBackColor = o.VisualStyleBack ?? true;   // as the button had it
                     break;
                 case ComboBox cb:
-                    cb.FlatStyle = Dark ? FlatStyle.Flat : o.Flat ?? FlatStyle.Standard;
+                    // A flat combo box paints its button in Windows' light colors; in a dark palette Windows draws the
+                    // whole box with its dark theme instead (Chrome), so it keeps the standard style there.
+                    cb.FlatStyle = p != null && !p.IsDark ? FlatStyle.Flat : o.Flat ?? FlatStyle.Standard;
                     break;
                 case DataGridView g:
-                    StyleGrid(g, o);
+                    StyleGrid(g, o, p);
+                    break;
+                case ThemedTabs themed:
+                    themed.Palette = p;
                     break;
                 case TabControl t:
                     StyleTabs(t, o);
                     break;
                 case TabPage page:
-                    page.UseVisualStyleBackColor = !Dark;
+                    page.UseVisualStyleBackColor = p == null;
                     break;
                 case TreeView tv:
-                    tv.LineColor = Dark ? Gray : o.TreeLines ?? SystemColors.ControlText;
+                    tv.LineColor = p != null ? p.Muted : o.TreeLines ?? SystemColors.ControlText;
                     break;
                 case ToolStrip strip:
-                    if (Dark) strip.Renderer = DarkRenderer;
+                    if (p != null) strip.Renderer = Renderer(p);
                     else if (o.Renderer != null) strip.Renderer = o.Renderer;   // the strip's own renderer, as it was
                     break;
             }
+            Chrome(c);
         }
 
-        static void StyleGrid(DataGridView g, Original o)
+        static void StyleGrid(DataGridView g, Original o, Palette? p)
         {
-            if (!Dark)
+            if (p == null)
             {
                 g.BackgroundColor = o.GridBack;
                 g.GridColor = o.GridLines;
@@ -213,18 +256,20 @@ namespace Foton.Gui
                 g.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle(o.Headers!);
                 return;
             }
-            g.BackgroundColor = Back;
-            g.GridColor = Grid;
+            g.BackgroundColor = p.List;
+            g.GridColor = p.GridLines;
             g.EnableHeadersVisualStyles = false;
-            var cells = new DataGridViewCellStyle(o.Cells!) { BackColor = Field, ForeColor = Text, SelectionBackColor = Selection, SelectionForeColor = Color.White };
-            g.DefaultCellStyle = cells;
-            g.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle(o.Headers!) { BackColor = Header, ForeColor = Text, SelectionBackColor = Header, SelectionForeColor = Text };
+            g.DefaultCellStyle = new DataGridViewCellStyle(o.Cells!) { BackColor = p.List, ForeColor = p.Text, SelectionBackColor = p.Selection, SelectionForeColor = p.SelectionText };
+            g.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle(o.Headers!) { BackColor = p.Header, ForeColor = p.Text, SelectionBackColor = p.Header, SelectionForeColor = p.Text };
         }
 
         /// <summary>Tab controls given the header painter (weak: a closed dialog's tabs are not kept alive).</summary>
         static readonly ConditionalWeakTable<TabControl, object> OwnerDrawn = new ConditionalWeakTable<TabControl, object>();
 
-        /// <summary>Dark tab headers are drawn here; the strip beside the last tab keeps Windows' color.</summary>
+        /// <summary>
+        /// A plain TabControl (not ThemedTabs) gets owner-drawn headers in a palette; the strip beside the last tab keeps
+        /// Windows' color. The console's own tab controls are ThemedTabs, which paint all of it.
+        /// </summary>
         static void StyleTabs(TabControl t, Original o)
         {
             if (!OwnerDrawn.TryGetValue(t, out _))
@@ -232,45 +277,81 @@ namespace Foton.Gui
                 OwnerDrawn.Add(t, new object());
                 t.DrawItem += (s, e) =>
                 {
-                    var page = t.TabPages[e.Index];
+                    var p = Palette;
+                    if (p == null) return;
                     var selected = e.Index == t.SelectedIndex;
-                    using (var back = new SolidBrush(selected ? Header : Back)) e.Graphics.FillRectangle(back, e.Bounds);
-                    TextRenderer.DrawText(e.Graphics, page.Text, t.Font, e.Bounds, selected ? Color.White : Gray,
+                    using (var back = new SolidBrush(selected ? p.Surface : p.Back)) e.Graphics.FillRectangle(back, e.Bounds);
+                    TextRenderer.DrawText(e.Graphics, t.TabPages[e.Index].Text, t.Font, e.Bounds, selected ? p.Text : p.Muted,
                         TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
-                    // Keyboard focus stays visible on hand-drawn tabs, as Windows shows it on its own.
-                    if (selected && t.Focused)
-                    {
-                        var r = e.Bounds;
-                        r.Inflate(-3, -3);
-                        ControlPaint.DrawFocusRectangle(e.Graphics, r, Color.White, Header);
-                    }
                 };
             }
-            t.DrawMode = Dark ? TabDrawMode.OwnerDrawFixed : o.TabDraw ?? TabDrawMode.Normal;
+            t.DrawMode = Palette != null ? TabDrawMode.OwnerDrawFixed : o.TabDraw ?? TabDrawMode.Normal;
             t.Invalidate();
         }
 
-        sealed class DarkStripColors : ProfessionalColorTable
+        /// <summary>Controls whose Windows-drawn parts follow the theme once their window exists.</summary>
+        static readonly ConditionalWeakTable<Control, object> ChromeHooked = new ConditionalWeakTable<Control, object>();
+
+        /// <summary>
+        /// The parts Windows draws for a control: the title bar of a form, scroll bars of anything that scrolls, tree
+        /// glyphs, and a drop-down's button. A control without a window yet gets them when its window is created.
+        /// </summary>
+        static void Chrome(Control c)
         {
-            public override Color MenuStripGradientBegin => Back;
-            public override Color MenuStripGradientEnd => Back;
-            public override Color StatusStripGradientBegin => Back;
-            public override Color StatusStripGradientEnd => Back;
-            public override Color ToolStripDropDownBackground => Header;
-            public override Color ImageMarginGradientBegin => Header;
-            public override Color ImageMarginGradientMiddle => Header;
-            public override Color ImageMarginGradientEnd => Header;
-            public override Color MenuItemSelected => Selection;
-            public override Color MenuItemSelectedGradientBegin => Selection;
-            public override Color MenuItemSelectedGradientEnd => Selection;
-            public override Color MenuItemPressedGradientBegin => Header;
-            public override Color MenuItemPressedGradientEnd => Header;
-            public override Color MenuItemBorder => Selection;
-            public override Color MenuBorder => Border;
-            public override Color SeparatorDark => Border;
-            public override Color SeparatorLight => Border;
-            public override Color CheckBackground => Selection;
-            public override Color CheckSelectedBackground => Selection;
+            var kind = c is Form ? 1
+                : c is ComboBox ? 2
+                : c is TextBoxBase || c is ListBox || c is TreeView || c is ListView || c is ScrollBar || c is DataGridView
+                  || (c is ScrollableControl sc && sc.AutoScroll) ? 3
+                : 0;
+            if (kind == 0) return;
+            if (!ChromeHooked.TryGetValue(c, out _))
+            {
+                ChromeHooked.Add(c, new object());
+                c.HandleCreated += (s, e) => Chrome(c);
+            }
+            if (!c.IsHandleCreated) return;
+            var p = Palette;
+            var dark = p != null && p.IsDark;
+            switch (kind)
+            {
+                case 1: WindowChrome.TitleBar(c.Handle, p); break;
+                case 2: WindowChrome.Control(c.Handle, dark ? WindowChrome.Parts.DarkComboBox : WindowChrome.Parts.Default); break;
+                default: WindowChrome.Control(c.Handle, dark ? WindowChrome.Parts.DarkExplorer : WindowChrome.Parts.Default); break;
+            }
+            if (kind != 1) c.Invalidate();
+        }
+
+        static ToolStripRenderer Renderer(Palette p)
+        {
+            if (!Renderers.TryGetValue(p, out var r))
+                Renderers[p] = r = new ToolStripProfessionalRenderer(new StripColors(p)) { RoundedEdges = false };
+            return r;
+        }
+
+        sealed class StripColors : ProfessionalColorTable
+        {
+            readonly Palette _p;
+            public StripColors(Palette p) { _p = p; UseSystemColors = false; }
+            public override Color MenuStripGradientBegin => _p.Back;
+            public override Color MenuStripGradientEnd => _p.Back;
+            public override Color StatusStripGradientBegin => _p.Back;
+            public override Color StatusStripGradientEnd => _p.Back;
+            public override Color ToolStripDropDownBackground => _p.Field;
+            public override Color ImageMarginGradientBegin => _p.Field;
+            public override Color ImageMarginGradientMiddle => _p.Field;
+            public override Color ImageMarginGradientEnd => _p.Field;
+            public override Color MenuItemSelected => _p.Hover;
+            public override Color MenuItemSelectedGradientBegin => _p.Hover;
+            public override Color MenuItemSelectedGradientEnd => _p.Hover;
+            public override Color MenuItemPressedGradientBegin => _p.Field;
+            public override Color MenuItemPressedGradientEnd => _p.Field;
+            public override Color MenuItemBorder => _p.Border;
+            public override Color MenuBorder => _p.Border;
+            public override Color SeparatorDark => _p.Border;
+            public override Color SeparatorLight => _p.Border;
+            public override Color CheckBackground => _p.Selection;
+            public override Color CheckSelectedBackground => _p.Selection;
+            public override Color CheckPressedBackground => _p.Selection;
         }
 
         /// <summary>Menu text colors follow the theme (the renderer draws item text; dynamic items such as recent cases included).</summary>
@@ -278,9 +359,27 @@ namespace Foton.Gui
         {
             foreach (ToolStripItem item in items)
             {
-                item.ForeColor = Dark ? Text : SystemColors.ControlText;
+                item.ForeColor = Palette?.Text ?? SystemColors.ControlText;
                 if (item is ToolStripDropDownItem d) StyleMenuItems(d.DropDownItems);
             }
+        }
+
+        /// <summary>How a theme setting is named in the menu and Settings.</summary>
+        public static string DisplayName(string theme) =>
+            theme == ConsoleSettings.ThemeWindows ? "Follow Windows"
+            : theme == ConsoleSettings.ThemeSolarizedDark ? "Solarized Dark"
+            : theme == ConsoleSettings.ThemeSolarizedLight ? "Solarized Light"
+            : theme;
+
+        /// <summary>
+        /// The palette a theme setting shows now: none with Windows High Contrast on (Windows' colors win) or for Light,
+        /// Dark or none for Follow Windows, else the named palette.
+        /// </summary>
+        public static Palette? PaletteFor(string theme)
+        {
+            if (SystemInformation.HighContrast) return null;
+            if (theme == ConsoleSettings.ThemeWindows) return WindowsPrefersDark() ? Foton.Win.Ui.Palette.Dark : null;
+            return Foton.Win.Ui.Palette.Find(theme);
         }
 
         /// <summary>Whether Windows is set to dark mode for apps (HKCU, the workstation's own preference; light when unknown).</summary>

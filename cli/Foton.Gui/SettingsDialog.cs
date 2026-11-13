@@ -25,7 +25,6 @@ namespace Foton.Gui
         readonly ListBox _caseFolders = new ListBox { Width = 420, Height = 120, HorizontalScrollbar = true };
         readonly ComboBox _theme = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
         readonly ComboBox _textSize = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
-        static readonly string[] Themes = { ConsoleSettings.ThemeLight, ConsoleSettings.ThemeDark, ConsoleSettings.ThemeWindows };
         bool _clearRecent;
 
         public SettingsDialog(ConsoleSettings settings)
@@ -49,7 +48,7 @@ namespace Foton.Gui
             _bundlesOutput.Text = settings.BundlesOutput;
             foreach (var f in settings.CaseFolders) _caseFolders.Items.Add(f);
 
-            var tabs = new TabControl { Dock = DockStyle.Fill };
+            var tabs = new ThemedTabs { Dock = DockStyle.Fill };
             tabs.TabPages.Add(GeneralTab(settings));
             tabs.TabPages.Add(AppearanceTab(settings));
             tabs.TabPages.Add(FoldersTab());
@@ -71,12 +70,13 @@ namespace Foton.Gui
         {
             var page = new TabPage("Appearance");
             var p = Page();
-            _theme.Items.AddRange(new object[] { "Light", "Dark", "Follow Windows (light or dark apps)" });
-            _theme.SelectedIndex = Math.Max(0, Array.IndexOf(Themes, settings.Theme));
+            foreach (var t in ConsoleSettings.Themes)
+                _theme.Items.Add(t == ConsoleSettings.ThemeWindows ? "Follow Windows (Light or Dark, as Windows apps are set)" : Theme.DisplayName(t));
+            _theme.SelectedIndex = Math.Max(0, Array.IndexOf(ConsoleSettings.Themes, settings.Theme));
             foreach (var size in ConsoleSettings.TextSizes) _textSize.Items.Add(size + " pt" + (size == 9 ? " (standard)" : ""));
             _textSize.SelectedIndex = Math.Max(0, Array.IndexOf(ConsoleSettings.TextSizes, settings.TextSize));
             p.Controls.Add(Row("Theme", _theme));
-            p.Controls.Add(Hint("Dark colors the window's panels, lists, grids, and menus. Windows still draws the title bar, scroll bars, check boxes, message boxes, and the open, save, and folder dialogs in its own colors."));
+            p.Controls.Add(Hint("Light uses Windows' own colors. Dark is neutral; Campbell follows the Windows Terminal default; Solarized Dark and Light follow the Solarized scheme, adjusted so all text stays readable. With Windows High Contrast on, the console uses Windows' colors whatever is chosen. Message boxes and the open, save, and folder dialogs keep Windows' colors."));
             p.Controls.Add(Row("Text size", _textSize));
             p.Controls.Add(Hint("The size of the window's text. The View menu changes both at once, too."));
             page.Controls.Add(p);
@@ -179,7 +179,7 @@ namespace Foton.Gui
             _target.BundlesOutput = bundles;
             _target.CaseFolders.Clear();
             _target.CaseFolders.AddRange(_caseFolders.Items.Cast<string>());
-            _target.Theme = Themes[Math.Max(0, _theme.SelectedIndex)];
+            _target.Theme = ConsoleSettings.Themes[Math.Max(0, _theme.SelectedIndex)];
             _target.TextSize = ConsoleSettings.TextSizes[Math.Max(0, _textSize.SelectedIndex)];
             return true;
         }

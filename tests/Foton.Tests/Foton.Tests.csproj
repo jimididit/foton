@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\Foton.Tools\Foton.Tools.csproj" />
     <ProjectReference Include="..\..\src\Foton.Carve\Foton.Carve.csproj" />
     <ProjectReference Include="..\..\src\Foton.Collect\Foton.Collect.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Win.Ui\Foton.Win.Ui.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.IO.Compression" />

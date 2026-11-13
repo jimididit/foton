@@ -87,7 +87,7 @@ namespace Foton.Gui
                 foreach (DataGridViewColumn c in _timeline.Columns) if (weights.TryGetValue(c.Name, out var w)) c.FillWeight = w;
                 foreach (DataGridViewRow r in _timeline.Rows)
                     if (r.DataBoundItem is DataRowView v && Convert.ToString(v["During collection"], CultureInfo.InvariantCulture) == "yes")
-                        r.DefaultCellStyle.ForeColor = SystemColors.GrayText;
+                        r.DefaultCellStyle.ForeColor = Theme.MutedText;
             };
             _timeline.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) ShowTimelineSource(); };
             _viewer.ShowInTimeline += async (artifact, row, utc) => await TimelineAround(utc, artifact, row);

@@ -39,6 +39,15 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Every_offered_theme_is_kept_and_an_unknown_one_falls_back_to_Light()
+        {
+            foreach (var theme in ConsoleSettings.Themes)
+                Assert.Equal(theme, ConsoleSettings.Parse("{ \"Theme\": \"" + theme + "\" }").Theme);
+            Assert.Equal(ConsoleSettings.ThemeLight, ConsoleSettings.Parse("{ \"Theme\": \"Neon\" }").Theme);
+            Assert.Equal(ConsoleSettings.ThemeLight, ConsoleSettings.Parse("{ \"Theme\": \"solarizeddark\" }").Theme);
+        }
+
+        [Fact]
         public void Recent_cases_are_most_recent_first_once_and_capped()
         {
             var s = new ConsoleSettings { RecentCount = 2 };
