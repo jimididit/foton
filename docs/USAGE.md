@@ -5,9 +5,9 @@ Foton has **two machines**. Mixing them is what usually causes confusion.
 | Where | What you run | What you get |
 |-------|--------------|--------------|
 | **Endpoint** | `foton-collect.exe` or `foton-baseline.exe` (one file each) | Hashed case folder or baseline folder (+ ZIP) |
-| **Workstation** | `foton.exe` | Parse, compose, analyze, IOC match, baseline compare, carve, package verification |
+| **Workstation** | `foton.exe`, or `foton-console.exe` in a window | Package verification, parse, compose, analyze, IOC match, timeline, search, notes, handoff, baseline compare, carve, and collector bundles for endpoints |
 
-Copy only the endpoint executable to a target. Parse, compose, and analyze read the copied package on the workstation and never touch the live host.
+Only a collector goes to an endpoint: download it, or build its folder on the workstation with [`foton bundle`](#bundles) or the console's **Collectors** tab. Everything else reads the copied package on the workstation and never touches the live host.
 
 **First time?** Start with [GETTING-STARTED.md](GETTING-STARTED.md). This page is the full reference.
 
@@ -20,6 +20,14 @@ Copy only the endpoint executable to a target. Parse, compose, and analyze read 
 **Versions.** Every executable prints its version and the collect, baseline, and findings schemas it writes with `-Version` (see [Formats](#formats-and-compatibility)).
 
 **Older hosts.** The executables need Windows 10 / Server 2016 or newer. For Windows 7, 8.1, or Server 2012 R2, use the PowerShell line: [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) and its [1.38.x usage guide](https://github.com/jimididit/foton/blob/v1.38.2/legacy/powershell/release-docs/docs/USAGE.md). 1.38.2 is the final PowerShell release and is no longer maintained ([SECURITY.md](../SECURITY.md)).
+
+**On this page**
+
+- [0. Getting Foton](#0-getting-foton): downloads, verifying them, antivirus
+- [1. Endpoint](#1-endpoint-collect-and-baseline-capture): [Collect](#collect-live-triage), [collection profiles](#collection-profiles), [Baseline](#baseline-known-state-snapshot)
+- [2. Workstation: `foton.exe`](#2-workstation-fotonexe): [baseline compare](#baseline-compare), [parse](#parse), [compose](#compose-ez-tools--hayabusa--chainsaw-optional), [timeline](#timeline), [examiner notes](#examiner-notes), [search](#search), [handoff](#handoff), [bundles](#bundles), [analysis notes](#analysis-notes)
+- [3. Workstation window: `foton-console.exe`](#3-workstation-window-foton-consoleexe)
+- [Formats and compatibility](#formats-and-compatibility) and [what we will not hide](#what-we-will-not-hide)
 
 ---
 
@@ -126,7 +134,7 @@ Every key is optional. Without `Categories` every category is collected. `Exclud
 
 A task the profile leaves out is not run. Its artifact holds a one-line note, the manifest records `NotSelected`, `collection_coverage.json` lists it, and the profile is copied into the package as `00_Collection\collection_profile.json` with its SHA-256 in the chain of custody. `analyze` names the profile in an Info finding and draws no conclusion from what it left out. The custody record, coverage, manifest, hashing, and the end-of-run report always run.
 
-To build a profile without writing JSON, use the **Profile** tab of `foton-console.exe` ([section 3](#3-workstation-window-foton-consoleexe)); it can also package the profile with `foton-collect.exe` for an endpoint.
+To build a profile without writing JSON, use the **Profile** tab of `foton-console.exe` ([section 3](#3-workstation-window-foton-consoleexe)). To send it to an endpoint with the collector, build a bundle: `foton bundle collect -Profile "\path\to\profile.json"`, or the console's **Collectors** tab.
 
 ### Baseline (known-state snapshot)
 
@@ -281,7 +289,22 @@ EZ Tools unpacks several tools into subfolders (`EvtxeCmd\`, `RECmd\`, `AmcacheP
 
 Each tool writes into a staging folder first. Compose replaces that tool's earlier output only when the run produces files, so those rows describe this run. When a tool does not run or produces nothing, earlier output is kept and listed as `Retained` with its hash, so the inventory still covers every file analyze reads. On a ZIP, compose works in the ZIP's `-extracted` folder like every other verb.
 
-Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are inventory rows (`NotOnPath`), not failures; a tool unchecked in the console's **Compose runs** list is `NotSelected`. Hayabusa hits are that engine's inferences (Tier 2) and name the tool. PECmd and EvtxECmd CSVs also feed `analyze` (coverage, user-writable path references, and a short list of high-attention Event IDs such as 1102 and 7045). RECmd batch output feeds it too: an Info overview (rows by hive type and category, Threat Hunting entries), a Medium finding when Autoruns, Services, or Threat Hunting values name user-writable paths, and an Info finding for keys or values RECmd recovered as deleted. RECmd reads every copied hive, including users whose hives were not loaded at collection time. Chainsaw hunt CSVs become one Info overview (detection rows and top rule titles, with rows the collection itself caused counted apart); Chainsaw's CSV carries no rule level, so read the rule before treating a title as severe. LECmd and JLECmd CSVs each become an Info overview (rows, distinct targets, and targets on removable media or network paths), a Medium finding when an executable or script target sits in a user-writable path, and a Medium finding when a target's arguments match a suspicious-command pattern. Documents in Downloads or AppData are not flagged. AmcacheParser CSVs become an Info overview (rows by CSV kind), a Medium finding for executables or scripts inventoried under user-writable paths (rows marked `IsOsComponent` are left out), and a Medium finding for drivers recorded as unsigned and not shipped with Windows. On Windows 10 and later an Amcache entry shows a file was present, not that it ran. AppCompatCacheParser (Shimcache) CSVs become an Info overview (entries per control set, how many are marked Executed) and a Medium finding for executables or scripts in user-writable paths; the Executed flag is the tool's reading of an insert flag, not proof of execution. SBECmd (shellbags) CSVs become one Info overview: folders browsed per user hive, phone and camera (MTP) entries, network paths, archive contents, and drive letters other than the system drive. A drive letter alone does not say whether the volume was removable. SrumECmd (SRUM) CSVs become an Info overview (rows per table, distinct apps, the dates covered) and a Medium finding for executables in user-writable paths that used the network, with bytes sent and received; SRUM counts bytes per app per hour, not destinations. MFTECmd (USN journal) CSVs become an Info overview (creates, deletes, and renames in the period covered) and an Info list of executables or scripts created, by name only: without `$MFT` the journal has no folder paths. Journal rows inside the collection window are counted apart, because the collector writes its own output to the volume.
+Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are inventory rows (`NotOnPath`), not failures; a tool unchecked in the console's **Compose runs** list is `NotSelected`.
+
+`analyze` then reads each tool's CSVs. The following table lists what it reports for each tool, and how to read it:
+
+| Tool | What `analyze` reports | Read it with care |
+|------|------------------------|-------------------|
+| Hayabusa | Its hits, as that engine's inferences (Tier 2), naming the tool | |
+| Chainsaw | One Info overview: detection rows and top rule titles, with rows the collection itself caused counted apart | The CSV carries no rule level; read the rule before treating a title as severe |
+| PECmd, EvtxECmd | Coverage, user-writable path references, and a short list of high-attention Event IDs such as 1102 and 7045 | |
+| RECmd | An Info overview (rows by hive type and category, Threat Hunting entries), a Medium finding when Autoruns, Services, or Threat Hunting values name user-writable paths, and an Info finding for keys or values recovered as deleted | It reads every copied hive, including users whose hives were not loaded at collection time |
+| LECmd, JLECmd | Per tool, an Info overview (rows, distinct targets, targets on removable media or network paths), a Medium finding when an executable or script target sits in a user-writable path, and a Medium finding when a target's arguments match a suspicious-command pattern | Documents in Downloads or AppData are not flagged |
+| AmcacheParser | An Info overview (rows by CSV kind), a Medium finding for executables or scripts under user-writable paths (rows marked `IsOsComponent` left out), and a Medium finding for drivers recorded as unsigned and not shipped with Windows | On Windows 10 and later an entry shows a file was present, not that it ran |
+| AppCompatCacheParser (Shimcache) | An Info overview (entries per control set, how many are marked Executed) and a Medium finding for executables or scripts in user-writable paths | Executed is the tool's reading of an insert flag, not proof of execution |
+| SBECmd (shellbags) | One Info overview: folders browsed per user hive, phone and camera (MTP) entries, network paths, archive contents, and drive letters other than the system drive | A drive letter alone does not say whether the volume was removable |
+| SrumECmd (SRUM) | An Info overview (rows per table, distinct apps, dates covered) and a Medium finding for executables in user-writable paths that used the network, with bytes sent and received | SRUM counts bytes per app per hour, not destinations |
+| MFTECmd (USN journal) | An Info overview (creates, deletes, and renames in the period covered) and an Info list of executables or scripts created | By name only: without `$MFT` the journal has no folder paths. Rows inside the collection window are counted apart, because the collector writes its own output to the volume |
 
 EZ Tools registered with Foton 2.4.0 or earlier list six tools; run `.\foton.exe tools EZTools "\path\to\EZTools"` again so AppCompatCacheParser, SBECmd, SrumECmd, and MFTECmd are found too.
 
@@ -335,10 +358,22 @@ It reads every CSV, JSON, text, log, XML, and HTML file in the package, the coll
 
 ```powershell
 .\foton.exe handoff "\path\to\case-folder"
-.\foton.exe handoff "\path\to\Foton_case.zip" -OutputPath "D:\Cases\Handoffs"
+.\foton.exe handoff "\path\to\Foton_case.zip" -OutputPath "\path\to\folder"
 ```
 
 `Foton_Handoff_<case>_<UTC>` holds `findings.csv`, `examiner_notes.json` and `examiner_notes.csv` (every finding with its status, then the other notes), `Foton_Handoff.html` (findings and the examiner's review side by side, labelled apart, with offline search), `package\chain_of_custody.txt` and `package\hashes.csv`, `HANDOFF.txt`, and `SHA256SUMS.txt` listing every other file. The package is not copied: `HANDOFF.txt` names it by the SHA-256 of its `hashes.csv` (and of the ZIP, when opened from one) and says whether it verified when the handoff was written; a package that does not verify still gets a handoff that says so, and the exit code is 2. A notes file Foton cannot read stops the handoff. `foton handoff` does not copy `Foton_Report.html`, because it cannot tell where that file was written; the console's **Export handoff** adds the report it built with **Analyze**, when unchanged.
+
+### Bundles
+
+`foton bundle` builds the folder you carry to an endpoint, with the collector `foton.exe` carries: the one released with it, so the endpoint runs the same Foton version you analyze with.
+
+```powershell
+.\foton.exe bundle collect                                          # every category, the collector's defaults
+.\foton.exe bundle collect -Profile "\path\to\profile.json"         # what a collection profile selects
+.\foton.exe bundle baseline -LoadUserHives                          # baseline collector, including users not signed in
+```
+
+Each run writes a new folder under `C:\Foton\Bundles` (or `-OutputPath "\path\to\folder"`): `Foton_Bundle_<profile>_<UTC>Z` for a collection, `Foton_BaselineBundle_<UTC>Z` for a baseline. It holds the collector, `profile.json` when one was given, `SHA256SUMS.txt`, and `RUN.txt` with the command to run on the endpoint and how to check the files first. A profile `foton-collect` would refuse is refused here too. Nothing is run on the workstation. The console's **Collectors** tab builds the same folders.
 
 ### Analysis notes
 
@@ -355,40 +390,118 @@ It reads every CSV, JSON, text, log, XML, and HTML file in the package, the coll
 
 ## 3. Workstation window: `foton-console.exe`
 
-A window for the same workstation work, for when you would rather click than type. It runs the same code as `foton.exe`, writes the same files, and never reads the live host.
+A window for the same workstation work, for when you would rather click than type. It runs the same code as `foton.exe`, writes the same files, and never reads the live host or runs a collector.
 
-1. Start `foton-console.exe`; it opens on the **Cases** tab, where **Start here** builds a collector or baseline collector to run on an endpoint (the **Collectors** tab) or opens a case folder or ZIP. Or pass a package on its command line to open it straight away: `.\foton-console.exe "\path\to\Foton_case.zip"`. Once a case is open, the **Package** tab lists its next steps (verify, parse, compose, analyze, timeline, review, hand off) with what each has done; **Do this next** runs the first one not done.
-2. On **Cases**, select a case and press **Open** (or double-click it). On the **Package** tab, **Open folder...** or **Open ZIP...** loads a case folder or package ZIP (a ZIP is extracted beside it, as with `foton.exe`). Findings already in the package are listed.
-3. **Verify** checks every file against `hashes.csv`, as `foton package` does. **Parse**, **Compose**, and **Analyze** run those verbs; **Parse, compose, analyze** runs all three in order.
-4. Select a finding to read why it matters, the source artifact, and the next step. **Show artifact** (or double-clicking the finding) opens that artifact in the **Viewer** tab. **Show case folder** opens the folder in Explorer. Filter the findings by **Severity**, **Status**, and **Find**; under the details, set the finding's [examiner](#examiner-notes) status and note and press **Save note**.
-5. **Open report** opens `Foton_Report.html` in your browser only when this window built it with **Analyze** and the file has not changed since. The report already in a package was written on the endpoint, and a browser runs whatever an HTML file contains, so for that one the console asks to run **Analyze** first and opens the rebuilt report.
-6. **Match IOCs...** runs `foton ioc` with an indicator list you choose (text, CSV, or JSON, as above). Matches are listed in the log and written to `analysis\ioc_matches.csv`, which opens in the **Viewer**.
+Start `foton-console.exe`. It opens on the **Cases** tab, where **Start here** builds a collector for an endpoint or opens a case folder or ZIP. To open a package straight away, pass it on the command line: `.\foton-console.exe "\path\to\Foton_case.zip"`.
+
+The tabs, in the order they appear:
+
+| Tab | What it is for |
+|-----|----------------|
+| [Cases](#cases-tab) | Your case and baseline packages; open, verify, or pick baselines to compare |
+| [Package](#package-tab) | The open case: next steps, verify, parse, compose, analyze, findings, report, IOCs |
+| [Viewer](#viewer-tab) | Read any file in the package, with its hash check |
+| [Timeline](#timeline-tab) | Build and filter the package's timeline |
+| [Notes](#notes-tab) | Every examiner note, and handoff export |
+| [Search](#search-tab) | Find a value across the whole package |
+| [Tools](#tools-tab) | Install or register the tools compose runs |
+| [Profile](#profile-tab) | Build a collection profile |
+| [Compare](#compare-tab) | Compare two baselines |
+| [Collectors](#collectors-tab) | Build the folder to carry to an endpoint |
 
 The log pane under the tabs shows the same lines `foton.exe` prints. One action runs at a time; the buttons come back when it finishes.
 
-The menu bar has **File** (open a case folder or ZIP, **Recent cases**, exit), **View** (find on this tab, refresh this tab, **Theme**, **Text size**, go to a tab), **Tools** (**Settings...**, and the Tools and Profile tabs), and **Help** (keyboard shortcuts, and **About**, which shows the version, schemas, release date, and the SHA-256 of `foton-console.exe` to compare with `SHA256SUMS.txt`). Shortcuts: Ctrl+O open a case folder, Ctrl+Shift+O open a ZIP, Ctrl+F find on this tab, F5 refresh this tab, Ctrl+1 to Ctrl+0 go to a tab, Ctrl+comma settings.
+#### Cases tab
 
-**Settings** holds the console's own preferences, in `%LOCALAPPDATA%\Foton\console-settings.json` (never in a package). **General**: the examiner name filled in for notes, whether the window opens on the **Cases** tab or the last case opened, and how many recent cases **File** lists. **Appearance**: **Light**, **Dark**, or **Follow Windows** (Windows' light or dark app setting, followed when it changes), and text size from 9 to 12 pt; **View** changes both too. Dark colors the window's panels, lists, grids, tabs, menus, and log; Windows still draws the title bar, scroll bars, check boxes, message boxes, and the file and folder dialogs in its own colors. With Windows High Contrast on, the console uses Windows' colors whatever theme is chosen. **Folders**: where you keep cases and baselines (the **Cases** tab lists them), where the **Collectors** tab builds bundles, and where **Export handoff** writes handoffs (empty uses `C:\Foton\Cases`, `C:\Foton\Baselines`, `C:\Foton\Bundles`, `C:\Foton\Handoffs`), and other folders for the **Cases** tab to list. Folders must be full paths. A setting the console cannot read falls back to its default without affecting the others.
+Lists the case and baseline packages in `C:\Foton\Cases`, `C:\Foton\Baselines`, and any folders you add with **Add folder...** (remembered in `%LOCALAPPDATA%\Foton\console-settings.json`; **Remove folder** forgets one, the two defaults always stay). It is the same listing as `foton cases`, read from each package's own files without hashing: host and time, case number and examiner, admin or standard account, profile, finding counts (from the workstation analyze when it has run, otherwise the collector's), which of parse, compose, and analyze have run, and whether there is a ZIP. A package it cannot read is listed with the reason; links and junctions are not followed.
 
-The **Tools** tab lists the tools compose can find: the catalog-pinned releases (installed or not) and installs registered from a folder, with where each one is. **Install Hayabusa...** and **Install Chainsaw...** show the pinned version, license, and SHA-256, then download the release or take an archive you already downloaded (for a workstation without internet). Either way it is installed only when its SHA-256 matches the pin, as with `foton tools`. **Register existing** records an install you already have (choose `EZTools` for the Eric Zimmerman tools folder, or one tool) without downloading anything. **Compose runs** picks the tools **Compose** runs; a tool left unchecked is listed as `NotSelected` in the inventory, and its earlier output is kept as `Retained`. PATH is never changed.
+- **Open** (or double-click) opens the selected case on the **Package** tab.
+- **Verify selected** checks the selected cases against their `hashes.csv`, as **Verify** does; the result is shown until the console closes. A ZIP that has not been extracted is not verified here (that would extract it): open it first.
+- For baselines, **Use as reference** and **Use as difference** fill in **Compare**, and **Compare these two** compares two selected baselines, the earlier capture as the reference.
 
-The **Profile** tab builds a [collection profile](#collection-profiles). Check the categories and tasks to collect (a category is collected while any of its tasks is checked; its unchecked tasks become `ExcludeTasks`) and set each option to **On**, **Off**, or **Default** (the profile leaves it to the collector, where every one of them is off unless its switch is given). The status line lists every option the profile sets, so a profile meant to be deep shows `Deep=On`. The JSON below is checked after every change by the same rules `foton-collect -Profile` applies, and **Save profile...** and **Build bundle...** work only while it is valid. **Load profile...** opens an existing profile; one that `foton-collect` would refuse is refused here too.
+Nothing on this tab deletes, moves, or renames a package.
 
-**Build bundle...** goes to the **Collectors** tab with this profile chosen.
+#### Package tab
 
-The **Cases** tab lists the case and baseline packages in `C:\Foton\Cases`, `C:\Foton\Baselines`, and any folders you add with **Add folder...** (remembered in `%LOCALAPPDATA%\Foton\console-settings.json`; **Remove folder** forgets one, the two defaults always stay). It is the same listing as `foton cases`, read from each package's own files without hashing: host and time, case number and examiner, admin or standard account, profile, finding counts (from the workstation analyze when it has run, otherwise the collector's), which of parse, compose, and analyze have run, and whether there is a ZIP. A package it cannot read is listed with the reason; links and junctions are not followed. **Verify selected** checks the selected cases against their `hashes.csv`, as **Verify** does; the result is shown until the console closes. A ZIP that has not been extracted is not verified here (that would extract it): open it first. For baselines, **Use as reference** and **Use as difference** fill in **Compare**, and **Compare these two** compares two selected baselines, the earlier capture as the reference. Nothing on this tab deletes, moves, or renames a package.
+Once a case is open, the **Package** tab lists its next steps (verify, parse, compose, analyze, timeline, review, hand off) with what each has done; **Do this next** runs the first one not done. **Open folder...** or **Open ZIP...** loads another case folder or package ZIP (a ZIP is extracted beside it, as with `foton.exe`). Findings already in the package are listed.
 
-The **Collectors** tab builds the folder you carry to an endpoint, as `foton bundle` does. The console carries the `foton-collect.exe` and `foton-baseline.exe` released with it, so nothing else needs to be downloaded. **Build collection bundle** creates `Foton_Bundle_<profile>_<UTC>` with `foton-collect.exe`, the **Profile** tab's profile as `profile.json` when **Use the profile on the Profile tab** is checked (otherwise every category with the collector's defaults), `SHA256SUMS.txt`, and `RUN.txt` with the command to run. **Build baseline bundle** creates `Foton_BaselineBundle_<UTC>` with `foton-baseline.exe` (and `-LoadUserHives` in `RUN.txt` when **Include users who are not signed in** is checked). Both go under `C:\Foton\Bundles` unless you choose another folder (or set one in **Settings**). Copy the folder to the endpoint or push it with your RMM tool, run the command in `RUN.txt` (an elevated prompt collects the most; a standard user is supported), and bring the package back to open on the **Cases** tab. The console never runs a collector or asks for elevation; to collect the PC it runs on, build a bundle and run it there the same way.
+- **Verify** checks every file against `hashes.csv`, as `foton package` does. **Parse**, **Compose**, and **Analyze** run those verbs; **Parse, compose, analyze** runs all three in order.
+- Select a finding to read why it matters, the source artifact, and the next step. **Show artifact** (or double-clicking the finding) opens that artifact in the **Viewer**. **Show case folder** opens the folder in Explorer. Filter the findings by **Severity**, **Status**, and **Find**; under the details, set the finding's [examiner](#examiner-notes) status and note and press **Save note**.
+- **Open report** opens `Foton_Report.html` in your browser only when this window built it with **Analyze** and the file has not changed since. The report already in a package was written on the endpoint, and a browser runs whatever an HTML file contains, so for that one the console asks to run **Analyze** first and opens the rebuilt report.
+- **Match IOCs...** runs `foton ioc` with an indicator list you choose (text, CSV, or JSON, as above). Matches are listed in the log and written to `analysis\ioc_matches.csv`, which opens in the **Viewer**.
 
-The **Compare** tab runs `foton compare`: choose the reference `baseline.json` (the earlier one, or the golden image) and the difference `baseline.json` (the later one, or the host), or type or paste a baseline folder, then **Compare**. As with the verb, `baseline_diff.csv` and `Foton_BaselineCompare.html` are written beside the difference baseline. The findings are listed with their explanation, and the table below them shows every field-level change (the first 50,000; all of them are in `baseline_diff.csv`). **Open compare report** opens only the report this window built, unchanged since.
+#### Viewer tab
 
-The **Viewer** tab lists the package's files. A CSV opens as a table, 1,000 rows a page, with **Find** filtering every loaded row (up to 500,000; a larger file says so); JSON opens as a tree; text and logs open as text (up to 5 MB). HTML (the package's own `Foton_Report.html`, `gpresult.html`) is shown as plain text, never rendered, because HTML written on an endpoint can contain anything; reports this console builds open in your browser from **Open report**. XML (`gpresult.xml`, task XML) opens as a tree; documents that declare a DTD are not read. **Show source** shows either file's markup. Binary artifacts such as `.evtx`, hives, and Prefetch show their size and hash only, because parse and compose read those. Every file shows its SHA-256 and whether it matches `00_Collection\hashes.csv`, changed since hashing, or is not listed (written later, such as `analysis\` outputs). Links and junctions inside a package are listed but never followed. On a CSV the timeline reads, **Show in timeline** opens the **Timeline** tab around the selected row's time.
+Lists the package's files. Every file shows its SHA-256 and whether it matches `00_Collection\hashes.csv`, changed since hashing, or is not listed (written later, such as `analysis\` outputs). Links and junctions inside a package are listed but never followed.
 
-The **Timeline** tab shows the package's [timeline](#timeline). **Build timeline** runs `foton timeline` on the open package (**Include SRUM hourly counters** is `-All`) and shows `analysis\timeline.csv`; a timeline already in the package is shown when you open the tab, with the time it was written, so build again after a new parse or compose. Filter it by **From** and **To** (UTC, as `yyyy-MM-dd` or `yyyy-MM-dd HH:mm:ss`; a bare **To** date includes that day), **Source**, and **Find** (text in the time, source, meaning, summary, or artifact), then **Apply** or press Enter. The first 10,000 matching rows are shown, with how many match in all. **Around selected row** shows every source within the chosen number of minutes of the selected row, and **Show source row** (or double-clicking a row) opens the artifact in the **Viewer** at the row it came from. Grey rows fall inside the collection window. **Note on source row...** notes the artifact row a timeline row came from.
+- A CSV opens as a table, 1,000 rows a page, with **Find** filtering every loaded row (up to 500,000; a larger file says so). On a CSV the timeline reads, **Show in timeline** opens the **Timeline** tab around the selected row's time. **Note on row...** records a status and note for the selected row.
+- JSON opens as a tree; text and logs open as text (up to 5 MB).
+- HTML (the package's own `Foton_Report.html`, `gpresult.html`) is shown as plain text, never rendered, because HTML written on an endpoint can contain anything; reports this console builds open in your browser from **Open report**. XML (`gpresult.xml`, task XML) opens as a tree; documents that declare a DTD are not read. **Show source** shows either file's markup.
+- Binary artifacts such as `.evtx`, hives, and Prefetch show their size and hash only, because parse and compose read those.
 
-**Note on row...** in the **Viewer** (on a CSV) records a status and note for the selected row. The **Notes** tab lists every examiner note: on findings, on findings the latest analyze no longer produces, and on rows (with whether the row still reads as it did). **Go to** (or double-clicking) opens the finding on the **Package** tab or the row in the **Viewer**; **Edit note...** changes it. The notes are the same file `foton notes` lists and sets. **Export handoff** writes a [handoff](#handoff) under `C:\Foton\Handoffs` (**Export handoff to...** asks for the folder), including `Foton_Report.html` when this window built it with **Analyze** and it has not changed.
+#### Timeline tab
 
-The **Search** tab runs [`foton search`](#search) on the open package (**Regular expression** for `-Regex`; **Stop** ends it early and keeps what was found). Double-click a hit, or **Open in Viewer**, to open its file in the **Viewer** at that row; for a text file the line is shown in the status bar.
+Shows the package's [timeline](#timeline). **Build timeline** runs `foton timeline` on the open package (**Include SRUM hourly counters** is `-All`) and shows `analysis\timeline.csv`; a timeline already in the package is shown when you open the tab, with the time it was written, so build again after a new parse or compose.
+
+- Filter by **From** and **To** (UTC, as `yyyy-MM-dd` or `yyyy-MM-dd HH:mm:ss`; a bare **To** date includes that day), **Source**, and **Find** (text in the time, source, meaning, summary, or artifact), then **Apply** or press Enter. The first 10,000 matching rows are shown, with how many match in all.
+- **Around selected row** shows every source within the chosen number of minutes of the selected row. **Show source row** (or double-clicking a row) opens the artifact in the **Viewer** at the row it came from, and **Note on source row...** notes that row.
+- Grey rows fall inside the collection window.
+
+#### Notes tab
+
+Lists every examiner note: on findings, on findings the latest analyze no longer produces, and on rows (with whether the row still reads as it did). **Go to** (or double-clicking) opens the finding on the **Package** tab or the row in the **Viewer**; **Edit note...** changes it. The notes are the same file `foton notes` lists and sets.
+
+**Export handoff** writes a [handoff](#handoff) under `C:\Foton\Handoffs` (**Export handoff to...** asks for the folder), including `Foton_Report.html` when this window built it with **Analyze** and it has not changed.
+
+#### Search tab
+
+Runs [`foton search`](#search) on the open package (**Regular expression** for `-Regex`; **Stop** ends it early and keeps what was found). Double-click a hit, or **Open in Viewer**, to open its file in the **Viewer** at that row; for a text file the line is shown in the status bar.
+
+#### Tools tab
+
+Lists the tools compose can find: the catalog-pinned releases (installed or not) and installs registered from a folder, with where each one is. PATH is never changed.
+
+- **Install Hayabusa...** and **Install Chainsaw...** show the pinned version, license, and SHA-256, then download the release or take an archive you already downloaded (for a workstation without internet). Either way it is installed only when its SHA-256 matches the pin, as with `foton tools`.
+- **Register existing** records an install you already have (choose `EZTools` for the Eric Zimmerman tools folder, or one tool) without downloading anything.
+- **Compose runs** picks the tools **Compose** runs; a tool left unchecked is listed as `NotSelected` in the inventory, and its earlier output is kept as `Retained`.
+
+#### Profile tab
+
+Builds a [collection profile](#collection-profiles). Check the categories and tasks to collect (a category is collected while any of its tasks is checked; its unchecked tasks become `ExcludeTasks`) and set each option to **On**, **Off**, or **Default** (the profile leaves it to the collector, where every one of them is off unless its switch is given). The status line lists every option the profile sets, so a profile meant to be deep shows `Deep=On`.
+
+The JSON below is checked after every change by the same rules `foton-collect -Profile` applies, and **Save profile...** and **Build bundle...** work only while it is valid. **Load profile...** opens an existing profile; one that `foton-collect` would refuse is refused here too. **Build bundle...** goes to the **Collectors** tab with this profile chosen.
+
+#### Compare tab
+
+Runs `foton compare`: choose the reference `baseline.json` (the earlier one, or the golden image) and the difference `baseline.json` (the later one, or the host), or type or paste a baseline folder, then **Compare**. As with the verb, `baseline_diff.csv` and `Foton_BaselineCompare.html` are written beside the difference baseline. The findings are listed with their explanation, and the table below them shows every field-level change (the first 50,000; all of them are in `baseline_diff.csv`). **Open compare report** opens only the report this window built, unchanged since.
+
+#### Collectors tab
+
+Builds the folder you carry to an endpoint, as [`foton bundle`](#bundles) does. The console carries the `foton-collect.exe` and `foton-baseline.exe` released with it, so nothing else needs to be downloaded.
+
+- **Build collection bundle** creates `Foton_Bundle_<profile>_<UTC>Z` with `foton-collect.exe`, the **Profile** tab's profile as `profile.json` when **Use the profile on the Profile tab** is checked (otherwise every category with the collector's defaults), `SHA256SUMS.txt`, and `RUN.txt` with the command to run.
+- **Build baseline bundle** creates `Foton_BaselineBundle_<UTC>Z` with `foton-baseline.exe` (and `-LoadUserHives` in `RUN.txt` when **Include users who are not signed in** is checked).
+- Both go under `C:\Foton\Bundles` unless you choose another folder (or set one in **Settings**). **Show the last bundle** opens the folder.
+
+Copy the folder to the endpoint or push it with your RMM tool, run the command in `RUN.txt` (an elevated prompt collects the most; a standard user is supported), and bring the package back to open on the **Cases** tab. The console never runs a collector or asks for elevation; to collect the PC it runs on, build a bundle and run it there the same way.
+
+#### Menu, shortcuts, and settings
+
+The menu bar has **File** (open a case folder or ZIP, **Recent cases**, exit), **View** (find on this tab, refresh this tab, **Theme**, **Text size**, go to a tab), **Tools** (**Settings...**, and the Collectors, Tools, and Profile tabs), and **Help** (keyboard shortcuts, and **About**, which shows the version, schemas, release date, and the SHA-256 of `foton-console.exe` to compare with `SHA256SUMS.txt`).
+
+| Shortcut | Does |
+|----------|------|
+| Ctrl+O / Ctrl+Shift+O | Open a case folder / a ZIP |
+| Ctrl+F | Find on this tab |
+| F5 | Refresh this tab |
+| Ctrl+1 to Ctrl+0 | Go to a tab |
+| Ctrl+comma | Settings |
+
+**Settings** holds the console's own preferences, in `%LOCALAPPDATA%\Foton\console-settings.json` (never in a package). A setting the console cannot read falls back to its default without affecting the others.
+
+- **General**: the examiner name filled in for notes, whether the window opens on the **Cases** tab or the last case opened, and how many recent cases **File** lists.
+- **Appearance**: **Light**, **Dark**, or **Follow Windows** (Windows' light or dark app setting, followed when it changes), and text size from 9 to 12 pt; **View** changes both too. Dark colors the window's panels, lists, grids, tabs, menus, and log; Windows still draws the title bar, scroll bars, check boxes, message boxes, and the file and folder dialogs in its own colors. With Windows High Contrast on, the console uses Windows' colors whatever theme is chosen.
+- **Folders**: where you keep cases and baselines (the **Cases** tab lists them), where the **Collectors** tab builds bundles, and where **Export handoff** writes handoffs (empty uses `C:\Foton\Cases`, `C:\Foton\Baselines`, `C:\Foton\Bundles`, `C:\Foton\Handoffs`), and other folders for the **Cases** tab to list. Folders must be full paths.
 
 ---
 

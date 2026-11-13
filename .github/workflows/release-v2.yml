@@ -169,7 +169,7 @@ jobs:
 
           Each executable prints its version and schemas with ``-Version``. Compare accepts baselines from Foton 1.38.x (schema 1.14.0) onward and explains the one-time format and coverage differences; see [Formats and compatibility](https://github.com/jimididit/foton/blob/$tag/docs/USAGE.md#formats-and-compatibility).
 
-          Hosts older than Windows 10 / Server 2016: use [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) (PowerShell; security fixes only). Operator guide: [docs/USAGE.md](https://github.com/jimididit/foton/blob/$tag/docs/USAGE.md).
+          Hosts older than Windows 10 / Server 2016: use [Foton 1.38.2](https://github.com/jimididit/foton/releases/tag/v1.38.2) (PowerShell; final release, no longer maintained). Operator guide: [docs/USAGE.md](https://github.com/jimididit/foton/blob/$tag/docs/USAGE.md).
 
           ## What's new in $tag
           $changes
