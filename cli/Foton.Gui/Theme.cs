@@ -208,6 +208,7 @@ namespace Foton.Gui
                         box.FlatAppearance.MouseOverBackColor = p.Hover;
                         box.FlatAppearance.MouseDownBackColor = p.Pressed;
                     }
+                    if (c is RadioButton radio) PaintRadio(radio);
                     break;
                 case ButtonBase b:
                     b.FlatStyle = p != null ? FlatStyle.Flat : o.Flat ?? FlatStyle.Standard;
@@ -247,6 +248,47 @@ namespace Foton.Gui
                     break;
             }
             Chrome(c);
+        }
+
+        /// <summary>Radio buttons given the palette painter (weak: closed dialogs' radios are not kept alive).</summary>
+        static readonly ConditionalWeakTable<RadioButton, object> PaintedRadios = new ConditionalWeakTable<RadioButton, object>();
+
+        /// <summary>
+        /// In a palette, radio buttons are drawn here: WinForms' flat radio is a grey disc whose small dot hardly shows on
+        /// a dark surface. A ring in the border colour; when selected, an accent ring with a solid accent dot (the dot,
+        /// not only the colour, says which is chosen). Light keeps Windows' own radio.
+        /// </summary>
+        static void PaintRadio(RadioButton radio)
+        {
+            radio.Invalidate();
+            if (PaintedRadios.TryGetValue(radio, out _)) return;
+            PaintedRadios.Add(radio, new object());
+            radio.Paint += (s, e) =>
+            {
+                var p = Palette;
+                if (p == null) return;
+                var g = e.Graphics;
+                using (var back = new SolidBrush(radio.BackColor)) g.FillRectangle(back, radio.ClientRectangle);
+                var d = Math.Max(11, radio.Font.Height - 3);
+                var ring = new Rectangle(1, (radio.ClientSize.Height - d) / 2, d - 1, d - 1);
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var fill = new SolidBrush(p.Field)) g.FillEllipse(fill, ring);
+                using (var pen = new Pen(radio.Checked ? p.Accent : p.Border, 1.5f)) g.DrawEllipse(pen, ring);
+                if (radio.Checked)
+                {
+                    var dot = ring;
+                    dot.Inflate(-(int)Math.Round(d * 0.27), -(int)Math.Round(d * 0.27));
+                    using (var accent = new SolidBrush(p.Accent)) g.FillEllipse(accent, dot);
+                }
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.Default;
+                var text = new Rectangle(d + 4, 0, Math.Max(0, radio.ClientSize.Width - d - 4), radio.ClientSize.Height);
+                TextRenderer.DrawText(g, radio.Text, radio.Font, text, radio.Enabled ? radio.ForeColor : p.Muted,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+                if (radio.Focused) ControlPaint.DrawFocusRectangle(g, new Rectangle(text.X - 1, 1, Math.Min(text.Width, TextRenderer.MeasureText(radio.Text, radio.Font).Width + 2), radio.ClientSize.Height - 2), p.Text, radio.BackColor);
+            };
+            radio.CheckedChanged += (s, e) => radio.Invalidate();
+            radio.GotFocus += (s, e) => radio.Invalidate();
+            radio.LostFocus += (s, e) => radio.Invalidate();
         }
 
         /// <summary>Buttons marked as the main action of their view.</summary>

@@ -159,9 +159,7 @@ namespace Foton.Gui
                     NextText = "Export handoff",
                     Next = async () =>
                     {
-                        var root = _caseRoot;
-                        await ExportHandoff(_settings.HandoffsFolder);
-                        return root != null && _handedOff.Contains(root) ? StepResult.Next(_status.Text) : StepResult.Stay("Not exported: see the log.");
+                        return await ExportHandoff(_settings.HandoffsFolder) ? StepResult.Next(_status.Text) : StepResult.Stay("Not exported: see the log.");
                     },
                 },
             };
@@ -217,11 +215,24 @@ namespace Foton.Gui
                         var fileName = Says(fileProfile != null ? "Profile: " + TextFile.OneLine(fileProfile.Name) : "");
                         all.CheckedChanged += (s, e) => { if (all.Checked) scope = "all"; };
                         tab.CheckedChanged += (s, e) => { if (tab.Checked) scope = "tab"; };
+                        // The scope shown is always the scope built: a cancelled or refused file puts the choice back to
+                        // what it was (or to every category), and a refused file drops any profile loaded before it.
+                        void Back(string previous)
+                        {
+                            if (previous == "tab" && tab.Enabled) tab.Checked = true; else all.Checked = true;
+                            scope = previous == "tab" && tab.Enabled ? "tab" : "all";
+                        }
                         file.Click += (s, e) =>
                         {
+                            var previous = scope;
                             using (var d = new OpenFileDialog { Title = "Choose a collection profile", Filter = "Collection profile (*.json)|*.json", CheckFileExists = true })
                             {
-                                if (d.ShowDialog(file.FindForm()) != DialogResult.OK) { if (fileProfile == null) all.Checked = true; return; }
+                                if (d.ShowDialog(file.FindForm()) != DialogResult.OK)
+                                {
+                                    if (previous == "file" && fileProfile != null) return;   // keep the file chosen before
+                                    Back(previous);
+                                    return;
+                                }
                                 try
                                 {
                                     // The same checks foton-collect -Profile applies.
@@ -231,8 +242,9 @@ namespace Foton.Gui
                                 }
                                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException || ex is ArgumentException)
                                 {
-                                    fileName.Text = "Not used: " + TextFile.OneLine(ex.Message);
-                                    if (fileProfile == null) all.Checked = true;
+                                    fileProfile = null;
+                                    Back(previous == "file" ? "all" : previous);
+                                    fileName.Text = "Not used: " + TextFile.OneLine(ex.Message) + " The collection uses " + (scope == "tab" ? "the Profile tab's profile." : "every category.");
                                 }
                             }
                         };

@@ -283,7 +283,8 @@ namespace Foton.Gui
         }
 
         /// <summary>foton handoff into <paramref name="parent"/>, plus Foton_Report.html when this console built it and it is unchanged.</summary>
-        async Task ExportHandoff(string parent)
+        /// <summary>Writes a handoff for the open case; true when this export wrote one (not an earlier export).</summary>
+        async Task<bool> ExportHandoff(string parent)
         {
             var report = _report.Unchanged() ? _report.Path : null;   // read on the UI thread
             Foton.Analyze.Handoff.HandoffRun? run = null;
@@ -293,10 +294,11 @@ namespace Foton.Gui
                 if (report == null) log.Write("Foton_Report.html is not included: this console has not built it with Analyze (or it changed since). The handoff's own page lists the findings.", StatusLevel.Info);
                 return null;
             });
-            if (run == null) return;
+            if (run == null) return false;
             if (_caseRoot != null) _handedOff.Add(_caseRoot);
             RefreshChecklist();
             _status.Text = (run.Verified ? "Handoff written: " : "Handoff written, but the package did not verify: ") + run.Folder;
+            return true;
         }
 
         async Task RefreshNotes()
