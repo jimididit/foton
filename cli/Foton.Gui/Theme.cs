@@ -42,6 +42,7 @@ namespace Foton.Gui
             public TabDrawMode? TabDraw;
             public Color? TreeLines;
             public ToolStripRenderer? Renderer;
+            public bool? VisualStyleBack;
         }
 
         static readonly ConditionalWeakTable<Control, Original> Originals = new ConditionalWeakTable<Control, Original>();
@@ -58,25 +59,35 @@ namespace Foton.Gui
         /// <summary>Themes a window built after the theme was set (dialogs), and keeps theming controls added to it later.</summary>
         public static void Adopt(Form form)
         {
+            Tidy.Apply(form);
             SetFont(form);
             Walk(form);
             Watch(form);
         }
 
+        /// <summary>Controls already watched: a control removed and added again (rebuilt panels) gets the handler once.</summary>
+        static readonly ConditionalWeakTable<Control, object> Watched = new ConditionalWeakTable<Control, object>();
+
         /// <summary>Themes controls as they are added anywhere under <paramref name="root"/> (checklist labels, rebuilt panels).</summary>
         public static void Watch(Control root)
         {
+            if (Watched.TryGetValue(root, out _)) return;
+            Watched.Add(root, new object());
             root.ControlAdded += (s, e) => { Walk(e.Control); Watch(e.Control); };
             foreach (Control c in root.Controls) Watch(c);
         }
 
-        /// <summary>A new font only when the size changes; the replaced one is disposed (children use the form's, never their own copy).</summary>
+        /// <summary>Fonts this class created for a form; only those are disposed when replaced (a caller's font is never disposed here).</summary>
+        static readonly ConditionalWeakTable<Form, Font> OwnFonts = new ConditionalWeakTable<Form, Font>();
+
+        /// <summary>A new font only when the size changes.</summary>
         static void SetFont(Form form)
         {
             if (Math.Abs(form.Font.Size - TextSize) < 0.01f) return;
-            var old = form.Font;
-            form.Font = new Font("Segoe UI", TextSize);
-            if (!ReferenceEquals(old, Control.DefaultFont)) old.Dispose();
+            var font = new Font("Segoe UI", TextSize);
+            form.Font = font;
+            if (OwnFonts.TryGetValue(form, out var previous)) { OwnFonts.Remove(form); previous.Dispose(); }
+            OwnFonts.Add(form, font);
         }
 
         /// <summary>Records a whole tree before styling any of it, so a child's inherited colors are seen as the parent's.</summary>
@@ -111,7 +122,7 @@ namespace Foton.Gui
                 InheritsBack = parent != null && c.BackColor == parent.BackColor && !(c is TextBoxBase) && !(c is ListControl) && !(c is TreeView) && !(c is ButtonBase) && !(c is UpDownBase) && !(c is TabPage),
                 InheritsFore = parent != null && c.ForeColor == parent.ForeColor,
             };
-            if (c is ButtonBase b) o.Flat = b.FlatStyle;
+            if (c is ButtonBase b) { o.Flat = b.FlatStyle; o.VisualStyleBack = b.UseVisualStyleBackColor; }
             if (c is ComboBox cb) o.Flat = cb.FlatStyle;
             if (c is DataGridView g)
             {
@@ -157,7 +168,7 @@ namespace Foton.Gui
                 case ButtonBase b:
                     b.FlatStyle = Dark ? FlatStyle.Flat : o.Flat ?? FlatStyle.Standard;
                     if (Dark) b.FlatAppearance.BorderColor = Border;
-                    if (!Dark && b is Button button) button.UseVisualStyleBackColor = true;
+                    if (!Dark) b.UseVisualStyleBackColor = o.VisualStyleBack ?? true;   // as the button had it
                     break;
                 case ComboBox cb:
                     cb.FlatStyle = Dark ? FlatStyle.Flat : o.Flat ?? FlatStyle.Standard;
@@ -200,12 +211,15 @@ namespace Foton.Gui
             g.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle(o.Headers!) { BackColor = Header, ForeColor = Text, SelectionBackColor = Header, SelectionForeColor = Text };
         }
 
-        static readonly HashSet<TabControl> OwnerDrawn = new HashSet<TabControl>();
+        /// <summary>Tab controls given the header painter (weak: a closed dialog's tabs are not kept alive).</summary>
+        static readonly ConditionalWeakTable<TabControl, object> OwnerDrawn = new ConditionalWeakTable<TabControl, object>();
 
         /// <summary>Dark tab headers are drawn here; the strip beside the last tab keeps Windows' color.</summary>
         static void StyleTabs(TabControl t, Original o)
         {
-            if (OwnerDrawn.Add(t))
+            if (!OwnerDrawn.TryGetValue(t, out _))
+            {
+                OwnerDrawn.Add(t, new object());
                 t.DrawItem += (s, e) =>
                 {
                     var page = t.TabPages[e.Index];
@@ -214,6 +228,7 @@ namespace Foton.Gui
                     TextRenderer.DrawText(e.Graphics, page.Text, t.Font, e.Bounds, selected ? Color.White : Gray,
                         TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
                 };
+            }
             t.DrawMode = Dark ? TabDrawMode.OwnerDrawFixed : o.TabDraw ?? TabDrawMode.Normal;
             t.Invalidate();
         }

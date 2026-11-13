@@ -101,7 +101,7 @@ namespace Foton.Gui
                 _checklist.ResumeLayout();
                 return;
             }
-            _checklist.Controls.Add(new Label { Text = "Next steps", AutoSize = true, Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold), Padding = new Padding(0, 6, 6, 0) });
+            _checklist.Controls.Add(new Label { Text = "Next steps", AutoSize = true, Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold), Padding = new Padding(0, 6, 6, 0), Margin = new Padding(0, 3, 3, 3) });
             List<Step> steps;
             try { steps = Steps(root); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)

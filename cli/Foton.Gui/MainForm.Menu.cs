@@ -18,6 +18,7 @@ namespace Foton.Gui
         readonly ToolStripMenuItem _themeMenu = new ToolStripMenuItem("&Theme");
         readonly ToolStripMenuItem _sizeMenu = new ToolStripMenuItem("Text &size");
         MenuStrip? _menu;
+        System.Drawing.Font? _logFont;
         StatusStrip? _statusStrip;
 
         MenuStrip MenuBar()
@@ -88,9 +89,11 @@ namespace Foton.Gui
             Theme.Apply(this, dark, _settings.TextSize);
             if (Math.Abs(_log.Font.Size - _settings.TextSize) > 0.01f)
             {
-                var old = _log.Font;
-                _log.Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, _settings.TextSize);
-                old.Dispose();
+                // Only a font made here is disposed; the log's first font belongs to its construction.
+                var font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, _settings.TextSize);
+                _log.Font = font;
+                _logFont?.Dispose();
+                _logFont = font;
             }
             if (_menu != null) Theme.StyleMenuItems(_menu.Items);
             if (_statusStrip != null) Theme.StyleMenuItems(_statusStrip.Items);
