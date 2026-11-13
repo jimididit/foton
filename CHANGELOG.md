@@ -2,7 +2,13 @@
 
 Notable changes to Foton, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
-Each `v2.*` release takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
+Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
+
+## [3.0.0] - 2026-11-13
+
+- `foton.exe` and `foton-console.exe` carry `foton-collect.exe` and `foton-baseline.exe` inside them: the same files the release publishes (a build test checks the bytes), only ever written to disk in a bundle, never run by the program that carries them. Building a bundle no longer needs the collector downloaded beside it.
+- `foton bundle collect [-Profile <profile.json>] [-OutputPath <folder>]` and `foton bundle baseline [-LoadUserHives] [-OutputPath <folder>]`: a folder to carry to an endpoint (under `C:\Foton\Bundles` by default) with the collector, the profile if any, `RUN.txt` with the command, and `SHA256SUMS.txt`. A collection bundle without a profile collects every category; a baseline bundle can include signed-out users. The bundle checks that the collector it writes is the right one and the same Foton version.
+- The console's **Build bundle...** uses the collector it carries instead of asking for a `foton-collect.exe`.
 
 ## [2.15.0] - 2026-11-13
 

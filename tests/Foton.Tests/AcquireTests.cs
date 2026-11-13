@@ -24,17 +24,15 @@ namespace Foton.Tests
         [Fact]
         public void Check_refuses_another_program_an_old_collector_or_a_hash_list_mismatch()
         {
-            Assert.Contains("not foton-baseline.exe", Assert.Throws<InvalidDataException>(() => DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton.exe", "2.10.0.0")).Message);
-            Assert.Contains("2.6.0 or later", Assert.Throws<InvalidDataException>(() => DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.5.0.0")).Message);
-            Assert.Equal(new Version(2, 10, 0, 0), DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "FOTON-BASELINE.EXE", "2.10.0.0"));
+            Assert.Contains("not foton-baseline.exe", Assert.Throws<InvalidDataException>(() => CollectorLauncher.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton.exe", "2.10.0.0")).Message);
+            Assert.Contains("2.6.0 or later", Assert.Throws<InvalidDataException>(() => CollectorLauncher.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.5.0.0")).Message);
+            Assert.Equal(new Version(2, 10, 0, 0), CollectorLauncher.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "FOTON-BASELINE.EXE", "2.10.0.0"));
             Assert.Equal(new Version(2, 8, 0), CollectorLauncher.MinimumVersion(CollectorKind.Collect));
             // A two-part version resource is compared and named without throwing anything but InvalidDataException.
-            Assert.Equal(new Version(2, 9), DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.9"));
-            Assert.Contains("2.5 is too old", Assert.Throws<InvalidDataException>(() => DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.5")).Message);
-            Assert.Contains("foton-collect 2.7 does not read", Assert.Throws<InvalidDataException>(() => DeploymentBundle.CheckCollect("foton-collect.exe", "2.7")).Message);
+            Assert.Equal(new Version(2, 9), CollectorLauncher.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.9"));
+            Assert.Contains("2.5 is too old", Assert.Throws<InvalidDataException>(() => CollectorLauncher.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.5")).Message);
             // Missing parts count as 0: "2.6" meets a 2.6.0 floor and "2.8" meets collect's 2.8.0.
-            Assert.Equal(new Version(2, 6), DeploymentBundle.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.6"));
-            Assert.Equal(new Version(2, 8), DeploymentBundle.CheckCollect("foton-collect.exe", "2.8"));
+            Assert.Equal(new Version(2, 6), CollectorLauncher.CheckExecutable("foton-baseline.exe", new Version(2, 6, 0), "foton-baseline.exe", "2.6"));
             foreach (var full in new[] { @"D:\Cases", @"\\server\share\Cases" }) Assert.True(CollectorLauncher.IsFullPath(full), full);
             foreach (var rel in new[] { "Cases", @".\Cases", @"C:Cases", @"\Cases" }) Assert.False(CollectorLauncher.IsFullPath(rel), rel);
             using (var t = new TempDir())

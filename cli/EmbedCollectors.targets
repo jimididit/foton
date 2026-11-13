@@ -1,0 +1,18 @@
+<Project>
+  <!--
+    foton.exe and foton-console.exe carry the endpoint collectors as data, so the analyst program can build bundles
+    (foton bundle, the console's bundle builders) without a separate download. The collector projects are built first
+    (ReferenceOutputAssembly="false": a build-order link only, no code is referenced or merged; the architecture tests
+    tell this apart from a code reference), and their final single-file executables (after ILRepack) are embedded as
+    manifest resources. The program only ever writes them to disk (Foton.Tools.EmbeddedCollectors); BinaryRules checks
+    the embedded bytes equal the published files.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Foton.Collect.Cli\Foton.Collect.Cli.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Foton.Baseline.Cli\Foton.Baseline.Cli.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Foton.Collect.Cli\bin\$(Configuration)\$(TargetFramework)\foton-collect.exe"
+                      LogicalName="Foton.Collectors.foton-collect.exe" Visible="false" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Foton.Baseline.Cli\bin\$(Configuration)\$(TargetFramework)\foton-baseline.exe"
+                      LogicalName="Foton.Collectors.foton-baseline.exe" Visible="false" />
+  </ItemGroup>
+</Project>
