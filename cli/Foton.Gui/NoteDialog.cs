@@ -20,6 +20,7 @@ namespace Foton.Gui
             MinimumSize = new Size(480, 320);
             StartPosition = FormStartPosition.CenterParent;
             ShowInTaskbar = false;
+            ShowIcon = false;
             MinimizeBox = MaximizeBox = false;
             foreach (var s in NoteStatus.All) _status.Items.Add(NoteStatus.Label(s));
             _status.SelectedIndex = System.Math.Max(0, System.Array.IndexOf(NoteStatus.All, status));

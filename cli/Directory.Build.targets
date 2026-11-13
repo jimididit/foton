@@ -7,4 +7,8 @@
   <ItemGroup>
     <PackageReference Include="ILRepack.Lib.MSBuild.Task" PrivateAssets="all" />
   </ItemGroup>
+  <!-- The Foton icon (assets\brand): Explorer, the taskbar, and Alt+Tab show it; ILRepack keeps the exe's own resources. -->
+  <PropertyGroup>
+    <ApplicationIcon>$(MSBuildThisFileDirectory)..\assets\brand\foton.ico</ApplicationIcon>
+  </PropertyGroup>
 </Project>
