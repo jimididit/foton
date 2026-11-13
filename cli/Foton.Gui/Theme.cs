@@ -23,6 +23,9 @@ namespace Foton.Gui
         public static Palette? Palette { get; private set; }
         public static float TextSize { get; private set; } = 9f;
 
+        /// <summary>Selected rows in Light: Explorer's pale blue (16:1 with black text).</summary>
+        static readonly Color LightSelection = Color.FromArgb(0xCC, 0xE4, 0xF7);
+
         /// <summary>Secondary text in the current theme (grey timeline rows, hints set after the control was themed).</summary>
         public static Color MutedText => Palette?.Muted ?? SystemColors.GrayText;
 
@@ -281,6 +284,12 @@ namespace Foton.Gui
                 g.GridColor = o.GridLines;
                 g.EnableHeadersVisualStyles = o.HeaderVisualStyles;
                 g.DefaultCellStyle = new DataGridViewCellStyle(o.Cells!);
+                // Windows 11's pale list selection rather than the saturated highlight; High Contrast keeps Windows' own.
+                if (!SystemInformation.HighContrast)
+                {
+                    g.DefaultCellStyle.SelectionBackColor = LightSelection;
+                    g.DefaultCellStyle.SelectionForeColor = SystemColors.ControlText;
+                }
                 g.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle(o.Headers!);
                 return;
             }
@@ -344,7 +353,11 @@ namespace Foton.Gui
             {
                 case 1: WindowChrome.TitleBar(c.Handle, p); break;
                 case 2: WindowChrome.Control(c.Handle, dark ? WindowChrome.Parts.DarkComboBox : WindowChrome.Parts.Default); break;
-                default: WindowChrome.Control(c.Handle, dark ? WindowChrome.Parts.DarkExplorer : WindowChrome.Parts.Default); break;
+                default:
+                    // Trees and lists take Explorer's soft selection and chevrons in light themes too (not with High Contrast).
+                    var explorerLight = !dark && !SystemInformation.HighContrast && (c is TreeView || c is ListView);
+                    WindowChrome.Control(c.Handle, dark ? WindowChrome.Parts.DarkExplorer : explorerLight ? WindowChrome.Parts.Explorer : WindowChrome.Parts.Default);
+                    break;
             }
             if (kind != 1) c.Invalidate();
         }

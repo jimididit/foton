@@ -122,6 +122,8 @@ namespace Foton.Gui
             _checklist.SuspendLayout();
             var old = _checklist.Controls.Cast<Control>().Where(c => c != _doNext).ToList();
             _checklist.Controls.Clear();
+            // The tooltip keeps every control given a tip; only step labels have one, so drop them all before disposing.
+            _stepTips.RemoveAll();
             foreach (var c in old) c.Dispose();
             var root = _caseRoot;
             if (root == null)

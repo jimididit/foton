@@ -46,6 +46,8 @@ namespace Foton.Win.Ui
             Default,
             /// <summary>Scroll bars, tree expand glyphs, list headers (Explorer's dark theme).</summary>
             DarkExplorer,
+            /// <summary>Explorer's light theme: chevrons and a soft selection in trees and lists.</summary>
+            Explorer,
             /// <summary>Drop-down button and list of a combo box (the common file dialog's dark theme).</summary>
             DarkComboBox,
         }
@@ -59,6 +61,7 @@ namespace Foton.Win.Ui
                 {
                     case Parts.DarkExplorer: SetWindowTheme(hwnd, "DarkMode_Explorer", null); break;
                     case Parts.DarkComboBox: SetWindowTheme(hwnd, "DarkMode_CFD", null); break;
+                    case Parts.Explorer: SetWindowTheme(hwnd, "Explorer", null); break;
                     default: SetWindowTheme(hwnd, null, null); break;   // both null: back to the default association
                 }
             }

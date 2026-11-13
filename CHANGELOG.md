@@ -13,6 +13,7 @@ Each release (tags `v2.*` and later) takes its "What's new" notes from the secti
 - Console layout: the log pane takes less height by default and **View > Show log** (Ctrl+L) hides it; its height and visibility are remembered (`ShowLog`, `LogPercent` in `console-settings.json`). The status bar shows the message of the tab on screen instead of the last one from any tab.
 - Package tab: the next steps fit on one line (a check mark for each step done, the next one in bold, what a step does on hover), **Do this next** is the highlighted main action, and the buttons are grouped (run steps, match IOCs, open). Findings show severity by color as well as by its word (High also bold), the Severity, Status, and Tier columns are shown whole, and the finding's details get more of the height.
 - Empty grids (cases, baselines, findings, timeline, notes, search, compare) say what to do next instead of staying blank.
+- Selected rows use a soft tint of the theme's accent with the normal text color (Light: Windows 11's pale list blue; trees use Explorer's style), instead of a saturated blue fill. With Windows High Contrast on, Windows' own highlight stays.
 
 ## [3.0.0] - 2026-11-13
 
