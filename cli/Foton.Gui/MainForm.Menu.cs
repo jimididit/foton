@@ -46,10 +46,12 @@ namespace Foton.Gui
             view.DropDownItems.Add(Item("&Find", Keys.Control | Keys.F, FocusFind));
             view.DropDownItems.Add(Item("&Refresh", Keys.F5, () => _ = RefreshCurrentTab()));
             view.DropDownItems.Add(new ToolStripSeparator());
-            foreach (var t in new[] { ConsoleSettings.ThemeLight, ConsoleSettings.ThemeDark, ConsoleSettings.ThemeWindows })
+            foreach (var t in ConsoleSettings.Themes)
             {
                 var theme = t;
-                _themeMenu.DropDownItems.Add(Item(theme == ConsoleSettings.ThemeWindows ? "&Follow Windows" : "&" + theme, Keys.None, () => { _settings.Theme = theme; SaveSettings(); ApplyAppearance(); }));
+                var item = Item(Theme.DisplayName(theme), Keys.None, () => { _settings.Theme = theme; SaveSettings(); ApplyAppearance(); });
+                item.Tag = theme;
+                _themeMenu.DropDownItems.Add(item);
             }
             foreach (var size in ConsoleSettings.TextSizes)
             {
@@ -67,7 +69,9 @@ namespace Foton.Gui
             }
 
             var tools = new ToolStripMenuItem("&Tools");
-            tools.DropDownItems.Add(Item("&Settings...", Keys.Control | Keys.Oemcomma, OpenSettings));
+            var settings = Item("&Settings...", Keys.Control | Keys.Oemcomma, OpenSettings);
+            settings.ShortcutKeyDisplayString = "Ctrl+,";   // Windows would name the key "Oemcomma"
+            tools.DropDownItems.Add(settings);
             tools.DropDownItems.Add(new ToolStripSeparator());
             tools.DropDownItems.Add(Item("Build collector bundles (Collectors tab)", Keys.None, () => SelectTab("Collectors")));
             tools.DropDownItems.Add(Item("Install or register tools (Tools tab)", Keys.None, () => SelectTab("Tools")));
@@ -82,18 +86,16 @@ namespace Foton.Gui
             return menu;
         }
 
-        /// <summary>Applies the theme (Light, Dark, or Windows' app setting) and text size from the settings to the whole window.</summary>
+        /// <summary>Applies the theme and text size from the settings to the whole window.</summary>
         void ApplyAppearance()
         {
-            // Windows High Contrast wins: the console then keeps Windows' own colors whatever theme is chosen.
-            var dark = !SystemInformation.HighContrast
-                && (_settings.Theme == ConsoleSettings.ThemeDark || (_settings.Theme == ConsoleSettings.ThemeWindows && Theme.WindowsPrefersDark()));
             SuspendLayout();
-            Theme.Apply(this, dark, _settings.TextSize);
-            if (Math.Abs(_log.Font.Size - _settings.TextSize) > 0.01f)
+            // Windows High Contrast wins: PaletteFor is then null and the console keeps Windows' own colors.
+            Theme.Apply(this, Theme.PaletteFor(_settings.Theme), _settings.TextSize);
+            if (_logFont == null || Math.Abs(_logFont.Size - _settings.TextSize) > 0.01f)
             {
                 // Only a font made here is disposed; the log's first font belongs to its construction.
-                var font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, _settings.TextSize);
+                var font = Theme.MonoFont(_settings.TextSize);
                 _log.Font = font;
                 _logFont?.Dispose();
                 _logFont = font;
@@ -101,7 +103,7 @@ namespace Foton.Gui
             if (_menu != null) Theme.StyleMenuItems(_menu.Items);
             if (_statusStrip != null) Theme.StyleMenuItems(_statusStrip.Items);
             foreach (ToolStripMenuItem i in _themeMenu.DropDownItems)
-                i.Checked = i.Text.Replace("&", "").StartsWith(_settings.Theme == ConsoleSettings.ThemeWindows ? "Follow" : _settings.Theme, StringComparison.Ordinal);
+                i.Checked = (string)i.Tag == _settings.Theme;
             foreach (ToolStripMenuItem i in _sizeMenu.DropDownItems)
                 i.Checked = i.Text.StartsWith(_settings.TextSize + " pt", StringComparison.Ordinal);
             ResumeLayout(true);
@@ -213,7 +215,7 @@ namespace Foton.Gui
                 "Updated " + FotonVersion.ReleaseDate + " (UTC)\r\n\r\n" +
                 exe + "\r\nSHA-256 " + sha + "\r\n\r\n" +
                 "Not code-signed: compare this hash with SHA256SUMS.txt from the release.\r\n" +
-                "Offline workstation console. It reads packages and runs foton-collect / foton-baseline as their own processes; it never collects in this window.",
+                "Offline workstation console. It reads packages and builds collector bundles with the foton-collect.exe and foton-baseline.exe it carries; it never runs them or collects from this computer.",
                 "About Foton console", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }

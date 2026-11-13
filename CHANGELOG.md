@@ -4,6 +4,13 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [3.1.0] - 2026-11-13
+
+- Console themes: **Light** (Windows' own colors), **Dark**, **Campbell** (the Windows Terminal default), **Solarized Dark**, **Solarized Light**, and **Follow Windows**, from **View > Theme** or **Settings > Appearance**. Each theme gives panels, inputs, lists, buttons, and headers their own shade, and every text color in every theme meets WCAG contrast (4.5:1 for text, 3:1 for borders and the accent; a test checks it). Solarized's reds, greens, and borders are adjusted where the originals fall short.
+- Dark themes now also darken the parts Windows draws: the title bar (on Windows 11 in the theme's own colors), scroll bars, tree expand glyphs, and drop-down buttons. Check boxes and radio buttons follow the theme too. These use two documented Windows calls in a new appearance-only library, `Foton.Win.Ui`, which architecture tests keep from touching the registry, files, processes, WMI, or the network; the console still never references `Foton.Win`.
+- Console tabs are flat, with the selected tab marked by an accent underline, hover feedback, and a visible keyboard focus. The log and raw-text panes use Cascadia Mono or Consolas.
+- About no longer says the console runs the collectors (it has not since 3.0.0).
+
 ## [3.0.0] - 2026-11-13
 
 - `foton.exe` and `foton-console.exe` carry `foton-collect.exe` and `foton-baseline.exe` inside them: the same files the release publishes (a build test checks the bytes), only ever written to disk in a bundle, never run by the program that carries them. Building a bundle no longer needs the collector downloaded beside it.

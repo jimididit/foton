@@ -28,11 +28,11 @@ namespace Foton.Gui
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
         };
         readonly TextBox _details = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, WordWrap = true };
-        readonly TextBox _log = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Font = new Font(FontFamily.GenericMonospace, 9f) };
+        readonly TextBox _log = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false };
         readonly ToolStripStatusLabel _status = new ToolStripStatusLabel("Ready") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
         readonly ToolStripProgressBar _progress = new ToolStripProgressBar { Style = ProgressBarStyle.Marquee, Visible = false };
         readonly List<Control> _actions = new List<Control>();
-        readonly TabControl _tabs = new TabControl { Dock = DockStyle.Fill };
+        readonly TabControl _tabs = new ThemedTabs { Dock = DockStyle.Fill };
         readonly ViewerTab _viewer = new ViewerTab();
         /// <summary>One writer for the log pane, shared by every action (each action gets its own StatusLog over it).</summary>
         readonly LogWriter _logWriter;

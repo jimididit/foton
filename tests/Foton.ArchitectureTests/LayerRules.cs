@@ -123,15 +123,16 @@ namespace Foton.ArchitectureTests
         [Fact]
         public void PInvoke_and_COM_imports_are_written_only_in_Foton_Win()
         {
-            // Fast source check. BinaryRules checks the compiled IL, which catches any spelling.
-            var win = Path.Combine(Repo.Root, "src", "Foton.Win") + Path.DirectorySeparatorChar;
+            // Fast source check. BinaryRules checks the compiled IL, which catches any spelling. Foton.Win.Ui holds the
+            // console's two window-appearance calls; UiRules limits it to those.
+            var allowed = new[] { "Foton.Win", "Foton.Win.Ui" }.Select(p => Path.Combine(Repo.Root, "src", p) + Path.DirectorySeparatorChar).ToList();
             var pattern = new Regex(
                 @"\bextern\b(?!\s+alias\b)|\[\s*(?:[\w.]+\.)?(?:DllImport|LibraryImport|ComImport)(?:Attribute)?\b");
             var offenders = Repo.SourceFiles()
-                .Where(f => !f.StartsWith(win, StringComparison.OrdinalIgnoreCase))
+                .Where(f => !allowed.Any(a => f.StartsWith(a, StringComparison.OrdinalIgnoreCase)))
                 .Where(f => pattern.IsMatch(File.ReadAllText(f)))
                 .ToList();
-            Assert.True(offenders.Count == 0, "P/Invoke or COM import outside Foton.Win: " + string.Join(", ", offenders));
+            Assert.True(offenders.Count == 0, "P/Invoke or COM import outside Foton.Win and Foton.Win.Ui: " + string.Join(", ", offenders));
         }
 
         [Fact]

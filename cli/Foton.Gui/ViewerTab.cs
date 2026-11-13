@@ -35,7 +35,7 @@ namespace Foton.Gui
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
         };
         readonly TreeView _json = new TreeView { Dock = DockStyle.Fill };
-        readonly TextBox _text = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Font = new Font(FontFamily.GenericMonospace, 9f) };
+        readonly TextBox _text = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Font = Theme.MonoFont(9f) };
         readonly Panel _content = new Panel { Dock = DockStyle.Fill };
         readonly CheckBox _source = new CheckBox { Text = "Show source (the file's markup, as text)", AutoSize = true, Padding = new Padding(4, 2, 0, 2) };
         readonly Button _toTimeline = new Button { Text = "Show in timeline", AutoSize = true };

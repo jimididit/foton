@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     foton-console.exe: the workstation GUI. It calls the same runners as foton.exe in process and never touches a live
-    host (no Foton.Win, Foton.Collect, or Foton.Baseline.Capture; architecture tests enforce it). WinForms, because it
+    host (no Foton.Win, Foton.Collect, or Foton.Baseline.Capture; architecture tests enforce it). Foton.Win.Ui gives it
+    the dark title bar and scroll bars and nothing else. WinForms, because it
     is in-box on .NET Framework 4.6.2 and merges into one file with ILRepack.
   -->
   <PropertyGroup>
@@ -17,6 +18,7 @@
     <ProjectReference Include="..\..\src\Foton.Patterns\Foton.Patterns.csproj" />
     <ProjectReference Include="..\..\src\Foton.Tools\Foton.Tools.csproj" />
     <ProjectReference Include="..\..\src\Foton.Baseline.Compare\Foton.Baseline.Compare.csproj" />
+    <ProjectReference Include="..\..\src\Foton.Win.Ui\Foton.Win.Ui.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />

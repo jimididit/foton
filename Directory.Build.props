@@ -5,7 +5,7 @@
     Schema numbers start where 1.38.x left them; the port changes them only with a disclosed reason.
   -->
   <PropertyGroup>
-    <FotonVersion>3.0.0</FotonVersion>
+    <FotonVersion>3.1.0</FotonVersion>
     <!-- Empty for a release (tag v$(FotonVersion)); set it (alpha.1, beta.1) for a prerelease tag v$(FotonVersion)-$(FotonPrerelease). -->
     <FotonPrerelease></FotonPrerelease>
     <!-- UTC date of the change that set FotonVersion; the banner shows it as Updated. -->

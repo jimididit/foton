@@ -22,6 +22,9 @@ namespace Foton.Tools
         public const int MaxRecent = 20;
         public const string StartOnCases = "Cases", StartOnLastCase = "LastCase";
         public const string ThemeLight = "Light", ThemeDark = "Dark", ThemeWindows = "Windows";
+        public const string ThemeCampbell = "Campbell", ThemeSolarizedDark = "SolarizedDark", ThemeSolarizedLight = "SolarizedLight";
+        /// <summary>Every theme, in the order the console offers them (Windows: follow Windows' light or dark app setting).</summary>
+        public static readonly string[] Themes = { ThemeLight, ThemeDark, ThemeCampbell, ThemeSolarizedDark, ThemeSolarizedLight, ThemeWindows };
         public static readonly int[] TextSizes = { 9, 10, 11, 12 };
 
         /// <summary>Folders the Cases tab lists besides the case and baseline output folders.</summary>
@@ -87,7 +90,7 @@ namespace Foton.Tools
             s.BaselinesOutput = FullPath(V("BaselinesOutput")) ?? "";
             s.HandoffsOutput = FullPath(V("HandoffsOutput")) ?? "";
             s.BundlesOutput = FullPath(V("BundlesOutput")) ?? "";
-            if (V("Theme") is string theme && (theme == ThemeLight || theme == ThemeDark || theme == ThemeWindows)) s.Theme = theme;
+            if (V("Theme") is string theme && Array.IndexOf(Themes, theme) >= 0) s.Theme = theme;
             if (V("TextSize") is int size && TextSizes.Contains(size)) s.TextSize = size;
             return s;
         }
