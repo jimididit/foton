@@ -5,7 +5,7 @@ This guide takes you from download to an analyzed collection.
 Foton uses **two computers**:
 
 - The **endpoint** is the computer you are examining. You run `foton-collect.exe` (or `foton-baseline.exe`) there. It writes a case folder and a ZIP.
-- The **workstation** is your own analysis computer. You copy the ZIP there and run `foton.exe` on it. `foton.exe` never touches the endpoint.
+- The **workstation** is your own analysis computer. You copy the ZIP there and run `foton.exe` on it (or `foton-console.exe`, the same work in a window). Neither touches the endpoint.
 
 To try Foton, one computer can play both roles.
 
@@ -24,7 +24,7 @@ From the [latest release](https://github.com/jimididit/foton/releases/latest), d
 - `foton.exe` for the workstation
 - `SHA256SUMS.txt`, to check the downloads
 
-Or download only `foton.exe` (or the `foton-console.exe` window) and `SHA256SUMS.txt`: both carry the collectors released with them. `.\foton.exe bundle collect` (or the console's **Collectors** tab) writes a folder under `C:\Foton\Bundles` with `foton-collect.exe`, `RUN.txt` with the command, and `SHA256SUMS.txt`; copy that folder to the endpoint or push it with your RMM tool, and check it there the same way as in step 2.
+Sending the collector to someone else, or pushing it with an RMM tool? Download only `foton.exe` (or `foton-console.exe`) and `SHA256SUMS.txt`, and see [Send a collector to an endpoint](#send-a-collector-to-an-endpoint) after step 2.
 
 Keep them in one folder. If the browser warns that a file "isn't commonly downloaded", choose **Keep**: the executables are not code-signed yet, and step 2 is how you check them instead.
 
@@ -53,6 +53,20 @@ gh attestation verify .\foton-collect.exe --repo jimididit/foton
 It should report that verification succeeded. If you cannot install `gh`, note in your case notes that only the hash was checked.
 
 Security products sometimes flag forensic tools, because they read the same places attackers do. See [If antivirus blocks the collector](USAGE.md#if-antivirus-blocks-the-collector). Never modify the executable to get past a scanner.
+
+### Send a collector to an endpoint
+
+`foton.exe` and `foton-console.exe` carry the collectors released with them, so you can build the endpoint's folder on your workstation instead of downloading the collector separately.
+
+1. On the workstation, build the folder:
+
+   ```powershell
+   .\foton.exe bundle collect
+   ```
+
+   It prints the new folder's path (`Bundle: ...`) under `C:\Foton\Bundles`. In the console, use the **Collectors** tab instead. To collect only some categories, build a profile on the console's **Profile** tab and add `-Profile "\path\to\profile.json"`. For a baseline collector, use `bundle baseline`.
+2. Copy the whole folder to the endpoint, or push it with your RMM tool. It holds the collector, `RUN.txt`, and `SHA256SUMS.txt`.
+3. On the endpoint, check the collector against `SHA256SUMS.txt` as in step 2, then run the command in `RUN.txt` from that folder. Step 3 below explains what it does.
 
 ## 3. Collect on the endpoint
 
@@ -95,6 +109,8 @@ You do not need to extract the ZIP yourself. `foton package` extracted it into a
 **One computer only?** Skip the copy. In the next step, use the case folder in `C:\Foton\Cases` (the `Foton_...` folder that holds `00_Collection`) instead of the ZIP, from the same Administrator window you collected in.
 
 ## 6. Analyze on the workstation
+
+Prefer a window? Start `foton-console.exe`, press **Open a ZIP...** under **Start here**, and choose the ZIP. The **Package** tab lists the steps below; **Do this next** runs the first one not done. The commands below do the same.
 
 Run these in order, with the same ZIP path as in step 5:
 

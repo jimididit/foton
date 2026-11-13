@@ -2,7 +2,7 @@
 
 Thank you for contributing. Foton is structured so you can add a **collection task**, **baseline provider**, **parser**, or **analysis rule** without rewriting the core.
 
-Foton 2 is C#: four single-file executables on the .NET Framework that ships with Windows (4.6.2+). The PowerShell 1.38.x line takes security fixes only (see [SECURITY.md](../SECURITY.md)); new work targets v2. Open an issue before starting a large feature.
+Foton is C#: four single-file executables on the .NET Framework that ships with Windows (4.6.2+). The PowerShell 1.38.x line is final and unmaintained (see [SECURITY.md](../SECURITY.md)); all work targets `main`. Open an issue before starting a large feature.
 
 ## Development setup
 
@@ -29,7 +29,7 @@ Use a throwaway Windows VM for live Collect and Baseline runs. Collection change
 | `src/Foton.Analyze`, `Foton.Report` | Rules (`Rules/*.cs`), findings, HTML reports | No |
 | `src/Foton.Parse`, `Foton.Carve`, `Foton.Package` | Parsers, carve, package open/verify | No |
 | `src/Foton.Tools`, `Foton.Patterns` | Tool catalog / compose, workstation pattern lists | No (only `foton tools` downloads, on request) |
-| `cli/*` | `foton-collect.exe`, `foton-baseline.exe`, `foton.exe`, `foton-console.exe` (`cli/Foton.Gui`) | Collect and baseline yes; `foton.exe` and the console no |
+| `cli/*` | `foton-collect.exe`, `foton-baseline.exe`, `foton.exe`, `foton-console.exe` (`cli/Foton.Gui`). `foton.exe` and the console carry the two collectors as resources (`cli/EmbedCollectors.targets`) for `bundle` and the Collectors tab | Collect and baseline yes; `foton.exe` and the console no (they write the collectors into a bundle, never run them) |
 
 | Rule | Enforced by |
 |------|-------------|
@@ -37,6 +37,7 @@ Use a throwaway Windows VM for live Collect and Baseline runs. Collection change
 | Offline layers never reference `Foton.Win`, WMI, or HTTP | LayerRules |
 | Endpoint executables never reference Parse, Carve, Tools, or Patterns | LayerRules |
 | P/Invoke only in `src/Foton.Win`, with a size test per struct; no `Assembly.Load(byte[])` | LayerRules, struct size tests |
+| The carried collectors are build-order references only (never code references), and their bytes equal the published executables | EmbeddedCollectorRules |
 | Runtime dependencies are in-box .NET Framework assemblies only; NuGet packages are build- or test-time | `Directory.Packages.props` review + vulnerable-package CI step |
 
 Version and schema numbers live once in [`Directory.Build.props`](../Directory.Build.props) and are read at runtime (`FotonVersion`).

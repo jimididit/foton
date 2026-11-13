@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/jimididit/foton?include_prereleases&sort=semver)](https://github.com/jimididit/foton/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Windows DFIR, baseline, and security-audit toolkit. Capture a host into a hashed **package** with one executable, then parse, compare, and analyze it **offline**. Findings are observations, not a compromise verdict.
+Windows DFIR, baseline, and security-audit toolkit for incident responders, forensic examiners, and IT security teams. Capture a host into a hashed **package** with one executable, then parse, compare, and analyze it **offline**. Findings are observations, not a compromise verdict.
 
 ## Quick start
 
@@ -31,7 +31,13 @@ Windows 10 / Server 2016 or newer; nothing to install.
 
 5. Open `Foton_Report.html` in the new folder under `C:\Foton\Cases`.
 
-[Getting started](docs/GETTING-STARTED.md) covers analyzing the package on another computer with `foton.exe`, baselines, and the stronger provenance check for casework.
+[Getting started](docs/GETTING-STARTED.md) covers analyzing the package on another computer, baselines, and the stronger provenance check for casework.
+
+## What you can do
+
+- **Triage a host.** `foton-collect.exe` gathers processes, persistence, accounts, event logs, registry hives, Prefetch, and more into a hashed case package with a first-pass HTML report.
+- **See what changed.** `foton-baseline.exe` records stable configuration (services, tasks, autoruns, accounts, drivers, certificates, firewall rules); `foton compare` lists every field that changed between two baselines of one host, or between a host and a golden image of its role.
+- **Work from your own computer.** Build the collector folder for an endpoint, send it or push it with your RMM tool, then verify, parse, run Hayabusa / Chainsaw / Eric Zimmerman's tools, analyze, search, build a timeline, take notes, and hand off, all offline. Use `foton.exe` in a terminal or `foton-console.exe` in a window.
 
 ## Four executables
 
@@ -39,10 +45,10 @@ Windows 10 / Server 2016 or newer; nothing to install.
 |------------|---------|------|
 | `foton-collect.exe` | Endpoint | Live triage into a hashed case package: custody, coverage, manifest, findings, `Foton_Report.html`, ZIP |
 | `foton-baseline.exe` | Endpoint | Snapshot of stable configuration (37 record types) for later temporal or fleet comparison |
-| `foton.exe` | Workstation | `parse`, `compose` (EZ Tools / Hayabusa / Chainsaw), `analyze`, `ioc`, `compare` baselines, `carve`, `tools`, `package` (verify hashes), `bundle` (build a collector folder for an endpoint) |
-| `foton-console.exe` | Workstation | A window for the same workstation work, plus collection profiles and the **Collectors** tab, which builds collector folders for endpoints |
+| `foton.exe` | Workstation | `parse`, `compose`, `analyze`, `ioc`, `compare`, `timeline`, `search`, `notes`, `handoff`, `cases`, `carve`, `tools`, `package` (verify hashes), and `bundle` (build a collector folder for an endpoint) |
+| `foton-console.exe` | Workstation | The same workstation work in a window, plus collection profiles and the **Collectors** tab for building collector folders |
 
-Each is one file. Copy only the endpoint executable to a target; parse, compose, and analyze run on the analyst workstation. `foton-console.exe` and `foton.exe` carry the two collectors released with them, so an analyst can download only the workstation program and build the folder to send or push with RMM (the collector, `RUN.txt` with the command, and `SHA256SUMS.txt`). The collectors are also published on their own, byte for byte the same.
+Each is one file. Only a collector goes to an endpoint; everything else runs on your workstation. `foton.exe` and `foton-console.exe` carry the collectors released with them, so you can download just the workstation program and build the endpoint folder from it. The collectors are also published on their own, byte for byte the same.
 
 ## Requirements
 
@@ -67,7 +73,7 @@ Live collect **changes the host**. Capture memory or disk first when the case pl
 | Doc | Audience |
 |-----|----------|
 | [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) | First run, step by step: download, collect, move the package, analyze, baselines, troubleshooting |
-| [docs/USAGE.md](docs/USAGE.md) | Operators: every executable, switch, and recipe |
+| [docs/USAGE.md](docs/USAGE.md) | Operators: every executable, switch, verb, console tab, and output |
 | [CHANGELOG.md](CHANGELOG.md) | What changed in each release |
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Contributors: building, layout, and how to add a collector, provider, parser, or rule |
 | [docs/CARVE.md](docs/CARVE.md) | Carve limits (signature scan, not NTFS carving) |

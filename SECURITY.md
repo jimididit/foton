@@ -4,11 +4,12 @@
 
 | Line | Status |
 |------|--------|
-| **2.x** (C# executables on `main`) | Supported. Prereleases (`v2.0.0-alpha.*`) are for testing and are not supported. |
+| **3.x** (C# executables on `main`) | Supported: the latest release. Prereleases (tags with a suffix, such as `-alpha.1`) are for testing and are not supported. |
+| **2.x** | Unsupported since v3.0.0. Upgrade to the latest release; packages and baselines from 2.x still open in 3.x. |
 | **1.38.x** (PowerShell; source at the [v1.38.2 tag](https://github.com/jimididit/foton/tree/v1.38.2/legacy/powershell)) | Unsupported since v2.0.0. 1.38.2 is the final release and stays available on [Releases](https://github.com/jimididit/foton/releases/tag/v1.38.2) and the PowerShell Gallery for hosts older than Windows 10 / Server 2016. |
 | Older than 1.38 | Unsupported. |
 
-Security fixes ship in a new 2.x release. Older releases are not backported unless a release advisory says otherwise.
+Security fixes ship in a new release on the current line. Older releases are not backported unless a release advisory says otherwise.
 
 ## Reporting a vulnerability
 
@@ -31,7 +32,7 @@ You should receive an acknowledgement within a few business days.
 
 ## Out of scope
 
-- Antivirus false positives on `foton-collect.exe` or the 1.38.x Collect scripts (common for DFIR tooling; see [docs/USAGE.md](docs/USAGE.md))
+- Antivirus false positives on the Foton executables or the 1.38.x Collect scripts (common for DFIR tooling; see [docs/USAGE.md](docs/USAGE.md))
 - Findings that match legitimate admin tools (pattern lists are intentionally broad)
 - Missing coverage of a Windows artifact (feature request)
 - Expected live-collection side effects (Prefetch, event logs, `reg save` hive exports into the case folder, optional `-LoadUserHives` load/unload)-disclosed in operator docs
