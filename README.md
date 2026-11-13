@@ -39,10 +39,10 @@ Windows 10 / Server 2016 or newer; nothing to install.
 |------------|---------|------|
 | `foton-collect.exe` | Endpoint | Live triage into a hashed case package: custody, coverage, manifest, findings, `Foton_Report.html`, ZIP |
 | `foton-baseline.exe` | Endpoint | Snapshot of stable configuration (37 record types) for later temporal or fleet comparison |
-| `foton.exe` | Workstation | `parse`, `compose` (EZ Tools / Hayabusa / Chainsaw), `analyze`, `ioc`, `compare` baselines, `carve`, `tools`, `package` (verify hashes) |
-| `foton-console.exe` | Workstation | A window for the same workstation work, plus building collection profiles and endpoint bundles |
+| `foton.exe` | Workstation | `parse`, `compose` (EZ Tools / Hayabusa / Chainsaw), `analyze`, `ioc`, `compare` baselines, `carve`, `tools`, `package` (verify hashes), `bundle` (build a collector folder for an endpoint) |
+| `foton-console.exe` | Workstation | A window for the same workstation work, plus collection profiles and the **Collectors** tab, which builds collector folders for endpoints |
 
-Each is one file. Copy only the endpoint executable to a target; parse, compose, and analyze run on the analyst workstation.
+Each is one file. Copy only the endpoint executable to a target; parse, compose, and analyze run on the analyst workstation. `foton-console.exe` and `foton.exe` carry the two collectors released with them, so an analyst can download only the workstation program and build the folder to send or push with RMM (the collector, `RUN.txt` with the command, and `SHA256SUMS.txt`). The collectors are also published on their own, byte for byte the same.
 
 ## Requirements
 

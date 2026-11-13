@@ -36,6 +36,7 @@ namespace Foton.Tools
         public string CasesOutput { get; set; } = "";
         public string BaselinesOutput { get; set; } = "";
         public string HandoffsOutput { get; set; } = "";
+        public string BundlesOutput { get; set; } = "";
         public string Theme { get; set; } = ThemeLight;
         /// <summary>Font size in points.</summary>
         public int TextSize { get; set; } = 9;
@@ -43,6 +44,7 @@ namespace Foton.Tools
         public string CasesFolder => CasesOutput.Length > 0 ? CasesOutput : CaseTree.DefaultOutput("Cases");
         public string BaselinesFolder => BaselinesOutput.Length > 0 ? BaselinesOutput : CaseTree.DefaultOutput("Baselines");
         public string HandoffsFolder => HandoffsOutput.Length > 0 ? HandoffsOutput : CaseTree.DefaultOutput("Handoffs");
+        public string BundlesFolder => BundlesOutput.Length > 0 ? BundlesOutput : CaseTree.DefaultOutput("Bundles");
 
         public static string DefaultPath()
         {
@@ -84,6 +86,7 @@ namespace Foton.Tools
             s.CasesOutput = FullPath(V("CasesOutput")) ?? "";
             s.BaselinesOutput = FullPath(V("BaselinesOutput")) ?? "";
             s.HandoffsOutput = FullPath(V("HandoffsOutput")) ?? "";
+            s.BundlesOutput = FullPath(V("BundlesOutput")) ?? "";
             if (V("Theme") is string theme && (theme == ThemeLight || theme == ThemeDark || theme == ThemeWindows)) s.Theme = theme;
             if (V("TextSize") is int size && TextSizes.Contains(size)) s.TextSize = size;
             return s;
@@ -137,7 +140,7 @@ namespace Foton.Tools
         public string ToJson() => Json.Indented(new Dictionary<string, object?>
         {
             ["Examiner"] = Examiner, ["OpenOnStart"] = OpenOnStart, ["RecentCount"] = RecentCount, ["RecentCases"] = RecentCases,
-            ["CaseFolders"] = CaseFolders, ["CasesOutput"] = CasesOutput, ["BaselinesOutput"] = BaselinesOutput, ["HandoffsOutput"] = HandoffsOutput,
+            ["CaseFolders"] = CaseFolders, ["CasesOutput"] = CasesOutput, ["BaselinesOutput"] = BaselinesOutput, ["HandoffsOutput"] = HandoffsOutput, ["BundlesOutput"] = BundlesOutput,
             ["Theme"] = Theme, ["TextSize"] = TextSize,
         });
 

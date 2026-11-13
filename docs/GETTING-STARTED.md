@@ -24,6 +24,8 @@ From the [latest release](https://github.com/jimididit/foton/releases/latest), d
 - `foton.exe` for the workstation
 - `SHA256SUMS.txt`, to check the downloads
 
+Or download only `foton.exe` (or the `foton-console.exe` window) and `SHA256SUMS.txt`: both carry the collectors released with them. `.\foton.exe bundle collect` (or the console's **Collectors** tab) writes a folder under `C:\Foton\Bundles` with `foton-collect.exe`, `RUN.txt` with the command, and `SHA256SUMS.txt`; copy that folder to the endpoint or push it with your RMM tool, and check it there the same way as in step 2.
+
 Keep them in one folder. If the browser warns that a file "isn't commonly downloaded", choose **Keep**: the executables are not code-signed yet, and step 2 is how you check them instead.
 
 ## 2. Check the download

@@ -8,7 +8,8 @@ Each release (tags `v2.*` and later) takes its "What's new" notes from the secti
 
 - `foton.exe` and `foton-console.exe` carry `foton-collect.exe` and `foton-baseline.exe` inside them: the same files the release publishes (a build test checks the bytes), only ever written to disk in a bundle, never run by the program that carries them. Building a bundle no longer needs the collector downloaded beside it.
 - `foton bundle collect [-Profile <profile.json>] [-OutputPath <folder>]` and `foton bundle baseline [-LoadUserHives] [-OutputPath <folder>]`: a folder to carry to an endpoint (under `C:\Foton\Bundles` by default) with the collector, the profile if any, `RUN.txt` with the command, and `SHA256SUMS.txt`. A collection bundle without a profile collects every category; a baseline bundle can include signed-out users. The bundle checks that the collector it writes is the right one and the same Foton version.
-- The console's **Build bundle...** uses the collector it carries instead of asking for a `foton-collect.exe`.
+- Console **Collectors** tab: **Build collection bundle** (with the Profile tab's profile, or every category) and **Build baseline bundle** (optionally with signed-out users), the same folders as `foton bundle`, using the collectors the console carries. The Profile tab's **Build bundle...** opens it with the profile chosen, and **Start here** offers **Build a collector...** and **Build a baseline collector...**. **Settings > Folders** has a **Bundles** folder (default `C:\Foton\Bundles`).
+- Console **Acquire** tab removed: the console no longer runs a collector on the PC it runs on or asks for elevation. To collect or baseline that PC, build a bundle and run it there like on any endpoint; the package opens on the **Cases** tab as before.
 
 ## [2.15.0] - 2026-11-13
 

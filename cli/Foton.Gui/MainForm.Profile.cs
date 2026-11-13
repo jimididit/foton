@@ -42,7 +42,7 @@ namespace Foton.Gui
             bar.Controls.Add(AddButton("New", () => FillProfile(null)));
             bar.Controls.Add(AddButton("Load profile...", LoadProfile));
             var save = AddButton("Save profile...", SaveProfile);
-            var bundle = AddButton("Build bundle...", BuildBundle);
+            var bundle = AddButton("Build bundle...", BundleFromProfileTab);
             _needsValidProfile.Add(save);
             _needsValidProfile.Add(bundle);
             bar.Controls.Add(save);
@@ -229,28 +229,6 @@ namespace Foton.Gui
                 File.WriteAllBytes(d.FileName, _profile.Bytes);
                 _status.Text = "Profile saved: " + d.FileName;
             }
-        }
-
-        async Task BuildBundle()
-        {
-            var profile = _profile;
-            if (profile == null) return;
-            string parent;
-            using (var d = new FolderBrowserDialog { Description = "Choose where to create the bundle folder", ShowNewFolderButton = true })
-            {
-                var standard = CaseTree.DefaultOutput("Bundles");
-                if (Directory.Exists(standard)) d.SelectedPath = standard;
-                if (d.ShowDialog(this) != DialogResult.OK) return;
-                parent = d.SelectedPath;
-            }
-            await Run("Build bundle", log =>
-            {
-                // The foton-collect.exe this console carries: the one released with it.
-                var b = DeploymentBundle.Build(CollectorKind.Collect, EmbeddedCollectors.Read(CollectorKind.Collect), profile, false, parent, DateTime.UtcNow);
-                log.Write($"foton-collect {b.CollectorVersion} SHA-256 {b.CollectorSha256} (released with this console)", StatusLevel.Info);
-                log.Write("Bundle: " + b.Folder + " (" + DeploymentBundle.ReadmeFileName + " has the command to run)", StatusLevel.Good);
-                return null;
-            });
         }
     }
 }

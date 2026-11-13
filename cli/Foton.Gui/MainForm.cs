@@ -57,7 +57,7 @@ namespace Foton.Gui
             _tabs.TabPages.Add(ToolsTab());
             _tabs.TabPages.Add(ProfileTab());
             _tabs.TabPages.Add(_comparePage = CompareTab());
-            _tabs.TabPages.Add(_acquirePage = AcquireTab());
+            _tabs.TabPages.Add(_collectorsPage = CollectorsTab());
             // The log sits under every tab: an install or register is followed there as much as a parse.
             var outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
             outer.Panel1.Controls.Add(_tabs);
