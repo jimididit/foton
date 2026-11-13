@@ -21,6 +21,8 @@ namespace Foton.Gui
         static readonly Color Back = Color.FromArgb(32, 32, 32);
         static readonly Color Field = Color.FromArgb(24, 24, 24);
         static readonly Color ButtonBack = Color.FromArgb(55, 55, 55);
+        static readonly Color ButtonHover = Color.FromArgb(72, 72, 72);
+        static readonly Color ButtonPressed = Color.FromArgb(40, 40, 40);
         static readonly Color Text = Color.FromArgb(232, 232, 232);
         static readonly Color Gray = Color.FromArgb(160, 160, 160);
         static readonly Color Border = Color.FromArgb(80, 80, 80);
@@ -167,7 +169,13 @@ namespace Foton.Gui
                     break;
                 case ButtonBase b:
                     b.FlatStyle = Dark ? FlatStyle.Flat : o.Flat ?? FlatStyle.Standard;
-                    if (Dark) b.FlatAppearance.BorderColor = Border;
+                    if (Dark)
+                    {
+                        // Hover and pressed feedback, which flat buttons do not draw by themselves.
+                        b.FlatAppearance.BorderColor = Border;
+                        b.FlatAppearance.MouseOverBackColor = ButtonHover;
+                        b.FlatAppearance.MouseDownBackColor = ButtonPressed;
+                    }
                     if (!Dark) b.UseVisualStyleBackColor = o.VisualStyleBack ?? true;   // as the button had it
                     break;
                 case ComboBox cb:
@@ -227,6 +235,13 @@ namespace Foton.Gui
                     using (var back = new SolidBrush(selected ? Header : Back)) e.Graphics.FillRectangle(back, e.Bounds);
                     TextRenderer.DrawText(e.Graphics, page.Text, t.Font, e.Bounds, selected ? Color.White : Gray,
                         TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+                    // Keyboard focus stays visible on hand-drawn tabs, as Windows shows it on its own.
+                    if (selected && t.Focused)
+                    {
+                        var r = e.Bounds;
+                        r.Inflate(-3, -3);
+                        ControlPaint.DrawFocusRectangle(e.Graphics, r, Color.White, Header);
+                    }
                 };
             }
             t.DrawMode = Dark ? TabDrawMode.OwnerDrawFixed : o.TabDraw ?? TabDrawMode.Normal;

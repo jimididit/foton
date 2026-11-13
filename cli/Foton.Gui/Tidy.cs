@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace Foton.Gui
@@ -45,7 +46,30 @@ namespace Foton.Gui
                     list.BorderStyle = BorderStyle.FixedSingle;
                     break;
             }
+            TabOrder(root);
             foreach (Control child in root.Controls) Apply(child);
+        }
+
+        /// <summary>
+        /// The Tab key follows the screen, top to bottom and left to right. WinForms orders it by when controls were
+        /// added, and docked bars are added after the pane they sit above (the last docked control is the outermost),
+        /// so without this Tab would go from the grid up through the bars above it.
+        /// </summary>
+        static void TabOrder(Control container)
+        {
+            // Flow panels already order by position; split containers and tab controls hold fixed panes and pages.
+            if (container is FlowLayoutPanel || container is TableLayoutPanel || container is SplitContainer || container is TabControl) return;
+            var kids = container.Controls.Cast<Control>().Select((c, i) => new { c, i }).ToList();
+            if (kids.Count < 2) return;
+            int Side(DockStyle d) => d == DockStyle.Top ? 0 : d == DockStyle.Left ? 1 : d == DockStyle.Right ? 3 : d == DockStyle.Bottom ? 4 : 2;
+            // Within a side the outermost control (added last for Top and Left) comes first; Fill and undocked
+            // controls by their position.
+            var ordered = kids
+                .OrderBy(k => Side(k.c.Dock))
+                .ThenBy(k => k.c.Dock == DockStyle.Top || k.c.Dock == DockStyle.Left ? -k.i : k.c.Dock == DockStyle.None ? k.c.Top : k.i)
+                .ThenBy(k => k.c.Left)
+                .ToList();
+            for (int n = 0; n < ordered.Count; n++) ordered[n].c.TabIndex = n;
         }
     }
 }

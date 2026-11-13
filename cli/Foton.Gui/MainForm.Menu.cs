@@ -84,7 +84,9 @@ namespace Foton.Gui
         /// <summary>Applies the theme (Light, Dark, or Windows' app setting) and text size from the settings to the whole window.</summary>
         void ApplyAppearance()
         {
-            var dark = _settings.Theme == ConsoleSettings.ThemeDark || (_settings.Theme == ConsoleSettings.ThemeWindows && Theme.WindowsPrefersDark());
+            // Windows High Contrast wins: the console then keeps Windows' own colors whatever theme is chosen.
+            var dark = !SystemInformation.HighContrast
+                && (_settings.Theme == ConsoleSettings.ThemeDark || (_settings.Theme == ConsoleSettings.ThemeWindows && Theme.WindowsPrefersDark()));
             SuspendLayout();
             Theme.Apply(this, dark, _settings.TextSize);
             if (Math.Abs(_log.Font.Size - _settings.TextSize) > 0.01f)
