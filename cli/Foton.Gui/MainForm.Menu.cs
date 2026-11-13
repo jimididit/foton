@@ -109,7 +109,10 @@ namespace Foton.Gui
         /// <summary>Follow Windows: re-applied when Windows' light/dark setting changes while the console is open.</summary>
         void OnWindowsPreferenceChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
         {
-            if (_settings.Theme != ConsoleSettings.ThemeWindows || IsDisposed || !IsHandleCreated) return;
+            // Follow Windows tracks the light/dark setting; High Contrast turning on or off applies to every theme.
+            var relevant = _settings.Theme == ConsoleSettings.ThemeWindows
+                || e.Category == Microsoft.Win32.UserPreferenceCategory.Accessibility || e.Category == Microsoft.Win32.UserPreferenceCategory.Color;
+            if (!relevant || IsDisposed || !IsHandleCreated) return;
             // The window can close between the check and the call (this event arrives on another thread).
             try { BeginInvoke(new Action(() => { if (!IsDisposed) ApplyAppearance(); })); }
             catch (Exception ex) when (ex is InvalidOperationException || ex is ObjectDisposedException) { }

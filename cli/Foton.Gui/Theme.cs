@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
@@ -36,7 +37,7 @@ namespace Foton.Gui
         sealed class Original
         {
             public Color Back, Fore;
-            public bool InheritsBack, InheritsFore;
+            public bool BackSet, ForeSet;
             public FlatStyle? Flat;
             public DataGridViewCellStyle? Cells, Headers;
             public Color GridBack, GridLines;
@@ -114,16 +115,11 @@ namespace Foton.Gui
         static Original Remember(Control c)
         {
             if (Originals.TryGetValue(c, out var o)) return o;
-            var parent = c.Parent;
-            o = new Original
-            {
-                Back = c.BackColor, Fore = c.ForeColor,
-                // Colors equal to the parent's current ones came from it (WinForms ambient colors): leave them to follow it.
-                // Input controls and buttons have their own defaults even when they match.
-                // A tab page paints its own background (its parent's color is not drawn), so it always gets one.
-                InheritsBack = parent != null && c.BackColor == parent.BackColor && !(c is TextBoxBase) && !(c is ListControl) && !(c is TreeView) && !(c is ButtonBase) && !(c is UpDownBase) && !(c is TabPage),
-                InheritsFore = parent != null && c.ForeColor == parent.ForeColor,
-            };
+            // Whether the color was set on this control (WinForms' own test), not inferred from what it reads now: a color
+            // that was never set is the parent's (ambient) or the control's default, whatever theme is showing when the
+            // control is first seen, and is reset rather than restored.
+            bool Set(string property) => TypeDescriptor.GetProperties(c)[property]?.ShouldSerializeValue(c) ?? false;
+            o = new Original { Back = c.BackColor, Fore = c.ForeColor, BackSet = Set("BackColor"), ForeSet = Set("ForeColor") };
             if (c is ButtonBase b) { o.Flat = b.FlatStyle; o.VisualStyleBack = b.UseVisualStyleBackColor; }
             if (c is ComboBox cb) o.Flat = cb.FlatStyle;
             if (c is DataGridView g)
@@ -152,15 +148,21 @@ namespace Foton.Gui
             var o = Remember(c);
             if (c is Form f) SetFont(f);
 
-            if (!o.InheritsBack)
+            var field = c is TextBoxBase || c is ListControl || c is TreeView || c is UpDownBase;
+            var pushButton = c is ButtonBase && !(c is CheckBox) && !(c is RadioButton);
+            if (!Dark)
             {
-                c.BackColor = !Dark ? o.Back
-                    : o.Back == SystemColors.Info ? InfoBack
-                    : c is TextBoxBase || c is ListControl || c is TreeView || c is UpDownBase ? Field
-                    : c is ButtonBase && !(c is CheckBox) && !(c is RadioButton) ? ButtonBack
-                    : Back;
+                if (o.BackSet) c.BackColor = o.Back; else c.ResetBackColor();
+                if (o.ForeSet) c.ForeColor = o.Fore; else c.ResetForeColor();
             }
-            if (!o.InheritsFore) c.ForeColor = Dark ? DarkFore(o.Fore) : o.Fore;
+            else
+            {
+                // Surfaces that paint themselves get dark colors; everything else (panels, labels, check boxes) follows
+                // its parent, as it did in Light.
+                if (o.BackSet || field || pushButton || c is Form || c is TabPage)
+                    c.BackColor = o.BackSet && o.Back == SystemColors.Info ? InfoBack : field ? Field : pushButton ? ButtonBack : Back;
+                if (o.ForeSet || field || c is Form) c.ForeColor = o.ForeSet ? DarkFore(o.Fore) : Text;
+            }
 
             switch (c)
             {
