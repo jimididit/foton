@@ -6,6 +6,8 @@ Each release (tags `v2.*` and later) takes its "What's new" notes from the secti
 
 ## [3.2.0] - 2026-11-13
 
+- Console wizards: **Build a collector** (collection or baseline, scope, folder, then the command to run), **Work a case** (choose, verify, parse/compose/analyze, review, hand off), and **Compare baselines** (reference, difference, result). Each shows its steps and runs the same action as the tab it stands for. **Start here** on the Cases tab opens them, as does **Tools > Wizards**.
+
 - Foton has an icon: the photon wave packet from the reports, in beam cyan on their near-black, with a simpler cut for 16 to 24 px. All four executables carry it (Explorer, the taskbar, Alt+Tab), and the console window shows it in its title bar. The masters (SVG, one-colour and reversed versions) and `foton.ico` are in `assets/brand`; a build test checks that every executable carries the icon.
 
 ## [3.1.0] - 2026-11-13

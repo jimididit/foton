@@ -392,7 +392,7 @@ Each run writes a new folder under `C:\Foton\Bundles` (or `-OutputPath "\path\to
 
 A window for the same workstation work, for when you would rather click than type. It runs the same code as `foton.exe`, writes the same files, and never reads the live host or runs a collector.
 
-Start `foton-console.exe`. It opens on the **Cases** tab, where **Start here** builds a collector for an endpoint or opens a case folder or ZIP. To open a package straight away, pass it on the command line: `.\foton-console.exe "\path\to\Foton_case.zip"`.
+Start `foton-console.exe`. It opens on the **Cases** tab, where **Start here** offers three [wizards](#wizards): **Build a collector...**, **Work a case...**, and **Compare baselines...**. To open a package straight away, pass it on the command line: `.\foton-console.exe "\path\to\Foton_case.zip"`.
 
 The tabs, in the order they appear:
 
@@ -410,6 +410,16 @@ The tabs, in the order they appear:
 | [Collectors](#collectors-tab) | Build the folder to carry to an endpoint |
 
 The log pane under the tabs shows the same lines `foton.exe` prints. **View > Show log** (Ctrl+L) hides or shows it; its height and whether it is shown are remembered. The status bar shows the last message of the tab on screen. One action runs at a time; the buttons come back when it finishes. A grid with nothing in it says what to do next.
+
+#### Wizards
+
+**Start here** on the Cases tab and **Tools > Wizards** open three step-by-step wizards. Each shows its steps (done, current, still to come), says what the step does, and runs the same action as the tab it stands for, with the log under the main window as usual. **Skip** passes an optional step; **Close** stops at any step, except while one runs.
+
+| Wizard | Steps |
+|--------|-------|
+| **Build a collector** | Collection or baseline bundle; scope (every category, the **Profile** tab's profile, or a saved profile file; for a baseline, users not signed in); the folder; build; then the command from `RUN.txt`, **Open the folder**, and **Copy the command** |
+| **Work a case** | Choose the case (listed, recent, or a folder or ZIP); verify; parse, compose, analyze (each optional); review (findings by severity, or **Review them on the Package tab**); export the handoff |
+| **Compare baselines** | Reference baseline; difference baseline (from the listed baselines or a `baseline.json`); compare; the result, with **Open compare report** |
 
 #### Cases tab
 
@@ -487,7 +497,7 @@ Copy the folder to the endpoint or push it with your RMM tool, run the command i
 
 #### Menu, shortcuts, and settings
 
-The menu bar has **File** (open a case folder or ZIP, **Recent cases**, exit), **View** (find on this tab, refresh this tab, **Show log**, **Theme**, **Text size**, go to a tab), **Tools** (**Settings...**, and the Collectors, Tools, and Profile tabs), and **Help** (keyboard shortcuts, and **About**, which shows the version, schemas, release date, and the SHA-256 of `foton-console.exe` to compare with `SHA256SUMS.txt`).
+The menu bar has **File** (open a case folder or ZIP, **Recent cases**, exit), **View** (find on this tab, refresh this tab, **Show log**, **Theme**, **Text size**, go to a tab), **Tools** (**Settings...**, **Wizards**, and the Collectors, Tools, and Profile tabs), and **Help** (keyboard shortcuts, and **About**, which shows the version, schemas, release date, and the SHA-256 of `foton-console.exe` to compare with `SHA256SUMS.txt`).
 
 | Shortcut | Does |
 |----------|------|

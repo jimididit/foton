@@ -221,6 +221,8 @@ namespace Foton.Tests
                 Assert.Equal(new[] { sha + "  foton-collect.exe", profile.Sha256.ToLowerInvariant() + "  profile.json" }, File.ReadAllLines(Path.Combine(b.Folder, "SHA256SUMS.txt")));
                 var run = File.ReadAllText(Path.Combine(b.Folder, "RUN.txt"));
                 Assert.Contains(@".\foton-collect.exe -Profile .\profile.json -CaseNumber", run);
+                Assert.Equal(@".\foton-collect.exe -Profile .\profile.json -CaseNumber CASE-0001 -Examiner NAME", b.RunCommand);
+                Assert.Contains("  " + b.RunCommand + "\r\n", run);
                 Assert.Contains("Options:      EventLogDays=3", run);
                 Assert.Contains("released with Foton " + FotonVersion.Product, run);
                 Assert.Throws<IOException>(() => Foton.Tools.DeploymentBundle.Build(Foton.Tools.CollectorKind.Collect, exe, profile, false, t.File("out"), when));
@@ -230,6 +232,7 @@ namespace Foton.Tests
                 Assert.Equal(t.File(@"out2\Foton_Bundle_All_categories_20261111-093000Z"), all.Folder);
                 Assert.Equal(new[] { sha + "  foton-collect.exe" }, File.ReadAllLines(Path.Combine(all.Folder, "SHA256SUMS.txt")));
                 Assert.Contains(@".\foton-collect.exe -CaseNumber", File.ReadAllText(Path.Combine(all.Folder, "RUN.txt")));
+                Assert.Equal(@".\foton-collect.exe -CaseNumber CASE-0001 -Examiner NAME", all.RunCommand);
             }
         }
 
@@ -244,6 +247,7 @@ namespace Foton.Tests
                 Assert.Equal(t.File(@"out\Foton_BaselineBundle_20261113-010203Z"), b.Folder);
                 Assert.Equal(new[] { "RUN.txt", "SHA256SUMS.txt", "foton-baseline.exe" }, Directory.GetFiles(b.Folder).Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal));
                 Assert.Contains(@".\foton-baseline.exe -LoadUserHives", File.ReadAllText(Path.Combine(b.Folder, "RUN.txt")));
+                Assert.Equal(@".\foton-baseline.exe -LoadUserHives", b.RunCommand);
                 Assert.Throws<ArgumentException>(() => Foton.Tools.DeploymentBundle.Build(Foton.Tools.CollectorKind.Baseline, exe, CollectionProfile.FromCategories("Users"), false, t.File("out2"), when));
             }
         }

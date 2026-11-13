@@ -118,6 +118,17 @@ namespace Foton.Gui
             // Read on the UI thread.
             var profile = collect && _bundleUseProfile.Checked ? _profile : null;
             var userHives = !collect && _bundleUserHives.Checked;
+            var built = await BuildBundleAt(kind, profile, userHives, parent);
+            if (built != null) _status.Text = "Bundle built: " + built.Folder;
+        }
+
+        /// <summary>
+        /// Builds a bundle with the collector this console carries (the Collectors tab and the Build a collector wizard).
+        /// Null when it was not built; the log says why.
+        /// </summary>
+        async Task<DeploymentBundle?> BuildBundleAt(CollectorKind kind, CollectionProfile? profile, bool userHives, string parent)
+        {
+            var collect = kind == CollectorKind.Collect;
             DeploymentBundle? built = null;
             await Run(collect ? "Build collection bundle" : "Build baseline bundle", log =>
             {
@@ -127,10 +138,10 @@ namespace Foton.Gui
                 log.Write("Bundle: " + built.Folder + " (" + DeploymentBundle.ReadmeFileName + " has the command to run)", StatusLevel.Good);
                 return null;
             });
-            if (built == null) return;
+            if (built == null) return null;
             _lastBundle = built.Folder;
             _showBundle.Enabled = true;
-            _status.Text = "Bundle built: " + built.Folder;
+            return built;
         }
     }
 }

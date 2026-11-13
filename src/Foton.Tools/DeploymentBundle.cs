@@ -27,6 +27,13 @@ namespace Foton.Tools
         public CollectorKind Kind { get; private set; }
         public string CollectorVersion { get; private set; } = "";
         public string CollectorSha256 { get; private set; } = "";
+        /// <summary>The command RUN.txt gives, to run from the bundle folder on the endpoint.</summary>
+        public string RunCommand { get; private set; } = "";
+
+        static string Command(CollectorKind kind, bool profile, bool loadUserHives) =>
+            kind == CollectorKind.Collect
+                ? $".\\{EmbeddedCollectors.FileName(kind)}{(profile ? $" -Profile .\\{ProfileFileName}" : "")} -CaseNumber CASE-0001 -Examiner NAME"
+                : $".\\{EmbeddedCollectors.FileName(kind)}{(loadUserHives ? " -LoadUserHives" : "")}";
 
         /// <summary>
         /// Builds Foton_Bundle_&lt;profile&gt;_&lt;UTC&gt;Z (collect) or Foton_BaselineBundle_&lt;UTC&gt;Z (baseline) under
@@ -62,7 +69,7 @@ namespace Foton.Tools
                 }
                 TextFile.Write(Path.Combine(folder, ReadmeFileName), Readme(kind, profile, profileSha, loadUserHives, version, sha, utcNow));
                 File.WriteAllText(Path.Combine(folder, SumsFileName), sums.ToString(), new UTF8Encoding(false));
-                return new DeploymentBundle { Folder = folder, Kind = kind, CollectorVersion = Show(version), CollectorSha256 = sha };
+                return new DeploymentBundle { Folder = folder, Kind = kind, CollectorVersion = Show(version), CollectorSha256 = sha, RunCommand = Command(kind, profile != null, loadUserHives) };
             }
             catch
             {
@@ -134,14 +141,14 @@ namespace Foton.Tools
             if (kind == CollectorKind.Collect)
             {
                 lines.Add("On the endpoint, from this folder (an elevated prompt collects the most; a standard user is supported):");
-                lines.Add($"  .\\{name}{(p != null ? $" -Profile .\\{ProfileFileName}" : "")} -CaseNumber CASE-0001 -Examiner NAME");
+                lines.Add("  " + Command(kind, p != null, false));
                 lines.Add(p != null ? "A switch given on the command line wins over the same option in the profile." : null);
                 lines.Add("The case package is written to C:\\Foton\\Cases (or -OutputPath <folder>). Bring it to the workstation and open it in foton-console.exe.");
             }
             else
             {
                 lines.Add("On the machine to baseline, from this folder (an elevated prompt captures the most; a standard user is supported):");
-                lines.Add($"  .\\{name}{(loadUserHives ? " -LoadUserHives" : "")}");
+                lines.Add("  " + Command(kind, false, loadUserHives));
                 lines.Add(loadUserHives ? "-LoadUserHives also reads the registry of users who are not signed in (loaded and unloaded again)." : null);
                 lines.Add("The baseline is written to C:\\Foton\\Baselines (or -OutputPath <folder>). Compare two baselines with foton compare or the console's Compare tab.");
             }
