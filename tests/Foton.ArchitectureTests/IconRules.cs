@@ -19,11 +19,14 @@ namespace Foton.ArchitectureTests
         {
             Assert.True(ico.Length > 6 && BitConverter.ToUInt16(ico, 2) == 1, "foton.ico is not an icon file.");
             int count = BitConverter.ToUInt16(ico, 4);
+            Assert.True(count > 0 && 6 + 16 * count <= ico.Length, "foton.ico's directory does not fit the file.");
             var frames = new List<byte[]>();
             for (int i = 0; i < count; i++)
             {
                 var entry = 6 + 16 * i;
                 int size = BitConverter.ToInt32(ico, entry + 8), offset = BitConverter.ToInt32(ico, entry + 12);
+                // A frame that is empty or runs past the file would make the byte search below meaningless.
+                Assert.True(size > 0 && offset >= 6 + 16 * count && (long)offset + size <= ico.Length, $"foton.ico frame {i} lies outside the file.");
                 frames.Add(ico.Skip(offset).Take(size).ToArray());
             }
             return frames;

@@ -43,14 +43,13 @@ namespace Foton.Gui
         {
             var panel = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(4, 6, 4, 6), BackColor = SystemColors.Info };
             panel.Controls.Add(new Label { Text = "Start here", AutoSize = true, Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold), Padding = new Padding(0, 6, 8, 0) });
-            panel.Controls.Add(AddButton("Build a collector...", () => { if (_collectorsPage != null) _tabs.SelectedTab = _collectorsPage; _status.Text = "Collectors: build a collection bundle to run on the endpoint."; }));
-            panel.Controls.Add(AddButton("Build a baseline collector...", () => { if (_collectorsPage != null) _tabs.SelectedTab = _collectorsPage; _status.Text = "Collectors: a baseline bundle records stable configuration to compare later."; }));
-            panel.Controls.Add(AddButton("Open a case folder...", async () => { var p = PickFolder(); if (p != null) { if (_packagePage != null) _tabs.SelectedTab = _packagePage; await Open(p); } }));
-            panel.Controls.Add(AddButton("Open a ZIP...", async () => { var p = PickZip(); if (p != null) { if (_packagePage != null) _tabs.SelectedTab = _packagePage; await Open(p); } }));
+            panel.Controls.Add(AddButton("Build a collector...", CollectorWizard));
+            panel.Controls.Add(AddButton("Work a case...", WorkCaseWizard));
+            panel.Controls.Add(AddButton("Compare baselines...", CompareWizard));
             panel.Controls.Add(new Label
             {
                 AutoSize = true, Padding = new Padding(8, 6, 0, 0),
-                Text = "Run a collector on the endpoint, then open its package: select it below and press Open. The Package tab lists the next steps.",
+                Text = "Step-by-step: build a collector for the endpoint, then work the case it brings back. Or select a case below and press Open.",
             });
             return panel;
         }

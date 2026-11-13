@@ -74,11 +74,12 @@ namespace Foton.Gui
                 if (d.ShowDialog(this) == DialogResult.OK) target.Text = d.FileName;
         }
 
-        async Task Compare()
+        /// <summary>Compares the two baselines; true when the comparison ran (the Compare tab and the wizard show it).</summary>
+        async Task<bool> Compare()
         {
             var reference = _reference.Text.Trim().Trim('"');
             var difference = _difference.Text.Trim().Trim('"');
-            if (reference.Length == 0 || difference.Length == 0) { _status.Text = "Choose both baselines first."; return; }
+            if (reference.Length == 0 || difference.Length == 0) { _status.Text = "Choose both baselines first."; return false; }
             _compareReport.Remember(null);
             CompareResult? result = null;
             string? html = null;
@@ -107,7 +108,7 @@ namespace Foton.Gui
                 result = r;
                 return null;
             });
-            if (result == null) return;
+            if (result == null) return false;
             _compareReport.Remember(html);
             ShowFindings(_compareFindings, result.Findings.Select(FindingRow));
             var table = new System.Data.DataTable();
@@ -118,6 +119,7 @@ namespace Foton.Gui
             var shown = result.Changes.Count > MaxChangeRows ? $" (first {MaxChangeRows:N0} shown; all in baseline_diff.csv)" : "";
             _compareSummary.Text = $"{result.Mode}: {result.Changes.Count} change(s){shown}, {result.Findings.Count} finding(s){intact}";
             _status.Text = "Compare finished - " + _compareSummary.Text;
+            return true;
         }
 
         void OpenCompareReport()

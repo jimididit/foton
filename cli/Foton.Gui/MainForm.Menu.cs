@@ -77,6 +77,12 @@ namespace Foton.Gui
             settings.ShortcutKeyDisplayString = "Ctrl+,";   // Windows would name the key "Oemcomma"
             tools.DropDownItems.Add(settings);
             tools.DropDownItems.Add(new ToolStripSeparator());
+            var wizards = new ToolStripMenuItem("&Wizards");
+            wizards.DropDownItems.Add(Item("&Build a collector...", Keys.None, CollectorWizard));
+            wizards.DropDownItems.Add(Item("&Work a case...", Keys.None, () => _ = WorkCaseWizard()));
+            wizards.DropDownItems.Add(Item("&Compare baselines...", Keys.None, () => _ = CompareWizard()));
+            tools.DropDownItems.Add(wizards);
+            tools.DropDownItems.Add(new ToolStripSeparator());
             tools.DropDownItems.Add(Item("Build collector bundles (Collectors tab)", Keys.None, () => SelectTab("Collectors")));
             tools.DropDownItems.Add(Item("Install or register tools (Tools tab)", Keys.None, () => SelectTab("Tools")));
             tools.DropDownItems.Add(Item("Build a collection profile (Profile tab)", Keys.None, () => SelectTab("Profile")));

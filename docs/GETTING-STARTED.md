@@ -110,7 +110,7 @@ You do not need to extract the ZIP yourself. `foton package` extracted it into a
 
 ## 6. Analyze on the workstation
 
-Prefer a window? Start `foton-console.exe`, press **Open a ZIP...** under **Start here**, and choose the ZIP. The **Package** tab lists the steps below; **Do this next** runs the first one not done. The commands below do the same.
+Prefer a window? Start `foton-console.exe` and press **Work a case...** under **Start here**: it opens the ZIP (**ZIP...**), then verifies, parses, composes, and analyzes it one step at a time, and ends with the handoff. The commands below do the same.
 
 Run these in order, with the same ZIP path as in step 5:
 
