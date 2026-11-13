@@ -1,6 +1,6 @@
 name: Release v2
 
-# Foton v2 (C#). Tag v2.Y.Z or v2.Y.Z-<prerelease> (matching FotonVersion / FotonPrerelease in
+# Foton 2 and later (C#). Tag vX.Y.Z or vX.Y.Z-<prerelease> (matching FotonVersion / FotonPrerelease in
 # Directory.Build.props) to publish. A tag with a prerelease suffix publishes a GitHub prerelease.
 # The release's "What's new" is the CHANGELOG.md section for that version; the build fails without one.
 # Run manually (workflow_dispatch) for a dry run: builds, tests, and uploads the executables as a
@@ -14,7 +14,7 @@ name: Release v2
 
 on:
   push:
-    tags: ['v2.*']
+    tags: ['v2.*', 'v3.*']
   workflow_dispatch:
 
 permissions:
@@ -154,7 +154,7 @@ jobs:
           $preNote = ''
           if ($tag.Contains('-')) {
             $pre = @('--prerelease')
-            $preNote = "`n`n**Prerelease** for testing; not supported. Use the latest v2 release for casework."
+            $preNote = "`n`n**Prerelease** for testing; not supported. Use the latest release for casework."
           }
           $changes = (Get-Content -Raw -Encoding UTF8 'notes\changes.md').Trim()
           $notes = @"
@@ -164,7 +164,7 @@ jobs:
 
           - **foton-collect.exe**: live triage into a hashed case package (custody, coverage, manifest, findings, ``Foton_Report.html``, ZIP). Same switches as the 1.38.x Collect flat script. Administrator preferred; standard user supported.
           - **foton-baseline.exe**: capture a baseline of stable configuration (37 record types) into a hashed package with ``Foton_Baseline.html``. Same switches as the 1.38.x flat script: ``-OutputPath``, ``-Path``, ``-NoZip``, ``-NoHtml``, ``-RequireAdministrator``.
-          - **foton.exe**: workstation verbs ``compare``, ``parse``, ``analyze``, ``ioc``, ``compose``, ``tools``, ``carve``, ``timeline``, ``cases`` (list packages), and ``package`` (verify hashes).
+          - **foton.exe**: workstation verbs ``compare``, ``parse``, ``analyze``, ``ioc``, ``compose``, ``tools``, ``carve``, ``timeline``, ``notes``, ``search``, ``handoff``, ``bundle`` (build a collector bundle for an endpoint), ``cases`` (list packages), and ``package`` (verify hashes). Carries the two collectors for ``bundle``.
           - **foton-console.exe**: a workstation window for the same work: open a package or ZIP, verify, parse, compose, analyze, read findings and artifacts, match IOCs, install and pick external tools, compare baselines, and build collection profiles and endpoint bundles. Never touches the live host.
 
           Each executable prints its version and schemas with ``-Version``. Compare accepts baselines from Foton 1.38.x (schema 1.14.0) onward and explains the one-time format and coverage differences; see [Formats and compatibility](https://github.com/jimididit/foton/blob/$tag/docs/USAGE.md#formats-and-compatibility).

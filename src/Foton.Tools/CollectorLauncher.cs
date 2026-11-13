@@ -8,8 +8,6 @@ using Foton.Core;
 
 namespace Foton.Tools
 {
-    public enum CollectorKind { Collect, Baseline }
-
     /// <summary>
     /// A collector that passed the console's checks, ready to run. Until disposed it holds the file open for reading
     /// only (others may read and run it, nobody may write, replace, rename, or delete it), so the file Windows starts is
@@ -78,11 +76,11 @@ namespace Foton.Tools
             try
             {
                 var v = FileVersionInfo.GetVersionInfo(info.FullName);
-                var version = DeploymentBundle.CheckExecutable(FileName(kind), MinimumVersion(kind), v.OriginalFilename, v.FileVersion);
+                var version = CheckExecutable(FileName(kind), MinimumVersion(kind), v.OriginalFilename, v.FileVersion);
                 string sha;
                 using (var h = System.Security.Cryptography.SHA256.Create())
                     sha = BitConverter.ToString(h.ComputeHash(hold)).Replace("-", "").ToLowerInvariant();
-                var verified = DeploymentBundle.Verify(System.IO.Path.Combine(info.DirectoryName!, DeploymentBundle.SumsFileName), info.Name, sha);
+                var verified = Verify(System.IO.Path.Combine(info.DirectoryName!, DeploymentBundle.SumsFileName), info.Name, sha);
                 return new CollectorCheck { Hold = hold, Path = info.FullName, Version = DeploymentBundle.Show(version), Sha256 = sha, Verified = verified };
             }
             catch
@@ -90,6 +88,42 @@ namespace Foton.Tools
                 hold.Dispose();
                 throw;
             }
+        }
+
+        static Version Full(Version v) => new Version(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
+
+        /// <summary>
+        /// The executable's version when its version resource names <paramref name="expected"/> and it is at least
+        /// <paramref name="minimum"/>; otherwise InvalidDataException naming why.
+        /// </summary>
+        internal static Version CheckExecutable(string expected, Version minimum, string? originalFilename, string? fileVersion)
+        {
+            if (!string.Equals(originalFilename, expected, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"This is not {expected} (its version resource names '{originalFilename}').");
+            if (!Version.TryParse(fileVersion ?? "", out var version))
+                throw new InvalidDataException($"{expected} has no readable version ('{fileVersion}').");
+            if (Full(version) < Full(minimum))
+                throw new InvalidDataException($"{expected} {DeploymentBundle.Show(version)} is too old for the console; use {DeploymentBundle.Show(minimum)} or later.");
+            return version;
+        }
+
+        /// <summary>
+        /// False when there is no SHA256SUMS.txt; true when it lists the file with this hash. A list that leaves the file
+        /// out, or gives another hash, is refused: the executable is not the one released with that list.
+        /// </summary>
+        internal static bool Verify(string sumsPath, string fileName, string sha256)
+        {
+            var sums = new FileInfo(sumsPath);
+            if (!sums.Exists) return false;
+            if (sums.Length > 64 * 1024) throw new InvalidDataException("SHA256SUMS.txt beside " + fileName + " is too large to be a release list.");
+            foreach (var line in File.ReadAllLines(sums.FullName))
+            {
+                var m = Regex.Match(line, @"^([0-9a-fA-F]{64}) [ *](.+)$");
+                if (!m.Success || !string.Equals(m.Groups[2].Value.Trim(), fileName, StringComparison.OrdinalIgnoreCase)) continue;
+                if (string.Equals(m.Groups[1].Value, sha256, StringComparison.OrdinalIgnoreCase)) return true;
+                throw new InvalidDataException($"{fileName} does not match SHA256SUMS.txt beside it (listed {m.Groups[1].Value.ToLowerInvariant()}, file is {sha256}). It is not the released file.");
+            }
+            throw new InvalidDataException($"SHA256SUMS.txt beside {fileName} does not list it, so the file cannot be checked against the release.");
         }
 
         /// <summary>The collector's command line. Values with quotes, control characters, or a leading '-' are refused.</summary>

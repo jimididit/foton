@@ -15,7 +15,8 @@ namespace Foton.Tests
         public void Product_version_comes_from_build_props_not_a_literal()
         {
             Assert.Matches(SemVer, FotonVersion.Product);
-            Assert.StartsWith("2.", FotonVersion.Product);
+            // The C# line starts at 2.0.0 (1.38.x was the PowerShell line).
+            Assert.True(int.Parse(FotonVersion.Product.Split('.')[0], System.Globalization.CultureInfo.InvariantCulture) >= 2, FotonVersion.Product);
         }
 
         [Fact]

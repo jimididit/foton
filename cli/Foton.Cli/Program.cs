@@ -66,6 +66,8 @@ namespace Foton.Cli
             }
             if (args.Length >= 2 && string.Equals(args[0], "notes", StringComparison.OrdinalIgnoreCase))
                 return NotesCommand.Run(args);
+            if (args.Length >= 2 && string.Equals(args[0], "bundle", StringComparison.OrdinalIgnoreCase))
+                return BundleCommand.Run(args);
             if ((args.Length == 3 || args.Length == 4) && string.Equals(args[0], "search", StringComparison.OrdinalIgnoreCase))
             {
                 if (args.Length == 4 && !string.Equals(args[3], "-Regex", StringComparison.OrdinalIgnoreCase)) return Usage();
@@ -142,6 +144,11 @@ namespace Foton.Cli
             Console.WriteLine("  foton notes <case-folder-or-zip> (-Key <key> | -Artifact <file> -Row <n>) [-Status <status>]");
             Console.WriteLine("              [-Text <note>] [-Examiner <name>]");
             Console.WriteLine("                                        set one; status: Not reviewed, Reviewed, Relevant, Not relevant, Follow up");
+            Console.WriteLine("  foton bundle collect [-Profile <profile.json>] [-OutputPath <folder>]");
+            Console.WriteLine("  foton bundle baseline [-LoadUserHives] [-OutputPath <folder>]");
+            Console.WriteLine("                                        a folder to carry to an endpoint (default under C:\\Foton\\Bundles):");
+            Console.WriteLine("                                        the collector released with this foton.exe, the profile, RUN.txt,");
+            Console.WriteLine("                                        SHA256SUMS.txt");
             Console.WriteLine("  foton search <case-folder-or-zip> <text> [-Regex]");
             Console.WriteLine("                                        find a text (case-insensitive) in every CSV, JSON, text, log, XML, and");
             Console.WriteLine("                                        HTML file of the package; writes analysis\\search_<UTC>.csv and .txt");

@@ -14,4 +14,5 @@
     <ProjectReference Include="..\..\src\Foton.Tools\Foton.Tools.csproj" />
     <ProjectReference Include="..\..\src\Foton.Carve\Foton.Carve.csproj" />
   </ItemGroup>
+  <Import Project="..\EmbedCollectors.targets" />
 </Project>

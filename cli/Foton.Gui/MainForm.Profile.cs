@@ -235,29 +235,19 @@ namespace Foton.Gui
         {
             var profile = _profile;
             if (profile == null) return;
-            string exe, parent;
-            using (var d = new OpenFileDialog
+            string parent;
+            using (var d = new FolderBrowserDialog { Description = "Choose where to create the bundle folder", ShowNewFolderButton = true })
             {
-                Title = "Choose foton-collect.exe (a SHA256SUMS.txt beside it is checked)",
-                Filter = "foton-collect.exe|foton-collect.exe|Programs (*.exe)|*.exe",
-                CheckFileExists = true,
-                InitialDirectory = AppDomain.CurrentDomain.BaseDirectory,
-            })
-            {
-                if (d.ShowDialog(this) != DialogResult.OK) return;
-                exe = d.FileName;
-            }
-            using (var d = new FolderBrowserDialog { Description = "Choose where to create the bundle folder", ShowNewFolderButton = true, SelectedPath = Path.GetDirectoryName(exe) })
-            {
+                var standard = CaseTree.DefaultOutput("Bundles");
+                if (Directory.Exists(standard)) d.SelectedPath = standard;
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 parent = d.SelectedPath;
             }
             await Run("Build bundle", log =>
             {
-                var b = DeploymentBundle.Build(exe, profile, parent, DateTime.UtcNow);
-                log.Write($"foton-collect {b.CollectVersion} SHA-256 {b.CollectSha256}", StatusLevel.Info);
-                if (b.CollectVerified) log.Write("foton-collect.exe matches the SHA256SUMS.txt beside it.", StatusLevel.Good);
-                else log.Write("foton-collect.exe NOT verified: no SHA256SUMS.txt beside it. Compare the hash with the release list before use.", StatusLevel.Warn);
+                // The foton-collect.exe this console carries: the one released with it.
+                var b = DeploymentBundle.Build(CollectorKind.Collect, EmbeddedCollectors.Read(CollectorKind.Collect), profile, false, parent, DateTime.UtcNow);
+                log.Write($"foton-collect {b.CollectorVersion} SHA-256 {b.CollectorSha256} (released with this console)", StatusLevel.Info);
                 log.Write("Bundle: " + b.Folder + " (" + DeploymentBundle.ReadmeFileName + " has the command to run)", StatusLevel.Good);
                 return null;
             });

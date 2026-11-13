@@ -25,7 +25,7 @@ Copy only the endpoint executable to a target. Parse, compose, and analyze read 
 
 ## 0. Getting Foton
 
-Each [GitHub Release](https://github.com/jimididit/foton/releases) tagged `v2.*` carries:
+Each [GitHub Release](https://github.com/jimididit/foton/releases) (tags `v2.*` and later) carries:
 
 | Asset | For |
 |-------|-----|
@@ -170,6 +170,7 @@ A baseline taken after an incident is a picture of **that** state. Compare prove
 | `carve <blob>` | MZ/PE signature scan of a copied blob (Tier 3, not NTFS carving). `-MaxBytes`, `-MaxHits` (defaults 8 MiB / 50 hits) |
 | `timeline <case-folder-or-zip>` | One list of the package's recorded times, sorted by UTC, each with what that time means: `analysis\timeline.csv` + `timeline_sources.csv`. `-From`, `-To` (UTC date or `"yyyy-MM-dd HH:mm:ss"`), `-All` ([Timeline](#timeline)) |
 | `notes <case-folder-or-zip>` | List each finding's review status and the examiner notes in `analysis\examiner_notes.json` (`-Json` for scripts), or set one: `-Key <key>` (a finding or note key it lists, or at least 8 characters of one) or `-Artifact <file> -Row <n>`, with `-Status`, `-Text`, `-Examiner` ([Examiner notes](#examiner-notes)) |
+| `bundle collect` / `bundle baseline` | Build a folder to carry to an endpoint: the collector `foton.exe` carries (the one released with it), `RUN.txt` with the command, and `SHA256SUMS.txt`. `collect` takes `-Profile <profile.json>` (without one, every category); `baseline` takes `-LoadUserHives`. Both take `-OutputPath <folder>` (default `C:\Foton\Bundles`) |
 | `search <case-folder-or-zip> <text>` | Find a text (case-insensitive) in every CSV, JSON, text, log, XML, and HTML file of the package; `-Regex` for a regular expression. Hits name the file and CSV row and column, or line: `analysis\search_<UTC>.csv` + `.txt` ([Search](#search)) |
 | `handoff <case-folder-or-zip>` | Write the review for another examiner: `Foton_Handoff_<case>_<UTC>` under `C:\Foton\Handoffs` (or `-OutputPath <folder>`) with findings, examiner notes, `Foton_Handoff.html`, custody and `hashes.csv` copies, `HANDOFF.txt`, and `SHA256SUMS.txt`. Exit 2 when the package does not verify ([Handoff](#handoff)) |
 | `cases` | List the case and baseline packages in `C:\Foton\Cases`, `C:\Foton\Baselines`, and each `-Path <folder>`: host, time, case number, examiner, elevated, profile, finding counts, and which of parse, compose, and analyze have run. `-Json` for scripts. Read-only and does not hash; use `package` to verify |
