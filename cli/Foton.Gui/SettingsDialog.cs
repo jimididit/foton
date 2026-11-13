@@ -21,6 +21,7 @@ namespace Foton.Gui
         readonly TextBox _casesOutput = new TextBox { Width = 420 };
         readonly TextBox _baselinesOutput = new TextBox { Width = 420 };
         readonly TextBox _handoffsOutput = new TextBox { Width = 420 };
+        readonly TextBox _bundlesOutput = new TextBox { Width = 420 };
         readonly ListBox _caseFolders = new ListBox { Width = 420, Height = 120, HorizontalScrollbar = true };
         readonly ComboBox _theme = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
         readonly ComboBox _textSize = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
@@ -45,6 +46,7 @@ namespace Foton.Gui
             _casesOutput.Text = settings.CasesOutput;
             _baselinesOutput.Text = settings.BaselinesOutput;
             _handoffsOutput.Text = settings.HandoffsOutput;
+            _bundlesOutput.Text = settings.BundlesOutput;
             foreach (var f in settings.CaseFolders) _caseFolders.Items.Add(f);
 
             var tabs = new TabControl { Dock = DockStyle.Fill };
@@ -98,7 +100,7 @@ namespace Foton.Gui
             var page = new TabPage("General");
             var p = Page();
             p.Controls.Add(Row("Examiner", _examiner));
-            p.Controls.Add(Hint("Filled in on the Acquire tab and for examiner notes. Empty uses the case's own examiner (notes) or your Windows account name (Acquire)."));
+            p.Controls.Add(Hint("Filled in for examiner notes. Empty uses the examiner recorded in the case."));
             p.Controls.Add(Row("Open on start", _openOnStart));
             p.Controls.Add(Hint("A package given on the command line always opens instead."));
             var clear = new Button { Text = "Clear the list", AutoSize = true };
@@ -123,10 +125,11 @@ namespace Foton.Gui
                 };
                 return b;
             }
-            p.Controls.Add(Row("Cases", _casesOutput, Browse(_casesOutput, "new cases")));
-            p.Controls.Add(Row("Baselines", _baselinesOutput, Browse(_baselinesOutput, "new baselines")));
+            p.Controls.Add(Row("Cases", _casesOutput, Browse(_casesOutput, "your cases")));
+            p.Controls.Add(Row("Baselines", _baselinesOutput, Browse(_baselinesOutput, "your baselines")));
+            p.Controls.Add(Row("Bundles", _bundlesOutput, Browse(_bundlesOutput, "collector bundles")));
             p.Controls.Add(Row("Handoffs", _handoffsOutput, Browse(_handoffsOutput, "handoffs")));
-            p.Controls.Add(Hint($"Where Acquire writes new cases and baselines and where Export handoff writes. Empty uses {CaseTree.DefaultOutput("Cases")}, {CaseTree.DefaultOutput("Baselines")}, and {CaseTree.DefaultOutput("Handoffs")}. The Cases tab lists the cases and baselines folders too."));
+            p.Controls.Add(Hint($"Where you keep the cases and baselines collectors bring back (the Cases tab lists them), where the Collectors tab builds bundles, and where Export handoff writes. Empty uses {CaseTree.DefaultOutput("Cases")}, {CaseTree.DefaultOutput("Baselines")}, {CaseTree.DefaultOutput("Bundles")}, and {CaseTree.DefaultOutput("Handoffs")}."));
             var add = new Button { Text = "Add...", AutoSize = true };
             add.Click += (s, e) =>
             {
@@ -162,6 +165,8 @@ namespace Foton.Gui
             if (baselines == null) return false;
             var handoffs = Folder(_handoffsOutput, "handoffs");
             if (handoffs == null) return false;
+            var bundles = Folder(_bundlesOutput, "bundles");
+            if (bundles == null) return false;
 
             _target.Examiner = TextFile.OneLine(_examiner.Text).Trim();
             _target.OpenOnStart = _openOnStart.SelectedIndex == 1 ? ConsoleSettings.StartOnLastCase : ConsoleSettings.StartOnCases;
@@ -171,6 +176,7 @@ namespace Foton.Gui
             _target.CasesOutput = cases;
             _target.BaselinesOutput = baselines;
             _target.HandoffsOutput = handoffs;
+            _target.BundlesOutput = bundles;
             _target.CaseFolders.Clear();
             _target.CaseFolders.AddRange(_caseFolders.Items.Cast<string>());
             _target.Theme = Themes[Math.Max(0, _theme.SelectedIndex)];

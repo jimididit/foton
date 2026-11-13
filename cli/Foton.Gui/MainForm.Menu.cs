@@ -69,6 +69,7 @@ namespace Foton.Gui
             var tools = new ToolStripMenuItem("&Tools");
             tools.DropDownItems.Add(Item("&Settings...", Keys.Control | Keys.Oemcomma, OpenSettings));
             tools.DropDownItems.Add(new ToolStripSeparator());
+            tools.DropDownItems.Add(Item("Build collector bundles (Collectors tab)", Keys.None, () => SelectTab("Collectors")));
             tools.DropDownItems.Add(Item("Install or register tools (Tools tab)", Keys.None, () => SelectTab("Tools")));
             tools.DropDownItems.Add(Item("Build a collection profile (Profile tab)", Keys.None, () => SelectTab("Profile")));
 
@@ -186,9 +187,8 @@ namespace Foton.Gui
         /// <summary>Puts the settings into the tabs that use them (output folders, examiner, case folder list).</summary>
         void ApplySettings()
         {
-            _caseOutput.Text = _settings.CasesFolder;
-            _baselineOutput.Text = _settings.BaselinesFolder;
-            if (_settings.Examiner.Length > 0) _examiner.Text = _settings.Examiner;
+            _collectBundleOut.Text = _settings.BundlesFolder;
+            _baselineBundleOut.Text = _settings.BundlesFolder;
             FillAddedFolders();
         }
 

@@ -17,6 +17,7 @@ namespace Foton.Tests
                 ""CaseFolders"": [""\\\\server\\share\\Cases"", ""C:relative""],
                 ""CasesOutput"": ""D:\\Cases"",
                 ""BaselinesOutput"": ""not a path"",
+                ""BundlesOutput"": ""relative\\Bundles"",
                 ""Theme"": ""Dark"",
                 ""TextSize"": 13
             }");
@@ -28,6 +29,8 @@ namespace Foton.Tests
             Assert.Equal(@"D:\Cases", s.CasesFolder);
             Assert.Equal("", s.BaselinesOutput);
             Assert.EndsWith(@"Foton\Baselines", s.BaselinesFolder);
+            Assert.Equal("", s.BundlesOutput);
+            Assert.EndsWith(@"Foton\Bundles", s.BundlesFolder);
             Assert.Equal(ConsoleSettings.ThemeDark, s.Theme);
             Assert.Equal(9, s.TextSize);
 
@@ -53,11 +56,12 @@ namespace Foton.Tests
             using (var t = new TempDir())
             {
                 var path = t.File(@"Foton\console-settings.json");
-                var s = new ConsoleSettings { Examiner = "Examiner A", OpenOnStart = ConsoleSettings.StartOnLastCase, HandoffsOutput = @"E:\Handoffs", Theme = ConsoleSettings.ThemeWindows, TextSize = 11 };
+                var s = new ConsoleSettings { Examiner = "Examiner A", OpenOnStart = ConsoleSettings.StartOnLastCase, HandoffsOutput = @"E:\Handoffs", BundlesOutput = @"E:\Bundles", Theme = ConsoleSettings.ThemeWindows, TextSize = 11 };
                 s.CaseFolders.Add(@"D:\More");
                 s.AddRecent(@"D:\Cases\Foton_A");
                 Assert.True(s.Save(out _, path));
                 Assert.Equal(s.ToJson(), ConsoleSettings.Load(path).ToJson());
+                Assert.Equal(@"E:\Bundles", ConsoleSettings.Load(path).BundlesFolder);
                 Assert.Equal(new ConsoleSettings().ToJson(), ConsoleSettings.Load(t.File("missing.json")).ToJson());
             }
         }

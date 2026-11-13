@@ -19,6 +19,8 @@ namespace Foton.Gui
         /// <summary>Rows shown in the change table; the full list is in baseline_diff.csv.</summary>
         const int MaxChangeRows = 50000;
 
+        TabPage? _comparePage;
+
         // Editable: a baseline folder (or its baseline.json) can be typed or pasted, as foton compare accepts either.
         readonly TextBox _reference = new TextBox { Width = 520 };
         readonly TextBox _difference = new TextBox { Width = 520 };

@@ -16,7 +16,6 @@ namespace Foton.Gui
     /// </summary>
     sealed partial class MainForm
     {
-        TabPage? _acquirePage;
         readonly FlowLayoutPanel _checklist = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(4, 0, 4, 4) };
         readonly Button _doNext = new Button { AutoSize = true, Visible = false };
         /// <summary>Package path to whether Verify on the Package tab matched hashes.csv, this session.</summary>
@@ -38,14 +37,14 @@ namespace Foton.Gui
         {
             var panel = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(4, 6, 4, 6), BackColor = SystemColors.Info };
             panel.Controls.Add(new Label { Text = "Start here", AutoSize = true, Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold), Padding = new Padding(0, 6, 8, 0) });
-            panel.Controls.Add(AddButton("Collect this PC...", () => { if (_acquirePage != null) _tabs.SelectedTab = _acquirePage; _status.Text = "Acquire: fill in the case number and examiner, then Collect this PC."; }));
-            panel.Controls.Add(AddButton("Baseline this PC...", () => { if (_acquirePage != null) _tabs.SelectedTab = _acquirePage; _status.Text = "Acquire: Baseline this PC records stable configuration to compare later."; }));
+            panel.Controls.Add(AddButton("Build a collector...", () => { if (_collectorsPage != null) _tabs.SelectedTab = _collectorsPage; _status.Text = "Collectors: build a collection bundle to run on the endpoint."; }));
+            panel.Controls.Add(AddButton("Build a baseline collector...", () => { if (_collectorsPage != null) _tabs.SelectedTab = _collectorsPage; _status.Text = "Collectors: a baseline bundle records stable configuration to compare later."; }));
             panel.Controls.Add(AddButton("Open a case folder...", async () => { var p = PickFolder(); if (p != null) { if (_packagePage != null) _tabs.SelectedTab = _packagePage; await Open(p); } }));
             panel.Controls.Add(AddButton("Open a ZIP...", async () => { var p = PickZip(); if (p != null) { if (_packagePage != null) _tabs.SelectedTab = _packagePage; await Open(p); } }));
             panel.Controls.Add(new Label
             {
                 AutoSize = true, Padding = new Padding(8, 6, 0, 0),
-                Text = "Or select a case below and press Open. The Package tab then lists the next steps for it.",
+                Text = "Run a collector on the endpoint, then open its package: select it below and press Open. The Package tab lists the next steps.",
             });
             return panel;
         }
