@@ -68,7 +68,8 @@ namespace Foton.Gui
         /// <summary>The note editor under a finding's details.</summary>
         Control NoteEditor()
         {
-            var panel = new Panel { Dock = DockStyle.Bottom, Height = 170, Padding = new Padding(0, 4, 0, 0) };
+            // Enough for a few lines of note; the finding's details above keep the rest of the height.
+            var panel = new Panel { Dock = DockStyle.Bottom, Height = 140, Padding = new Padding(0, 4, 0, 0) };
             foreach (var s in NoteStatus.All) _noteStatus.Items.Add(NoteStatus.Label(s));
             _noteStatus.SelectedIndex = 0;
             var bar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false };

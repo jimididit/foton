@@ -17,6 +17,7 @@ namespace Foton.Gui
         readonly ToolStripMenuItem _recentMenu = new ToolStripMenuItem("&Recent cases");
         readonly ToolStripMenuItem _themeMenu = new ToolStripMenuItem("&Theme");
         readonly ToolStripMenuItem _sizeMenu = new ToolStripMenuItem("Text &size");
+        readonly ToolStripMenuItem _logMenu = new ToolStripMenuItem("Show &log") { Checked = true };
         MenuStrip? _menu;
         System.Drawing.Font? _logFont;
         StatusStrip? _statusStrip;
@@ -45,6 +46,9 @@ namespace Foton.Gui
             var view = new ToolStripMenuItem("&View");
             view.DropDownItems.Add(Item("&Find", Keys.Control | Keys.F, FocusFind));
             view.DropDownItems.Add(Item("&Refresh", Keys.F5, () => _ = RefreshCurrentTab()));
+            _logMenu.ShortcutKeys = Keys.Control | Keys.L;
+            _logMenu.Click += (s, e) => ShowLog(_outer.Panel2Collapsed);
+            view.DropDownItems.Add(_logMenu);
             view.DropDownItems.Add(new ToolStripSeparator());
             foreach (var t in ConsoleSettings.Themes)
             {
@@ -119,6 +123,25 @@ namespace Foton.Gui
             // The window can close between the check and the call (this event arrives on another thread).
             try { BeginInvoke(new Action(() => { if (!IsDisposed) ApplyAppearance(); })); }
             catch (Exception ex) when (ex is InvalidOperationException || ex is ObjectDisposedException) { }
+        }
+
+        /// <summary>Shows or hides the log pane (View > Show log, Ctrl+L) and remembers the choice.</summary>
+        void ShowLog(bool show)
+        {
+            RememberLog();
+            _outer.Panel2Collapsed = !show;
+            _logMenu.Checked = show;
+            _settings.ShowLog = show;
+            SaveSettings();
+        }
+
+        /// <summary>Keeps the log's share of the height (only while it is shown: a hidden pane has no height to keep).</summary>
+        void RememberLog()
+        {
+            if (_outer.Panel2Collapsed || _outer.Height <= 0) return;
+            var percent = (int)Math.Round(100.0 * _outer.Panel2.Height / _outer.Height);
+            _settings.LogPercent = Math.Max(ConsoleSettings.MinLogPercent, Math.Min(ConsoleSettings.MaxLogPercent, percent));
+            if (_settings.ShowLog) SaveSettings();
         }
 
         void SelectTab(string text)
@@ -199,6 +222,7 @@ namespace Foton.Gui
             "Ctrl+Shift+O      Open a ZIP\r\n" +
             "Ctrl+F            Find on this tab\r\n" +
             "F5                Refresh this tab\r\n" +
+            "Ctrl+L            Show or hide the log\r\n" +
             "Ctrl+1 ... Ctrl+0 Go to a tab (in tab order)\r\n" +
             "Ctrl+,            Settings\r\n" +
             "Alt+F4            Exit",

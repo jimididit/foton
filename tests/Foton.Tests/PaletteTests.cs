@@ -21,6 +21,7 @@ namespace Foton.Tests
                 yield return (name + " on List", fore, p.List, 4.5);
             }
             yield return ("SelectionText on Selection", p.SelectionText, p.Selection, 4.5);
+            yield return ("AccentText on Accent", p.AccentText, p.Accent, 4.5);
             yield return ("Border on Field", p.Border, p.Field, 3.0);
             yield return ("Border on Surface", p.Border, p.Surface, 3.0);
             yield return ("Accent on Back", p.Accent, p.Back, 3.0);

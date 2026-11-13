@@ -23,6 +23,9 @@ namespace Foton.Gui
         public static Palette? Palette { get; private set; }
         public static float TextSize { get; private set; } = 9f;
 
+        /// <summary>Selected rows in Light: Explorer's pale blue (16:1 with black text).</summary>
+        static readonly Color LightSelection = Color.FromArgb(0xCC, 0xE4, 0xF7);
+
         /// <summary>Secondary text in the current theme (grey timeline rows, hints set after the control was themed).</summary>
         public static Color MutedText => Palette?.Muted ?? SystemColors.GrayText;
 
@@ -216,6 +219,7 @@ namespace Foton.Gui
                         b.FlatAppearance.MouseDownBackColor = p.Pressed;
                     }
                     else b.UseVisualStyleBackColor = o.VisualStyleBack ?? true;   // as the button had it
+                    if (Primary.TryGetValue(b, out _)) StylePrimary(b, p);
                     break;
                 case ComboBox cb:
                     // A flat combo box paints its button in Windows' light colors; in a dark palette Windows draws the
@@ -245,6 +249,33 @@ namespace Foton.Gui
             Chrome(c);
         }
 
+        /// <summary>Buttons marked as the main action of their view.</summary>
+        static readonly ConditionalWeakTable<ButtonBase, object> Primary = new ConditionalWeakTable<ButtonBase, object>();
+        /// <summary>Bold fonts by size, shared by primary buttons (a few sizes at most; kept for the process).</summary>
+        static readonly Dictionary<float, Font> BoldFonts = new Dictionary<float, Font>();
+
+        /// <summary>The one main action of a view (Do this next): bold, and in a palette the accent fill.</summary>
+        public static void MarkPrimary(ButtonBase b)
+        {
+            if (!Primary.TryGetValue(b, out _)) Primary.Add(b, new object());
+            Remember(b);
+            Style(b);
+        }
+
+        static void StylePrimary(ButtonBase b, Palette? p)
+        {
+            if (!BoldFonts.TryGetValue(TextSize, out var bold)) BoldFonts[TextSize] = bold = new Font("Segoe UI", TextSize, FontStyle.Bold);
+            b.Font = bold;
+            if (p == null) return;
+            b.BackColor = p.Accent;
+            b.ForeColor = p.AccentText;
+            b.FlatAppearance.BorderColor = p.Accent;
+            // Hover moves away from the text color, so the text keeps (and gains) contrast.
+            var hover = p.AccentText.GetBrightness() < 0.5f ? ControlPaint.Light(p.Accent, 0.4f) : ControlPaint.Dark(p.Accent, 0.1f);
+            b.FlatAppearance.MouseOverBackColor = hover;
+            b.FlatAppearance.MouseDownBackColor = hover;
+        }
+
         static void StyleGrid(DataGridView g, Original o, Palette? p)
         {
             if (p == null)
@@ -253,6 +284,12 @@ namespace Foton.Gui
                 g.GridColor = o.GridLines;
                 g.EnableHeadersVisualStyles = o.HeaderVisualStyles;
                 g.DefaultCellStyle = new DataGridViewCellStyle(o.Cells!);
+                // Windows 11's pale list selection rather than the saturated highlight; High Contrast keeps Windows' own.
+                if (!SystemInformation.HighContrast)
+                {
+                    g.DefaultCellStyle.SelectionBackColor = LightSelection;
+                    g.DefaultCellStyle.SelectionForeColor = SystemColors.ControlText;
+                }
                 g.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle(o.Headers!);
                 return;
             }
@@ -316,7 +353,11 @@ namespace Foton.Gui
             {
                 case 1: WindowChrome.TitleBar(c.Handle, p); break;
                 case 2: WindowChrome.Control(c.Handle, dark ? WindowChrome.Parts.DarkComboBox : WindowChrome.Parts.Default); break;
-                default: WindowChrome.Control(c.Handle, dark ? WindowChrome.Parts.DarkExplorer : WindowChrome.Parts.Default); break;
+                default:
+                    // Trees and lists take Explorer's soft selection and chevrons in light themes too (not with High Contrast).
+                    var explorerLight = !dark && !SystemInformation.HighContrast && (c is TreeView || c is ListView);
+                    WindowChrome.Control(c.Handle, dark ? WindowChrome.Parts.DarkExplorer : explorerLight ? WindowChrome.Parts.Explorer : WindowChrome.Parts.Default);
+                    break;
             }
             if (kind != 1) c.Invalidate();
         }
