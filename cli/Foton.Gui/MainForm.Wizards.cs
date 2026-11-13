@@ -44,6 +44,7 @@ namespace Foton.Gui
 
         async Task WorkCaseWizard()
         {
+            if (_busy) { _status.Text = "Wait for the current action to finish."; return; }
             await EnsureCaseList();
             string? chosen = _caseRoot != null ? _path.Text : null;
             bool parse = true, compose = true, analyze = true;
@@ -125,12 +126,13 @@ namespace Foton.Gui
                         if (!parse && !compose && !analyze) return StepResult.Stay("Not run: check at least one step.");
                         var composeStep = compose ? ComposeStep() : null;
                         var label = string.Join(", ", new[] { parse ? "parse" : null, compose ? "compose" : null, analyze ? "analyze" : null }.Where(x => x != null));
-                        await Run(char.ToUpperInvariant(label[0]) + label.Substring(1), (log, path) =>
+                        var ran = await Run(char.ToUpperInvariant(label[0]) + label.Substring(1), (log, path) =>
                         {
                             if (parse) Parse(log, path);
                             composeStep?.Invoke(log, path);
                             return analyze ? Analyze(log, path) : null;
                         });
+                        if (!ran) return StepResult.Stay("Stopped: see the log (" + _status.Text + ").");
                         return StepResult.Next(analyze ? $"Done: {_allFindings.Count} finding(s) ({Severities(_allFindings.Select(f => f.TryGetValue("Severity", out var s) ? s ?? "" : ""))})." : "Done: run Analyze to turn the results into findings.");
                     },
                 },
@@ -323,6 +325,7 @@ namespace Foton.Gui
 
         async Task CompareWizard()
         {
+            if (_busy) { _status.Text = "Wait for the current action to finish."; return; }
             await EnsureCaseList();
             string? reference = _reference.Text.Trim().Length > 0 ? _reference.Text.Trim() : null;
             string? difference = _difference.Text.Trim().Length > 0 ? _difference.Text.Trim() : null;

@@ -188,17 +188,19 @@ namespace Foton.Gui
 
         /// <summary>
         /// Runs one action on a worker thread with its own StatusLog; a failure is logged, never thrown at the operator.
-        /// The package path is read here, on the UI thread, and handed to the work.
+        /// The package path is read here, on the UI thread, and handed to the work. True when the action ran to the end
+        /// (false when it stopped with an error, or did not start because another action was running).
         /// </summary>
-        Task Run(string label, Func<StatusLog, string, object?> work)
+        Task<bool> Run(string label, Func<StatusLog, string, object?> work)
         {
             var path = _path.Text;
             return Run(label, log => work(log, path));
         }
 
-        async Task Run(string label, Func<StatusLog, object?> work)
+        async Task<bool> Run(string label, Func<StatusLog, object?> work)
         {
-            if (_busy) return;
+            if (_busy) return false;
+            var completed = false;
             _busy = true;
             _statusOwner = _tabs.SelectedTab;
             UpdateButtons();
@@ -225,6 +227,7 @@ namespace Foton.Gui
                     _status.Text += $" - {ioc.Hits.Count} match(es)";
                     _viewer.Select(Path.Combine("analysis", "ioc_matches.csv"));
                 }
+                completed = true;
             }
             catch (Exception ex)
             {
@@ -239,6 +242,7 @@ namespace Foton.Gui
                 RefreshChecklist();
                 _statusOwner = null;
             }
+            return completed;
         }
 
         async Task Open(string path)
