@@ -21,6 +21,10 @@
     <ProjectReference Include="..\..\src\Foton.Win.Ui\Foton.Win.Ui.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The window's own icon (title bar, taskbar at every size); the file icon comes from cli\Directory.Build.targets. -->
+    <EmbeddedResource Include="..\..\assets\brand\foton.ico" LogicalName="Foton.Gui.foton.ico" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
   </ItemGroup>

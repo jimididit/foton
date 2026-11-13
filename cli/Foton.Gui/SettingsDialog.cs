@@ -36,6 +36,7 @@ namespace Foton.Gui
             MinimumSize = new Size(560, 420);
             StartPosition = FormStartPosition.CenterParent;
             ShowInTaskbar = false;
+            ShowIcon = false;
             MinimizeBox = MaximizeBox = false;
 
             _openOnStart.Items.AddRange(new object[] { "The Cases tab", "The last case opened" });

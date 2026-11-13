@@ -4,6 +4,10 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [3.2.0] - 2026-11-13
+
+- Foton has an icon: the photon wave packet from the reports, in beam cyan on their near-black, with a simpler cut for 16 to 24 px. All four executables carry it (Explorer, the taskbar, Alt+Tab), and the console window shows it in its title bar. The masters (SVG, one-colour and reversed versions) and `foton.ico` are in `assets/brand`; a build test checks that every executable carries the icon.
+
 ## [3.1.0] - 2026-11-13
 
 - Console themes: **Light** (Windows' own colors), **Dark**, **Campbell** (the Windows Terminal default), **Solarized Dark**, **Solarized Light**, and **Follow Windows**, from **View > Theme** or **Settings > Appearance**. Each theme gives panels, inputs, lists, buttons, and headers their own shade, and every text color in every theme meets WCAG contrast (4.5:1 for text, 3:1 for borders and the accent; a test checks it). Solarized's reds, greens, and borders are adjusted where the originals fall short.

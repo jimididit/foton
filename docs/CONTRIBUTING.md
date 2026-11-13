@@ -30,6 +30,7 @@ Use a throwaway Windows VM for live Collect and Baseline runs. Collection change
 | `src/Foton.Analyze`, `Foton.Report` | Rules (`Rules/*.cs`), findings, HTML reports | No |
 | `src/Foton.Parse`, `Foton.Carve`, `Foton.Package` | Parsers, carve, package open/verify | No |
 | `src/Foton.Tools`, `Foton.Patterns` | Tool catalog / compose, workstation pattern lists | No (only `foton tools` downloads, on request) |
+| `assets/brand` | The Foton mark (SVG masters) and `foton.ico`, which every executable carries (`cli/Directory.Build.targets`; IconRules) | No |
 | `cli/*` | `foton-collect.exe`, `foton-baseline.exe`, `foton.exe`, `foton-console.exe` (`cli/Foton.Gui`). `foton.exe` and the console carry the two collectors as resources (`cli/EmbedCollectors.targets`) for `bundle` and the Collectors tab | Collect and baseline yes; `foton.exe` and the console no (they write the collectors into a bundle, never run them) |
 
 | Rule | Enforced by |
