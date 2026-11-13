@@ -41,6 +41,8 @@ namespace Foton.Gui
         bool _busy;
         readonly Dictionary<TabPage, string> _tabStatus = new Dictionary<TabPage, string>();
         bool _restoringStatus;
+        /// <summary>The tab the running action was started from; null when nothing runs.</summary>
+        TabPage? _statusOwner;
 
         public MainForm(string? openPath)
         {
@@ -98,7 +100,8 @@ namespace Foton.Gui
             // The list is cheap to re-read (no hashing), so it is current whenever the tab is shown.
             _tabs.Selected += async (s, e) => { if (e.TabPage == _casesPage && !_busy) await RefreshCases(); };
             // The status bar shows the tab on screen's last message, not another tab's (while an action runs, its own).
-            _status.TextChanged += (s, e) => { if (!_restoringStatus && _tabs.SelectedTab != null) _tabStatus[_tabs.SelectedTab] = _status.Text; };
+            // A running action's messages (its finish included) belong to the tab it was started from.
+            _status.TextChanged += (s, e) => { var tab = _statusOwner ?? _tabs.SelectedTab; if (!_restoringStatus && tab != null) _tabStatus[tab] = _status.Text; };
             _tabs.Selected += (s, e) =>
             {
                 if (_busy || e.TabPage == null) return;
@@ -195,6 +198,7 @@ namespace Foton.Gui
         {
             if (_busy) return;
             _busy = true;
+            _statusOwner = _tabs.SelectedTab;
             UpdateButtons();
             _status.Text = label + "...";
             _progress.Visible = true;
@@ -231,6 +235,7 @@ namespace Foton.Gui
                 _progress.Visible = false;
                 UpdateButtons();
                 RefreshChecklist();
+                _statusOwner = null;
             }
         }
 
