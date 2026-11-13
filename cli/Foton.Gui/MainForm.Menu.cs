@@ -86,7 +86,12 @@ namespace Foton.Gui
             var dark = _settings.Theme == ConsoleSettings.ThemeDark || (_settings.Theme == ConsoleSettings.ThemeWindows && Theme.WindowsPrefersDark());
             SuspendLayout();
             Theme.Apply(this, dark, _settings.TextSize);
-            _log.Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, _settings.TextSize);
+            if (Math.Abs(_log.Font.Size - _settings.TextSize) > 0.01f)
+            {
+                var old = _log.Font;
+                _log.Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, _settings.TextSize);
+                old.Dispose();
+            }
             if (_menu != null) Theme.StyleMenuItems(_menu.Items);
             if (_statusStrip != null) Theme.StyleMenuItems(_statusStrip.Items);
             foreach (ToolStripMenuItem i in _themeMenu.DropDownItems)
@@ -99,7 +104,10 @@ namespace Foton.Gui
         /// <summary>Follow Windows: re-applied when Windows' light/dark setting changes while the console is open.</summary>
         void OnWindowsPreferenceChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
         {
-            if (_settings.Theme == ConsoleSettings.ThemeWindows && IsHandleCreated) BeginInvoke(new Action(ApplyAppearance));
+            if (_settings.Theme != ConsoleSettings.ThemeWindows || IsDisposed || !IsHandleCreated) return;
+            // The window can close between the check and the call (this event arrives on another thread).
+            try { BeginInvoke(new Action(() => { if (!IsDisposed) ApplyAppearance(); })); }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is ObjectDisposedException) { }
         }
 
         void SelectTab(string text)

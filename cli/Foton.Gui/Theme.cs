@@ -41,6 +41,7 @@ namespace Foton.Gui
             public bool HeaderVisualStyles;
             public TabDrawMode? TabDraw;
             public Color? TreeLines;
+            public ToolStripRenderer? Renderer;
         }
 
         static readonly ConditionalWeakTable<Control, Original> Originals = new ConditionalWeakTable<Control, Original>();
@@ -57,7 +58,7 @@ namespace Foton.Gui
         /// <summary>Themes a window built after the theme was set (dialogs), and keeps theming controls added to it later.</summary>
         public static void Adopt(Form form)
         {
-            form.Font = new Font("Segoe UI", TextSize);
+            SetFont(form);
             Walk(form);
             Watch(form);
         }
@@ -67,6 +68,15 @@ namespace Foton.Gui
         {
             root.ControlAdded += (s, e) => { Walk(e.Control); Watch(e.Control); };
             foreach (Control c in root.Controls) Watch(c);
+        }
+
+        /// <summary>A new font only when the size changes; the replaced one is disposed (children use the form's, never their own copy).</summary>
+        static void SetFont(Form form)
+        {
+            if (Math.Abs(form.Font.Size - TextSize) < 0.01f) return;
+            var old = form.Font;
+            form.Font = new Font("Segoe UI", TextSize);
+            if (!ReferenceEquals(old, Control.DefaultFont)) old.Dispose();
         }
 
         /// <summary>Records a whole tree before styling any of it, so a child's inherited colors are seen as the parent's.</summary>
@@ -113,6 +123,7 @@ namespace Foton.Gui
             }
             if (c is TabControl t) o.TabDraw = t.DrawMode;
             if (c is TreeView tv) o.TreeLines = tv.LineColor;
+            if (c is ToolStrip ts) o.Renderer = ts.Renderer;
             Originals.Add(c, o);
             return o;
         }
@@ -126,7 +137,7 @@ namespace Foton.Gui
         static void Style(Control c)
         {
             var o = Remember(c);
-            if (c is Form f) f.Font = new Font("Segoe UI", TextSize);
+            if (c is Form f) SetFont(f);
 
             if (!o.InheritsBack)
             {
@@ -165,7 +176,7 @@ namespace Foton.Gui
                     break;
                 case ToolStrip strip:
                     if (Dark) strip.Renderer = DarkRenderer;
-                    else strip.RenderMode = ToolStripRenderMode.ManagerRenderMode;
+                    else if (o.Renderer != null) strip.Renderer = o.Renderer;   // the strip's own renderer, as it was
                     break;
             }
         }
