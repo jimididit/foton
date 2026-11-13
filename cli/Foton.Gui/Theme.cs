@@ -216,6 +216,7 @@ namespace Foton.Gui
                         b.FlatAppearance.MouseDownBackColor = p.Pressed;
                     }
                     else b.UseVisualStyleBackColor = o.VisualStyleBack ?? true;   // as the button had it
+                    if (Primary.TryGetValue(b, out _)) StylePrimary(b, p);
                     break;
                 case ComboBox cb:
                     // A flat combo box paints its button in Windows' light colors; in a dark palette Windows draws the
@@ -243,6 +244,33 @@ namespace Foton.Gui
                     break;
             }
             Chrome(c);
+        }
+
+        /// <summary>Buttons marked as the main action of their view.</summary>
+        static readonly ConditionalWeakTable<ButtonBase, object> Primary = new ConditionalWeakTable<ButtonBase, object>();
+        /// <summary>Bold fonts by size, shared by primary buttons (a few sizes at most; kept for the process).</summary>
+        static readonly Dictionary<float, Font> BoldFonts = new Dictionary<float, Font>();
+
+        /// <summary>The one main action of a view (Do this next): bold, and in a palette the accent fill.</summary>
+        public static void MarkPrimary(ButtonBase b)
+        {
+            if (!Primary.TryGetValue(b, out _)) Primary.Add(b, new object());
+            Remember(b);
+            Style(b);
+        }
+
+        static void StylePrimary(ButtonBase b, Palette? p)
+        {
+            if (!BoldFonts.TryGetValue(TextSize, out var bold)) BoldFonts[TextSize] = bold = new Font("Segoe UI", TextSize, FontStyle.Bold);
+            b.Font = bold;
+            if (p == null) return;
+            b.BackColor = p.Accent;
+            b.ForeColor = p.AccentText;
+            b.FlatAppearance.BorderColor = p.Accent;
+            // Hover moves away from the text color, so the text keeps (and gains) contrast.
+            var hover = p.AccentText.GetBrightness() < 0.5f ? ControlPaint.Light(p.Accent, 0.4f) : ControlPaint.Dark(p.Accent, 0.1f);
+            b.FlatAppearance.MouseOverBackColor = hover;
+            b.FlatAppearance.MouseDownBackColor = hover;
         }
 
         static void StyleGrid(DataGridView g, Original o, Palette? p)

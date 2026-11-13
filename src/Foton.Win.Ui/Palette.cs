@@ -39,6 +39,8 @@ namespace Foton.Win.Ui
         public Color SelectionText { get; private set; }
         /// <summary>Selected tab underline, primary action, keyboard focus.</summary>
         public Color Accent { get; private set; }
+        /// <summary>Text on an Accent fill (the primary action).</summary>
+        public Color AccentText { get; private set; }
         /// <summary>Guidance strips (Start here).</summary>
         public Color Info { get; private set; }
         public Color Good { get; private set; }
@@ -54,7 +56,7 @@ namespace Foton.Win.Ui
             Back = H("#1B1B1B"), Surface = H("#232323"), List = H("#1E1E1E"), Field = H("#2D2D2D"),
             Raised = H("#333333"), Hover = H("#3D3D3D"), Pressed = H("#262626"), Header = H("#2A2A2A"),
             Text = H("#E6E6E6"), Muted = H("#A8A8A8"), Border = H("#7A7A7A"), GridLines = H("#3A3A3A"),
-            Selection = H("#0F4C81"), SelectionText = H("#FFFFFF"), Accent = H("#4CC2FF"), Info = H("#1C3344"),
+            Selection = H("#0F4C81"), SelectionText = H("#FFFFFF"), Accent = H("#4CC2FF"), AccentText = H("#000000"), Info = H("#1C3344"),
             Good = H("#6CCB5F"), Bad = H("#FF99A4"), Warn = H("#FCE100"),
         };
 
@@ -65,7 +67,7 @@ namespace Foton.Win.Ui
             Back = H("#0C0C0C"), Surface = H("#121212"), List = H("#0C0C0C"), Field = H("#1E1E1E"),
             Raised = H("#262626"), Hover = H("#303030"), Pressed = H("#181818"), Header = H("#1A1A1A"),
             Text = H("#CCCCCC"), Muted = H("#949494"), Border = H("#767676"), GridLines = H("#2A2A2A"),
-            Selection = H("#0037DA"), SelectionText = H("#FFFFFF"), Accent = H("#3B78FF"), Info = H("#0D2440"),
+            Selection = H("#0037DA"), SelectionText = H("#FFFFFF"), Accent = H("#3B78FF"), AccentText = H("#000000"), Info = H("#0D2440"),
             Good = H("#16C60C"), Bad = H("#F26D78"), Warn = H("#F9F1A5"),
         };
 
@@ -76,7 +78,7 @@ namespace Foton.Win.Ui
             Back = H("#00212B"), Surface = H("#002B36"), List = H("#002B36"), Field = H("#073642"),
             Raised = H("#05313D"), Hover = H("#083B48"), Pressed = H("#02252F"), Header = H("#073642"),
             Text = H("#93A1A1"), Muted = H("#839496"), Border = H("#7B9096"), GridLines = H("#0A4252"),
-            Selection = H("#1C6A9E"), SelectionText = H("#FDF6E3"), Accent = H("#268BD2"), Info = H("#012F3B"),
+            Selection = H("#1C6A9E"), SelectionText = H("#FDF6E3"), Accent = H("#268BD2"), AccentText = H("#000000"), Info = H("#012F3B"),
             Good = H("#9AB000"), Bad = H("#F0625F"), Warn = H("#C9A100"),
         };
 
@@ -87,7 +89,7 @@ namespace Foton.Win.Ui
             Back = H("#EEE8D5"), Surface = H("#FDF6E3"), List = H("#FDF6E3"), Field = H("#FFFDF7"),
             Raised = H("#EEE8D5"), Hover = H("#E4DDC8"), Pressed = H("#D9D2BC"), Header = H("#EEE8D5"),
             Text = H("#073642"), Muted = H("#4E6269"), Border = H("#7E9196"), GridLines = H("#E0D9C3"),
-            Selection = H("#1B6CA8"), SelectionText = H("#FFFFFF"), Accent = H("#1F7AB8"), Info = H("#F5E7C0"),
+            Selection = H("#1B6CA8"), SelectionText = H("#FFFFFF"), Accent = H("#1F7AB8"), AccentText = H("#FFFFFF"), Info = H("#F5E7C0"),
             Good = H("#5A6B00"), Bad = H("#B5241F"), Warn = H("#7A5C00"),
         };
 

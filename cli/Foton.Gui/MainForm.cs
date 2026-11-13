@@ -33,11 +33,14 @@ namespace Foton.Gui
         readonly ToolStripProgressBar _progress = new ToolStripProgressBar { Style = ProgressBarStyle.Marquee, Visible = false };
         readonly List<Control> _actions = new List<Control>();
         readonly TabControl _tabs = new ThemedTabs { Dock = DockStyle.Fill };
+        readonly SplitContainer _outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, Panel2MinSize = 60 };
         readonly ViewerTab _viewer = new ViewerTab();
         /// <summary>One writer for the log pane, shared by every action (each action gets its own StatusLog over it).</summary>
         readonly LogWriter _logWriter;
         string? _caseRoot;
         bool _busy;
+        readonly Dictionary<TabPage, string> _tabStatus = new Dictionary<TabPage, string>();
+        bool _restoringStatus;
 
         public MainForm(string? openPath)
         {
@@ -58,12 +61,14 @@ namespace Foton.Gui
             _tabs.TabPages.Add(ProfileTab());
             _tabs.TabPages.Add(_comparePage = CompareTab());
             _tabs.TabPages.Add(_collectorsPage = CollectorsTab());
-            // The log sits under every tab: an install or register is followed there as much as a parse.
-            var outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
+            // The log sits under every tab: an install or register is followed there as much as a parse. View > Show log
+            // hides it; its height and visibility are remembered.
+            var outer = _outer;
             outer.Panel1.Controls.Add(_tabs);
             outer.Panel2.Controls.Add(_log);
             outer.Panel2.Padding = new Padding(8, 2, 8, 4);   // lines the log up with the tab content above it
-            Load += (s, e) => SetSplit(outer, 0.68);
+            Load += (s, e) => { SetSplit(outer, 1 - _settings.LogPercent / 100.0); outer.Panel2Collapsed = !_settings.ShowLog; _logMenu.Checked = _settings.ShowLog; };
+            FormClosing += (s, e) => RememberLog();
             Controls.Add(outer);
             var strip = new StatusStrip();
             strip.Items.Add(_status);
@@ -81,6 +86,7 @@ namespace Foton.Gui
             FormClosed += (s, e) => Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnWindowsPreferenceChanged;
 
             FindingGrid(_findings, _details);
+            EmptyStates();
             // Double-click a finding (or use Show artifact) to read its source artifact in the Viewer.
             _findings.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) ShowArtifact(); };   // not on a header (that sorts)
             // A package on the command line opens in the Package tab; otherwise the window starts on Cases.
@@ -91,6 +97,15 @@ namespace Foton.Gui
             else Shown += async (s, e) => await RefreshCases();
             // The list is cheap to re-read (no hashing), so it is current whenever the tab is shown.
             _tabs.Selected += async (s, e) => { if (e.TabPage == _casesPage && !_busy) await RefreshCases(); };
+            // The status bar shows the tab on screen's last message, not another tab's (while an action runs, its own).
+            _status.TextChanged += (s, e) => { if (!_restoringStatus && _tabs.SelectedTab != null) _tabStatus[_tabs.SelectedTab] = _status.Text; };
+            _tabs.Selected += (s, e) =>
+            {
+                if (_busy || e.TabPage == null) return;
+                _restoringStatus = true;
+                _status.Text = _tabStatus.TryGetValue(e.TabPage, out var text) ? text : "Ready";
+                _restoringStatus = false;
+            };
         }
 
         TabPage PackageTab()
@@ -112,10 +127,16 @@ namespace Foton.Gui
                 var compose = ComposeStep();
                 return Run("Parse, compose, analyze", (log, path) => { Parse(log, path); compose(log, path); return Analyze(log, path); });
             }, needsPackage: true));
-            actions.Controls.Add(AddButton("Match IOCs...", MatchIocs, needsPackage: true));
-            actions.Controls.Add(AddButton("Show artifact", ShowArtifact, needsPackage: true));
+            // Three groups, set apart: run the steps, match indicators, open what the package holds.
+            var ioc = AddButton("Match IOCs...", MatchIocs, needsPackage: true);
+            ioc.Margin = new Padding(18, ioc.Margin.Top, ioc.Margin.Right, ioc.Margin.Bottom);
+            actions.Controls.Add(ioc);
+            var show = AddButton("Show artifact", ShowArtifact, needsPackage: true);
+            show.Margin = new Padding(18, show.Margin.Top, show.Margin.Right, show.Margin.Bottom);
+            actions.Controls.Add(show);
             actions.Controls.Add(AddButton("Open report", OpenReport, needsPackage: true));
             actions.Controls.Add(AddButton("Show case folder", ShowFolder, needsPackage: true));
+            _summary.Padding = new Padding(12, 6, 0, 0);
             actions.Controls.Add(_summary);
 
             var findingsSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
@@ -202,7 +223,7 @@ namespace Foton.Gui
             catch (Exception ex)
             {
                 log.Write(label + " stopped: " + ex.Message, StatusLevel.Error);
-                _status.Text = label + " stopped: " + TextFile.OneLine(ex.Message);
+                _status.Text = label + " stopped: " + TextFile.OneLine(ex.Message) + (_outer.Panel2Collapsed ? " (Ctrl+L shows the log)" : "");
             }
             finally
             {
@@ -326,14 +347,17 @@ namespace Foton.Gui
         {
             grid.DataBindingComplete += (s, e) =>
             {
-                var weights = new Dictionary<string, float> { ["Severity"] = 8, ["Status"] = 9, ["Tier"] = 5, ["Category"] = 12, ["Title"] = 35, ["Observation"] = 60 };
+                var weights = new Dictionary<string, float> { ["Category"] = 12, ["Title"] = 35, ["Observation"] = 60 };
                 foreach (DataGridViewColumn c in grid.Columns)
                 {
-                    if (weights.TryGetValue(c.Name, out var w)) c.FillWeight = w;
+                    // Short values (High, Not reviewed, 2) are shown whole; the long ones share the rest of the width.
+                    if (c.Name == "Severity" || c.Name == "Status" || c.Name == "Tier") c.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    else if (weights.TryGetValue(c.Name, out var w)) c.FillWeight = w;
                     else c.Visible = false;
                 }
             };
             grid.SelectionChanged += (s, e) => ShowDetails(grid, details);
+            Cues.Severity(grid);
         }
 
         static void ShowDetails(DataGridView grid, TextBox details)

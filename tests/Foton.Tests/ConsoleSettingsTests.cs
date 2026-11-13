@@ -48,6 +48,18 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Log_pane_settings_are_kept_in_range()
+        {
+            var s = ConsoleSettings.Parse("{ \"ShowLog\": false, \"LogPercent\": 35 }");
+            Assert.False(s.ShowLog);
+            Assert.Equal(35, s.LogPercent);
+            var bad = ConsoleSettings.Parse("{ \"ShowLog\": \"no\", \"LogPercent\": 95 }");
+            Assert.True(bad.ShowLog);
+            Assert.Equal(22, bad.LogPercent);
+            Assert.Equal(22, ConsoleSettings.Parse("{ \"LogPercent\": 5 }").LogPercent);
+        }
+
+        [Fact]
         public void Recent_cases_are_most_recent_first_once_and_capped()
         {
             var s = new ConsoleSettings { RecentCount = 2 };

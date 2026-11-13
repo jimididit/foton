@@ -409,7 +409,7 @@ The tabs, in the order they appear:
 | [Compare](#compare-tab) | Compare two baselines |
 | [Collectors](#collectors-tab) | Build the folder to carry to an endpoint |
 
-The log pane under the tabs shows the same lines `foton.exe` prints. One action runs at a time; the buttons come back when it finishes.
+The log pane under the tabs shows the same lines `foton.exe` prints. **View > Show log** (Ctrl+L) hides or shows it; its height and whether it is shown are remembered. The status bar shows the last message of the tab on screen. One action runs at a time; the buttons come back when it finishes. A grid with nothing in it says what to do next.
 
 #### Cases tab
 
@@ -423,7 +423,7 @@ Nothing on this tab deletes, moves, or renames a package.
 
 #### Package tab
 
-Once a case is open, the **Package** tab lists its next steps (verify, parse, compose, analyze, timeline, review, hand off) with what each has done; **Do this next** runs the first one not done. **Open folder...** or **Open ZIP...** loads another case folder or package ZIP (a ZIP is extracted beside it, as with `foton.exe`). Findings already in the package are listed.
+Once a case is open, the **Package** tab lists its next steps (verify, parse, compose, analyze, timeline, review, hand off): a check mark for each one done, the next one in bold, and what a step does when the pointer rests on it. **Do this next**, the highlighted button, runs the next one. **Open folder...** or **Open ZIP...** loads another case folder or package ZIP (a ZIP is extracted beside it, as with `foton.exe`). Findings already in the package are listed.
 
 - **Verify** checks every file against `hashes.csv`, as `foton package` does. **Parse**, **Compose**, and **Analyze** run those verbs; **Parse, compose, analyze** runs all three in order.
 - Select a finding to read why it matters, the source artifact, and the next step. **Show artifact** (or double-clicking the finding) opens that artifact in the **Viewer**. **Show case folder** opens the folder in Explorer. Filter the findings by **Severity**, **Status**, and **Find**; under the details, set the finding's [examiner](#examiner-notes) status and note and press **Save note**.
@@ -487,13 +487,14 @@ Copy the folder to the endpoint or push it with your RMM tool, run the command i
 
 #### Menu, shortcuts, and settings
 
-The menu bar has **File** (open a case folder or ZIP, **Recent cases**, exit), **View** (find on this tab, refresh this tab, **Theme**, **Text size**, go to a tab), **Tools** (**Settings...**, and the Collectors, Tools, and Profile tabs), and **Help** (keyboard shortcuts, and **About**, which shows the version, schemas, release date, and the SHA-256 of `foton-console.exe` to compare with `SHA256SUMS.txt`).
+The menu bar has **File** (open a case folder or ZIP, **Recent cases**, exit), **View** (find on this tab, refresh this tab, **Show log**, **Theme**, **Text size**, go to a tab), **Tools** (**Settings...**, and the Collectors, Tools, and Profile tabs), and **Help** (keyboard shortcuts, and **About**, which shows the version, schemas, release date, and the SHA-256 of `foton-console.exe` to compare with `SHA256SUMS.txt`).
 
 | Shortcut | Does |
 |----------|------|
 | Ctrl+O / Ctrl+Shift+O | Open a case folder / a ZIP |
 | Ctrl+F | Find on this tab |
 | F5 | Refresh this tab |
+| Ctrl+L | Show or hide the log |
 | Ctrl+1 to Ctrl+0 | Go to a tab |
 | Ctrl+comma | Settings |
 

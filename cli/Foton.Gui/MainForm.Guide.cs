@@ -24,11 +24,17 @@ namespace Foton.Gui
         readonly HashSet<string> _handedOff = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         Func<Task>? _nextStep;
 
+        readonly ToolTip _stepTips = new ToolTip();
+        Font? _stepBold;
+
         sealed class Step
         {
             public string Name = "";
             public string State = "";
             public bool Done;
+            public bool Failed;
+            /// <summary>What the step does, shown when the pointer rests on it.</summary>
+            public string Hint = "";
             public Func<Task> Do = () => Task.FromResult(0);
         }
 
@@ -49,11 +55,30 @@ namespace Foton.Gui
             return panel;
         }
 
+        /// <summary>What each grid says while it is empty: the next thing to do, for the state the window is in.</summary>
+        void EmptyStates()
+        {
+            Cues.EmptyText(_cases, () => "No case packages in the listed folders yet. Build a collector (Start here), run it on the endpoint, and copy its package here, or press Add folder to list the folder it is in.");
+            Cues.EmptyText(_baselines, () => "No baselines yet. Build a baseline collector on the Collectors tab, run it on the host now and again later, then compare the two.");
+            Cues.EmptyText(_findings, () => _caseRoot == null ? "Open a case to see its findings: Start here on the Cases tab, or File > Open (Ctrl+O)."
+                : _allFindings.Count == 0 ? "No findings in this package yet. Run Analyze, or press Do this next."
+                : "No findings match the filters above.");
+            Cues.EmptyText(_timeline, () => _caseRoot == null ? "Open a case, then build its timeline here."
+                : "No timeline rows to show. Build timeline reads the package's recorded times; run Parse and Compose first for more sources, or clear the filters.");
+            Cues.EmptyText(_notesGrid, () => _caseRoot == null ? "Open a case to see its examiner notes."
+                : "No examiner notes yet. Set a finding's status on the Package tab, or use Note on row in the Viewer.");
+            Cues.EmptyText(_searchHits, () => _caseRoot == null ? "Open a case, then search it for a user name, file name, IP address, or hash."
+                : "No hits to show. Type a value above and search: a user name, file name, IP address, or hash.");
+            Cues.EmptyText(_compareFindings, () => "Choose the reference (earlier or golden) and the difference baseline above, then press Compare.");
+            Cues.EmptyText(_changes, () => "Every field-level change between the two baselines appears here after Compare.");
+        }
+
         /// <summary>The checklist row under the Package tab's buttons.</summary>
         Control Checklist()
         {
             _doNext.Click += async (s, e) => { if (_nextStep != null) await _nextStep(); };
             _actions.Add(_doNext);
+            Theme.MarkPrimary(_doNext);
             RefreshChecklist();
             return _checklist;
         }
@@ -69,19 +94,25 @@ namespace Foton.Gui
             return new List<Step>
             {
                 // Checked is done either way: a package that does not verify stays red here, and the steps go on (they work on it as it is).
-                new Step { Name = "Verify", Done = verified != null, State = verified == null ? "not checked" : verified.Value ? "matches" : "DOES NOT VERIFY", Do = VerifyOpenPackage },
-                new Step { Name = "Parse", Done = stages.Parsed, State = stages.Parsed ? "done" : "not yet", Do = () => Run("Parse", Parse) },
-                new Step { Name = "Compose", Done = stages.Composed, State = stages.Composed ? "done" : "not yet (EZ Tools, Hayabusa, Chainsaw: Tools tab)", Do = () => Run("Compose", ComposeStep()) },
-                new Step { Name = "Analyze", Done = stages.Analyzed, State = stages.Analyzed ? "done" : "not yet", Do = () => Run("Analyze", Analyze) },
-                new Step { Name = "Timeline", Done = stages.Timeline, State = stages.Timeline ? "built" : "not built", Do = async () => { if (_timelinePage != null) _tabs.SelectedTab = _timelinePage; await BuildTimeline(); } },
+                new Step
+                {
+                    Name = "Verify", Done = verified != null, Failed = verified == false,
+                    State = verified == null ? "not checked" : verified.Value ? "matches" : "does not verify",
+                    Hint = "Checks every file against the package's hashes.csv.", Do = VerifyOpenPackage,
+                },
+                new Step { Name = "Parse", Done = stages.Parsed, State = "not yet", Hint = "Reads the copied Prefetch, shortcuts, jump lists, event logs, and Amcache.", Do = () => Run("Parse", Parse) },
+                new Step { Name = "Compose", Done = stages.Composed, State = "not yet", Hint = "Runs EZ Tools, Hayabusa, and Chainsaw on the copied files, if installed (Tools tab).", Do = () => Run("Compose", ComposeStep()) },
+                new Step { Name = "Analyze", Done = stages.Analyzed, State = "not yet", Hint = "Rebuilds the findings and the report from everything above.", Do = () => Run("Analyze", Analyze) },
+                new Step { Name = "Timeline", Done = stages.Timeline, State = "not built", Hint = "Puts the package's recorded times in one list (Timeline tab).", Do = async () => { if (_timelinePage != null) _tabs.SelectedTab = _timelinePage; await BuildTimeline(); } },
                 new Step
                 {
                     // An analyze with no findings leaves nothing to review.
                     Name = "Review", Done = findings == 0 ? stages.Analyzed : reviewed == findings,
-                    State = findings == 0 ? (stages.Analyzed ? "no findings" : "no findings yet") : $"{reviewed} of {findings} findings have a status",
+                    State = findings == 0 ? (stages.Analyzed ? "no findings" : "no findings yet") : $"{reviewed} of {findings} reviewed",
+                    Hint = "Give each finding a status and note (Package tab, under its details).",
                     Do = () => { ReviewNextFinding(); return Task.FromResult(0); },
                 },
-                new Step { Name = "Hand off", Done = _handedOff.Contains(root), State = _handedOff.Contains(root) ? "exported" : "not exported", Do = () => ExportHandoff(_settings.HandoffsFolder) },
+                new Step { Name = "Hand off", Done = _handedOff.Contains(root), State = "not exported", Hint = "Writes the review for another examiner (Notes tab).", Do = () => ExportHandoff(_settings.HandoffsFolder) },
             };
         }
 
@@ -109,16 +140,26 @@ namespace Foton.Gui
                 _checklist.ResumeLayout();
                 return;
             }
-            int n = 0;
+            var next = steps.FirstOrDefault(s => !s.Done);
+            if (_stepBold == null || Math.Abs(_stepBold.Size - _checklist.Font.Size) > 0.01f)
+            {
+                _stepBold?.Dispose();
+                _stepBold = new Font(_checklist.Font, FontStyle.Bold);
+            }
+            // One short entry per step: a check mark when done (a cross when the package does not verify), its state
+            // otherwise, the next step in bold. The color repeats what the text says.
             foreach (var s in steps)
             {
-                _checklist.Controls.Add(new Label
+                var label = new Label
                 {
-                    Text = $"{++n}. {s.Name}: {s.State}", AutoSize = true, Padding = new Padding(4, 6, 4, 0),
-                    ForeColor = s.State.StartsWith("DOES NOT", StringComparison.Ordinal) ? Color.DarkRed : s.Done ? Color.DarkGreen : SystemColors.ControlText,
-                });
+                    Text = s.Failed ? "\u2717 " + s.Name + ": " + s.State : s.Done ? "\u2713 " + s.Name : s.Name + ": " + s.State,
+                    AutoSize = true, Padding = new Padding(4, 6, 8, 0),
+                    ForeColor = s.Failed ? Color.DarkRed : s.Done ? Color.DarkGreen : SystemColors.ControlText,
+                };
+                if (s == next) label.Font = _stepBold;
+                _stepTips.SetToolTip(label, s.Hint);
+                _checklist.Controls.Add(label);
             }
-            var next = steps.FirstOrDefault(s => !s.Done);
             _nextStep = next?.Do;
             _doNext.Text = next == null ? "" : "Do this next: " + next.Name;
             _doNext.Visible = next != null;

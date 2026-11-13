@@ -43,6 +43,10 @@ namespace Foton.Tools
         public string Theme { get; set; } = ThemeLight;
         /// <summary>Font size in points.</summary>
         public int TextSize { get; set; } = 9;
+        /// <summary>Whether the log pane under the tabs is shown, and its share of the window height in percent.</summary>
+        public bool ShowLog { get; set; } = true;
+        public int LogPercent { get; set; } = 22;
+        public const int MinLogPercent = 10, MaxLogPercent = 60;
 
         public string CasesFolder => CasesOutput.Length > 0 ? CasesOutput : CaseTree.DefaultOutput("Cases");
         public string BaselinesFolder => BaselinesOutput.Length > 0 ? BaselinesOutput : CaseTree.DefaultOutput("Baselines");
@@ -92,6 +96,8 @@ namespace Foton.Tools
             s.BundlesOutput = FullPath(V("BundlesOutput")) ?? "";
             if (V("Theme") is string theme && Array.IndexOf(Themes, theme) >= 0) s.Theme = theme;
             if (V("TextSize") is int size && TextSizes.Contains(size)) s.TextSize = size;
+            if (V("ShowLog") is bool show) s.ShowLog = show;
+            if (V("LogPercent") is int log && log >= MinLogPercent && log <= MaxLogPercent) s.LogPercent = log;
             return s;
         }
 
@@ -144,7 +150,7 @@ namespace Foton.Tools
         {
             ["Examiner"] = Examiner, ["OpenOnStart"] = OpenOnStart, ["RecentCount"] = RecentCount, ["RecentCases"] = RecentCases,
             ["CaseFolders"] = CaseFolders, ["CasesOutput"] = CasesOutput, ["BaselinesOutput"] = BaselinesOutput, ["HandoffsOutput"] = HandoffsOutput, ["BundlesOutput"] = BundlesOutput,
-            ["Theme"] = Theme, ["TextSize"] = TextSize,
+            ["Theme"] = Theme, ["TextSize"] = TextSize, ["ShowLog"] = ShowLog, ["LogPercent"] = LogPercent,
         });
 
         /// <summary>Writes the settings; false (and the reason) when the file cannot be written.</summary>
