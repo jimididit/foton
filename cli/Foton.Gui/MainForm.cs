@@ -99,6 +99,8 @@ namespace Foton.Gui
             if (openPath == null && last != null && (Directory.Exists(last) || File.Exists(last))) openPath = last;
             if (openPath != null) Shown += async (s, e) => { _tabs.SelectedTab = _packagePage; await Open(openPath); };
             else Shown += async (s, e) => await RefreshCases();
+            // Opt-in (Settings), at most once a day, in the background: it only says an update exists.
+            Shown += (s, e) => StartupUpdateCheck();
             // The list is cheap to re-read (no hashing), so it is current whenever the tab is shown.
             _tabs.Selected += async (s, e) => { if (e.TabPage == _casesPage && !_busy) await RefreshCases(); };
             // The status bar shows the tab on screen's last message, not another tab's (while an action runs, its own).
