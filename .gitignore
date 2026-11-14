@@ -40,3 +40,7 @@ obj/
 .vs/
 *.user
 TestResults/
+
+# Release signing keys stay offline (packaging/new-release-key.ps1)
+*.pfx
+*.p12

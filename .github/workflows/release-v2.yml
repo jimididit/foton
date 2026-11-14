@@ -102,9 +102,28 @@ jobs:
           $zip = Join-Path $out "$name.zip"
           # Files at the root: Explorer's Extract All already makes a folder named after the ZIP.
           [IO.Compression.ZipFile]::CreateFromDirectory($stage.FullName, (Join-Path (Resolve-Path $out) "$name.zip"), [IO.Compression.CompressionLevel]::Optimal, $false)
-          $sums += '{0}  {1}' -f (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant(), "$name.zip"
+          $zipSha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sums += '{0}  {1}' -f $zipSha, "$name.zip"
           [IO.File]::WriteAllLines((Join-Path $out 'SHA256SUMS.txt'), [string[]]$sums)
           Get-Content (Join-Path $out 'SHA256SUMS.txt')
+          # The release statement the owner signs offline (packaging\sign-release.ps1) and the console's updater trusts
+          # only with that signature. Written by hand so the signed bytes are stable: fixed key order, LF, no BOM.
+          $files = Get-ChildItem $out -Filter *.exe | Sort-Object Name | ForEach-Object {
+            '    "{0}": "{1}"' -f $_.Name, (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          }
+          $statement = @(
+            '{'
+            '  "product": "Foton",'
+            ('  "version": "{0}",' -f $ver)
+            ('  "released": "{0}",' -f [string]$p.FotonReleaseDate)
+            ('  "zip": {{ "name": "{0}", "sha256": "{1}" }},' -f "$name.zip", $zipSha)
+            '  "files": {'
+            ($files -join ",`n")
+            '  }'
+            '}'
+          ) -join "`n"
+          [IO.File]::WriteAllText((Join-Path $out 'foton-release.json'), $statement + "`n", (New-Object System.Text.UTF8Encoding $false))
+          Get-Content (Join-Path $out 'foton-release.json')
 
       - name: Upload executables
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -115,6 +134,7 @@ jobs:
             dist/release-v2/*.exe
             dist/release-v2/*.zip
             dist/release-v2/SHA256SUMS.txt
+            dist/release-v2/foton-release.json
 
       - name: Upload release notes
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -211,6 +231,8 @@ jobs:
           Unblock-File .\$zipName
           ``````
           A single executable checks the same way against its line in ``SHA256SUMS.txt``.
+
+          ``foton-release.json`` lists this release's files and hashes for the console's updater; the updater installs nothing until the maintainer's offline signature, ``foton-release.json.sig``, is attached.
           "@
           $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
           Set-Content -LiteralPath $notesFile -Value $notes -Encoding UTF8
