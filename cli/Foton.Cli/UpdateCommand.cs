@@ -12,7 +12,7 @@ namespace Foton.Cli
     /// </summary>
     static class UpdateCommand
     {
-        /// <summary>Exit 0 up to date, nothing installable, or installed; 2 a newer signed release is available (check only); 1 failed or cancelled.</summary>
+        /// <summary>Exit 0 up to date, nothing installable, or installed; 2 a newer signed release is available (check only); 3 the operator declined the install prompt; 1 failed.</summary>
         public static int Run(string[] args)
         {
             bool install = false, force = false;
@@ -81,8 +81,8 @@ namespace Foton.Cli
                 var answer = Console.ReadLine()?.Trim();
                 if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase) && !string.Equals(answer, "yes", StringComparison.OrdinalIgnoreCase))
                 {
-                    log.Write("Cancelled.", StatusLevel.Warn);
-                    return 1;
+                    log.Write("Cancelled; nothing downloaded or installed.", StatusLevel.Warn);
+                    return 3;
                 }
             }
             try

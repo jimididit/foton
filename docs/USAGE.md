@@ -400,7 +400,7 @@ Your current folder is kept, so a case can be re-run with the version that produ
 
 It connects only over HTTPS: to `api.github.com`, and to this repository's release downloads on `github.com`, which GitHub serves from `githubusercontent.com`. A Foton installed with Scoop is updated with `scoop update foton`.
 
-Exit codes: 0 when up to date, when nothing is installable yet, or after an install; 2 when a newer signed release is available (check only); 1 when the check or the install failed, or you cancelled.
+Exit codes: 0 when up to date, when nothing is installable yet, or after an install; 2 when a newer signed release is available (check only); 3 when you answer no at the prompt (nothing is downloaded); 1 when the check or the install failed.
 
 ### Analysis notes
 

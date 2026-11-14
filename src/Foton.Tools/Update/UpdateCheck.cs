@@ -39,7 +39,8 @@ namespace Foton.Tools.Update
     /// <summary>
     /// Finds the newest stable release newer than the running one whose foton-release.json is signed by a pinned key.
     /// Never installs anything; downgrades are impossible (only newer versions are considered) and any release that fails
-    /// a check stops the search with the reason, rather than quietly falling back to another.
+    /// a check stops the search with the reason, rather than quietly falling back to another: whoever can break the
+    /// newest release must not be able to steer analysts to an older one. A network error just means trying again later.
     /// </summary>
     public static class UpdateCheck
     {
