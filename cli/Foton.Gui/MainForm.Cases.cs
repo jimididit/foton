@@ -29,12 +29,18 @@ namespace Foton.Gui
         readonly Dictionary<string, string> _verified = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         CaseList? _caseList;
 
-        static DataGridView CasesGrid() => new DataGridView
+        static DataGridView CasesGrid()
         {
-            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = true, RowHeadersVisible = false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
-        };
+            var grid = new DataGridView
+            {
+                Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = true, RowHeadersVisible = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+            };
+            // Short columns fit their values; Path, the last, takes the rest of a wide window.
+            grid.DataBindingComplete += (s, e) => Tidy.FillLastColumn(grid);
+            return grid;
+        }
 
         TabPage CasesTab()
         {

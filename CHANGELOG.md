@@ -4,6 +4,10 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [3.3.1] - 2026-11-14
+
+- In the console's Cases and Baselines lists and the Viewer's tables, the last column (Path, or a file's last field) now takes the rest of the window's width, so a wide or maximized window no longer leaves an empty band to the right of the columns. Other columns still fit their values. The last column never gets narrower than its own values (up to 400 pixels), so a narrow window scrolls sideways instead of cutting paths off. The console's other tables already stretched their columns this way.
+
 ## [3.3.0] - 2026-11-14
 
 - New `foton update` checks GitHub for a newer stable release signed with the Foton release key. With `-Install`, it downloads the release ZIP, checks it against the signed statement, and installs the files in a new `Foton-<version>` folder beside your copy (or under `-OutputPath`). The checks cover the ZIP's SHA-256, that it holds only the expected files, and each executable's SHA-256 and version. Your copy is never replaced, so a case can be re-run with the version that produced it.

@@ -426,6 +426,7 @@ namespace Foton.Gui
             _grid.DataSource = dt;
             _grid.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             foreach (DataGridViewColumn c in _grid.Columns) if (c.Width > 400) c.Width = 400;
+            Tidy.FillLastColumn(_grid);
             int pages = Math.Max(1, (_rows.Count + PageRows - 1) / PageRows);
             _page.Text = string.Format(CultureInfo.InvariantCulture, "Page {0} of {1}  -  {2:N0} of {3:N0} rows{4}", _pageIndex + 1, pages, _rows.Count, _table.Rows.Count,
                 _table.Truncated ? $" (first {MaxCsvRows:N0} rows of a larger file)" : "");
