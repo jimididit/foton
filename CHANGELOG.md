@@ -4,6 +4,10 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [3.2.2] - 2026-11-14
+
+- Each executable has its own icon, so the four are told apart in Explorer, the taskbar, and Alt+Tab: `foton-console.exe` keeps the photon wave packet (beam cyan), `foton.exe` a prompt with a quantum (violet), `foton-collect.exe` an aperture (amber), and `foton-baseline.exe` a reference beam with a break (mint), all on the reports' near-black tile. Each has a simpler cut for 16 to 24 px. The icons are in `assets/brand/icons`, named for each executable; a build test checks that every executable carries its own icon and no other.
+
 ## [3.2.1] - 2026-11-14
 
 - Each release now has one download for most people: `Foton-<version>-windows.zip`, with all four executables, their `SHA256SUMS.txt`, `LICENSE.txt`, and a `README.txt` (which file does what, how to check them). The ZIP is listed in the release's `SHA256SUMS.txt`, carries its own build provenance attestation, and its SHA-256 is printed in the release notes. The executables stay attached on their own for RMM tools and scripts. The README quick start and Getting started now start from the ZIP.
