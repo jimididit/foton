@@ -80,8 +80,10 @@ try {
             $cert = $request.CreateSelfSigned($now.AddMinutes(-5), $now.AddYears(20))
             try { $bytes = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $passwords[$role]) }
             finally { $cert.Dispose() }
+            # CreateNew: the write itself refuses a file that appeared since the check above.
+            $stream = New-Object IO.FileStream($pfx, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
             $written += $pfx
-            [IO.File]::WriteAllBytes($pfx, $bytes)
+            try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
             $blob = Get-PublicBlob $key
             $sha = [System.Security.Cryptography.SHA256]::Create()
             $fingerprint = ([BitConverter]::ToString($sha.ComputeHash($blob)) -replace '-', '').ToLowerInvariant()
@@ -94,8 +96,9 @@ try {
         }
         finally { $key.Dispose() }
     }
+    $writer = New-Object IO.StreamWriter((New-Object IO.FileStream($public, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)), (New-Object Text.UTF8Encoding $false))
     $written += $public
-    [IO.File]::WriteAllLines($public, [string[]]$lines)
+    try { foreach ($line in $lines) { $writer.WriteLine($line) } } finally { $writer.Dispose() }
     $done = $true
 }
 finally {
