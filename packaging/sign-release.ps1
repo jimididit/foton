@@ -33,29 +33,31 @@ try {
     }
     $bytes = [IO.File]::ReadAllBytes($statement)
     $json = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
-    if ($json.product -ne 'Foton' -or $json.version -ne $Version) { throw "foton-release.json says $($json.product) $($json.version), not Foton $Version." }
+    # Case-sensitive comparisons throughout (-cne, -cnotmatch): the console compares these values ordinally, so the
+    # signer must not accept a spelling the console would refuse.
+    if ($json.product -cne 'Foton' -or $json.version -cne $Version) { throw "foton-release.json says $($json.product) $($json.version), not Foton $Version." }
     # Names from the statement become local paths: allow only the ZIP's own name and plain executable names.
-    if ($json.zip.name -ne "Foton-$Version-windows.zip") { throw "foton-release.json names the ZIP '$($json.zip.name)', not Foton-$Version-windows.zip." }
+    if ($json.zip.name -cne "Foton-$Version-windows.zip") { throw "foton-release.json names the ZIP '$($json.zip.name)', not Foton-$Version-windows.zip." }
     $listed = [ordered]@{ $json.zip.name = $json.zip.sha256 }
     foreach ($p in $json.files.PSObject.Properties) {
-        if ($p.Name -notmatch '^foton(-[a-z]+)?\.exe$') { throw "foton-release.json lists an unexpected file name '$($p.Name)'." }
+        if ($p.Name -cnotmatch '^foton(-[a-z]+)?\.exe$') { throw "foton-release.json lists an unexpected file name '$($p.Name)'." }
         $listed[$p.Name] = $p.Value
     }
-    foreach ($n in $listed.Keys) { if ($listed[$n] -notmatch '^[0-9a-f]{64}$') { throw "foton-release.json has no valid SHA-256 for $n." } }
+    foreach ($n in $listed.Keys) { if ($listed[$n] -cnotmatch '^[0-9a-f]{64}$') { throw "foton-release.json has no valid SHA-256 for $n." } }
 
     if (-not $StatementPath) {
         # Every hash in the statement must be the release's own, and every listed file must be what this tag's
         # release workflow built on a GitHub-hosted runner: what is signed is what was built and published.
-        $sums = @{}
+        $sums = New-Object Collections.Hashtable ([StringComparer]::Ordinal)
         foreach ($line in Get-Content (Join-Path $work 'SHA256SUMS.txt')) { $h, $n = $line -split '\s+', 2; $sums[$n] = $h }
-        foreach ($n in $listed.Keys) { if ($sums[$n] -ne $listed[$n]) { throw "$n in foton-release.json does not match the release's SHA256SUMS.txt." } }
+        foreach ($n in $listed.Keys) { if ($sums[$n] -cne $listed[$n]) { throw "$n in foton-release.json does not match the release's SHA256SUMS.txt." } }
         foreach ($n in $listed.Keys) {
             gh release download $tag --repo $repo -p $n -D $work
             if ($LASTEXITCODE -ne 0) { throw "Could not download $n from $tag." }
             $file = Join-Path $work $n
             gh attestation verify $file --repo $repo --signer-workflow "$repo/.github/workflows/release-v2.yml" --source-ref "refs/tags/$tag" --deny-self-hosted-runners | Out-Null
             if ($LASTEXITCODE -ne 0) { throw "$n has no valid build provenance from $tag's release workflow; not signing." }
-            if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $listed[$n]) { throw "The downloaded $n does not match foton-release.json." }
+            if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -cne $listed[$n]) { throw "The downloaded $n does not match foton-release.json." }
         }
     }
 
