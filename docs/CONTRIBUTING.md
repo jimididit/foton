@@ -103,6 +103,11 @@ HTML goes through `Foton.Report`: escape every host value, and include the offli
 
 Maintainers release from `main` after the version PR merges: set `FotonVersion` (and `FotonPrerelease` for a prerelease) and `FotonReleaseDate` in `Directory.Build.props`, then push a matching `vX.Y.Z` tag (the workflow runs for `v2.*` and `v3.*` tags). `.github/workflows/release-v2.yml` refuses a mismatched tag or a version with no `CHANGELOG.md` section, builds and tests, packs `Foton-<version>-windows.zip` (the four executables, their `SHA256SUMS.txt`, `LICENSE.txt`, and `packaging/README.txt`), writes `SHA256SUMS.txt` for the executables and the ZIP, attests build provenance for all of them, and creates the GitHub release (a prerelease when the tag has a suffix). Run the workflow manually for a dry run: the executables are uploaded as a workflow artifact and nothing is published.
 
+Each release also carries `foton-release.json`: its version, date, and the SHA-256 of the ZIP and of each executable, written by the workflow with stable bytes. The console's updater trusts a release only with the maintainer's signature over that file, made offline:
+
+- **Once**, on an offline machine: `.\packaging\new-release-key.ps1 -OutputFolder <offline folder>` makes the primary and backup keys (ECDSA P-256, each in a password-protected `.pfx`, never in the certificate store) and `public-keys.txt`, whose public halves the console pins. Keep the two `.pfx` files on separate offline media.
+- **After each release is published**, on the machine holding a key: `.\packaging\sign-release.ps1 -Version X.Y.Z -KeyPath <...>\foton-release-key-primary.pfx`. It checks the statement against the release's `SHA256SUMS.txt` and the ZIP's build provenance, signs, verifies the signature, and uploads `foton-release.json.sig`. Until then the updater reports the release as published but not yet signed. If the primary key is lost, sign with the backup key; if one is compromised, release a version signed with the other that pins a new pair.
+
 After a release (not a prerelease) is published, point the Scoop manifest at it and open a PR with the change: `.\packaging\update-scoop.ps1 -Version X.Y.Z` reads the ZIP's SHA-256 from the release's `SHA256SUMS.txt` and updates `bucket/foton.json` (PackagingRules checks its shape).
 
 ## What we will not accept
