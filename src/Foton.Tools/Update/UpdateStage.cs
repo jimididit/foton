@@ -31,7 +31,7 @@ namespace Foton.Tools.Update
             return Path.GetFullPath(Path.Combine(baseDir, "Foton", "updates"));
         }
 
-        static readonly Regex ReleaseVersion = new Regex(@"^\d{1,4}\.\d{1,4}\.\d{1,4}\z", RegexOptions.CultureInvariant);
+        static readonly Regex ReleaseVersion = new Regex(@"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}\z", RegexOptions.CultureInvariant);
 
         /// <summary>updatesRoot\version, for an X.Y.Z version only: the one folder Stage and Clean may delete.</summary>
         static string WorkFolder(string updatesRoot, string version)

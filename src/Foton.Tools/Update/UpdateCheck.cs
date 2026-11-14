@@ -138,7 +138,7 @@ namespace Foton.Tools.Update
     /// <summary>One entry of GitHub's release list, with only what the updater reads.</summary>
     sealed class GitHubRelease
     {
-        static readonly Regex StableTag = new Regex(@"^v(\d{1,4}\.\d{1,4}\.\d{1,4})\z", RegexOptions.CultureInvariant);
+        static readonly Regex StableTag = new Regex(@"^v([0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4})\z", RegexOptions.CultureInvariant);
 
         public string Tag { get; private set; } = "";
         /// <summary>X.Y.Z from a vX.Y.Z tag; empty for any other tag.</summary>

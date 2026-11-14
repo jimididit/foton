@@ -12,7 +12,7 @@
     .\packaging\sign-release.ps1 -Version 3.3.0 -KeyPath E:\FotonKeys\foton-release-key-primary.pfx
 #>
 param(
-    [Parameter(Mandatory)][ValidatePattern('^\d+\.\d+\.\d+\z')][string]$Version,
+    [Parameter(Mandatory)][ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+\z')][string]$Version,
     [Parameter(Mandatory)][string]$KeyPath,
     # Sign this local statement instead of downloading it, and do not upload (tests, dry runs).
     [string]$StatementPath,

@@ -6,15 +6,18 @@ namespace Foton.Tools.Update
     /// <summary>One public half of a release signing key: a CNG ECCPUBLICBLOB (ECDSA P-256) and its fingerprint.</summary>
     public sealed class ReleaseKey
     {
+        readonly byte[] _blob;
+
         public ReleaseKey(string role, string blobBase64, string fingerprint)
         {
             Role = role;
-            Blob = Convert.FromBase64String(blobBase64);
+            _blob = Convert.FromBase64String(blobBase64);
             Fingerprint = fingerprint;
         }
 
         public string Role { get; }
-        public byte[] Blob { get; }
+        /// <summary>A copy each time, so nothing in the process can alter a pinned key.</summary>
+        public byte[] Blob => (byte[])_blob.Clone();
         /// <summary>SHA-256 of <see cref="Blob"/>, lowercase hex: what packaging\sign-release.ps1 prints when it signs.</summary>
         public string Fingerprint { get; }
     }

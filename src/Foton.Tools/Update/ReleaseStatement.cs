@@ -22,7 +22,8 @@ namespace Foton.Tools.Update
         public static readonly IReadOnlyList<string> RequiredFiles = new[] { "foton-baseline.exe", "foton-collect.exe", "foton-console.exe", "foton.exe" };
 
         // \z, not $: in .NET, $ also matches before a final newline, which would let "foton.exe\n" through.
-        static readonly Regex VersionPattern = new Regex(@"^\d{1,4}\.\d{1,4}\.\d{1,4}\z", RegexOptions.CultureInvariant);
+        // [0-9], not \d: \d also matches non-ASCII digits (Arabic-Indic, Devanagari, and others).
+        static readonly Regex VersionPattern = new Regex(@"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}\z", RegexOptions.CultureInvariant);
         static readonly Regex HashPattern = new Regex(@"^[0-9a-f]{64}\z", RegexOptions.CultureInvariant);
         static readonly Regex ExeName = new Regex(@"^foton(-[a-z]+)?\.exe\z", RegexOptions.CultureInvariant);
 

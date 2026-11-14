@@ -103,6 +103,10 @@ namespace Foton.Tests
                     Assert.Equal(256, ecdsa.KeySize);
             }
             Assert.NotEqual(ReleaseKeys.All[0].Fingerprint, ReleaseKeys.All[1].Fingerprint);
+
+            // A caller changing the bytes it was given does not change the pinned key.
+            ReleaseKeys.All[0].Blob[10] ^= 0xFF;
+            Assert.Equal(ReleaseKeys.All[0].Fingerprint, Hashing.Sha256Hex(ReleaseKeys.All[0].Blob).ToLowerInvariant());
         }
 
         [Fact]
@@ -156,6 +160,8 @@ namespace Foton.Tests
             yield return new object[] { "does not list foton-console.exe", Statement("3.4.0", files: good.Where(p => p.Key != "foton-console.exe").ToDictionary(p => p.Key, p => p.Value)) };
             // A trailing newline (a JSON \n escape) must not slip past an anchored pattern.
             yield return new object[] { "version", Statement("3.4.0\\n") };
+            // Arabic-Indic digits: \d would accept them; the version must be ASCII.
+            yield return new object[] { "version", Statement("\u0663.\u0664.\u0660") };
             yield return new object[] { "unexpected file name", Statement("3.4.0", files: new Dictionary<string, string>(good) { ["foton.exe\\n"] = new string('b', 64) }) };
             yield return new object[] { "SHA-256 of foton.exe", Statement("3.4.0", files: new Dictionary<string, string>(good) { ["foton.exe"] = new string('b', 64) + "\\n" }) };
             yield return new object[] { "not JSON", Encoding.UTF8.GetBytes("{ nope") };
