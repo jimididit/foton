@@ -68,6 +68,8 @@ namespace Foton.Cli
                 return NotesCommand.Run(args);
             if (args.Length >= 2 && string.Equals(args[0], "bundle", StringComparison.OrdinalIgnoreCase))
                 return BundleCommand.Run(args);
+            if (args.Length >= 1 && string.Equals(args[0], "update", StringComparison.OrdinalIgnoreCase))
+                return UpdateCommand.Run(args);
             if ((args.Length == 3 || args.Length == 4) && string.Equals(args[0], "search", StringComparison.OrdinalIgnoreCase))
             {
                 if (args.Length == 4 && !string.Equals(args[3], "-Regex", StringComparison.OrdinalIgnoreCase)) return Usage();
@@ -162,6 +164,11 @@ namespace Foton.Cli
             Console.WriteLine("  foton carve <blob> [-MaxBytes <n>] [-MaxHits <n>]");
             Console.WriteLine("                                        MZ/PE signature scan of a copied blob (Tier 3; not NTFS carving);");
             Console.WriteLine("                                        defaults 8 MiB and 50 hits");
+            Console.WriteLine("  foton update [-Install [-Force] [-OutputPath <folder>]]");
+            Console.WriteLine("                                        check GitHub for a newer release signed with the Foton release key;");
+            Console.WriteLine("                                        -Install downloads it, checks every file against the signed hashes,");
+            Console.WriteLine("                                        and installs it in a new Foton-<version> folder beside this one");
+            Console.WriteLine("                                        (or under -OutputPath); this copy is never replaced");
             Console.WriteLine();
             Console.WriteLine("Operator guide: https://github.com/jimididit/foton/blob/main/docs/USAGE.md");
             return 1;

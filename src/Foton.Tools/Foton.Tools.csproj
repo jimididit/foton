@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Workstation tool setup and compose. Install is the only network code in Foton (a catalog-pinned,
-    hash-verified download, run by the operator as setup). Compose runs external parsers on copied
-    package files and never touches the network or the live host.
+    Workstation tool setup, compose, and updates. The only network code in Foton is here, and both paths run on
+    the operator's request: tool install (a catalog-pinned, hash-verified download) and Update (a release whose
+    statement is signed by a pinned offline key, every file checked against it). Compose runs external parsers on
+    copied package files and never touches the network or the live host.
   -->
   <ItemGroup>
     <ProjectReference Include="..\Foton.Core\Foton.Core.csproj" />
@@ -10,6 +11,8 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\FotonToolCatalog.json" LogicalName="Foton.Tools.FotonToolCatalog.json" />

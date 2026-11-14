@@ -12,7 +12,7 @@
     .\packaging\sign-release.ps1 -Version 3.3.0 -KeyPath E:\FotonKeys\foton-release-key-primary.pfx
 #>
 param(
-    [Parameter(Mandatory)][ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version,
+    [Parameter(Mandatory)][ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+\z')][string]$Version,
     [Parameter(Mandatory)][string]$KeyPath,
     # Sign this local statement instead of downloading it, and do not upload (tests, dry runs).
     [string]$StatementPath,
@@ -34,16 +34,16 @@ try {
     $bytes = [IO.File]::ReadAllBytes($statement)
     $json = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
     # Case-sensitive comparisons throughout (-cne, -cnotmatch): the console compares these values ordinally, so the
-    # signer must not accept a spelling the console would refuse.
+    # signer must not accept a spelling the console would refuse. Patterns end in \z: $ also matches before a final newline.
     if ($json.product -cne 'Foton' -or $json.version -cne $Version) { throw "foton-release.json says $($json.product) $($json.version), not Foton $Version." }
     # Names from the statement become local paths: allow only the ZIP's own name and plain executable names.
     if ($json.zip.name -cne "Foton-$Version-windows.zip") { throw "foton-release.json names the ZIP '$($json.zip.name)', not Foton-$Version-windows.zip." }
     $listed = [ordered]@{ $json.zip.name = $json.zip.sha256 }
     foreach ($p in $json.files.PSObject.Properties) {
-        if ($p.Name -cnotmatch '^foton(-[a-z]+)?\.exe$') { throw "foton-release.json lists an unexpected file name '$($p.Name)'." }
+        if ($p.Name -cnotmatch '^foton(-[a-z]+)?\.exe\z') { throw "foton-release.json lists an unexpected file name '$($p.Name)'." }
         $listed[$p.Name] = $p.Value
     }
-    foreach ($n in $listed.Keys) { if ($listed[$n] -cnotmatch '^[0-9a-f]{64}$') { throw "foton-release.json has no valid SHA-256 for $n." } }
+    foreach ($n in $listed.Keys) { if ($listed[$n] -cnotmatch '^[0-9a-f]{64}\z') { throw "foton-release.json has no valid SHA-256 for $n." } }
 
     if (-not $StatementPath) {
         # Every hash in the statement must be the release's own, and every listed file must be what this tag's
