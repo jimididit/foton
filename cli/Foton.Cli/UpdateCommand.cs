@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Reflection;
 using Foton.Core;
 using Foton.Tools.Update;
 
@@ -55,7 +54,7 @@ namespace Foton.Cli
             log.Write(result.Message, StatusLevel.Good);
             log.Write("Release notes: " + result.ReleaseUrl);
             if (result.PendingVersion.Length > 0) log.Write($"Foton {result.PendingVersion} is also published but not signed yet.", StatusLevel.Warn);
-            var exeDir = Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!;
+            var exeDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
             if (UpdateInstall.IsScoop(exeDir))
             {
                 log.Write("This Foton was installed with Scoop: run  scoop update foton", StatusLevel.Warn);
@@ -90,14 +89,17 @@ namespace Foton.Cli
             {
                 var staged = UpdateStage.Stage(statement, result.ZipUrl, new HttpUpdateSource(), updates, log);
                 UpdateInstall.Install(staged, target, statement, log);
-                UpdateStage.Clean(updates, statement.Version);
             }
-            catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException
+                || ex is ArgumentException || ex is NotSupportedException)
             {
                 log.Write("Update not installed: " + ex.Message, StatusLevel.Error);
                 log.Write("This copy is unchanged.", StatusLevel.Info);
                 return 1;
             }
+            // After a successful install: a staging folder left behind is only disk space, not a failed update.
+            try { UpdateStage.Clean(updates, statement.Version); }
+            catch (InvalidDataException ex) { log.Write("Staging folder not removed: " + ex.Message, StatusLevel.Warn); }
             log.Write($"This copy in {exeDir} is unchanged; cases can still be re-run with Foton {current}.", StatusLevel.Info);
             log.WriteConsole($"     Run the new version from {target}", ConsoleColor.DarkGray);
             return 0;

@@ -154,6 +154,10 @@ namespace Foton.Tests
             yield return new object[] { "unexpected file name", Statement("3.4.0", files: new Dictionary<string, string>(good) { ["FOTON.exe"] = new string('b', 64) }) };
             yield return new object[] { "SHA-256 of foton.exe", Statement("3.4.0", files: new Dictionary<string, string>(good) { ["foton.exe"] = "zz" }) };
             yield return new object[] { "does not list foton-console.exe", Statement("3.4.0", files: good.Where(p => p.Key != "foton-console.exe").ToDictionary(p => p.Key, p => p.Value)) };
+            // A trailing newline (a JSON \n escape) must not slip past an anchored pattern.
+            yield return new object[] { "version", Statement("3.4.0\\n") };
+            yield return new object[] { "unexpected file name", Statement("3.4.0", files: new Dictionary<string, string>(good) { ["foton.exe\\n"] = new string('b', 64) }) };
+            yield return new object[] { "SHA-256 of foton.exe", Statement("3.4.0", files: new Dictionary<string, string>(good) { ["foton.exe"] = new string('b', 64) + "\\n" }) };
             yield return new object[] { "not JSON", Encoding.UTF8.GetBytes("{ nope") };
             yield return new object[] { "not UTF-8", new byte[] { 0x7B, 0xFF, 0xFE, 0x7D } };
             yield return new object[] { "size", new byte[ReleaseStatement.MaxBytes + 1] };

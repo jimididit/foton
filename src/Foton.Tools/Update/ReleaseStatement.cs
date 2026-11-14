@@ -21,9 +21,10 @@ namespace Foton.Tools.Update
         /// <summary>Every release carries these; a statement without one of them is refused.</summary>
         public static readonly IReadOnlyList<string> RequiredFiles = new[] { "foton-baseline.exe", "foton-collect.exe", "foton-console.exe", "foton.exe" };
 
-        static readonly Regex VersionPattern = new Regex(@"^\d{1,4}\.\d{1,4}\.\d{1,4}$", RegexOptions.CultureInvariant);
-        static readonly Regex HashPattern = new Regex("^[0-9a-f]{64}$", RegexOptions.CultureInvariant);
-        static readonly Regex ExeName = new Regex(@"^foton(-[a-z]+)?\.exe$", RegexOptions.CultureInvariant);
+        // \z, not $: in .NET, $ also matches before a final newline, which would let "foton.exe\n" through.
+        static readonly Regex VersionPattern = new Regex(@"^\d{1,4}\.\d{1,4}\.\d{1,4}\z", RegexOptions.CultureInvariant);
+        static readonly Regex HashPattern = new Regex(@"^[0-9a-f]{64}\z", RegexOptions.CultureInvariant);
+        static readonly Regex ExeName = new Regex(@"^foton(-[a-z]+)?\.exe\z", RegexOptions.CultureInvariant);
 
         public string Version { get; private set; } = "";
         public DateTime Released { get; private set; }
