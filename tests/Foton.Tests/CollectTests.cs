@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Threading;
 using Foton.Analyze;
 using Foton.Collect;
 using Foton.Core;
@@ -292,6 +293,44 @@ namespace Foton.Tests
                 finally { File.SetAttributes(f, FileAttributes.Normal); }
             }
             Assert.Equal(TaskStatus.Success, CopyTaskStatus.Evaluate(new[] { new CopyRow { SourcePath = "x", Status = "SkippedCloudPlaceholder" } }).Status);
+        }
+
+        [Fact]
+        public void A_locked_source_is_retried_then_copied_or_recorded_as_CopyError()
+        {
+            using (var t = new TempDir())
+            {
+                var src = Path.Combine(t.Path, "SRUDB.dat");
+                File.WriteAllBytes(src, new byte[] { 1, 2, 3, 4 });
+
+                // Exclusive lock briefly (as a host writer can hold), then release so a retry succeeds.
+                var held = new ManualResetEvent(false);
+                var holder = new Thread(() =>
+                {
+                    using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                    {
+                        held.Set();
+                        Thread.Sleep(500);
+                    }
+                });
+                holder.IsBackground = true;
+                holder.Start();
+                Assert.True(held.WaitOne(5000));
+                var recovered = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out\SRUDB.dat"), skipHashing: true);
+                holder.Join(10000);
+                Assert.Equal("Copied", recovered.Status);
+                Assert.Contains("attempts", recovered.Note);
+                Assert.True(File.Exists(Path.Combine(t.Path, @"out\SRUDB.dat")));
+
+                // A lock that outlasts the retry budget is still CopyError, never Missing.
+                using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    var failed = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out2\SRUDB.dat"), skipHashing: true);
+                    Assert.Equal("CopyError", failed.Status);
+                    Assert.False(string.IsNullOrWhiteSpace(failed.Note));
+                    Assert.False(File.Exists(Path.Combine(t.Path, @"out2\SRUDB.dat")));
+                }
+            }
         }
 
         [Fact]
