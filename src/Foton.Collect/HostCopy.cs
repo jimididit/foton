@@ -38,6 +38,10 @@ namespace Foton.Collect
         const string MissingNote = "Source leaf not found. Visibility gap, not proof it never existed on the host.";
         const string NonLocalNote = "Non-local source refused. Collect does not follow remote paths (NTLM / network footprint).";
 
+        // SRUDB.dat and similar ESE/WAL files can be briefly exclusive-locked by the host writer. A few short
+        // retries avoid a one-off CopyError that leaves SrumECmd with NoInput on an otherwise healthy package.
+        const int CopyAttempts = 5;
+
         /// <summary>Copy-FotonHostFile: Copied / Missing / CopyError, with size and SHA-256 of the copy.</summary>
         public static CopyRow CopyFile(string source, string destination, bool skipHashing)
         {
@@ -54,24 +58,36 @@ namespace Foton.Collect
                 row.Note = "Cloud-only placeholder (for example OneDrive Files On-Demand). Not copied: reading it would download it to the host.";
                 return row;
             }
-            try
+            Exception? last = null;
+            for (int attempt = 1; ; attempt++)
             {
-                var dir = Path.GetDirectoryName(destination);
-                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                using (var src = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                using (var dst = File.Create(destination))
-                    src.CopyTo(dst);
-                row.SizeBytes = new FileInfo(destination).Length;
-                row.SHA256 = Hashing.SafeHash(destination, skipHashing);
-                row.Status = "Copied";
-                row.Note = "Copied with FileShare.ReadWrite. Do not parse the live path.";
+                try
+                {
+                    var dir = Path.GetDirectoryName(destination);
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    using (var src = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var dst = File.Create(destination))
+                        src.CopyTo(dst);
+                    row.SizeBytes = new FileInfo(destination).Length;
+                    row.SHA256 = Hashing.SafeHash(destination, skipHashing);
+                    row.Status = "Copied";
+                    row.Note = attempt == 1
+                        ? "Copied with FileShare.ReadWrite. Do not parse the live path."
+                        : F("Copied with FileShare.ReadWrite after {0} attempts (transient lock). Do not parse the live path.", attempt);
+                    return row;
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException || ex is ArgumentException || ex is System.Security.SecurityException)
+                {
+                    last = ex;
+                    try { if (File.Exists(destination)) File.Delete(destination); } catch (Exception) { }
+                    // NotSupported / Argument / Security are not transient locks; do not burn the retry budget.
+                    if (ex is NotSupportedException || ex is ArgumentException || ex is System.Security.SecurityException || attempt >= CopyAttempts)
+                        break;
+                    System.Threading.Thread.Sleep(200 * attempt);
+                }
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException || ex is ArgumentException || ex is System.Security.SecurityException)
-            {
-                row.Status = "CopyError";
-                row.Note = ex.Message;
-                try { if (File.Exists(destination)) File.Delete(destination); } catch (Exception) { }
-            }
+            row.Status = "CopyError";
+            row.Note = last != null ? last.Message : "Copy failed.";
             return row;
         }
 

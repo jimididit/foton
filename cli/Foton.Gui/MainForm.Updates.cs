@@ -93,7 +93,7 @@ namespace Foton.Gui
 
         async Task OfferUpdate(UpdateCheckResult result)
         {
-            var exeDir = Path.GetFullPath(Application.StartupPath);
+            var exeDir = Path.GetFullPath(Application.StartupPath).TrimEnd('\\');
             var s = result.Statement!;
             if (UpdateInstall.IsScoop(exeDir))
             {

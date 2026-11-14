@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [3.3.2] - 2026-11-14
+
+- Collect retries a locked host-file copy a few times before recording `CopyError`. A brief exclusive lock (seen once on `SRUDB.dat` during SrumECmd prep) no longer leaves the package without the file when the lock clears within about a second. A lock that lasts longer is still `CopyError` with the failure note; statuses and schema are unchanged.
+- `foton update -Install` and the console's update confirmation no longer show a trailing backslash on the "this copy" path (`AppDomain.BaseDirectory` / `Application.StartupPath`).
+
 ## [3.3.1] - 2026-11-14
 
 - In the console's Cases and Baselines lists and the Viewer's tables, the last column (Path, or a file's last field) now takes the rest of the window's width, so a wide or maximized window no longer leaves an empty band to the right of the columns. Other columns still fit their values. The last column never gets narrower than its own values (up to 400 pixels), so a narrow window scrolls sideways instead of cutting paths off. The console's other tables already stretched their columns this way.

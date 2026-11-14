@@ -54,7 +54,7 @@ namespace Foton.Cli
             log.Write(result.Message, StatusLevel.Good);
             log.Write("Release notes: " + result.ReleaseUrl);
             if (result.PendingVersion.Length > 0) log.Write($"Foton {result.PendingVersion} is also published but not signed yet.", StatusLevel.Warn);
-            var exeDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
+            var exeDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory).TrimEnd('\\');
             if (UpdateInstall.IsScoop(exeDir))
             {
                 log.Write("This Foton was installed with Scoop: run  scoop update foton", StatusLevel.Warn);
