@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace Foton.Tools.Update
 {
@@ -30,7 +31,8 @@ namespace Foton.Tools.Update
     /// </summary>
     public static class ReleaseKeys
     {
-        public static readonly IReadOnlyList<ReleaseKey> All = new[]
+        // A ReadOnlyCollection, not a bare array: an array exposed as IReadOnlyList can be cast back and changed.
+        public static readonly IReadOnlyList<ReleaseKey> All = new ReadOnlyCollection<ReleaseKey>(new[]
         {
             new ReleaseKey("primary",
                 "RUNTMSAAAAAVn/M5W4BbpB6kdyiNbDV36K8cHhuvKGfzvk5VwNvmwqpKrLp0Df3GBdXhAhR5qoLpvwiPusy/KQhcWVPPOYpt",
@@ -38,6 +40,6 @@ namespace Foton.Tools.Update
             new ReleaseKey("backup",
                 "RUNTMSAAAADXTpD7oIPStcKZlWk/YHUlSfRPpcmFugwvKilrE/SS5SXN7nINf7NkLPxGQFfT7PumLS7012Et+Vsf7sH51rIR",
                 "a0f42ace5da28ddca292c6f17bf307a755eae6dc70d8360f6ec9c2fbf95a7596"),
-        };
+        });
     }
 }

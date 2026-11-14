@@ -104,6 +104,10 @@ namespace Foton.Tests
             }
             Assert.NotEqual(ReleaseKeys.All[0].Fingerprint, ReleaseKeys.All[1].Fingerprint);
 
+            // The pinned list cannot be cast back to an array and changed.
+            Assert.False(ReleaseKeys.All is ReleaseKey[]);
+            Assert.True(((ICollection<ReleaseKey>)ReleaseKeys.All).IsReadOnly);
+
             // A caller changing the bytes it was given does not change the pinned key.
             ReleaseKeys.All[0].Blob[10] ^= 0xFF;
             Assert.Equal(ReleaseKeys.All[0].Fingerprint, Hashing.Sha256Hex(ReleaseKeys.All[0].Blob).ToLowerInvariant());

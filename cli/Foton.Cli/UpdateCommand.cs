@@ -99,7 +99,11 @@ namespace Foton.Cli
             }
             // After a successful install: a staging folder left behind is only disk space, not a failed update.
             try { UpdateStage.Clean(updates, statement.Version); }
-            catch (InvalidDataException ex) { log.Write("Staging folder not removed: " + ex.Message, StatusLevel.Warn); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException
+                || ex is ArgumentException || ex is NotSupportedException)
+            {
+                log.Write("Staging folder not removed: " + ex.Message, StatusLevel.Warn);
+            }
             log.Write($"This copy in {exeDir} is unchanged; cases can still be re-run with Foton {current}.", StatusLevel.Info);
             log.WriteConsole($"     Run the new version from {target}", ConsoleColor.DarkGray);
             return 0;
