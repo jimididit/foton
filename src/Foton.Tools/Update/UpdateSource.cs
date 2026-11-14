@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Authentication;
 using Foton.Core;
 
 namespace Foton.Tools.Update
@@ -74,8 +75,12 @@ namespace Foton.Tools.Update
                     }
                 }
             }
+            // Every transport failure becomes IOException, the one type the check and the install report as "nothing installed".
             catch (HttpRequestException ex) { throw new IOException("Could not reach GitHub: " + (ex.InnerException?.Message ?? ex.Message), ex); }
             catch (OperationCanceledException ex) { throw new IOException("GitHub did not answer within " + Timeout.TotalSeconds + " seconds.", ex); }
+            catch (WebException ex) { throw new IOException("Could not reach GitHub: " + ex.Message, ex); }
+            catch (AuthenticationException ex) { throw new IOException("The TLS connection to GitHub failed: " + ex.Message, ex); }
+            catch (InvalidOperationException ex) { throw new IOException("The connection to GitHub failed: " + ex.Message, ex); }
         }
 
         static Uri Allowed(string url)

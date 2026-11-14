@@ -296,6 +296,14 @@ namespace Foton.Tests
             Assert.Contains("not JSON", r.Message);
         }
 
+        [Theory]
+        [InlineData("http://api.github.com/repos/jimididit/foton/releases")]
+        [InlineData("https://example.com/foton-release.json")]
+        [InlineData("https://github.com.example.com/foton-release.json")]
+        [InlineData("not a url")]
+        public void The_source_refuses_any_address_that_is_not_HTTPS_GitHub_before_connecting(string url) =>
+            Assert.Throws<IOException>(() => new HttpUpdateSource().Fetch(url, new MemoryStream(), 1024));
+
         [Fact]
         public void A_body_over_its_cap_is_refused_before_it_lands_whole()
         {
