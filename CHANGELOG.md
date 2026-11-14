@@ -4,6 +4,10 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [3.2.1] - 2026-11-14
+
+- Each release now has one download for most people: `Foton-<version>-windows.zip`, with all four executables, their `SHA256SUMS.txt`, `LICENSE.txt`, and a `README.txt` (which file does what, how to check them). The ZIP is listed in the release's `SHA256SUMS.txt`, carries its own build provenance attestation, and its SHA-256 is printed in the release notes. The executables stay attached on their own for RMM tools and scripts. The README quick start and Getting started now start from the ZIP.
+
 ## [3.2.0] - 2026-11-13
 
 - Console wizards: **Build a collector** (collection or baseline, scope, folder, then the command to run), **Work a case** (choose, verify, parse/compose/analyze, review, hand off), and **Compare baselines** (reference, difference, result). Each shows its steps and runs the same action as the tab it stands for. **Start here** on the Cases tab opens them, as does **Tools > Wizards**.

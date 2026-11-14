@@ -12,22 +12,25 @@ Windows DFIR, baseline, and security-audit toolkit for incident responders, fore
 
 Windows 10 / Server 2016 or newer; nothing to install.
 
-1. Download `foton-collect.exe` and `SHA256SUMS.txt` from the [latest release](https://github.com/jimididit/foton/releases/latest).
-2. Open PowerShell as Administrator (Start menu, type `PowerShell`, right-click **Windows PowerShell**, **Run as administrator**). Go to the folder where you saved the files, replacing the path with yours:
+1. Download `Foton-<version>-windows.zip` from the [latest release](https://github.com/jimididit/foton/releases/latest). It holds all four executables, their `SHA256SUMS.txt`, and a `README.txt`.
+2. Open PowerShell as Administrator (Start menu, type `PowerShell`, right-click **Windows PowerShell**, **Run as administrator**). Go to the folder where you saved the ZIP, replacing the path with yours:
 
    ```powershell
    cd "\path\to\folder"
    ```
 
-3. Check the download. The `Hash` value it prints must match the `foton-collect.exe` line in `SHA256SUMS.txt`. If it does not, delete the file and download it again.
+3. Check the download. The `Hash` value it prints must match the SHA-256 shown in the release notes. If it does not, delete the ZIP and download it again. Then unblock and extract it:
 
    ```powershell
-   Get-FileHash .\foton-collect.exe
+   Get-FileHash .\Foton-*-windows.zip
+   Unblock-File .\Foton-*-windows.zip
+   Expand-Archive .\Foton-*-windows.zip -DestinationPath .\Foton
    ```
 
-4. Run it:
+4. Run the collector:
 
    ```powershell
+   cd .\Foton
    .\foton-collect.exe -CaseNumber CASE-0001
    ```
 
