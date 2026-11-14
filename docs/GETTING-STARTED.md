@@ -27,6 +27,8 @@ The executables are also attached to the release on their own, with the release'
 
 If the browser warns that the file "isn't commonly downloaded", choose **Keep**: the executables are not code-signed yet, and step 2 is how you check them instead.
 
+On a workstation with [Scoop](https://scoop.sh), `scoop bucket add foton https://github.com/jimididit/foton` and `scoop install foton/foton` download the same ZIP, check its SHA-256, and put the four executables on your PATH (`scoop update foton` later). For casework, still run the provenance check in step 2 on the installed files.
+
 ## 2. Check the download
 
 In PowerShell, go to the folder holding the ZIP:
