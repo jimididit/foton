@@ -102,6 +102,8 @@ HTML goes through `Foton.Report`: escape every host value, and include the offli
 
 Maintainers release from `main` after the version PR merges: set `FotonVersion` (and `FotonPrerelease` for a prerelease) and `FotonReleaseDate` in `Directory.Build.props`, then push a matching `vX.Y.Z` tag (the workflow runs for `v2.*` and `v3.*` tags). `.github/workflows/release-v2.yml` refuses a mismatched tag or a version with no `CHANGELOG.md` section, builds and tests, packs `Foton-<version>-windows.zip` (the four executables, their `SHA256SUMS.txt`, `LICENSE.txt`, and `packaging/README.txt`), writes `SHA256SUMS.txt` for the executables and the ZIP, attests build provenance for all of them, and creates the GitHub release (a prerelease when the tag has a suffix). Run the workflow manually for a dry run: the executables are uploaded as a workflow artifact and nothing is published.
 
+After a release (not a prerelease) is published, point the Scoop manifest at it and open a PR with the change: `.\packaging\update-scoop.ps1 -Version X.Y.Z` reads the ZIP's SHA-256 from the release's `SHA256SUMS.txt` and updates `bucket/foton.json` (PackagingRules checks its shape).
+
 ## What we will not accept
 
 - Remediation, process kill, quarantine, or "repair" switches

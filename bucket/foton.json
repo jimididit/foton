@@ -1,0 +1,28 @@
+{
+    "version": "3.2.1",
+    "description": "Windows DFIR triage and baseline toolkit: capture a host into a hashed package, then analyze it offline.",
+    "homepage": "https://github.com/jimididit/foton",
+    "license": "MIT",
+    "notes": "Check the download against the release: https://github.com/jimididit/foton/releases. The executables are not code-signed yet.",
+    "url": "https://github.com/jimididit/foton/releases/download/v3.2.1/Foton-3.2.1-windows.zip",
+    "hash": "db0e7e4ed150ed784af2f4af09ee15277fe6b1012089dcdb68c857d3d4a5360b",
+    "bin": [
+        "foton.exe",
+        "foton-console.exe",
+        "foton-collect.exe",
+        "foton-baseline.exe"
+    ],
+    "shortcuts": [
+        [
+            "foton-console.exe",
+            "Foton console"
+        ]
+    ],
+    "checkver": "github",
+    "autoupdate": {
+        "url": "https://github.com/jimididit/foton/releases/download/v$version/Foton-$version-windows.zip",
+        "hash": {
+            "url": "https://github.com/jimididit/foton/releases/download/v$version/SHA256SUMS.txt"
+        }
+    }
+}

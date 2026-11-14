@@ -36,6 +36,8 @@ Windows 10 / Server 2016 or newer; nothing to install.
 
 5. Open `Foton_Report.html` in the new folder under `C:\Foton\Cases`.
 
+With [Scoop](https://scoop.sh), `scoop bucket add foton https://github.com/jimididit/foton` and then `scoop install foton/foton` install the same ZIP, checked against its SHA-256.
+
 [Getting started](docs/GETTING-STARTED.md) covers analyzing the package on another computer, baselines, and the stronger provenance check for casework.
 
 ## What you can do

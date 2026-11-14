@@ -44,6 +44,8 @@ Each [GitHub Release](https://github.com/jimididit/foton/releases) (tags `v2.*` 
 | `Foton-<version>-windows.zip` | All four executables, their `SHA256SUMS.txt`, `LICENSE.txt`, and a `README.txt`, in one download (since 3.2.1); its SHA-256 is in the release notes |
 | `SHA256SUMS.txt` | Hashes of the four executables and the ZIP |
 
+**Scoop.** This repository is also a [Scoop](https://scoop.sh) bucket. `scoop bucket add foton https://github.com/jimididit/foton`, then `scoop install foton/foton`, downloads the release ZIP, checks it against the SHA-256 pinned in `bucket/foton.json`, puts `foton`, `foton-console`, `foton-collect`, and `foton-baseline` on PATH, and adds a Start menu shortcut for the console. `scoop update foton` moves to a newer release once the manifest points at it. A collector you send to an endpoint still goes as a file or bundle, not through Scoop.
+
 They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is installed, and nothing is fetched at run time except by `foton tools`, which downloads a pinned, hash-checked Hayabusa or Chainsaw release only when you ask.
 
 **Verify before use.** The executables are not code-signed yet, so Windows SmartScreen may warn when one is started from File Explorer. Trust comes from the hash and the build provenance, not a publisher certificate. In the folder holding the downloads, print the hash of each executable you have and compare each with its line in `SHA256SUMS.txt`:
