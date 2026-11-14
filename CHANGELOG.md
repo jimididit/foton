@@ -4,6 +4,16 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [3.3.0] - 2026-11-14
+
+- New `foton update` checks GitHub for a newer stable release signed with the Foton release key. With `-Install`, it downloads the release ZIP, checks it against the signed statement, and installs the files in a new `Foton-<version>` folder beside your copy (or under `-OutputPath`). The checks cover the ZIP's SHA-256, that it holds only the expected files, and each executable's SHA-256 and version. Your copy is never replaced, so a case can be re-run with the version that produced it.
+  - A release is offered only when it is newer than yours and its signature verifies against the keys pinned in Foton; prereleases and older versions are never offered.
+  - A release published but not signed yet is reported, and nothing is installed. A bad signature, a statement for another version, or a future release date stops the check with the reason.
+  - Every step is logged with UTC times, hashes, and the signing key's fingerprint in `%LOCALAPPDATA%\Foton\updates\update.log`.
+  - A Foton installed with Scoop is pointed to `scoop update foton`.
+  - See [USAGE](docs/USAGE.md#updates) and [SECURITY](SECURITY.md#release-signature-updates).
+- Each release now carries `foton-release.json`: the version, release date, and SHA-256 of the ZIP and of each executable. The maintainer signs it offline after publishing (`foton-release.json.sig`); the release notes say so.
+
 ## [3.2.2] - 2026-11-14
 
 - Each executable has its own icon, so the four are told apart in Explorer, the taskbar, and Alt+Tab: `foton-console.exe` keeps the photon wave packet (beam cyan), `foton.exe` a prompt with a quantum (violet), `foton-collect.exe` an aperture (amber), and `foton-baseline.exe` a reference beam with a break (mint), all on the reports' near-black tile. Each has a simpler cut for 16 to 24 px. The icons are in `assets/brand/icons`, named for each executable; a build test checks that every executable carries its own icon and no other.

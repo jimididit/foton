@@ -25,7 +25,7 @@ Only a collector goes to an endpoint: download it, or build its folder on the wo
 
 - [0. Getting Foton](#0-getting-foton): downloads, verifying them, antivirus
 - [1. Endpoint](#1-endpoint-collect-and-baseline-capture): [Collect](#collect-live-triage), [collection profiles](#collection-profiles), [Baseline](#baseline-known-state-snapshot)
-- [2. Workstation: `foton.exe`](#2-workstation-fotonexe): [baseline compare](#baseline-compare), [parse](#parse), [compose](#compose-ez-tools--hayabusa--chainsaw-optional), [timeline](#timeline), [examiner notes](#examiner-notes), [search](#search), [handoff](#handoff), [bundles](#bundles), [analysis notes](#analysis-notes)
+- [2. Workstation: `foton.exe`](#2-workstation-fotonexe): [baseline compare](#baseline-compare), [parse](#parse), [compose](#compose-ez-tools--hayabusa--chainsaw-optional), [timeline](#timeline), [examiner notes](#examiner-notes), [search](#search), [handoff](#handoff), [bundles](#bundles), [updates](#updates), [analysis notes](#analysis-notes)
 - [3. Workstation window: `foton-console.exe`](#3-workstation-window-foton-consoleexe)
 - [Formats and compatibility](#formats-and-compatibility) and [what we will not hide](#what-we-will-not-hide)
 
@@ -46,7 +46,7 @@ Each [GitHub Release](https://github.com/jimididit/foton/releases) (tags `v2.*` 
 
 **Scoop.** This repository is also a [Scoop](https://scoop.sh) bucket. `scoop bucket add foton https://github.com/jimididit/foton`, then `scoop install foton/foton`, downloads the release ZIP, checks it against the SHA-256 pinned in `bucket/foton.json`, puts `foton`, `foton-console`, `foton-collect`, and `foton-baseline` on PATH, and adds a Start menu shortcut for the console. `scoop update foton` moves to a newer release once the manifest points at it. A collector you send to an endpoint still goes as a file or bundle, not through Scoop.
 
-They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is installed, and nothing is fetched at run time except by `foton tools`, which downloads a pinned, hash-checked Hayabusa or Chainsaw release only when you ask.
+They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is installed, and nothing is fetched at run time except on your request: `foton tools` downloads a pinned, hash-checked Hayabusa or Chainsaw release, and [`foton update`](#updates) checks for a newer Foton signed with the Foton release key.
 
 **Verify before use.** The executables are not code-signed yet, so Windows SmartScreen may warn when one is started from File Explorer. Trust comes from the hash and the build provenance, not a publisher certificate. In the folder holding the downloads, print the hash of each executable you have and compare each with its line in `SHA256SUMS.txt`:
 
@@ -377,6 +377,30 @@ It reads every CSV, JSON, text, log, XML, and HTML file in the package, the coll
 ```
 
 Each run writes a new folder under `C:\Foton\Bundles` (or `-OutputPath "\path\to\folder"`): `Foton_Bundle_<profile>_<UTC>Z` for a collection, `Foton_BaselineBundle_<UTC>Z` for a baseline. It holds the collector, `profile.json` when one was given, `SHA256SUMS.txt`, and `RUN.txt` with the command to run on the endpoint and how to check the files first. A profile `foton-collect` would refuse is refused here too. Nothing is run on the workstation. The console's **Collectors** tab builds the same folders.
+
+### Updates
+
+`foton update` asks GitHub whether a newer Foton release exists and whether the maintainer has signed it. It never runs on its own and never replaces the copy you are running.
+
+```powershell
+.\foton.exe update                                         # check only
+.\foton.exe update -Install                                # asks, then downloads, verifies, and installs
+.\foton.exe update -Install -Force -OutputPath "\path\to\folder"
+```
+
+**What counts as an update.** Only a stable release newer than yours; prereleases and older versions are never offered. A release counts only when its `foton-release.json` (version, release date, and the SHA-256 of the ZIP and of each executable) carries a signature from one of the two Foton release keys pinned inside Foton. The maintainer makes that signature offline after the release is published, so for a while a new release shows as "published but not signed yet" and nothing can be installed. A signature that does not verify, a signed statement for another version, or a release date in the future stops the check and names the reason; the updater does not quietly fall back to another release.
+
+**What -Install does.**
+
+1. Downloads the release ZIP into `%LOCALAPPDATA%\Foton\updates`.
+2. Checks it against the signed statement: the ZIP's SHA-256, that it holds only the expected files, and each executable's SHA-256 and version. Any failure deletes the download and names the check.
+3. Copies the verified files into a new `Foton-<version>` folder beside the folder `foton.exe` is in (or under `-OutputPath`).
+
+Your current folder is kept, so a case can be re-run with the version that produced it. Settings, recent cases, and registered tools are in `%LOCALAPPDATA%\Foton` and carry over. Without `-Force` it asks before downloading. Every step, with UTC times, hashes, and the signing key's fingerprint, goes to `%LOCALAPPDATA%\Foton\updates\update.log`.
+
+It connects only over HTTPS: to `api.github.com`, and to this repository's release downloads on `github.com`, which GitHub serves from `githubusercontent.com`. A Foton installed with Scoop is updated with `scoop update foton`.
+
+Exit codes: 0 when up to date, when nothing is installable yet, or after an install; 2 when a newer signed release is available (check only); 1 when the check or the install failed, or you cancelled.
 
 ### Analysis notes
 

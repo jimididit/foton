@@ -29,6 +29,7 @@ You should receive an acknowledgement within a few business days.
 - Package or hash integrity bypasses
 - Path traversal or unsafe handling when opening a case folder or ZIP
 - Unintended credential or secret leakage in default logs or reports (SAM and SECURITY hives are deliberately not collected)
+- `foton update` accepting a release not signed by a pinned release key, installing files that do not match the signed hashes, or writing outside its staging and install folders
 
 ## Out of scope
 
@@ -45,3 +46,12 @@ Release executables are **not Authenticode-signed** yet, so Windows SmartScreen 
 - Each asset carries a GitHub build provenance attestation. With the [GitHub CLI](https://cli.github.com/), `gh attestation verify <file> --repo jimididit/foton` proves it was built by this repository's release workflow from a specific commit.
 
 [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md#2-check-the-download) has the commands for both checks. A file downloaded with a browser carries Mark-of-the-Web, which only makes SmartScreen warn when it is started from File Explorer; after both checks pass, `Unblock-File` removes it. Authenticode signing is planned once Foton sees wider public use; this document will be updated when it ships. The 1.38.x scripts and their ExecutionPolicy guidance are documented in the [1.38.2 operator guide](https://github.com/jimididit/foton/blob/v1.38.2/legacy/powershell/release-docs/docs/USAGE.md).
+
+### Release signature (updates)
+
+From 3.3.0, each release also carries `foton-release.json`, which lists the SHA-256 of the release ZIP and of each executable. The maintainer signs it offline with the Foton release key (ECDSA P-256) and attaches the signature, `foton-release.json.sig`. The key never touches GitHub, so access to the repository or its workflows alone cannot sign a release. [`foton update`](docs/USAGE.md#updates) installs nothing without that signature, and checks every file against the signed hashes. The public halves are pinned in `src/Foton.Tools/Update/ReleaseKeys.cs`, with these SHA-256 fingerprints:
+
+- Primary: `010afa6652bf2e495118bc711f484e88c7ea87d0c6db5781a4b4b8cd6a17bf02`
+- Backup, used only if the primary is lost or retired: `a0f42ace5da28ddca292c6f17bf307a755eae6dc70d8360f6ec9c2fbf95a7596`
+
+A change to these keys ships in a release signed with a key already pinned, and is announced in its notes.
