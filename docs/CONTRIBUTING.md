@@ -40,6 +40,7 @@ Use a throwaway Windows VM for live Collect and Baseline runs. Collection change
 | Endpoint executables never reference Parse, Carve, Tools, or Patterns | LayerRules |
 | P/Invoke only in `src/Foton.Win`, with a size test per struct, and `src/Foton.Win.Ui`, limited to `DwmSetWindowAttribute` and `SetWindowTheme`; no `Assembly.Load(byte[])` | LayerRules, BinaryRules, UiRules, struct size tests |
 | A console theme keeps WCAG contrast (4.5:1 text, 3:1 borders and accent) | PaletteTests |
+| Published text (docs, release notes, code, brand and packaging files) uses hyphens, never en or em dashes | TextRules |
 | The carried collectors are build-order references only (never code references), and their bytes equal the published executables | EmbeddedCollectorRules |
 | Runtime dependencies are in-box .NET Framework assemblies only; NuGet packages are build- or test-time | `Directory.Packages.props` review + vulnerable-package CI step |
 
