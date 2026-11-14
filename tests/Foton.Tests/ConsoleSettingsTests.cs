@@ -60,6 +60,28 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void The_update_check_at_start_is_off_by_default_and_runs_at_most_once_a_day()
+        {
+            var now = new System.DateTime(2026, 11, 20, 12, 0, 0, System.DateTimeKind.Utc);
+            Assert.False(new ConsoleSettings().CheckUpdatesOnStart);
+            Assert.False(new ConsoleSettings().UpdateCheckDue(now));
+
+            var s = ConsoleSettings.Parse("{ \"CheckUpdatesOnStart\": true, \"LastUpdateCheckUtc\": \"2026-11-19 13:00:00\" }");
+            Assert.True(s.CheckUpdatesOnStart);
+            Assert.Equal("2026-11-19 13:00:00", s.LastUpdateCheckUtc);
+            Assert.False(s.UpdateCheckDue(now));                    // 23 hours ago
+            Assert.True(s.UpdateCheckDue(now.AddHours(1)));         // 24 hours ago
+            s.LastUpdateCheckUtc = "2026-11-21 08:00:00";
+            Assert.True(s.UpdateCheckDue(now));                     // dated in the future: the clock moved back
+            s.LastUpdateCheckUtc = "";
+            Assert.True(s.UpdateCheckDue(now));                     // never checked
+
+            var bad = ConsoleSettings.Parse("{ \"CheckUpdatesOnStart\": \"yes\", \"LastUpdateCheckUtc\": \"yesterday\" }");
+            Assert.False(bad.CheckUpdatesOnStart);
+            Assert.Equal("", bad.LastUpdateCheckUtc);
+        }
+
+        [Fact]
         public void Recent_cases_are_most_recent_first_once_and_capped()
         {
             var s = new ConsoleSettings { RecentCount = 2 };
@@ -77,7 +99,7 @@ namespace Foton.Tests
             using (var t = new TempDir())
             {
                 var path = t.File(@"Foton\console-settings.json");
-                var s = new ConsoleSettings { Examiner = "Examiner A", OpenOnStart = ConsoleSettings.StartOnLastCase, HandoffsOutput = @"E:\Handoffs", BundlesOutput = @"E:\Bundles", Theme = ConsoleSettings.ThemeWindows, TextSize = 11 };
+                var s = new ConsoleSettings { Examiner = "Examiner A", OpenOnStart = ConsoleSettings.StartOnLastCase, HandoffsOutput = @"E:\Handoffs", BundlesOutput = @"E:\Bundles", Theme = ConsoleSettings.ThemeWindows, TextSize = 11, CheckUpdatesOnStart = true, LastUpdateCheckUtc = "2026-11-19 13:00:00" };
                 s.CaseFolders.Add(@"D:\More");
                 s.AddRecent(@"D:\Cases\Foton_A");
                 Assert.True(s.Save(out _, path));

@@ -380,7 +380,7 @@ Each run writes a new folder under `C:\Foton\Bundles` (or `-OutputPath "\path\to
 
 ### Updates
 
-`foton update` asks GitHub whether a newer Foton release exists and whether the maintainer has signed it. It never runs on its own and never replaces the copy you are running.
+`foton update` asks GitHub whether a newer Foton release exists and whether the maintainer has signed it. It never runs on its own and never replaces the copy you are running. In the console, **Help > Check for updates...** does the same. When a signed update is out, it shows the version, release date, and signing key's fingerprint, and the folder it would install into (**Change...** picks another). **Download and install** then does what `-Install` does, and offers to open the new console. **Settings** can also check when the console starts.
 
 ```powershell
 .\foton.exe update                                         # check only
@@ -524,7 +524,7 @@ Copy the folder to the endpoint or push it with your RMM tool, run the command i
 
 #### Menu, shortcuts, and settings
 
-The menu bar has **File** (open a case folder or ZIP, **Recent cases**, exit), **View** (find on this tab, refresh this tab, **Show log**, **Theme**, **Text size**, go to a tab), **Tools** (**Settings...**, **Wizards**, and the Collectors, Tools, and Profile tabs), and **Help** (keyboard shortcuts, and **About**, which shows the version, schemas, release date, and the SHA-256 of `foton-console.exe` to compare with `SHA256SUMS.txt`).
+The menu bar has **File** (open a case folder or ZIP, **Recent cases**, exit), **View** (find on this tab, refresh this tab, **Show log**, **Theme**, **Text size**, go to a tab), **Tools** (**Settings...**, **Wizards**, and the Collectors, Tools, and Profile tabs), and **Help** (keyboard shortcuts, **Check for updates...** as described in [Updates](#updates), and **About**, which shows the version, schemas, release date, and the SHA-256 of `foton-console.exe` to compare with `SHA256SUMS.txt`).
 
 | Shortcut | Does |
 |----------|------|
@@ -537,7 +537,7 @@ The menu bar has **File** (open a case folder or ZIP, **Recent cases**, exit), *
 
 **Settings** holds the console's own preferences, in `%LOCALAPPDATA%\Foton\console-settings.json` (never in a package). A setting the console cannot read falls back to its default without affecting the others.
 
-- **General**: the examiner name filled in for notes, whether the window opens on the **Cases** tab or the last case opened, and how many recent cases **File** lists.
+- **General**: the examiner name filled in for notes, whether the window opens on the **Cases** tab or the last case opened, how many recent cases **File** lists, and whether to check for updates when the console starts. That check is off by default and runs at most once a day, in the background. It only says in the status bar and the log that a newer signed release is out, and never downloads or installs anything.
 - **Appearance**: the theme and text size from 9 to 12 pt; **View** changes both too. **Light** uses Windows' own colors. **Dark** is neutral, **Campbell** follows the Windows Terminal default, and **Solarized Dark** and **Solarized Light** follow the Solarized scheme, with the colors that fell short adjusted so every text meets WCAG contrast. **Follow Windows** uses Light or Dark as Windows' app setting says, and follows it when it changes. The dark themes also darken the title bar (on Windows 11 in the theme's colors), scroll bars, tree glyphs, and drop-down buttons; message boxes and the file and folder dialogs keep Windows' colors. With Windows High Contrast on, the console uses Windows' colors whatever theme is chosen.
 - **Folders**: where you keep cases and baselines (the **Cases** tab lists them), where the **Collectors** tab builds bundles, and where **Export handoff** writes handoffs (empty uses `C:\Foton\Cases`, `C:\Foton\Baselines`, `C:\Foton\Bundles`, `C:\Foton\Handoffs`), and other folders for the **Cases** tab to list. Folders must be full paths.
 

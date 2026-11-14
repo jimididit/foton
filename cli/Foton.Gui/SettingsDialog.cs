@@ -25,6 +25,7 @@ namespace Foton.Gui
         readonly ListBox _caseFolders = new ListBox { Width = 420, Height = 120, HorizontalScrollbar = true };
         readonly ComboBox _theme = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
         readonly ComboBox _textSize = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+        readonly CheckBox _checkUpdates = new CheckBox { Text = "Check for updates when the console starts (at most once a day)", AutoSize = true };
         bool _clearRecent;
 
         public SettingsDialog(ConsoleSettings settings)
@@ -108,6 +109,10 @@ namespace Foton.Gui
             clear.Click += (s, e) => { _clearRecent = true; clear.Enabled = false; clear.Text = "Cleared (on OK)"; };
             p.Controls.Add(Row("Recent cases", _recentCount, clear));
             p.Controls.Add(Hint($"How many recently opened cases File > Recent cases lists (0 keeps none). {settings.RecentCases.Count} listed now."));
+            _checkUpdates.Checked = settings.CheckUpdatesOnStart;
+            _checkUpdates.Margin = new Padding(0, 4, 0, 4);
+            p.Controls.Add(_checkUpdates);
+            p.Controls.Add(Hint("Asks GitHub whether a newer Foton signed with the Foton release key is out, and says so in the status bar and the log. It never downloads or installs anything; Help > Check for updates does that when you ask."));
             page.Controls.Add(p);
             return page;
         }
@@ -182,6 +187,7 @@ namespace Foton.Gui
             _target.CaseFolders.AddRange(_caseFolders.Items.Cast<string>());
             _target.Theme = ConsoleSettings.Themes[Math.Max(0, _theme.SelectedIndex)];
             _target.TextSize = ConsoleSettings.TextSizes[Math.Max(0, _textSize.SelectedIndex)];
+            _target.CheckUpdatesOnStart = _checkUpdates.Checked;
             return true;
         }
     }

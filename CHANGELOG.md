@@ -12,6 +12,7 @@ Each release (tags `v2.*` and later) takes its "What's new" notes from the secti
   - Every step is logged with UTC times, hashes, and the signing key's fingerprint in `%LOCALAPPDATA%\Foton\updates\update.log`.
   - A Foton installed with Scoop is pointed to `scoop update foton`.
   - See [USAGE](docs/USAGE.md#updates) and [SECURITY](SECURITY.md#release-signature-updates).
+- The console has **Help > Check for updates...**, which runs the same check, download, and side-by-side install as `foton update`. When a signed update is out, it shows the version, release date, signing key's fingerprint, and install folder (which can be changed), then offers to open the new console after installing. **Settings > General** can check when the console starts. That check is off by default, runs at most once a day in the background, and only says in the status bar and the log that an update is out; it never downloads or installs anything.
 - Each release now carries `foton-release.json`: the version, release date, and SHA-256 of the ZIP and of each executable. The maintainer signs it offline after publishing (`foton-release.json.sig`); the release notes say so.
 
 ## [3.2.2] - 2026-11-14

@@ -47,6 +47,22 @@ namespace Foton.Tools
         public bool ShowLog { get; set; } = true;
         public int LogPercent { get; set; } = 22;
         public const int MinLogPercent = 10, MaxLogPercent = 60;
+        /// <summary>Opt-in: check GitHub for a signed update when the console starts, at most once a day. Off by default.</summary>
+        public bool CheckUpdatesOnStart { get; set; }
+        /// <summary>UTC time (yyyy-MM-dd HH:mm:ss) of the last update check that reached GitHub; "" before the first.</summary>
+        public string LastUpdateCheckUtc { get; set; } = "";
+
+        /// <summary>
+        /// True when the opt-in startup check should run: on, and no check reached GitHub in the last 24 hours. A last
+        /// check dated in the future (the clock moved back) counts as due, so a wrong clock cannot silence it.
+        /// </summary>
+        public bool UpdateCheckDue(DateTime utcNow)
+        {
+            if (!CheckUpdatesOnStart) return false;
+            if (!DateTime.TryParseExact(LastUpdateCheckUtc, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var last)) return true;
+            return last > utcNow || utcNow - last >= TimeSpan.FromHours(24);
+        }
 
         public string CasesFolder => CasesOutput.Length > 0 ? CasesOutput : CaseTree.DefaultOutput("Cases");
         public string BaselinesFolder => BaselinesOutput.Length > 0 ? BaselinesOutput : CaseTree.DefaultOutput("Baselines");
@@ -98,6 +114,10 @@ namespace Foton.Tools
             if (V("TextSize") is int size && TextSizes.Contains(size)) s.TextSize = size;
             if (V("ShowLog") is bool show) s.ShowLog = show;
             if (V("LogPercent") is int log && log >= MinLogPercent && log <= MaxLogPercent) s.LogPercent = log;
+            if (V("CheckUpdatesOnStart") is bool check) s.CheckUpdatesOnStart = check;
+            if (V("LastUpdateCheckUtc") is string lastCheck && DateTime.TryParseExact(lastCheck, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out _))
+                s.LastUpdateCheckUtc = lastCheck;
             return s;
         }
 
@@ -151,6 +171,7 @@ namespace Foton.Tools
             ["Examiner"] = Examiner, ["OpenOnStart"] = OpenOnStart, ["RecentCount"] = RecentCount, ["RecentCases"] = RecentCases,
             ["CaseFolders"] = CaseFolders, ["CasesOutput"] = CasesOutput, ["BaselinesOutput"] = BaselinesOutput, ["HandoffsOutput"] = HandoffsOutput, ["BundlesOutput"] = BundlesOutput,
             ["Theme"] = Theme, ["TextSize"] = TextSize, ["ShowLog"] = ShowLog, ["LogPercent"] = LogPercent,
+            ["CheckUpdatesOnStart"] = CheckUpdatesOnStart, ["LastUpdateCheckUtc"] = LastUpdateCheckUtc,
         });
 
         /// <summary>Writes the settings; false (and the reason) when the file cannot be written.</summary>

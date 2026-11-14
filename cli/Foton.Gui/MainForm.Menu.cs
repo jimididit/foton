@@ -89,6 +89,8 @@ namespace Foton.Gui
 
             var help = new ToolStripMenuItem("&Help");
             help.DropDownItems.Add(Item("&Keyboard shortcuts", Keys.None, ShowShortcuts));
+            help.DropDownItems.Add(Item("Check for &updates...", Keys.None, () => _ = CheckForUpdates()));
+            help.DropDownItems.Add(new ToolStripSeparator());
             help.DropDownItems.Add(Item("&About Foton console", Keys.None, ShowAbout));
 
             menu.Items.AddRange(new ToolStripItem[] { file, view, tools, help });
