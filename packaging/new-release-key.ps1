@@ -17,14 +17,27 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
+$MinimumPassword = 16
+
+# Compares two SecureStrings in their unmanaged copies, zeroed afterwards, so no plaintext string is left on the heap.
+function Test-SamePassword([System.Security.SecureString]$A, [System.Security.SecureString]$B) {
+    if ($A.Length -ne $B.Length) { return $false }
+    $marshal = [Runtime.InteropServices.Marshal]
+    $pa = $marshal::SecureStringToBSTR($A); $pb = $marshal::SecureStringToBSTR($B)
+    try {
+        $same = $true
+        for ($i = 0; $i -lt $A.Length * 2; $i += 2) { if ($marshal::ReadInt16($pa, $i) -ne $marshal::ReadInt16($pb, $i)) { $same = $false } }
+        return $same
+    }
+    finally { $marshal::ZeroFreeBSTR($pa); $marshal::ZeroFreeBSTR($pb) }
+}
+
 function Read-NewPassword([string]$Role) {
     while ($true) {
-        $a = Read-Host -AsSecureString "Password for the $Role key (at least 16 characters)"
+        $a = Read-Host -AsSecureString "Password for the $Role key (at least $MinimumPassword characters)"
         $b = Read-Host -AsSecureString "Repeat it"
-        $pa = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($a))
-        $pb = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($b))
-        if ($pa -ne $pb) { Write-Host 'The two entries differ; try again.'; continue }
-        if ($pa.Length -lt 16) { Write-Host 'Too short; use at least 16 characters.'; continue }
+        if (-not (Test-SamePassword $a $b)) { Write-Host 'The two entries differ; try again.'; continue }
+        if ($a.Length -lt $MinimumPassword) { Write-Host "Too short; use at least $MinimumPassword characters."; continue }
         return $a
     }
 }
@@ -40,31 +53,53 @@ function Get-PublicBlob([System.Security.Cryptography.ECDsa]$Key) {
 }
 
 $folder = [IO.Path]::GetFullPath($OutputFolder)
-New-Item -ItemType Directory -Force -Path $folder | Out-Null
-$lines = @('Foton release signing keys: public halves (safe to share; the console pins these).', '')
-foreach ($role in 'primary', 'backup') {
-    $pfx = Join-Path $folder "foton-release-key-$role.pfx"
-    if (Test-Path -LiteralPath $pfx) { throw "$pfx already exists; refusing to overwrite a key." }
-    $password = if ($role -eq 'primary' -and $PrimaryPassword) { $PrimaryPassword } elseif ($role -eq 'backup' -and $BackupPassword) { $BackupPassword } else { Read-NewPassword $role }
-    $key = [System.Security.Cryptography.ECDsa]::Create([System.Security.Cryptography.ECCurve+NamedCurves]::nistP256)
-    try {
-        $request = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest("CN=Foton release key ($role)", $key, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
-        $now = [DateTimeOffset]::UtcNow
-        $cert = $request.CreateSelfSigned($now.AddMinutes(-5), $now.AddYears(20))
-        [IO.File]::WriteAllBytes($pfx, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $password))
-        $cert.Dispose()
-        $blob = Get-PublicBlob $key
-        $sha = [System.Security.Cryptography.SHA256]::Create()
-        $fingerprint = ([BitConverter]::ToString($sha.ComputeHash($blob)) -replace '-', '').ToLowerInvariant()
-        $sha.Dispose()
-        $lines += "$role key"
-        $lines += "  public key (ECCPUBLICBLOB, base64): $([Convert]::ToBase64String($blob))"
-        $lines += "  fingerprint (SHA-256 of the blob):  $fingerprint"
-        $lines += ''
-        Write-Host "Wrote $pfx (fingerprint $fingerprint)"
-    }
-    finally { $key.Dispose() }
-}
+$roles = 'primary', 'backup'
 $public = Join-Path $folder 'public-keys.txt'
-[IO.File]::WriteAllLines($public, [string[]]$lines)
+# Check everything before writing anything, so a refusal or a bad password never leaves half a key set behind.
+foreach ($path in @($roles | ForEach-Object { Join-Path $folder "foton-release-key-$_.pfx" }) + $public) {
+    if (Test-Path -LiteralPath $path) { throw "$path already exists; refusing to overwrite a key." }
+}
+$passwords = @{}
+foreach ($role in $roles) {
+    $given = if ($role -eq 'primary') { $PrimaryPassword } else { $BackupPassword }
+    if ($given -and $given.Length -lt $MinimumPassword) { throw "The $role password is shorter than $MinimumPassword characters." }
+    $passwords[$role] = if ($given) { $given } else { Read-NewPassword $role }
+}
+
+New-Item -ItemType Directory -Force -Path $folder | Out-Null
+$written = @()
+$done = $false
+try {
+    $lines = @('Foton release signing keys: public halves (safe to share; the console pins these).', '')
+    foreach ($role in $roles) {
+        $pfx = Join-Path $folder "foton-release-key-$role.pfx"
+        $key = [System.Security.Cryptography.ECDsa]::Create([System.Security.Cryptography.ECCurve+NamedCurves]::nistP256)
+        try {
+            $request = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest("CN=Foton release key ($role)", $key, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
+            $now = [DateTimeOffset]::UtcNow
+            $cert = $request.CreateSelfSigned($now.AddMinutes(-5), $now.AddYears(20))
+            try { $bytes = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $passwords[$role]) }
+            finally { $cert.Dispose() }
+            $written += $pfx
+            [IO.File]::WriteAllBytes($pfx, $bytes)
+            $blob = Get-PublicBlob $key
+            $sha = [System.Security.Cryptography.SHA256]::Create()
+            $fingerprint = ([BitConverter]::ToString($sha.ComputeHash($blob)) -replace '-', '').ToLowerInvariant()
+            $sha.Dispose()
+            $lines += "$role key"
+            $lines += "  public key (ECCPUBLICBLOB, base64): $([Convert]::ToBase64String($blob))"
+            $lines += "  fingerprint (SHA-256 of the blob):  $fingerprint"
+            $lines += ''
+            Write-Host "Wrote $pfx (fingerprint $fingerprint)"
+        }
+        finally { $key.Dispose() }
+    }
+    $written += $public
+    [IO.File]::WriteAllLines($public, [string[]]$lines)
+    $done = $true
+}
+finally {
+    # A key without its recorded public half (or the reverse) is useless and confusing: remove this run's files.
+    if (-not $done) { foreach ($path in $written) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue } }
+}
 Write-Host "Wrote $public. Give the developer that file; keep the two .pfx files offline and apart, with their passwords."
