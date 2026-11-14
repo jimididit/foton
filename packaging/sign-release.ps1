@@ -66,8 +66,11 @@ try {
         $private = [System.Security.Cryptography.X509Certificates.ECDsaCertificateExtensions]::GetECDsaPrivateKey($cert)
         $public = [System.Security.Cryptography.X509Certificates.ECDsaCertificateExtensions]::GetECDsaPublicKey($cert)
         if (-not $private) { throw "$KeyPath holds no ECDSA private key." }
+        # The console pins P-256 public keys and expects a 64-byte signature; any other curve would never verify there.
+        # The certificate's DER-encoded curve OID (1.2.840.10045.3.1.7) reads the same on .NET Framework and .NET.
+        if ([BitConverter]::ToString($cert.GetKeyAlgorithmParameters()) -ne '06-08-2A-86-48-CE-3D-03-01-07') { throw "$KeyPath is not a P-256 key; Foton release keys are ECDSA P-256." }
         $signature = $private.SignData($bytes, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
-        if (-not $public.VerifyData($bytes, $signature, [System.Security.Cryptography.HashAlgorithmName]::SHA256)) { throw 'The new signature does not verify; nothing written.' }
+        if ($signature.Length -ne 64 -or -not $public.VerifyData($bytes, $signature, [System.Security.Cryptography.HashAlgorithmName]::SHA256)) { throw 'The new signature does not verify; nothing written.' }
         $q = $public.ExportParameters($false).Q
         $blob = [byte[]](0x45, 0x43, 0x53, 0x31, 0x20, 0x00, 0x00, 0x00) + $q.X + $q.Y
         $sha = [System.Security.Cryptography.SHA256]::Create()
