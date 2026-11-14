@@ -18,39 +18,48 @@ To try Foton, one computer can play both roles.
 
 ## 1. Download
 
-From the [latest release](https://github.com/jimididit/foton/releases/latest), download:
+From the [latest release](https://github.com/jimididit/foton/releases/latest), download `Foton-<version>-windows.zip`. It holds all four executables, their `SHA256SUMS.txt`, `LICENSE.txt`, and a `README.txt`:
 
 - `foton-collect.exe` (and `foton-baseline.exe` for baselines) for the endpoint
-- `foton.exe` for the workstation
-- `SHA256SUMS.txt`, to check the downloads
+- `foton.exe` and `foton-console.exe` for the workstation
 
-Sending the collector to someone else, or pushing it with an RMM tool? Download only `foton.exe` (or `foton-console.exe`) and `SHA256SUMS.txt`, and see [Send a collector to an endpoint](#send-a-collector-to-an-endpoint) after step 2.
+The executables are also attached to the release on their own, with the release's `SHA256SUMS.txt`, for an RMM tool or a script that needs just one. Sending the collector to someone else? See [Send a collector to an endpoint](#send-a-collector-to-an-endpoint) after step 2.
 
-Keep them in one folder. If the browser warns that a file "isn't commonly downloaded", choose **Keep**: the executables are not code-signed yet, and step 2 is how you check them instead.
+If the browser warns that the file "isn't commonly downloaded", choose **Keep**: the executables are not code-signed yet, and step 2 is how you check them instead.
 
 ## 2. Check the download
 
-In PowerShell, go to the folder holding the files:
+In PowerShell, go to the folder holding the ZIP:
 
 ```powershell
 cd "\path\to\folder"
 ```
 
-Print each file's SHA-256 hash:
+Print its SHA-256 hash:
 
 ```powershell
-Get-FileHash .\foton-collect.exe
+Get-FileHash .\Foton-*-windows.zip
 ```
 
-The `Hash` value must match the line for `foton-collect.exe` in `SHA256SUMS.txt` (open it in Notepad; upper and lower case do not matter). Repeat for every `.exe` you downloaded. If a hash does not match, delete that file and download it again.
+The `Hash` value must match the SHA-256 shown at the top of the release notes (upper and lower case do not matter). If it does not, delete the ZIP and download it again.
 
 That check shows the file is the one the release published. For casework, also check **who built it**: the build provenance attestation is signed by GitHub and names the repository and commit that produced the file. It needs the [GitHub CLI](https://cli.github.com/) (`gh`), signed in once with `gh auth login`:
 
 ```powershell
-gh attestation verify .\foton-collect.exe --repo jimididit/foton
+gh attestation verify .\Foton-*-windows.zip --repo jimididit/foton
 ```
 
 It should report that verification succeeded. If you cannot install `gh`, note in your case notes that only the hash was checked.
+
+Then unblock the ZIP (so Windows does not warn about each file in it) and extract it:
+
+```powershell
+Unblock-File .\Foton-*-windows.zip
+Expand-Archive .\Foton-*-windows.zip -DestinationPath .\Foton
+cd .\Foton
+```
+
+A single executable downloaded on its own checks the same way: `Get-FileHash .\foton-collect.exe`, compared with its line in the release's `SHA256SUMS.txt`, and `gh attestation verify .\foton-collect.exe --repo jimididit/foton`.
 
 Security products sometimes flag forensic tools, because they read the same places attackers do. See [If antivirus blocks the collector](USAGE.md#if-antivirus-blocks-the-collector). Never modify the executable to get past a scanner.
 

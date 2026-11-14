@@ -41,7 +41,8 @@ Each [GitHub Release](https://github.com/jimididit/foton/releases) (tags `v2.*` 
 | `foton-baseline.exe` | Endpoint baseline capture |
 | `foton.exe` | Analyst workstation |
 | `foton-console.exe` | Analyst workstation, in a window ([section 3](#3-workstation-window-foton-consoleexe)) |
-| `SHA256SUMS.txt` | Hashes of the four executables |
+| `Foton-<version>-windows.zip` | All four executables, their `SHA256SUMS.txt`, `LICENSE.txt`, and a `README.txt`, in one download (since 3.2.1); its SHA-256 is in the release notes |
+| `SHA256SUMS.txt` | Hashes of the four executables and the ZIP |
 
 They run on the .NET Framework that ships with Windows (4.6.2+). Nothing is installed, and nothing is fetched at run time except by `foton tools`, which downloads a pinned, hash-checked Hayabusa or Chainsaw release only when you ask.
 

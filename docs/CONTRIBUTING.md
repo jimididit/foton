@@ -100,7 +100,7 @@ HTML goes through `Foton.Report`: escape every host value, and include the offli
 
 ## Releases
 
-Maintainers release from `main` after the version PR merges: set `FotonVersion` (and `FotonPrerelease` for a prerelease) and `FotonReleaseDate` in `Directory.Build.props`, then push a matching `vX.Y.Z` tag (the workflow runs for `v2.*` and `v3.*` tags). `.github/workflows/release-v2.yml` refuses a mismatched tag or a version with no `CHANGELOG.md` section, builds and tests, writes `SHA256SUMS.txt`, attests build provenance, and creates the GitHub release (a prerelease when the tag has a suffix). Run the workflow manually for a dry run: the executables are uploaded as a workflow artifact and nothing is published.
+Maintainers release from `main` after the version PR merges: set `FotonVersion` (and `FotonPrerelease` for a prerelease) and `FotonReleaseDate` in `Directory.Build.props`, then push a matching `vX.Y.Z` tag (the workflow runs for `v2.*` and `v3.*` tags). `.github/workflows/release-v2.yml` refuses a mismatched tag or a version with no `CHANGELOG.md` section, builds and tests, packs `Foton-<version>-windows.zip` (the four executables, their `SHA256SUMS.txt`, `LICENSE.txt`, and `packaging/README.txt`), writes `SHA256SUMS.txt` for the executables and the ZIP, attests build provenance for all of them, and creates the GitHub release (a prerelease when the tag has a suffix). Run the workflow manually for a dry run: the executables are uploaded as a workflow artifact and nothing is published.
 
 ## What we will not accept
 

@@ -9,7 +9,8 @@ name: Release v2
 # Same split as release.yml: `build` runs repository code with a read-only token; `publish` runs no
 # repository code and only verifies, attests, and releases the exact files `build` uploaded.
 # Executables are not Authenticode-signed yet (deferred until public use); provenance attestation
-# and SHA256SUMS.txt are the integrity story until then.
+# and SHA256SUMS.txt are the integrity story until then. Each release also carries Foton-<version>-windows.zip
+# (the four executables, their SHA256SUMS.txt, LICENSE.txt, packaging\README.txt), hashed and attested like them.
 # Actions are pinned to commit SHAs (tag in the trailing comment).
 
 on:
@@ -73,10 +74,13 @@ jobs:
       - name: Test
         run: dotnet test Foton.sln -c Release --no-build
 
-      - name: Stage executables
+      - name: Stage executables and the all-in-one ZIP
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $p = ([xml](Get-Content -Raw .\Directory.Build.props)).Project.PropertyGroup | Where-Object { $_.FotonVersion } | Select-Object -First 1
+          $ver = [string]$p.FotonVersion
+          if ([string]$p.FotonPrerelease) { $ver = "$ver-$($p.FotonPrerelease)" }
           $out = New-Item -ItemType Directory -Force -Path 'dist\release-v2'
           Copy-Item 'cli\Foton.Collect.Cli\bin\Release\net462\foton-collect.exe' $out
           Copy-Item 'cli\Foton.Baseline.Cli\bin\Release\net462\foton-baseline.exe' $out
@@ -85,6 +89,20 @@ jobs:
           $sums = Get-ChildItem $out -Filter *.exe | Sort-Object Name | ForEach-Object {
             '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
           }
+          # One download for most people: the four executables, their SHA256SUMS.txt, LICENSE, and a README, in one
+          # folder. The same executables stay attached on their own (RMM, scripts).
+          $name = "Foton-$ver-windows"
+          $stage = New-Item -ItemType Directory -Force -Path (Join-Path 'dist\zip' $name)
+          Copy-Item (Join-Path $out '*.exe') $stage
+          [IO.File]::WriteAllLines((Join-Path $stage 'SHA256SUMS.txt'), [string[]]$sums)
+          Copy-Item 'LICENSE' (Join-Path $stage 'LICENSE.txt')
+          $readme = (Get-Content -Raw -Encoding UTF8 'packaging\README.txt').Replace('{VERSION}', $ver) -replace "`r?`n", "`r`n"
+          [IO.File]::WriteAllText((Join-Path $stage 'README.txt'), $readme, (New-Object System.Text.UTF8Encoding $false))
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = Join-Path $out "$name.zip"
+          # Files at the root: Explorer's Extract All already makes a folder named after the ZIP.
+          [IO.Compression.ZipFile]::CreateFromDirectory($stage.FullName, (Join-Path (Resolve-Path $out) "$name.zip"), [IO.Compression.CompressionLevel]::Optimal, $false)
+          $sums += '{0}  {1}' -f (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant(), "$name.zip"
           [IO.File]::WriteAllLines((Join-Path $out 'SHA256SUMS.txt'), [string[]]$sums)
           Get-Content (Join-Path $out 'SHA256SUMS.txt')
 
@@ -95,6 +113,7 @@ jobs:
           if-no-files-found: error
           path: |
             dist/release-v2/*.exe
+            dist/release-v2/*.zip
             dist/release-v2/SHA256SUMS.txt
 
       - name: Upload release notes
@@ -141,7 +160,9 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: assets/*.exe
+          subject-path: |
+            assets/*.exe
+            assets/*.zip
 
       - name: Create GitHub release
         shell: pwsh
@@ -157,10 +178,16 @@ jobs:
             $preNote = "`n`n**Prerelease** for testing; not supported. Use the latest release for casework."
           }
           $changes = (Get-Content -Raw -Encoding UTF8 'notes\changes.md').Trim()
+          $zipFile = Get-ChildItem $env:ASSET_DIR -Filter 'Foton-*-windows.zip' | Select-Object -First 1
+          if (-not $zipFile) { throw 'The all-in-one ZIP is missing from the release assets.' }
+          $zipName = $zipFile.Name
+          $zipSha = (Get-FileHash $zipFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           $notes = @"
           ## Foton $tag
 
           Single-file executables on in-box .NET Framework 4.6.2+ (Windows 10 / Server 2016 and newer). Nothing to install.$preNote
+
+          **Download ``$zipName``**: all four executables, their ``SHA256SUMS.txt``, ``LICENSE.txt``, and a ``README.txt``, in one folder. Its SHA-256 is ``$zipSha``. The executables are also attached on their own, for RMM and scripts.
 
           - **foton-collect.exe**: live triage into a hashed case package (custody, coverage, manifest, findings, ``Foton_Report.html``, ZIP). Same switches as the 1.38.x Collect flat script. Administrator preferred; standard user supported.
           - **foton-baseline.exe**: capture a baseline of stable configuration (37 record types) into a hashed package with ``Foton_Baseline.html``. Same switches as the 1.38.x flat script: ``-OutputPath``, ``-Path``, ``-NoZip``, ``-NoHtml``, ``-RequireAdministrator``.
@@ -177,12 +204,13 @@ jobs:
           Full history: [CHANGELOG.md](https://github.com/jimididit/foton/blob/$tag/CHANGELOG.md).
 
           ## Verify before use
-          The executables are not Authenticode-signed yet, so Windows SmartScreen may warn on first run. Check the hash and the build provenance, then unblock:
+          The executables are not Authenticode-signed yet, so Windows SmartScreen may warn on first run. Check the ZIP's hash and build provenance, then unblock it before extracting (what you extract then carries no download mark):
           ``````powershell
-          Get-FileHash .\foton-collect.exe -Algorithm SHA256   # compare with SHA256SUMS.txt
-          gh attestation verify .\foton-collect.exe --repo $env:GITHUB_REPOSITORY
-          Unblock-File .\foton-collect.exe
+          Get-FileHash .\$zipName -Algorithm SHA256   # compare with the SHA-256 above
+          gh attestation verify .\$zipName --repo $env:GITHUB_REPOSITORY
+          Unblock-File .\$zipName
           ``````
+          A single executable checks the same way against its line in ``SHA256SUMS.txt``.
           "@
           $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
           Set-Content -LiteralPath $notesFile -Value $notes -Encoding UTF8
