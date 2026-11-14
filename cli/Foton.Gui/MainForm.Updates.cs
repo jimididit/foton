@@ -15,10 +15,31 @@ namespace Foton.Gui
     /// </summary>
     sealed partial class MainForm
     {
-        /// <summary>Help > Check for updates.</summary>
+        /// <summary>The check at start while it runs: a check asked for meanwhile waits, so one writer at a time appends to update.log.</summary>
+        Task? _startupCheck;
+
+        /// <summary>Help > Check for updates. Started from the menu without being awaited, so nothing may escape it.</summary>
         async Task CheckForUpdates()
         {
+            try { await CheckForUpdatesCore(); }
+            catch (Exception ex)
+            {
+                var message = "Update stopped: " + TextFile.OneLine(ex.Message);
+                new StatusLog(_logWriter).Write(message, StatusLevel.Error);
+                if (IsDisposed) return;
+                _status.Text = message;
+                MessageBox.Show(this, message + "\r\n\r\nThis copy is unchanged.", "Check for updates", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        async Task CheckForUpdatesCore()
+        {
             if (_busy) { _status.Text = "Wait for the current action to finish."; return; }
+            if (_startupCheck != null && !_startupCheck.IsCompleted)
+            {
+                _status.Text = "Waiting for the update check at start to finish...";
+                try { await _startupCheck; } catch (Exception) { }   // its own continuation reports it
+            }
             UpdateCheckResult? result = null;
             if (!await Run("Check for updates", log => { result = CheckUpdates(log); return null; }) || result == null) return;
             RememberUpdateCheck(result);
@@ -116,7 +137,14 @@ namespace Foton.Gui
                 $"Foton {s.Version} is installed in {installed}.\r\n\r\nThis copy stays in {exeDir}.\r\n\r\nOpen Foton {s.Version} now? This window closes.",
                 "Update Foton", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (open != DialogResult.Yes || !File.Exists(console)) return;
-            Process.Start(new ProcessStartInfo(console) { UseShellExecute = true, WorkingDirectory = installed });
+            try { Process.Start(new ProcessStartInfo(console) { UseShellExecute = true, WorkingDirectory = installed }); }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException)
+            {
+                // The install itself succeeded; only starting it failed (an application control policy, for one).
+                MessageBox.Show(this, $"Foton {s.Version} is installed, but Windows did not start it: {TextFile.OneLine(ex.Message)}\r\n\r\nStart foton-console.exe from {installed}.",
+                    "Update Foton", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             Close();
         }
 
@@ -133,7 +161,7 @@ namespace Foton.Gui
             var log = new StatusLog(lines);
             log.WriteConsole("");
             log.WriteConsole("== Update check at start (" + FotonTime.Format(DateTime.UtcNow) + " UTC; Settings turns it off)");
-            Task.Run(() => CheckUpdates(log)).ContinueWith(t =>
+            _startupCheck = Task.Run(() => CheckUpdates(log)).ContinueWith(t =>
             {
                 if (IsDisposed) return;
                 if (t.IsFaulted) log.Write("Update check stopped: " + (t.Exception?.GetBaseException().Message ?? "unknown error"), StatusLevel.Warn);

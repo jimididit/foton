@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -70,7 +71,15 @@ namespace Foton.Gui
                 var notes = new Button { Text = "Release notes", AutoSize = true };
                 notes.Margin = new Padding(notes.Margin.Left, notes.Margin.Top, 18, notes.Margin.Bottom);
                 // ReleaseUrl is accepted only as this repository's https://github.com/.../releases/ page (GitHubRelease).
-                notes.Click += (o, e) => Process.Start(new ProcessStartInfo(result.ReleaseUrl) { UseShellExecute = true });
+                notes.Click += (o, e) =>
+                {
+                    try { Process.Start(new ProcessStartInfo(result.ReleaseUrl) { UseShellExecute = true }); }
+                    catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException)
+                    {
+                        MessageBox.Show(this, "No browser opened the release notes: " + TextFile.OneLine(ex.Message) + "\r\n\r\n" + result.ReleaseUrl,
+                            "Release notes", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                };
                 buttons.Controls.Add(notes);
             }
             AcceptButton = install;
