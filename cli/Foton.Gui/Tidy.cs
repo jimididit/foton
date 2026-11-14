@@ -51,6 +51,23 @@ namespace Foton.Gui
         }
 
         /// <summary>
+        /// For grids whose columns fit their content: the last visible column takes whatever width is left, so a wide or
+        /// maximized window has no empty band to the right of the columns. It never gets narrower than its own content
+        /// (up to <paramref name="maxContent"/> pixels), so a narrow window scrolls sideways instead of cutting values off.
+        /// Call after each bind: the columns are new every time the data source is set.
+        /// </summary>
+        public static void FillLastColumn(DataGridView grid, int maxContent = 400)
+        {
+            var last = grid.Columns.Cast<DataGridViewColumn>().Where(c => c.Visible).OrderBy(c => c.DisplayIndex).LastOrDefault();
+            if (last == null) return;
+            last.AutoSizeMode = DataGridViewAutoSizeColumnMode.NotSet;
+            // All cells, not displayed ones: a grid on a tab not yet shown has no displayed rows to measure.
+            var content = last.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, true);
+            last.MinimumWidth = System.Math.Max(40, System.Math.Min(content, maxContent));
+            last.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        }
+
+        /// <summary>
         /// The Tab key follows the screen, top to bottom and left to right. WinForms orders it by when controls were
         /// added, and docked bars are added after the pane they sit above (the last docked control is the outermost),
         /// so without this Tab would go from the grid up through the bars above it.
