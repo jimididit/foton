@@ -47,7 +47,7 @@ namespace Foton.Gui
         public MainForm(string? openPath)
         {
             Text = "Foton console " + FotonVersion.Product;
-            using (var icon = typeof(MainForm).Assembly.GetManifestResourceStream("Foton.Gui.foton.ico"))
+            using (var icon = typeof(MainForm).Assembly.GetManifestResourceStream("Foton.Gui.foton-console.ico"))
                 if (icon != null) Icon = new Icon(icon);
             Font = new Font("Segoe UI", 9f);
             Size = new Size(1280, 820);

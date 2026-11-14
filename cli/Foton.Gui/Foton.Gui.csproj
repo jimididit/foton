@@ -22,7 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- The window's own icon (title bar, taskbar at every size); the file icon comes from cli\Directory.Build.targets. -->
-    <EmbeddedResource Include="..\..\assets\brand\foton.ico" LogicalName="Foton.Gui.foton.ico" Visible="false" />
+    <EmbeddedResource Include="..\..\assets\brand\icons\foton-console.ico" LogicalName="Foton.Gui.foton-console.ico" Visible="false" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />

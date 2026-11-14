@@ -30,7 +30,7 @@ Use a throwaway Windows VM for live Collect and Baseline runs. Collection change
 | `src/Foton.Analyze`, `Foton.Report` | Rules (`Rules/*.cs`), findings, HTML reports | No |
 | `src/Foton.Parse`, `Foton.Carve`, `Foton.Package` | Parsers, carve, package open/verify | No |
 | `src/Foton.Tools`, `Foton.Patterns` | Tool catalog / compose, workstation pattern lists | No (only `foton tools` downloads, on request) |
-| `assets/brand` | The Foton mark (SVG masters) and `foton.ico`, which every executable carries (`cli/Directory.Build.targets`; IconRules) | No |
+| `assets/brand` | The Foton mark and its per-executable siblings (SVG masters), and `icons/<AssemblyName>.ico`, which each executable carries (`cli/Directory.Build.targets`; IconRules; rebuild with `build-ico.py`) | No |
 | `cli/*` | `foton-collect.exe`, `foton-baseline.exe`, `foton.exe`, `foton-console.exe` (`cli/Foton.Gui`). `foton.exe` and the console carry the two collectors as resources (`cli/EmbedCollectors.targets`) for `bundle` and the Collectors tab | Collect and baseline yes; `foton.exe` and the console no (they write the collectors into a bundle, never run them) |
 
 | Rule | Enforced by |
@@ -40,6 +40,7 @@ Use a throwaway Windows VM for live Collect and Baseline runs. Collection change
 | Endpoint executables never reference Parse, Carve, Tools, or Patterns | LayerRules |
 | P/Invoke only in `src/Foton.Win`, with a size test per struct, and `src/Foton.Win.Ui`, limited to `DwmSetWindowAttribute` and `SetWindowTheme`; no `Assembly.Load(byte[])` | LayerRules, BinaryRules, UiRules, struct size tests |
 | A console theme keeps WCAG contrast (4.5:1 text, 3:1 borders and accent) | PaletteTests |
+| Published text (docs, release notes, code, brand and packaging files) uses hyphens, never en or em dashes | TextRules |
 | The carried collectors are build-order references only (never code references), and their bytes equal the published executables | EmbeddedCollectorRules |
 | Runtime dependencies are in-box .NET Framework assemblies only; NuGet packages are build- or test-time | `Directory.Packages.props` review + vulnerable-package CI step |
 
