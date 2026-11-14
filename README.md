@@ -1,6 +1,6 @@
 # Foton
 
-<img src="assets/brand/foton-tile.svg" alt="Foton mark: a photon wave packet" width="72" height="72">
+![Foton: Windows forensics and triage](assets/foton-readme-header.png)
 
 [![CI](https://github.com/jimididit/foton/actions/workflows/ci.yml/badge.svg)](https://github.com/jimididit/foton/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/jimididit/foton?include_prereleases&sort=semver)](https://github.com/jimididit/foton/releases)
