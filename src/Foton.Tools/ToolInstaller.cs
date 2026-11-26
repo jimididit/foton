@@ -16,7 +16,8 @@ namespace Foton.Tools
         public string Version { get; set; } = "";
         /// <summary>
         /// Rule set the tool runs with (Hayabusa / Chainsaw), as recorded in tools.json. For a catalog tool that is not
-        /// installed, a preview of what the pinned release bundles, marked "(on install)" and not recorded anywhere yet.
+        /// installed, a generic note that the pinned release bundles rules, marked "(on install)". No version is shown there:
+        /// the rule set is only known once the archive is downloaded, and Install records what it actually finds.
         /// Empty when the tool has no rules.
         /// </summary>
         public string RulesVersion { get; set; } = "";
@@ -90,8 +91,11 @@ namespace Foton.Tools
         static bool IsVerified(Dictionary<string, object?> row) =>
             !row.ContainsKey("Verified") && ToolManifest.Get(row, "ArchiveSha256").Length > 0;
 
-        static string Observed(Dictionary<string, object?> row) =>
-            $"Registered existing install; observed SHA-256 {ToolManifest.Get(row, "ObservedSha256")}, not verified against upstream.";
+        static string Observed(Dictionary<string, object?> row)
+        {
+            var sha = ToolManifest.Get(row, "ObservedSha256");
+            return $"Registered existing install; observed SHA-256 {(sha.Length > 0 ? sha : "not recorded")}, not verified against upstream.";
+        }
 
         /// <summary>The rule set recorded at install. A manifest with no RulesVersion key predates the field, so it says
         /// "not recorded" rather than reading as "no rules". A key that is present but empty means the install found none.</summary>
