@@ -539,6 +539,56 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_locked_manifest_undoes_the_swap_when_the_reinstall_cannot_record_it()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"v1\hayabusa-1.0.0.exe"), "v1");
+                Write(t.File(@"v1\rules\dummy.yml"), "title: v1");
+                ZipFile.CreateFromDirectory(t.File("v1"), t.File("v1.zip"));
+                Write(t.File(@"v2\hayabusa-2.0.0.exe"), "v2");
+                Write(t.File(@"v2\rules\dummy.yml"), "title: v2");
+                ZipFile.CreateFromDirectory(t.File("v2"), t.File("v2.zip"));
+                var hash1 = Hashing.Sha256Hex(t.File("v1.zip"));
+                var hash2 = Hashing.Sha256Hex(t.File("v2.zip"));
+
+                string Catalog(string version, string sha)
+                {
+                    var file = t.File("catalog-" + version + ".json");
+                    File.WriteAllText(file, Json.Indented(new Dictionary<string, object?>
+                    {
+                        ["Tools"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["Name"] = "Hayabusa", ["Version"] = version, ["AssetName"] = "x.zip",
+                                ["DownloadUrl"] = "https://example.invalid/x.zip", ["ExpectedSha256"] = sha,
+                                ["License"] = "AGPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                                ["ExecutableNames"] = new[] { "hayabusa.exe", "hayabusa-*.exe" }, ["RulesRelativePath"] = "rules", ["Notes"] = "test pin",
+                            },
+                        },
+                    }));
+                    return file;
+                }
+                var root = t.File("tools");
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("1.0.0", hash1)), t.File("v1.zip"), root, Quiet());
+
+                // tools.json cannot be read or rewritten while held open, so the reinstall cannot record the new version.
+                using (new FileStream(ToolManifest.PathOf(root), FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    Assert.ThrowsAny<IOException>(() =>
+                        ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("2.0.0", hash2)), t.File("v2.zip"), root, Quiet()));
+                }
+
+                Assert.Equal("title: v1", File.ReadAllText(Path.Combine(root, "hayabusa", "rules", "dummy.yml")));
+                Assert.Empty(Directory.GetDirectories(Path.Combine(root, "hayabusa"), "rules.replaced-*"));
+                Assert.False(Directory.Exists(Path.Combine(root, "hayabusa", "2.0.0")));
+                Assert.False(File.Exists(Path.Combine(root, "hayabusa", "hayabusa-2.0.0.exe")));
+                Assert.Equal("1.0.0", ToolManifest.Get(ToolManifest.Find("Hayabusa", root)!, "Version"));
+            }
+        }
+
+        [Fact]
         public void A_manifest_row_from_before_the_rules_field_reads_local_rules_beside_its_executable()
         {
             using (var t = new TempDir())

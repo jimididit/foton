@@ -288,17 +288,21 @@ namespace Foton.Tools
                 // tools.json is rewritten in place, so a failed write can leave it short. The earlier bytes are kept and put back,
                 // and the swap is undone, so a failed save leaves the tool and its record as they were.
                 var manifestPath = ToolManifest.PathOf(root);
-                var priorManifest = File.Exists(manifestPath) ? File.ReadAllBytes(manifestPath) : null;
+                var manifestExisted = File.Exists(manifestPath);
+                byte[]? priorManifest = null;
                 try
                 {
+                    // The read is inside the try too: if it fails, the swap is still undone below.
+                    if (manifestExisted) priorManifest = File.ReadAllBytes(manifestPath);
                     Log("Wrote manifest " + ToolManifest.Save(root, record));
                 }
                 catch
                 {
                     try
                     {
-                        if (priorManifest != null) File.WriteAllBytes(manifestPath, priorManifest);
-                        else if (File.Exists(manifestPath)) File.Delete(manifestPath);
+                        // Restore only what was read. A failed read leaves tools.json as it was, since Save never ran.
+                        if (!manifestExisted) { if (File.Exists(manifestPath)) File.Delete(manifestPath); }
+                        else if (priorManifest != null) File.WriteAllBytes(manifestPath, priorManifest);
                     }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                     { Log($"Could not restore {manifestPath}: {ex.Message}"); }
