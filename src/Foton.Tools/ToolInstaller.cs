@@ -186,7 +186,8 @@ namespace Foton.Tools
                 }
                 exe = stable;
 
-                var rulesVersion = "bundled-" + entry.Version;
+                // Empty unless the pinned release actually brought a rules folder: a tool with none records no rule set.
+                var rulesVersion = "";
                 var rulesPath = "";
                 if (entry.RulesRelativePath.Length > 0)
                 {
@@ -194,7 +195,7 @@ namespace Foton.Tools
                     if (Directory.Exists(rp) || File.Exists(rp))
                     {
                         rulesPath = Path.GetFullPath(rp);
-                        rulesVersion = GitRulesVersion(rp) ?? rulesVersion;
+                        rulesVersion = GitRulesVersion(rp) ?? "bundled-" + entry.Version;
                     }
                 }
 

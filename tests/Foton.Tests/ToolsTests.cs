@@ -236,13 +236,15 @@ namespace Foton.Tests
             {
                 var pkg = Package(t.File("Foton_HOST_20260101-000000Z"));
                 var log = new StringWriter();
-                ComposeRunner.Run(pkg, new StatusLog(log), t.File("empty"), new Dictionary<string, string>(), System32Only, new[] { "PECmd" });
-                var text = log.ToString();
-                Assert.Contains("1 selected tool(s) not found: PECmd", text);
-                Assert.Contains("recorded as NotOnPath", text);
-                // A tool the operator left out is not named in the warning (checked on that line only).
-                var warning = text.Split('\n').Single(l => l.Contains("selected tool(s) not found"));
+                var run = ComposeRunner.Run(pkg, new StatusLog(log), t.File("empty"), new Dictionary<string, string>(), System32Only, new[] { "PECmd" });
+                // Checked on the warning line itself, so no other line in the log can stand in for it.
+                var warning = log.ToString().Split('\n').Single(l => l.Contains("selected tool(s) not found"));
+                Assert.Contains("1 selected tool(s) not found: PECmd", warning);
+                Assert.Contains("recorded as NotOnPath", warning);
+                // A tool the operator left out is not named in the warning.
                 Assert.DoesNotContain("Hayabusa", warning);
+                // The inventory row the warning describes.
+                Assert.Equal("NotOnPath", run.Rows.Single(r => r.Tool == "PECmd").Status);
             }
         }
 

@@ -194,7 +194,8 @@ namespace Foton.Tools
                 if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) continue;
                 try
                 {
-                    if (resolvedBy[j].Value == null && !missing.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) missing.Add(j.Tool);
+                    // Same test as the loop's NotOnPath decision (no resolved path), so the warning and the rows cannot disagree.
+                    if (resolvedBy[j].Value?.Path == null && !missing.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) missing.Add(j.Tool);
                 }
                 catch (Exception ex)
                 {
