@@ -187,6 +187,26 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void The_missing_tool_warning_is_logged_before_a_selected_tool_runs()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"07_Event_Logs\evtx");
+                Write(Path.Combine(pkg, @"07_Event_Logs\evtx\Security.evtx"), "x");
+                Write(t.File(@"bin\evtxecmd.cmd"), ArgsRecorder(0));
+                var log = new StringWriter();
+                ComposeRunner.Run(pkg, new StatusLog(log), t.File("empty"),
+                    new Dictionary<string, string> { ["EvtxECmd"] = t.File(@"bin\evtxecmd.cmd") }, System32Only, new[] { "PECmd", "EvtxECmd" });
+                var text = log.ToString();
+                var warnAt = text.IndexOf("1 selected tool(s) not found: PECmd", StringComparison.Ordinal);
+                var runAt = text.IndexOf("EvtxECmd: ", StringComparison.Ordinal);
+                Assert.True(warnAt >= 0, text);
+                Assert.True(runAt > warnAt, text);
+                Assert.True(File.Exists(t.File(@"bin\args_evtxecmd.txt")));
+            }
+        }
+
+        [Fact]
         public void Version_is_read_from_the_tool_when_the_binary_has_no_version_resource()
         {
             using (var t = new TempDir())

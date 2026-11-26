@@ -188,6 +188,7 @@ namespace Foton.Tools
             }
             // A missing tool still gets its NotOnPath row in the loop; this only makes the gap visible before the run starts.
             var missing = new List<string>();
+            var broken = new List<string>();
             foreach (var j in jobs)
             {
                 if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) continue;
@@ -195,13 +196,16 @@ namespace Foton.Tools
                 {
                     if (resolvedBy[j].Value == null && !missing.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) missing.Add(j.Tool);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // Raised again at this tool's turn in the loop, where it is reported with that tool.
+                    // Raised again at this tool's turn in the loop; named here too, so the operator sees it before the run.
+                    broken.Add($"{j.Tool} ({ex.Message})");
                 }
             }
             if (missing.Count > 0)
                 log.Write($"{missing.Count} selected tool(s) not found: {string.Join(", ", missing)}. Each is recorded as NotOnPath, not as a parse error. Install or register them on the Tools tab (or foton tools), then compose again.", StatusLevel.Warn);
+            if (broken.Count > 0)
+                log.Write($"{broken.Count} selected tool(s) could not be looked up: {string.Join("; ", broken)}. Compose stops at the first of them, after the tools before it have run.", StatusLevel.Warn);
 
             var run = new ComposeRun();
             var rows = run.Rows;
