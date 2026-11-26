@@ -172,16 +172,33 @@ namespace Foton.Tools
                 },
             };
 
-            // Resolve each tool once, before any runs, so the log names the selected tools that are missing up front. A
-            // missing tool still gets its NotOnPath row below; this line only makes the gap visible before the run starts.
-            var resolvedBy = jobs.ToDictionary(j => j.Tool, j =>
+            // Each tool's resolution is deferred and cached. The pre-pass below only asks which selected tools are missing,
+            // so the log names them before any tool runs. A resolution that throws is raised again at that tool's own turn,
+            // as before: one bad tools.json entry does not stop the tools ahead of it. A duplicate name shares one entry.
+            var resolvedBy = new Dictionary<string, Lazy<ResolvedTool?>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var j in jobs)
             {
-                overrides.TryGetValue(j.Tool, out var over);
-                return ToolResolver.Resolve(j.Tool, j.Names, over, toolRoot, pathEnv);
-            }, StringComparer.OrdinalIgnoreCase);
-            var missing = jobs
-                .Where(j => (onlyTools == null || onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) && resolvedBy[j.Tool] == null)
-                .Select(j => j.Tool).ToList();
+                var job = j;
+                resolvedBy[job.Tool] = new Lazy<ResolvedTool?>(() =>
+                {
+                    overrides.TryGetValue(job.Tool, out var over);
+                    return ToolResolver.Resolve(job.Tool, job.Names, over, toolRoot, pathEnv);
+                });
+            }
+            // A missing tool still gets its NotOnPath row in the loop; this only makes the gap visible before the run starts.
+            var missing = new List<string>();
+            foreach (var j in jobs)
+            {
+                if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) continue;
+                try
+                {
+                    if (resolvedBy[j.Tool].Value == null && !missing.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) missing.Add(j.Tool);
+                }
+                catch (Exception)
+                {
+                    // Raised again at this tool's turn in the loop, where it is reported with that tool.
+                }
+            }
             if (missing.Count > 0)
                 log.Write($"{missing.Count} selected tool(s) not found: {string.Join(", ", missing)}. Each is recorded as NotOnPath, not as a parse error. Install or register them on the Tools tab (or foton tools), then compose again.", StatusLevel.Warn);
 
@@ -190,7 +207,7 @@ namespace Foton.Tools
             bool anyTool = false;
             foreach (var j in jobs)
             {
-                var resolved = resolvedBy[j.Tool];
+                var resolved = resolvedBy[j.Tool].Value;
                 var exe = resolved?.Path;
                 var ver = resolved?.Version ?? "";
                 var rulesVer = resolved?.RulesVersion ?? "";
