@@ -93,7 +93,8 @@ namespace Foton.Gui
 
         async Task OfferUpdate(UpdateCheckResult result)
         {
-            var exeDir = Path.GetFullPath(Application.StartupPath).TrimEnd('\\');
+            var exeDir = Path.GetFullPath(Application.StartupPath);
+            if (exeDir.Length > 3) exeDir = exeDir.TrimEnd('\\'); // keep "C:\" a root: "C:" means the current folder on C:
             var s = result.Statement!;
             if (UpdateInstall.IsScoop(exeDir))
             {

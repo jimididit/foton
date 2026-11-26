@@ -80,8 +80,9 @@ namespace Foton.Collect
                 {
                     last = ex;
                     try { if (File.Exists(destination)) File.Delete(destination); } catch (Exception) { }
-                    // NotSupported / Argument / Security are not transient locks; do not burn the retry budget.
-                    if (ex is NotSupportedException || ex is ArgumentException || ex is System.Security.SecurityException || attempt >= CopyAttempts)
+                    // Only a sharing or lock violation is worth waiting for. Access denied, not found, and bad
+                    // arguments are permanent for this run: record them at once instead of sleeping the budget.
+                    if (!IsTransientLock(ex) || attempt >= CopyAttempts)
                         break;
                     System.Threading.Thread.Sleep(200 * attempt);
                 }
@@ -90,6 +91,10 @@ namespace Foton.Collect
             row.Note = last != null ? last.Message : "Copy failed.";
             return row;
         }
+
+        // Win32 ERROR_SHARING_VIOLATION (32) and ERROR_LOCK_VIOLATION (33), carried in the low word of HResult.
+        internal static bool IsTransientLock(Exception ex) =>
+            ex is IOException && ((ex.HResult & 0xFFFF) == 32 || (ex.HResult & 0xFFFF) == 33);
 
         static bool LeafExists(string path)
         {

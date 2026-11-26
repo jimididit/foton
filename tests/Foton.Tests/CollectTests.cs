@@ -334,6 +334,18 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Only_sharing_and_lock_violations_are_retried()
+        {
+            // Win32 32 (sharing violation) and 33 (lock violation) are transient; access denied (5) and not found (2)
+            // are permanent for the run and must not sleep through the retry budget.
+            Assert.True(HostCopy.IsTransientLock(new IOException("in use", unchecked((int)0x80070020))));
+            Assert.True(HostCopy.IsTransientLock(new IOException("locked", unchecked((int)0x80070021))));
+            Assert.False(HostCopy.IsTransientLock(new IOException("denied", unchecked((int)0x80070005))));
+            Assert.False(HostCopy.IsTransientLock(new FileNotFoundException("gone")));
+            Assert.False(HostCopy.IsTransientLock(new UnauthorizedAccessException("no")));
+        }
+
+        [Fact]
         public void Capped_list_copies_newest_first_and_refuses_escapes_and_remote_sources()
         {
             using (var t = new TempDir())
