@@ -208,7 +208,12 @@ namespace Foton.Tools
             bool anyTool = false;
             foreach (var j in jobs)
             {
-                var resolved = resolvedBy[j].Value;
+                // A selected tool that cannot be looked up stops the run at its turn, as before. An unselected tool keeps
+                // its NotSelected row (with no version) so a broken entry for a tool the operator left out cannot stop the run.
+                var selected = onlyTools == null || onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase);
+                ResolvedTool? resolved = null;
+                try { resolved = resolvedBy[j].Value; }
+                catch (Exception) when (!selected) { }
                 var exe = resolved?.Path;
                 var ver = resolved?.Version ?? "";
                 var rulesVer = resolved?.RulesVersion ?? "";

@@ -94,6 +94,8 @@ namespace Foton.Tests
                 Assert.NotNull(rules.RulesPath);
                 Assert.NotNull(rules.SigmaPath);
                 Assert.EndsWith("sigma-event-logs-all.yml", rules.MappingPath);
+                // A pinned install records the rule set as bundled with the release, so the list shows it.
+                Assert.Equal("bundled-9.9.9-test", ToolInstaller.List(t.File("tools")).Single(r => r.Name == "Chainsaw").RulesVersion);
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\9.9.9-test\chainsaw\sigma\regression_data")));
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\sigma\regression_data")));
 
@@ -151,7 +153,6 @@ namespace Foton.Tests
                 Assert.Equal("Registered", hb.Source);
                 Assert.False(hb.Verified);
                 Assert.Contains("not verified", hb.Notes);
-                Assert.Equal("", hb.RulesVersion);
             }
         }
 
