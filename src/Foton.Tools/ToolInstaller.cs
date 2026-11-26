@@ -173,15 +173,19 @@ namespace Foton.Tools
                     if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
                         || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
                         throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
-                    if (!Directory.Exists(src) || File.Exists(dst)) continue;
+                    if (File.Exists(dst)) continue;
+                    // An earlier version's folder is moved aside even when this release has no such folder, so a stale rules\
+                    // is never used (or recorded) with a release that does not ship one. Kept, not deleted: local edits stay recoverable.
                     if (Directory.Exists(dst))
                     {
-                        // Kept, not deleted: local edits (a tuned config, extra rules) stay recoverable beside the tool.
                         var kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
                         for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
                         Directory.Move(dst, kept);
-                        Log($"Moved the existing {leaf}\\ to {Path.GetFileName(kept)}\\ and installed the pinned release's copy.");
+                        Log(Directory.Exists(src)
+                            ? $"Moved the existing {leaf}\\ to {Path.GetFileName(kept)}\\ and installed the pinned release's copy."
+                            : $"The pinned release has no {leaf}\\ folder; moved the earlier one to {Path.GetFileName(kept)}\\ so it is not used with this version.");
                     }
+                    if (!Directory.Exists(src)) continue;
                     CopyDirectory(src, dst);
                 }
                 exe = stable;

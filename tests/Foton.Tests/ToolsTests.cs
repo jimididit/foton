@@ -339,6 +339,52 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_release_without_rules_moves_the_earlier_rules_aside_and_records_no_rule_set()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"v1\hayabusa-1.0.0.exe"), "v1");
+                Write(t.File(@"v1\rules\dummy.yml"), "title: v1");
+                ZipFile.CreateFromDirectory(t.File("v1"), t.File("v1.zip"));
+                Write(t.File(@"v2\hayabusa-2.0.0.exe"), "v2");
+                ZipFile.CreateFromDirectory(t.File("v2"), t.File("v2.zip"));
+                var hash1 = Hashing.Sha256Hex(t.File("v1.zip"));
+                var hash2 = Hashing.Sha256Hex(t.File("v2.zip"));
+
+                string Catalog(string version, string sha)
+                {
+                    var file = t.File("catalog-" + version + ".json");
+                    File.WriteAllText(file, Json.Indented(new Dictionary<string, object?>
+                    {
+                        ["Tools"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["Name"] = "Hayabusa", ["Version"] = version, ["AssetName"] = "x.zip",
+                                ["DownloadUrl"] = "https://example.invalid/x.zip", ["ExpectedSha256"] = sha,
+                                ["License"] = "AGPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                                ["ExecutableNames"] = new[] { "hayabusa.exe", "hayabusa-*.exe" }, ["RulesRelativePath"] = "rules", ["Notes"] = "test pin",
+                            },
+                        },
+                    }));
+                    return file;
+                }
+                var root = t.File("tools");
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("1.0.0", hash1)), t.File("v1.zip"), root, Quiet());
+                Assert.True(Directory.Exists(Path.Combine(root, "hayabusa", "rules")));
+
+                // The next release ships no rules folder: the earlier one must not stay beside the tool and be recorded.
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("2.0.0", hash2)), t.File("v2.zip"), root, Quiet());
+                var installed = ToolManifest.Find("Hayabusa", root)!;
+                Assert.Equal("2.0.0", ToolManifest.Get(installed, "Version"));
+                Assert.False(Directory.Exists(Path.Combine(root, "hayabusa", "rules")));
+                Assert.Single(Directory.GetDirectories(Path.Combine(root, "hayabusa"), "rules.replaced-*"));
+                Assert.Equal("", ToolManifest.Get(installed, "RulesVersion"));
+                Assert.Equal("", ToolManifest.Get(installed, "RulesPath"));
+            }
+        }
+
+        [Fact]
         public void An_explicit_tool_path_wins_over_the_manifest_and_PATH()
         {
             using (var t = new TempDir())
