@@ -51,7 +51,7 @@ namespace Foton.Tools
                 {
                     Name = entry.Name,
                     Version = have != null ? ToolManifest.Get(have, "Version") : entry.Version,
-                    RulesVersion = have != null ? InstalledRules(have, entry)
+                    RulesVersion = have != null ? InstalledRules(have)
                         // Not installed: nothing is recorded yet, and no version is invented. Say only that the pinned release
                         // bundles rules; Install records the rule set it actually finds (a rules folder, or its git commit).
                         : entry.RulesRelativePath.Length > 0 ? "bundled with release (on install)" : "",
@@ -68,16 +68,17 @@ namespace Foton.Tools
                 .Where(r => !catalog.Any(c => string.Equals(c.Name, ToolManifest.Get(r, "Name"), StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(r => ToolManifest.Get(r, "Name"), StringComparer.OrdinalIgnoreCase))
             {
-                var verified = ToolManifest.Get(have, "Verified") == "True";
+                // Same rule as the catalog rows above: only an explicit "False" is a registration.
+                bool registered = ToolManifest.Get(have, "Verified") == "False";
                 rows.Add(new ToolListRow
                 {
                     Name = ToolManifest.Get(have, "Name"),
                     Version = ToolManifest.Get(have, "Version"),
-                    RulesVersion = InstalledRules(have, null),
-                    Source = verified ? "Installed" : "Registered",
-                    Verified = verified,
+                    RulesVersion = InstalledRules(have),
+                    Source = registered ? "Registered" : "Installed",
+                    Verified = !registered,
                     Location = ToolManifest.Get(have, "ExecutablePath"),
-                    Notes = verified ? "Pinned install; no longer in the catalog." : Observed(have),
+                    Notes = registered ? Observed(have) : "Pinned install; no longer in the catalog.",
                 });
             }
             return rows;
@@ -86,14 +87,10 @@ namespace Foton.Tools
         static string Observed(Dictionary<string, object?> row) =>
             $"Registered existing install; observed SHA-256 {ToolManifest.Get(row, "ObservedSha256")}, not verified against upstream.";
 
-        /// <summary>The rule set recorded at install. An install from before the field was written says so, rather than
-        /// reading as "no rules" when the catalog's release bundles them.</summary>
-        static string InstalledRules(Dictionary<string, object?> have, CatalogTool? entry)
-        {
-            var recorded = ToolManifest.Get(have, "RulesVersion");
-            if (recorded.Length > 0) return recorded;
-            return entry != null && entry.RulesRelativePath.Length > 0 ? "not recorded" : "";
-        }
+        /// <summary>The rule set recorded at install. A manifest with no RulesVersion key predates the field, so it says
+        /// "not recorded" rather than reading as "no rules". A key that is present but empty means the install found none.</summary>
+        static string InstalledRules(Dictionary<string, object?> have) =>
+            have.ContainsKey("RulesVersion") ? ToolManifest.Get(have, "RulesVersion") : "not recorded";
 
         /// <summary>Where a pinned release unpacks: tool root\name\version.</summary>
         public static string Destination(CatalogTool entry, string? toolRoot) =>

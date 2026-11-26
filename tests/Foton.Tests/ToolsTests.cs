@@ -189,7 +189,7 @@ namespace Foton.Tests
             {
                 var pkg = Package(t.File("Foton_HOST_20260101-000000Z"));
                 var log = new StringWriter();
-                ComposeRunner.Run(pkg, new StatusLog(log), t.File("empty"), null, System32Only, new[] { "PECmd" });
+                ComposeRunner.Run(pkg, new StatusLog(log), t.File("empty"), new Dictionary<string, string>(), System32Only, new[] { "PECmd" });
                 var text = log.ToString();
                 Assert.Contains("1 selected tool(s) not found: PECmd", text);
                 Assert.Contains("recorded as NotOnPath", text);
