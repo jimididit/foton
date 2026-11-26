@@ -31,7 +31,8 @@ namespace Foton.Tools
                 // An explicit path to the executable tools.json already records is that install: report what it recorded.
                 // A damaged tool root must not stop a valid explicit path, so this lookup is best effort.
                 var recorded = TryFind(tool, toolRoot);
-                if (recorded != null && SameFile(ToolManifest.Get(recorded, "ExecutablePath"), path)) return FromManifest(recorded, path, "ToolPath");
+                var fromRecord = recorded == null ? null : TryFromRecord(recorded, path);
+                if (fromRecord != null) return fromRecord;
                 return new ResolvedTool { Path = path, Source = "ToolPath", Version = ToolRegistry.FileVersion(path), RulesVersion = LocalRules(path) };
             }
 
@@ -53,6 +54,16 @@ namespace Foton.Tools
         static Dictionary<string, object?>? TryFind(string tool, string? toolRoot)
         {
             try { return ToolManifest.Find(tool, toolRoot); }
+            catch (Exception) { return null; }
+        }
+
+        /// <summary>The recorded install, when the explicit path is its executable; null otherwise or when the row is damaged.</summary>
+        static ResolvedTool? TryFromRecord(Dictionary<string, object?> recorded, string path)
+        {
+            try
+            {
+                return SameFile(ToolManifest.Get(recorded, "ExecutablePath"), path) ? FromManifest(recorded, path, "ToolPath") : null;
+            }
             catch (Exception) { return null; }
         }
 
