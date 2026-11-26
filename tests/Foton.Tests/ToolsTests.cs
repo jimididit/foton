@@ -186,6 +186,19 @@ namespace Foton.Tests
                 pe = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "PECmd");
                 Assert.Equal("Registered", pe.Source);
                 Assert.False(pe.Verified);
+
+                // An edited Verified = True without a recorded hash is not a pin either.
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "PECmd",
+                    ["ExecutablePath"] = t.File(@"ez\PECmd.exe"),
+                    ["Version"] = "1.0",
+                    ["ArchiveSha256"] = "",
+                    ["Verified"] = "True",
+                });
+                pe = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "PECmd");
+                Assert.Equal("Registered", pe.Source);
+                Assert.False(pe.Verified);
             }
         }
 
