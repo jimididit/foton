@@ -218,8 +218,9 @@ namespace Foton.Tools
                 // resolves keeps its version on that row, as it always has (the status says it was not selected).
                 var selected = onlyTools == null || onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase);
                 ResolvedTool? resolved = null;
+                string? unselectedLookupError = null;
                 try { resolved = resolvedBy[j].Value; }
-                catch (Exception) when (!selected) { }
+                catch (Exception ex) when (!selected) { unselectedLookupError = ex.Message; }
                 var exe = resolved?.Path;
                 var ver = resolved?.Version ?? "";
                 var rulesVer = resolved?.RulesVersion ?? "";
@@ -243,7 +244,10 @@ namespace Foton.Tools
 
                 if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase))
                 {
-                    rows.Add(Row("NotSelected", "", $"{j.Tool} was not selected for this compose run."));
+                    var note = $"{j.Tool} was not selected for this compose run.";
+                    if (unselectedLookupError != null)
+                        note += $" Its tools.json lookup also failed ({unselectedLookupError}), so no version is shown.";
+                    rows.Add(Row("NotSelected", "", note));
                     Retained("not selected");
                     continue;
                 }

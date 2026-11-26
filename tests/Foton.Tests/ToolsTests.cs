@@ -157,20 +157,33 @@ namespace Foton.Tests
         }
 
         [Fact]
-        public void A_damaged_verified_value_is_listed_as_registered_not_installed()
+        public void Damaged_or_hand_edited_rows_are_listed_as_registered_not_installed()
         {
             using (var t = new TempDir())
             {
-                // Install writes no Verified key, so an absent key is verified. A key present with an empty value is
-                // a damaged record and must not show as a pinned, hash-checked install.
+                Write(t.File(@"ez\PECmd.exe"), "x");
+                // Only an Install-shaped row (no Verified key, a recorded ArchiveSha256) is a pinned install. A present
+                // but empty Verified, and a row with neither the key nor a hash, are damaged and must read as Registered.
                 ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
                 {
                     ["Name"] = "PECmd",
-                    ["Location"] = t.File(@"ez\PECmd.exe"),
+                    ["ExecutablePath"] = t.File(@"ez\PECmd.exe"),
                     ["Version"] = "1.0",
+                    ["ArchiveSha256"] = "ABC",
                     ["Verified"] = "",
                 });
                 var pe = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "PECmd");
+                Assert.Equal("Registered", pe.Source);
+                Assert.False(pe.Verified);
+
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "PECmd",
+                    ["ExecutablePath"] = t.File(@"ez\PECmd.exe"),
+                    ["Version"] = "1.0",
+                    ["ArchiveSha256"] = "",
+                });
+                pe = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "PECmd");
                 Assert.Equal("Registered", pe.Source);
                 Assert.False(pe.Verified);
             }

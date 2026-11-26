@@ -83,11 +83,13 @@ namespace Foton.Tools
             return rows;
         }
 
-        /// <summary>A pinned, hash-checked install. Install writes no Verified key (its pin is the archive hash), so an
-        /// absent key is verified. Register writes "False". A key that is present but not exactly "True" (empty, null,
-        /// or edited) is a damaged record and is not trusted. Get alone cannot tell absent from empty, so check the key.</summary>
+        /// <summary>A pinned, hash-checked install. Install writes no Verified key and records the archive hash it matched
+        /// against the pin; Register writes Verified = False and an empty ArchiveSha256. So a row is verified only when it
+        /// has no Verified key AND a non-empty ArchiveSha256. Any other shape (a damaged or hand-edited row) is unverified.
+        /// Get alone cannot tell absent from empty, so the key is checked directly.</summary>
         static bool IsVerified(Dictionary<string, object?> row) =>
-            !row.ContainsKey("Verified") || ToolManifest.Get(row, "Verified") == "True";
+            ToolManifest.Get(row, "Verified") == "True"
+            || (!row.ContainsKey("Verified") && ToolManifest.Get(row, "ArchiveSha256").Length > 0);
 
         static string Observed(Dictionary<string, object?> row) =>
             $"Registered existing install; observed SHA-256 {ToolManifest.Get(row, "ObservedSha256")}, not verified against upstream.";
