@@ -68,6 +68,10 @@ jobs:
           $out = New-Item -ItemType Directory -Force -Path 'dist\release-v2-notes'
           [IO.File]::WriteAllText((Join-Path $out 'changes.md'), (($body -join "`n").Trim() + "`n"))
 
+      # Same locked restore as ci.yml: the release is built from exactly the locked package versions and hashes.
+      - name: Restore (locked)
+        run: dotnet restore Foton.sln --use-lock-file --locked-mode
+
       - name: Build (Release, warnings as errors)
         run: dotnet build Foton.sln -c Release -warnaserror
 

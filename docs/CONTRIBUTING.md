@@ -11,10 +11,13 @@ Prerequisites: Windows and the .NET SDK pinned in [`global.json`](../global.json
 ```powershell
 git clone https://github.com/jimididit/foton.git
 Set-Location foton
+dotnet restore Foton.sln --use-lock-file --locked-mode
 dotnet build Foton.sln -c Release -warnaserror
 dotnet test Foton.sln -c Release --no-build
 .\cli\Foton.Collect.Cli\bin\Release\net462\foton-collect.exe -Version
 ```
+
+After changing a package version in `Directory.Packages.props`, run `dotnet restore Foton.sln --use-lock-file` and commit the changed `packages.lock.json` files. CI and the release restore with `--locked-mode`, so a package version or content hash that does not match its lock file fails the build.
 
 Use a throwaway Windows VM for live Collect and Baseline runs. Collection changes the host.
 

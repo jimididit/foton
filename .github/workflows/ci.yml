@@ -25,6 +25,10 @@ jobs:
         with:
           global-json-file: global.json
 
+      # Restore against the committed packages.lock.json files: fails if a package version or content hash differs.
+      - name: Restore (locked)
+        run: dotnet restore Foton.sln --use-lock-file --locked-mode
+
       - name: Build (Release, warnings as errors)
         run: dotnet build Foton.sln -c Release -warnaserror
 
