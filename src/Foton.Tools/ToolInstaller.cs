@@ -97,6 +97,46 @@ namespace Foton.Tools
             return $"Registered existing install; observed SHA-256 {(sha.Length > 0 ? sha : "not recorded")}, not verified against upstream.";
         }
 
+        /// <summary>Moves an existing file or folder aside to a timestamped .replaced- name and records it for rollback.
+        /// Returns the kept name, or null when nothing was there. Kept, not deleted, so local edits stay recoverable.</summary>
+        static string? MoveAside(string target, List<Moved> moved)
+        {
+            var isFolder = Directory.Exists(target);
+            if (!isFolder && !File.Exists(target)) return null;
+            var kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
+            for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
+            if (isFolder) Directory.Move(target, kept); else File.Move(target, kept);
+            moved.Add(new Moved { Original = target, Kept = kept, IsFolder = isFolder });
+            return kept;
+        }
+
+        /// <summary>An earlier file or folder moved aside during an install swap, recorded so a failed swap can put it back.</summary>
+        sealed class Moved
+        {
+            public string Original = "";
+            public string Kept = "";
+            public bool IsFolder;
+        }
+
+        /// <summary>Undoes a failed swap: removes what was written, then puts the earlier copies back. A failure here is
+        /// logged and does not replace the original error, which the caller rethrows.</summary>
+        static void RollBack(List<Moved> moved, List<string> copied, Action<string> log)
+        {
+            foreach (var written in copied)
+            {
+                try { if (Directory.Exists(written)) Directory.Delete(written, true); else if (File.Exists(written)) File.Delete(written); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                { log($"Could not remove the partial copy {written}: {ex.Message}"); }
+            }
+            for (int i = moved.Count - 1; i >= 0; i--)
+            {
+                var m = moved[i];
+                try { if (m.IsFolder) Directory.Move(m.Kept, m.Original); else File.Move(m.Kept, m.Original); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                { log($"Could not restore {m.Original}; the earlier copy is at {m.Kept}: {ex.Message}"); }
+            }
+        }
+
         /// <summary>The rule set recorded at install. A manifest with no RulesVersion key predates the field, so it says
         /// "not recorded" rather than reading as "no rules". A key that is present but empty means the install found none.</summary>
         static string InstalledRules(Dictionary<string, object?> have) =>
@@ -168,43 +208,52 @@ namespace Foton.Tools
                 // part of the pinned release.
                 var stableDir = Path.GetDirectoryName(destVer)!;
                 var stable = Path.Combine(stableDir, Path.GetFileName(exe));
-                File.Copy(exe, stable, true);
                 var exeDir = Path.GetDirectoryName(exe)!;
-                foreach (var leaf in folders)
+
+                // Every swap below is one transaction. Each earlier file or folder is moved aside before its replacement is
+                // written, and if any step fails all of them are put back, so a failed reinstall leaves the tool as it was.
+                // tools.json is written last, only after every copy succeeded.
+                var moved = new List<Moved>();
+                var copied = new List<string>();
+                var notes = new List<string>();
+                try
                 {
-                    var src = Path.Combine(exeDir, leaf!);
-                    var dst = Path.GetFullPath(Path.Combine(stableDir, leaf!));
-                    if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
-                    // An earlier version's folder, or a stray file in the way, is moved aside even when this release has no such
-                    // folder, so a stale rules\ is never used (or recorded) and the release's copy is never silently skipped.
-                    // Kept, not deleted: local edits stay recoverable.
-                    string? kept = null;
-                    var isFolder = Directory.Exists(dst);
-                    if (File.Exists(dst) || isFolder)
+                    var exeKept = MoveAside(stable, moved);
+                    copied.Add(stable);
+                    File.Copy(exe, stable, true);
+                    if (exeKept != null) notes.Add($"Kept the earlier executable as {Path.GetFileName(exeKept)}.");
+
+                    foreach (var leaf in folders)
                     {
-                        kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
-                        for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
-                        if (isFolder) Directory.Move(dst, kept); else File.Move(dst, kept);
+                        var src = Path.Combine(exeDir, leaf!);
+                        var dst = Path.GetFullPath(Path.Combine(stableDir, leaf!));
+                        if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
+                        // A file where the release ships a folder would be skipped silently; refuse it instead.
+                        if (File.Exists(src)) throw new InvalidDataException($"The pinned release ships '{leaf}' as a file, not a folder.");
+
+                        // An earlier version's folder, or a stray file in the way, is moved aside even when this release has no
+                        // such folder, so a stale rules\ is never used (or recorded). Kept, not deleted: local edits stay recoverable.
+                        var kept = MoveAside(dst, moved);
+                        var srcExists = Directory.Exists(src);
+                        if (srcExists)
+                        {
+                            copied.Add(dst);
+                            CopyDirectory(src, dst);
+                        }
+                        if (kept != null)
+                            notes.Add(srcExists
+                                ? $"Moved the existing {leaf} to {Path.GetFileName(kept)} and installed the pinned release's copy."
+                                : $"The pinned release has no {leaf} folder; moved the earlier {leaf} to {Path.GetFileName(kept)} so it is not used with this version.");
                     }
-                    try
-                    {
-                        if (Directory.Exists(src)) CopyDirectory(src, dst);
-                    }
-                    catch
-                    {
-                        // A failed copy must not leave the tool without the folder it had: remove the partial copy and put the
-                        // earlier one back, then let the install fail as before.
-                        try { if (Directory.Exists(dst)) Directory.Delete(dst, true); else if (File.Exists(dst)) File.Delete(dst); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                        if (kept != null) { if (isFolder) Directory.Move(kept, dst); else File.Move(kept, dst); }
-                        throw;
-                    }
-                    if (kept != null)
-                        Log(Directory.Exists(src)
-                            ? $"Moved the existing {leaf} to {Path.GetFileName(kept)} and installed the pinned release's copy."
-                            : $"The pinned release has no {leaf} folder; moved the earlier {leaf} to {Path.GetFileName(kept)} so it is not used with this version.");
                 }
+                catch
+                {
+                    RollBack(moved, copied, Log);
+                    throw;
+                }
+                foreach (var note in notes) Log(note);
                 exe = stable;
 
                 // Empty unless the pinned release actually brought a rules folder: a tool with none records no rule set.

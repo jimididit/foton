@@ -433,6 +433,55 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_failed_reinstall_puts_back_the_earlier_folders_and_leaves_the_manifest_alone()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"v1\hayabusa-1.0.0.exe"), "v1");
+                Write(t.File(@"v1\rules\dummy.yml"), "title: v1");
+                ZipFile.CreateFromDirectory(t.File("v1"), t.File("v1.zip"));
+                // The next release ships a valid rules folder, then a plain file where the sigma folder belongs.
+                Write(t.File(@"v2\hayabusa-2.0.0.exe"), "v2");
+                Write(t.File(@"v2\rules\dummy.yml"), "title: v2");
+                Write(t.File(@"v2\sigma"), "a file, not a folder");
+                ZipFile.CreateFromDirectory(t.File("v2"), t.File("v2.zip"));
+                var hash1 = Hashing.Sha256Hex(t.File("v1.zip"));
+                var hash2 = Hashing.Sha256Hex(t.File("v2.zip"));
+
+                string Catalog(string version, string sha)
+                {
+                    var file = t.File("catalog-" + version + ".json");
+                    File.WriteAllText(file, Json.Indented(new Dictionary<string, object?>
+                    {
+                        ["Tools"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["Name"] = "Hayabusa", ["Version"] = version, ["AssetName"] = "x.zip",
+                                ["DownloadUrl"] = "https://example.invalid/x.zip", ["ExpectedSha256"] = sha,
+                                ["License"] = "AGPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                                ["ExecutableNames"] = new[] { "hayabusa.exe", "hayabusa-*.exe" },
+                                ["RulesRelativePath"] = "rules", ["SupportFolders"] = new[] { "rules", "sigma" }, ["Notes"] = "test pin",
+                            },
+                        },
+                    }));
+                    return file;
+                }
+                var root = t.File("tools");
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("1.0.0", hash1)), t.File("v1.zip"), root, Quiet());
+
+                Assert.Throws<InvalidDataException>(() =>
+                    ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("2.0.0", hash2)), t.File("v2.zip"), root, Quiet()));
+
+                // The earlier rules folder is back with its own content, nothing was left behind, and tools.json still says 1.0.0.
+                Assert.Equal("title: v1", File.ReadAllText(Path.Combine(root, "hayabusa", "rules", "dummy.yml")));
+                Assert.Empty(Directory.GetDirectories(Path.Combine(root, "hayabusa"), "rules.replaced-*"));
+                Assert.False(File.Exists(Path.Combine(root, "hayabusa", "hayabusa-2.0.0.exe")));
+                Assert.Equal("1.0.0", ToolManifest.Get(ToolManifest.Find("Hayabusa", root)!, "Version"));
+            }
+        }
+
+        [Fact]
         public void An_explicit_tool_path_wins_over_the_manifest_and_PATH()
         {
             using (var t = new TempDir())
