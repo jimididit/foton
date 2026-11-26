@@ -305,17 +305,23 @@ namespace Foton.Tests
                 // The host holds the file exclusively for the first attempt. The hook releases it just before attempt 2,
                 // so the copy succeeds on exactly one retry. No thread and no timing: the attempt number is the signal.
                 var stream = new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-                var seen = new List<int>();
-                var recovered = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out\SRUDB.dat"), true, null, attempt =>
+                try
                 {
-                    seen.Add(attempt);
-                    if (attempt == 2 && stream != null) { stream.Dispose(); stream = null; }
-                });
-                Assert.Equal("Copied", recovered.Status);
-                Assert.Equal(new[] { 1, 2 }, seen);
-                Assert.False(string.IsNullOrWhiteSpace(recovered.Note));
-                Assert.NotEqual("Copied with FileShare.ReadWrite. Do not parse the live path.", recovered.Note);
-                Assert.True(File.Exists(Path.Combine(t.Path, @"out\SRUDB.dat")));
+                    var seen = new List<int>();
+                    var recovered = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out\SRUDB.dat"), true, null, attempt =>
+                    {
+                        seen.Add(attempt);
+                        if (attempt == 2 && stream != null) { stream.Dispose(); stream = null; }
+                    });
+                    Assert.Equal("Copied", recovered.Status);
+                    Assert.Equal(new[] { 1, 2 }, seen);
+                    // The copy must be the file's bytes, not a partial or stale read.
+                    Assert.Equal(new byte[] { 1, 2, 3, 4 }, File.ReadAllBytes(Path.Combine(t.Path, @"out\SRUDB.dat")));
+                }
+                finally
+                {
+                    stream?.Dispose();
+                }
 
                 // A lock that outlasts the whole budget is CopyError after all five attempts, never Missing.
                 using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
@@ -328,14 +334,22 @@ namespace Foton.Tests
                     Assert.False(File.Exists(Path.Combine(t.Path, @"out2\SRUDB.dat")));
                 }
 
-                // Once one file in a call has used its budget on a lock, the next locked file gets one attempt.
+                // Per-call cap (300 ms here, not the production 5 s). File A, held throughout, waits 100 + 200 = 300 ms
+                // and gets 3 attempts; the cap is then reached, so file B gets one attempt and no wait.
                 using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
                 {
-                    var gate = new HostCopy.LockGate { Exhausted = true };
-                    var tries = 0;
-                    var second = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out3\SRUDB.dat"), true, gate, _ => tries++);
-                    Assert.Equal("CopyError", second.Status);
-                    Assert.Equal(1, tries);
+                    var gate = new HostCopy.LockGate(capMs: 300);
+                    var triesA = 0;
+                    var a = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out3\A.dat"), true, gate, _ => triesA++);
+                    Assert.Equal("CopyError", a.Status);
+                    Assert.Equal(3, triesA);
+                    Assert.Equal(300, gate.SleptMs);
+
+                    var triesB = 0;
+                    var b = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out3\B.dat"), true, gate, _ => triesB++);
+                    Assert.Equal("CopyError", b.Status);
+                    Assert.Equal(1, triesB);
+                    Assert.Equal(300, gate.SleptMs);
                 }
             }
         }

@@ -6,7 +6,7 @@ Each release (tags `v2.*` and later) takes its "What's new" notes from the secti
 
 ## [3.3.2] - 2026-11-14
 
-- Collect retries a locked host-file copy a few times before recording `CopyError`. A brief exclusive lock (seen once on `SRUDB.dat` during SrumECmd prep) no longer leaves the package without the file when the lock clears within about a second. A lock that lasts longer is still `CopyError` with the failure note; statuses and schema are unchanged. The retry budget is per collection call: once one file in a directory or list uses it up, the other locked files in that call get a single attempt, so many held files cost about one budget, not one each.
+- Collect retries a locked host-file copy a few times before recording `CopyError`. A brief exclusive lock (seen once on `SRUDB.dat` during SrumECmd prep) no longer leaves the package without the file when the lock clears within about a second. A lock that lasts longer is still `CopyError` with the failure note; statuses and schema are unchanged. Each collection call caps its total waiting on held locks at 5 seconds. Every file still gets its full retry budget until that cap is reached; after it, further locked files in that call get one attempt, so many held files cost about the cap in total, not one budget each.
 - `foton update -Install` and the console's update confirmation no longer show a trailing backslash on the "this copy" path (`AppDomain.BaseDirectory` / `Application.StartupPath`).
 
 ## [3.3.1] - 2026-11-14

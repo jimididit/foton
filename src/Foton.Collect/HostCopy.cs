@@ -43,13 +43,27 @@ namespace Foton.Collect
         const int CopyAttempts = 5;
 
         /// <summary>
-        /// Lock retries are per collection call, not per file. Once one file in the call uses its whole budget on a held
-        /// lock, the rest get a single attempt, so a directory full of held files costs about one budget, not one each.
+        /// Caps the total time a single collection call spends waiting on held locks. Each file still gets its own
+        /// retry budget until the call's total reaches the cap; after that, further locked files get one attempt. A
+        /// directory full of held files therefore costs about the cap in total, not one budget per file, and a brief
+        /// lock on a later file is still retried while the cap has room.
         /// </summary>
         internal sealed class LockGate
         {
-            public bool Exhausted { get; set; }
-            public int Attempts => Exhausted ? 1 : CopyAttempts;
+            public const int DefaultCapMs = 5000;
+
+            public LockGate(int capMs = DefaultCapMs) { CapMs = capMs; }
+
+            public int CapMs { get; }
+            public int SleptMs { get; private set; }
+
+            /// <summary>Reserves a wait; false when it would take the call past its cap.</summary>
+            public bool TryReserve(int ms)
+            {
+                if (SleptMs + ms > CapMs) return false;
+                SleptMs += ms;
+                return true;
+            }
         }
 
         /// <summary>Copy-FotonHostFile: Copied / Missing / CopyError, with size and SHA-256 of the copy.</summary>
@@ -76,7 +90,6 @@ namespace Foton.Collect
                 return row;
             }
             Exception? last = null;
-            int maxAttempts = gate != null ? gate.Attempts : CopyAttempts;
             for (int attempt = 1; ; attempt++)
             {
                 beforeAttempt?.Invoke(attempt);
@@ -101,18 +114,18 @@ namespace Foton.Collect
                     try { if (File.Exists(destination)) File.Delete(destination); } catch (Exception) { }
                     // Only a sharing or lock violation is worth waiting for. Access denied, not found, and bad
                     // arguments are permanent for this run: record them at once instead of sleeping the budget.
-                    if (!IsTransientLock(ex) || attempt >= maxAttempts)
-                    {
-                        if (IsTransientLock(ex) && gate != null) gate.Exhausted = true;
+                    if (!IsTransientLock(ex) || attempt >= CopyAttempts)
                         break;
-                    }
-                    // Total wait across the budget is about 1 s (100+200+300+400 ms). A longer wait per locked file
-                    // would stall a capped run for minutes when many files are held.
-                    System.Threading.Thread.Sleep(100 * attempt);
+                    // Per-file budget: 100+200+300+400 ms (about 1 s). Under a gate, the call's total wait is also capped.
+                    var wait = 100 * attempt;
+                    if (gate != null && !gate.TryReserve(wait))
+                        break;
+                    System.Threading.Thread.Sleep(wait);
                 }
             }
             row.Status = "CopyError";
-            row.Note = last != null ? last.Message : "Copy failed.";
+            // The loop leaves only through the catch above, so a failure always has an exception to report.
+            row.Note = last!.Message;
             return row;
         }
 
