@@ -42,8 +42,25 @@ namespace Foton.Collect
         // retries avoid a one-off CopyError that leaves SrumECmd with NoInput on an otherwise healthy package.
         const int CopyAttempts = 5;
 
+        /// <summary>
+        /// Lock retries are per collection call, not per file. Once one file in the call uses its whole budget on a held
+        /// lock, the rest get a single attempt, so a directory full of held files costs about one budget, not one each.
+        /// </summary>
+        internal sealed class LockGate
+        {
+            public bool Exhausted { get; set; }
+            public int Attempts => Exhausted ? 1 : CopyAttempts;
+        }
+
         /// <summary>Copy-FotonHostFile: Copied / Missing / CopyError, with size and SHA-256 of the copy.</summary>
-        public static CopyRow CopyFile(string source, string destination, bool skipHashing)
+        public static CopyRow CopyFile(string source, string destination, bool skipHashing) =>
+            CopyFile(source, destination, skipHashing, null, null);
+
+        /// <summary>
+        /// The copy with its lock gate and an optional hook that runs before each attempt (tests use it to release a
+        /// lock at a chosen attempt, so the retry is exercised without timing).
+        /// </summary>
+        internal static CopyRow CopyFile(string source, string destination, bool skipHashing, LockGate? gate, Action<int>? beforeAttempt)
         {
             var row = new CopyRow { SourcePath = source, Status = "CopyError" };
             if (string.IsNullOrWhiteSpace(source) || !Hashing.IsLocalPath(source) || !LeafExists(source))
@@ -59,8 +76,10 @@ namespace Foton.Collect
                 return row;
             }
             Exception? last = null;
+            int maxAttempts = gate != null ? gate.Attempts : CopyAttempts;
             for (int attempt = 1; ; attempt++)
             {
+                beforeAttempt?.Invoke(attempt);
                 try
                 {
                     var dir = Path.GetDirectoryName(destination);
@@ -82,8 +101,11 @@ namespace Foton.Collect
                     try { if (File.Exists(destination)) File.Delete(destination); } catch (Exception) { }
                     // Only a sharing or lock violation is worth waiting for. Access denied, not found, and bad
                     // arguments are permanent for this run: record them at once instead of sleeping the budget.
-                    if (!IsTransientLock(ex) || attempt >= CopyAttempts)
+                    if (!IsTransientLock(ex) || attempt >= maxAttempts)
+                    {
+                        if (IsTransientLock(ex) && gate != null) gate.Exhausted = true;
                         break;
+                    }
                     // Total wait across the budget is about 1 s (100+200+300+400 ms). A longer wait per locked file
                     // would stall a capped run for minutes when many files are held.
                     System.Threading.Thread.Sleep(100 * attempt);
@@ -145,6 +167,7 @@ namespace Foton.Collect
             }
             int copied = 0;
             long used = 0;
+            var gate = new LockGate();
             foreach (var f in files)
             {
                 string? skip = copied >= maxFiles ? $"Capped at MaxFiles={maxFiles}. Prefer the listing CSV for names not copied."
@@ -154,7 +177,7 @@ namespace Foton.Collect
                     rows.Add(new CopyRow { SourcePath = f.FullName, SizeBytes = f.Length, Status = "CappedSkip", Note = skip });
                     continue;
                 }
-                var copy = CopyFile(f.FullName, Path.Combine(destinationDirectory, f.Name), skipHashing);
+                var copy = CopyFile(f.FullName, Path.Combine(destinationDirectory, f.Name), skipHashing, gate, null);
                 copy.DestRelative = Rel(packageRelativeDirectory, f.Name);
                 rows.Add(copy);
                 if (copy.Status == "Copied") { copied++; used += copy.SizeBytes; }
@@ -184,6 +207,7 @@ namespace Foton.Collect
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { family = new FileInfo[0]; }
             long budget = maxTotalBytes;
+            var gate = new LockGate();
             foreach (var f in family)
             {
                 if (f.Length > budget)
@@ -191,7 +215,7 @@ namespace Foton.Collect
                     rows.Add(new CopyRow { SourcePath = f.FullName, SizeBytes = f.Length, Status = "CappedSkip", Note = "File exceeds remaining copy budget. Full file remains on the host; this package is a capped copy." });
                     continue;
                 }
-                var copy = CopyFile(f.FullName, Path.Combine(destinationDirectory, f.Name), skipHashing);
+                var copy = CopyFile(f.FullName, Path.Combine(destinationDirectory, f.Name), skipHashing, gate, null);
                 copy.DestRelative = Rel(packageRelativeDirectory, f.Name);
                 rows.Add(copy);
                 if (copy.Status == "Copied") budget -= copy.SizeBytes;
@@ -219,6 +243,7 @@ namespace Foton.Collect
             var rootFull = Path.GetFullPath(destinationDirectory).TrimEnd('\\');
             int copied = 0;
             long used = 0;
+            var gate = new LockGate();
             foreach (var it in sorted)
             {
                 var src = it.SourcePath;
@@ -255,7 +280,7 @@ namespace Foton.Collect
                     rows.Add(new CopyRow { SourcePath = src, DestRelative = relLeaf, SizeBytes = len, Status = "CopyError", Note = "Resolved destination left DestinationDirectory; copy refused." });
                     continue;
                 }
-                var copy = CopyFile(src, destFull, skipHashing);
+                var copy = CopyFile(src, destFull, skipHashing, gate, null);
                 copy.DestRelative = Rel(packageRelativeDirectory, fitted);
                 if (copy.Status == "Copied" && !string.Equals(fitted, relLeaf, StringComparison.Ordinal))
                     copy.Note += F(" Name shortened to keep the path inside the package under {0} characters (Windows tools and ZIP extraction fail on longer paths); SourcePath holds the original name.", MaxPackagePath);

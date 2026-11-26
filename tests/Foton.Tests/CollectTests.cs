@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using System.Threading;
 using Foton.Analyze;
 using Foton.Collect;
 using Foton.Core;
@@ -303,41 +302,40 @@ namespace Foton.Tests
                 var src = Path.Combine(t.Path, "SRUDB.dat");
                 File.WriteAllBytes(src, new byte[] { 1, 2, 3, 4 });
 
-                // Exclusive lock briefly (as a host writer can hold), then release so a retry succeeds. The holder
-                // catches its own exception: an unhandled one on a background thread would end the whole test run.
-                var held = new ManualResetEvent(false);
-                Exception? holderError = null;
-                var holder = new Thread(() =>
+                // The host holds the file exclusively for the first attempt. The hook releases it just before attempt 2,
+                // so the copy succeeds on exactly one retry. No thread and no timing: the attempt number is the signal.
+                var stream = new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                var seen = new List<int>();
+                var recovered = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out\SRUDB.dat"), true, null, attempt =>
                 {
-                    try
-                    {
-                        using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-                        {
-                            held.Set();
-                            Thread.Sleep(200);
-                        }
-                    }
-                    catch (Exception ex) { holderError = ex; }
-                    finally { held.Set(); }
+                    seen.Add(attempt);
+                    if (attempt == 2 && stream != null) { stream.Dispose(); stream = null; }
                 });
-                holder.IsBackground = true;
-                holder.Start();
-                Assert.True(held.WaitOne(5000));
-                var recovered = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out\SRUDB.dat"), skipHashing: true);
-                holder.Join(10000);
-                Assert.Null(holderError);
                 Assert.Equal("Copied", recovered.Status);
-                // The retry path leaves its own note; a first-attempt copy would carry the plain one.
+                Assert.Equal(new[] { 1, 2 }, seen);
+                Assert.False(string.IsNullOrWhiteSpace(recovered.Note));
                 Assert.NotEqual("Copied with FileShare.ReadWrite. Do not parse the live path.", recovered.Note);
                 Assert.True(File.Exists(Path.Combine(t.Path, @"out\SRUDB.dat")));
 
-                // A lock that outlasts the retry budget is still CopyError, never Missing.
+                // A lock that outlasts the whole budget is CopyError after all five attempts, never Missing.
                 using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
                 {
-                    var failed = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out2\SRUDB.dat"), skipHashing: true);
+                    var tries = 0;
+                    var failed = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out2\SRUDB.dat"), true, null, _ => tries++);
                     Assert.Equal("CopyError", failed.Status);
+                    Assert.Equal(5, tries);
                     Assert.False(string.IsNullOrWhiteSpace(failed.Note));
                     Assert.False(File.Exists(Path.Combine(t.Path, @"out2\SRUDB.dat")));
+                }
+
+                // Once one file in a call has used its budget on a lock, the next locked file gets one attempt.
+                using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    var gate = new HostCopy.LockGate { Exhausted = true };
+                    var tries = 0;
+                    var second = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out3\SRUDB.dat"), true, gate, _ => tries++);
+                    Assert.Equal("CopyError", second.Status);
+                    Assert.Equal(1, tries);
                 }
             }
         }
