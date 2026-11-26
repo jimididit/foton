@@ -51,9 +51,9 @@ namespace Foton.Tools
                 {
                     Name = entry.Name,
                     Version = have != null ? ToolManifest.Get(have, "Version") : entry.Version,
-                    // Not installed: nothing is recorded yet, and no version is invented. Say only that the pinned release
-                    // bundles rules; Install records the rule set it actually finds (a rules folder, or its git commit).
-                    RulesVersion = have != null ? ToolManifest.Get(have, "RulesVersion")
+                    RulesVersion = have != null ? InstalledRules(have, entry)
+                        // Not installed: nothing is recorded yet, and no version is invented. Say only that the pinned release
+                        // bundles rules; Install records the rule set it actually finds (a rules folder, or its git commit).
                         : entry.RulesRelativePath.Length > 0 ? "bundled with release (on install)" : "",
                     Source = have == null ? "Catalog" : registered ? "Registered" : "Installed",
                     Location = have != null ? ToolManifest.Get(have, "ExecutablePath") : entry.DownloadUrl,
@@ -63,23 +63,37 @@ namespace Foton.Tools
                     Notes = registered ? Observed(have!) : entry.Notes,
                 });
             }
+            // Installs whose catalog entry is gone keep the verification they were recorded with: a pinned install stays Installed.
             foreach (var have in installed
                 .Where(r => !catalog.Any(c => string.Equals(c.Name, ToolManifest.Get(r, "Name"), StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(r => ToolManifest.Get(r, "Name"), StringComparer.OrdinalIgnoreCase))
+            {
+                var verified = ToolManifest.Get(have, "Verified") == "True";
                 rows.Add(new ToolListRow
                 {
                     Name = ToolManifest.Get(have, "Name"),
                     Version = ToolManifest.Get(have, "Version"),
-                    RulesVersion = ToolManifest.Get(have, "RulesVersion"),
-                    Source = "Registered",
+                    RulesVersion = InstalledRules(have, null),
+                    Source = verified ? "Installed" : "Registered",
+                    Verified = verified,
                     Location = ToolManifest.Get(have, "ExecutablePath"),
-                    Notes = Observed(have),
+                    Notes = verified ? "Pinned install; no longer in the catalog." : Observed(have),
                 });
+            }
             return rows;
         }
 
         static string Observed(Dictionary<string, object?> row) =>
             $"Registered existing install; observed SHA-256 {ToolManifest.Get(row, "ObservedSha256")}, not verified against upstream.";
+
+        /// <summary>The rule set recorded at install. An install from before the field was written says so, rather than
+        /// reading as "no rules" when the catalog's release bundles them.</summary>
+        static string InstalledRules(Dictionary<string, object?> have, CatalogTool? entry)
+        {
+            var recorded = ToolManifest.Get(have, "RulesVersion");
+            if (recorded.Length > 0) return recorded;
+            return entry != null && entry.RulesRelativePath.Length > 0 ? "not recorded" : "";
+        }
 
         /// <summary>Where a pinned release unpacks: tool root\name\version.</summary>
         public static string Destination(CatalogTool entry, string? toolRoot) =>
