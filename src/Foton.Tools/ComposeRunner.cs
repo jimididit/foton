@@ -172,10 +172,10 @@ namespace Foton.Tools
                 },
             };
 
-            // Each tool's resolution is deferred and cached. The pre-pass below only asks which selected tools are missing,
-            // so the log names them before any tool runs. A resolution that throws is raised again at that tool's own turn,
-            // as before: one bad tools.json entry does not stop the tools ahead of it. Keyed by job, so two jobs that name
-            // the same tool each resolve with their own names.
+            // Each job's lookup runs at most once and is cached. The pre-pass below looks up every selected job before the
+            // first tool runs, so the log can name the missing ones up front. A lookup that throws is raised again at that
+            // job's own turn, as before: one bad tools.json entry does not stop the tools ahead of it. Keyed by job, so two
+            // jobs that name the same tool each resolve with their own names.
             var resolvedBy = new Dictionary<Job, Lazy<ResolvedTool?>>();
             foreach (var j in jobs)
             {
@@ -189,7 +189,7 @@ namespace Foton.Tools
             // A missing tool still gets its NotOnPath row in the loop; this only makes the gap visible before the run starts.
             var missing = new List<string>();
             var broken = new List<string>();
-            var brokenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var brokenSeen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var j in jobs)
             {
                 if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) continue;
@@ -199,8 +199,9 @@ namespace Foton.Tools
                 }
                 catch (Exception ex)
                 {
-                    // Raised again at this tool's turn in the loop; named here too, once, so the operator sees it before the run.
-                    if (brokenNames.Add(j.Tool)) broken.Add($"{j.Tool} ({ex.Message})");
+                    // Raised again at this job's turn in the loop; named here too, once per distinct message, before the run.
+                    var message = $"{j.Tool} ({ex.Message})";
+                    if (brokenSeen.Add(message)) broken.Add(message);
                 }
             }
             if (missing.Count > 0)

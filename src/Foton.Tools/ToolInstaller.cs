@@ -14,7 +14,11 @@ namespace Foton.Tools
     {
         public string Name { get; set; } = "";
         public string Version { get; set; } = "";
-        /// <summary>Rule set the tool runs with (Hayabusa / Chainsaw), as recorded in tools.json; empty when none.</summary>
+        /// <summary>
+        /// Rule set the tool runs with (Hayabusa / Chainsaw), as recorded in tools.json. For a catalog tool that is not
+        /// installed, a preview of what the pinned release bundles, marked "(on install)" and not recorded anywhere yet.
+        /// Empty when the tool has no rules.
+        /// </summary>
         public string RulesVersion { get; set; } = "";
         /// <summary>Installed (pinned, hash-verified), Registered (existing install, observed hash), or Catalog (not installed).</summary>
         public string Source { get; set; } = "";
