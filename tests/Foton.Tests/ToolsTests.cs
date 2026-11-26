@@ -539,6 +539,24 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_manifest_row_from_before_the_rules_field_reads_local_rules_beside_its_executable()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"tools\hayabusa\hayabusa.exe"), "x");
+                Write(t.File(@"tools\hayabusa\rules\r.yml"), "x");
+                // No RulesVersion key at all: written before the field existed.
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "Hayabusa", ["Version"] = "4.0.0", ["ExecutablePath"] = t.File(@"tools\hayabusa\hayabusa.exe"),
+                });
+                var r = ToolResolver.Resolve("Hayabusa", new[] { "hayabusa.exe" }, null, t.File("tools"), System32Only)!;
+                Assert.Equal("Manifest", r.Source);
+                Assert.Equal("local-unversioned", r.RulesVersion);
+            }
+        }
+
+        [Fact]
         public void An_explicit_tool_path_wins_over_the_manifest_and_PATH()
         {
             using (var t = new TempDir())

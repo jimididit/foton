@@ -247,7 +247,7 @@ namespace Foton.Tools
                         if (kept != null)
                             notes.Add(srcExists
                                 ? $"Moved the existing {leaf} to {Path.GetFileName(kept)} and installed the pinned release's copy."
-                                : $"The pinned release has no {leaf} folder; moved the earlier {leaf} to {Path.GetFileName(kept)} so it is not used with this version.");
+                                : $"The pinned release has no {leaf} folder beside its executable; moved the earlier {leaf} to {Path.GetFileName(kept)} so it is not used with this version.");
                     }
                 }
                 catch
@@ -285,7 +285,26 @@ namespace Foton.Tools
                     ["RulesVersion"] = rulesVersion,
                     ["License"] = entry.License,
                 };
-                Log("Wrote manifest " + ToolManifest.Save(root, record));
+                // tools.json is rewritten in place, so a failed write can leave it short. The earlier bytes are kept and put back,
+                // and the swap is undone, so a failed save leaves the tool and its record as they were.
+                var manifestPath = ToolManifest.PathOf(root);
+                var priorManifest = File.Exists(manifestPath) ? File.ReadAllBytes(manifestPath) : null;
+                try
+                {
+                    Log("Wrote manifest " + ToolManifest.Save(root, record));
+                }
+                catch
+                {
+                    try
+                    {
+                        if (priorManifest != null) File.WriteAllBytes(manifestPath, priorManifest);
+                        else if (File.Exists(manifestPath)) File.Delete(manifestPath);
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    { Log($"Could not restore {manifestPath}: {ex.Message}"); }
+                    RollBack(moved, copied, Log);
+                    throw;
+                }
                 Log($"Installed {entry.Name} {entry.Version} -> {exe}");
                 return record;
             }

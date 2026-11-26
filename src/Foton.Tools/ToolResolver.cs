@@ -63,7 +63,9 @@ namespace Foton.Tools
             {
                 Path = path, Source = source,
                 Version = recorded.Length > 0 ? recorded : ToolRegistry.FileVersion(path),
-                RulesVersion = ToolManifest.Get(installed, "RulesVersion"),
+                // A row from before the RulesVersion field has no key: read it like an untracked tool. A recorded empty value
+                // means the install found no rules, and stays empty.
+                RulesVersion = installed.ContainsKey("RulesVersion") ? ToolManifest.Get(installed, "RulesVersion") : LocalRules(path),
             };
         }
 
