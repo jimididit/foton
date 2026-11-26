@@ -157,6 +157,26 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_damaged_verified_value_is_listed_as_registered_not_installed()
+        {
+            using (var t = new TempDir())
+            {
+                // Install writes no Verified key, so an absent key is verified. A key present with an empty value is
+                // a damaged record and must not show as a pinned, hash-checked install.
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "PECmd",
+                    ["Location"] = t.File(@"ez\PECmd.exe"),
+                    ["Version"] = "1.0",
+                    ["Verified"] = "",
+                });
+                var pe = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "PECmd");
+                Assert.Equal("Registered", pe.Source);
+                Assert.False(pe.Verified);
+            }
+        }
+
+        [Fact]
         public void A_registered_tool_with_a_rules_folder_reports_its_rule_set_in_the_list()
         {
             using (var t = new TempDir())
