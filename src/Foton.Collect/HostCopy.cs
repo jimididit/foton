@@ -38,8 +38,43 @@ namespace Foton.Collect
         const string MissingNote = "Source leaf not found. Visibility gap, not proof it never existed on the host.";
         const string NonLocalNote = "Non-local source refused. Collect does not follow remote paths (NTLM / network footprint).";
 
+        // SRUDB.dat and similar ESE/WAL files can be briefly exclusive-locked by the host writer. A few short
+        // retries avoid a one-off CopyError that leaves SrumECmd with NoInput on an otherwise healthy package.
+        const int CopyAttempts = 5;
+
+        /// <summary>
+        /// Caps the total time a single collection call spends waiting on held locks. Each file still gets its own
+        /// retry budget until the call's total reaches the cap; after that, further locked files get one attempt. A
+        /// directory full of held files therefore costs about the cap in total, not one budget per file, and a brief
+        /// lock on a later file is still retried while the cap has room.
+        /// </summary>
+        internal sealed class LockGate
+        {
+            public const int DefaultCapMs = 5000;
+
+            public LockGate(int capMs = DefaultCapMs) { CapMs = capMs; }
+
+            public int CapMs { get; }
+            public int SleptMs { get; private set; }
+
+            /// <summary>Reserves a wait; false when it would take the call past its cap.</summary>
+            public bool TryReserve(int ms)
+            {
+                if (SleptMs + ms > CapMs) return false;
+                SleptMs += ms;
+                return true;
+            }
+        }
+
         /// <summary>Copy-FotonHostFile: Copied / Missing / CopyError, with size and SHA-256 of the copy.</summary>
-        public static CopyRow CopyFile(string source, string destination, bool skipHashing)
+        public static CopyRow CopyFile(string source, string destination, bool skipHashing) =>
+            CopyFile(source, destination, skipHashing, null, null);
+
+        /// <summary>
+        /// The copy with its lock gate and an optional hook that runs before each attempt (tests use it to release a
+        /// lock at a chosen attempt, so the retry is exercised without timing).
+        /// </summary>
+        internal static CopyRow CopyFile(string source, string destination, bool skipHashing, LockGate? gate, Action<int>? beforeAttempt)
         {
             var row = new CopyRow { SourcePath = source, Status = "CopyError" };
             if (string.IsNullOrWhiteSpace(source) || !Hashing.IsLocalPath(source) || !LeafExists(source))
@@ -54,25 +89,53 @@ namespace Foton.Collect
                 row.Note = "Cloud-only placeholder (for example OneDrive Files On-Demand). Not copied: reading it would download it to the host.";
                 return row;
             }
-            try
+            Exception? last = null;
+            for (int attempt = 1; ; attempt++)
             {
-                var dir = Path.GetDirectoryName(destination);
-                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                using (var src = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                using (var dst = File.Create(destination))
-                    src.CopyTo(dst);
-                row.SizeBytes = new FileInfo(destination).Length;
-                row.SHA256 = Hashing.SafeHash(destination, skipHashing);
-                row.Status = "Copied";
-                row.Note = "Copied with FileShare.ReadWrite. Do not parse the live path.";
+                beforeAttempt?.Invoke(attempt);
+                try
+                {
+                    var dir = Path.GetDirectoryName(destination);
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    using (var src = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var dst = File.Create(destination))
+                        src.CopyTo(dst);
+                    row.SizeBytes = new FileInfo(destination).Length;
+                    row.SHA256 = Hashing.SafeHash(destination, skipHashing);
+                    row.Status = "Copied";
+                    row.Note = attempt == 1
+                        ? "Copied with FileShare.ReadWrite. Do not parse the live path."
+                        : F("Copied with FileShare.ReadWrite after {0} attempts (transient lock). Do not parse the live path.", attempt);
+                    return row;
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException || ex is ArgumentException || ex is System.Security.SecurityException)
+                {
+                    last = ex;
+                    try { if (File.Exists(destination)) File.Delete(destination); } catch (Exception) { }
+                    // Only a sharing or lock violation is worth waiting for. Access denied, not found, and bad
+                    // arguments are permanent for this run: record them at once instead of sleeping the budget.
+                    if (!IsTransientLock(ex) || attempt >= CopyAttempts)
+                        break;
+                    // Per-file budget: 100+200+300+400 ms (about 1 s). Under a gate, the call's total wait is also capped.
+                    var wait = 100 * attempt;
+                    if (gate != null && !gate.TryReserve(wait))
+                        break;
+                    System.Threading.Thread.Sleep(wait);
+                }
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException || ex is ArgumentException || ex is System.Security.SecurityException)
-            {
-                row.Status = "CopyError";
-                row.Note = ex.Message;
-                try { if (File.Exists(destination)) File.Delete(destination); } catch (Exception) { }
-            }
+            row.Status = "CopyError";
+            // The loop leaves only through the catch above, so a failure always has an exception to report.
+            row.Note = last!.Message;
             return row;
+        }
+
+        // Win32 ERROR_SHARING_VIOLATION (32) and ERROR_LOCK_VIOLATION (33) as HRESULTs in the FACILITY_WIN32 range
+        // (0x8007xxxx). Matching the low word alone would also retry unrelated HRESULTs that end in 0x20 or 0x21.
+        internal static bool IsTransientLock(Exception ex)
+        {
+            if (!(ex is IOException) || (ex.HResult & unchecked((int)0xFFFF0000)) != unchecked((int)0x80070000)) return false;
+            var code = ex.HResult & 0xFFFF;
+            return code == 32 || code == 33;
         }
 
         static bool LeafExists(string path)
@@ -117,6 +180,7 @@ namespace Foton.Collect
             }
             int copied = 0;
             long used = 0;
+            var gate = new LockGate();
             foreach (var f in files)
             {
                 string? skip = copied >= maxFiles ? $"Capped at MaxFiles={maxFiles}. Prefer the listing CSV for names not copied."
@@ -126,7 +190,7 @@ namespace Foton.Collect
                     rows.Add(new CopyRow { SourcePath = f.FullName, SizeBytes = f.Length, Status = "CappedSkip", Note = skip });
                     continue;
                 }
-                var copy = CopyFile(f.FullName, Path.Combine(destinationDirectory, f.Name), skipHashing);
+                var copy = CopyFile(f.FullName, Path.Combine(destinationDirectory, f.Name), skipHashing, gate, null);
                 copy.DestRelative = Rel(packageRelativeDirectory, f.Name);
                 rows.Add(copy);
                 if (copy.Status == "Copied") { copied++; used += copy.SizeBytes; }
@@ -156,6 +220,7 @@ namespace Foton.Collect
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { family = new FileInfo[0]; }
             long budget = maxTotalBytes;
+            var gate = new LockGate();
             foreach (var f in family)
             {
                 if (f.Length > budget)
@@ -163,7 +228,7 @@ namespace Foton.Collect
                     rows.Add(new CopyRow { SourcePath = f.FullName, SizeBytes = f.Length, Status = "CappedSkip", Note = "File exceeds remaining copy budget. Full file remains on the host; this package is a capped copy." });
                     continue;
                 }
-                var copy = CopyFile(f.FullName, Path.Combine(destinationDirectory, f.Name), skipHashing);
+                var copy = CopyFile(f.FullName, Path.Combine(destinationDirectory, f.Name), skipHashing, gate, null);
                 copy.DestRelative = Rel(packageRelativeDirectory, f.Name);
                 rows.Add(copy);
                 if (copy.Status == "Copied") budget -= copy.SizeBytes;
@@ -191,6 +256,7 @@ namespace Foton.Collect
             var rootFull = Path.GetFullPath(destinationDirectory).TrimEnd('\\');
             int copied = 0;
             long used = 0;
+            var gate = new LockGate();
             foreach (var it in sorted)
             {
                 var src = it.SourcePath;
@@ -227,7 +293,7 @@ namespace Foton.Collect
                     rows.Add(new CopyRow { SourcePath = src, DestRelative = relLeaf, SizeBytes = len, Status = "CopyError", Note = "Resolved destination left DestinationDirectory; copy refused." });
                     continue;
                 }
-                var copy = CopyFile(src, destFull, skipHashing);
+                var copy = CopyFile(src, destFull, skipHashing, gate, null);
                 copy.DestRelative = Rel(packageRelativeDirectory, fitted);
                 if (copy.Status == "Copied" && !string.Equals(fitted, relLeaf, StringComparison.Ordinal))
                     copy.Note += F(" Name shortened to keep the path inside the package under {0} characters (Windows tools and ZIP extraction fail on longer paths); SourcePath holds the original name.", MaxPackagePath);
