@@ -47,9 +47,10 @@ namespace Foton.Tools
                 {
                     Name = entry.Name,
                     Version = have != null ? ToolManifest.Get(have, "Version") : entry.Version,
-                    // Not installed: the rule set the install would bring (the same value Install records for a bundled rules folder).
+                    // Not installed: nothing is recorded yet. Say what the pinned release bundles, labelled as a preview; Install
+                    // records the rule set it actually finds (a rules folder, or its git commit), which can differ.
                     RulesVersion = have != null ? ToolManifest.Get(have, "RulesVersion")
-                        : entry.RulesRelativePath.Length > 0 ? "bundled-" + entry.Version : "",
+                        : entry.RulesRelativePath.Length > 0 ? "bundled-" + entry.Version + " (on install)" : "",
                     Source = have == null ? "Catalog" : registered ? "Registered" : "Installed",
                     Location = have != null ? ToolManifest.Get(have, "ExecutablePath") : entry.DownloadUrl,
                     Verified = have != null && !registered,

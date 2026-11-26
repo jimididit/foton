@@ -177,7 +177,8 @@ namespace Foton.Tests
             {
                 var hb = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "Hayabusa");
                 Assert.Equal("Catalog", hb.Source);
-                Assert.Equal("bundled-" + ToolCatalog.Load().Single(c => c.Name == "Hayabusa").Version, hb.RulesVersion);
+                // A preview, labelled as one: install records the rule set it finds, which may differ.
+                Assert.Equal("bundled-" + ToolCatalog.Load().Single(c => c.Name == "Hayabusa").Version + " (on install)", hb.RulesVersion);
             }
         }
 
