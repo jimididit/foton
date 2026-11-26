@@ -166,7 +166,12 @@ namespace Foton.Tools
                 var stable = Path.Combine(stableDir, Path.GetFileName(exe));
                 File.Copy(exe, stable, true);
                 var exeDir = Path.GetDirectoryName(exe)!;
-                foreach (var leaf in entry.SupportFolders.Count > 0 ? entry.SupportFolders : new[] { "config", "rules" })
+                // The rules folder is part of the pinned release even when SupportFolders leave it out, so an earlier release's
+                // copy is replaced here too rather than recorded as this release's rule set.
+                var folders = entry.SupportFolders.Count > 0 ? entry.SupportFolders.ToList() : new List<string> { "config", "rules" };
+                if (entry.RulesRelativePath.Length > 0 && !folders.Contains(entry.RulesRelativePath, StringComparer.OrdinalIgnoreCase))
+                    folders.Add(entry.RulesRelativePath);
+                foreach (var leaf in folders)
                 {
                     var src = Path.Combine(exeDir, leaf!);
                     var dst = Path.GetFullPath(Path.Combine(stableDir, leaf!));

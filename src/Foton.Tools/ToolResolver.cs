@@ -28,7 +28,7 @@ namespace Foton.Tools
             if (!string.IsNullOrWhiteSpace(toolPath) && File.Exists(toolPath!.Trim()))
             {
                 var path = Path.GetFullPath(toolPath.Trim());
-                return new ResolvedTool { Path = path, Source = "ToolPath", Version = ToolRegistry.FileVersion(path) };
+                return new ResolvedTool { Path = path, Source = "ToolPath", Version = ToolRegistry.FileVersion(path), RulesVersion = LocalRules(path) };
             }
 
             var installed = ToolManifest.Find(tool, toolRoot);
@@ -47,9 +47,18 @@ namespace Foton.Tools
             foreach (var name in executableNames)
             {
                 var hit = OnPath(name, pathEnv ?? Environment.GetEnvironmentVariable("PATH") ?? "");
-                if (hit != null) return new ResolvedTool { Path = hit, Source = "PATH", Version = ToolRegistry.FileVersion(hit) };
+                if (hit != null) return new ResolvedTool { Path = hit, Source = "PATH", Version = ToolRegistry.FileVersion(hit), RulesVersion = LocalRules(hit) };
             }
             return null;
+        }
+
+        /// <summary>An untracked executable has no recorded rule set. If a rules or sigma folder sits beside it, the rules
+        /// are local and unversioned (the same convention ToolRegistry records); otherwise there are none to report.</summary>
+        static string LocalRules(string exePath)
+        {
+            var dir = Path.GetDirectoryName(exePath) ?? "";
+            return new[] { "rules", "sigma" }.Any(leaf => Directory.Exists(Path.Combine(dir, leaf)) || File.Exists(Path.Combine(dir, leaf)))
+                ? "local-unversioned" : "";
         }
 
         /// <summary>The first PATH directory holding the name (with a PATHEXT extension when it has none), as Get-Command finds it.</summary>

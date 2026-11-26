@@ -385,6 +385,22 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void An_untracked_tool_reports_an_unversioned_rule_set_only_when_rules_sit_beside_it()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"bin\chainsaw.exe"), "x");
+                Write(t.File(@"bin\rules\r.yml"), "x");
+                var withRules = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bin\chainsaw.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("local-unversioned", withRules.RulesVersion);
+
+                Write(t.File(@"bare\chainsaw.exe"), "x");
+                var bare = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bare\chainsaw.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("", bare.RulesVersion);
+            }
+        }
+
+        [Fact]
         public void An_explicit_tool_path_wins_over_the_manifest_and_PATH()
         {
             using (var t = new TempDir())
