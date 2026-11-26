@@ -48,10 +48,12 @@ namespace Foton.Tools
             return null;
         }
 
+        /// <summary>Best-effort tools.json lookup for an explicit path. Any failure means "not tracked here": the explicit
+        /// path still resolves, reported from the file itself. Broad on purpose; the lookup must never block the caller.</summary>
         static Dictionary<string, object?>? TryFind(string tool, string? toolRoot)
         {
             try { return ToolManifest.Find(tool, toolRoot); }
-            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return null; }
+            catch (Exception) { return null; }
         }
 
         static ResolvedTool FromManifest(Dictionary<string, object?> installed, string path, string source)

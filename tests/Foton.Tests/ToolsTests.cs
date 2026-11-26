@@ -477,6 +477,7 @@ namespace Foton.Tests
                 Assert.Equal("title: v1", File.ReadAllText(Path.Combine(root, "hayabusa", "rules", "dummy.yml")));
                 Assert.Empty(Directory.GetDirectories(Path.Combine(root, "hayabusa"), "rules.replaced-*"));
                 Assert.False(File.Exists(Path.Combine(root, "hayabusa", "hayabusa-2.0.0.exe")));
+                Assert.False(Directory.Exists(Path.Combine(root, "hayabusa", "2.0.0")));
                 Assert.Equal("1.0.0", ToolManifest.Get(ToolManifest.Find("Hayabusa", root)!, "Version"));
             }
         }
