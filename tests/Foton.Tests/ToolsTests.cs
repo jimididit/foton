@@ -169,7 +169,8 @@ namespace Foton.Tests
                     ["Name"] = "PECmd",
                     ["ExecutablePath"] = t.File(@"ez\PECmd.exe"),
                     ["Version"] = "1.0",
-                    ["ArchiveSha256"] = "ABC",
+                    // A full-length hash, so the empty Verified value is the only reason this row is not a pin.
+                    ["ArchiveSha256"] = new string('A', 64),
                     ["Verified"] = "",
                 });
                 var pe = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "PECmd");
