@@ -179,11 +179,10 @@ namespace Foton.Tools
             var resolvedBy = new Dictionary<Job, Lazy<ResolvedTool?>>();
             foreach (var j in jobs)
             {
-                var job = j;
-                resolvedBy[job] = new Lazy<ResolvedTool?>(() =>
+                resolvedBy[j] = new Lazy<ResolvedTool?>(() =>
                 {
-                    overrides.TryGetValue(job.Tool, out var over);
-                    return ToolResolver.Resolve(job.Tool, job.Names, over, toolRoot, pathEnv);
+                    overrides.TryGetValue(j.Tool, out var over);
+                    return ToolResolver.Resolve(j.Tool, j.Names, over, toolRoot, pathEnv);
                 });
             }
             // A missing tool still gets its NotOnPath row in the loop; this only makes the gap visible before the run starts.

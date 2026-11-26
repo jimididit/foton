@@ -45,8 +45,8 @@ namespace Foton.Tools
             foreach (var entry in catalog)
             {
                 var have = installed.FirstOrDefault(r => string.Equals(ToolManifest.Get(r, "Name"), entry.Name, StringComparison.OrdinalIgnoreCase));
-                // A catalog tool can also be registered from an existing folder; only a pinned install is verified.
-                bool registered = have != null && ToolManifest.Get(have, "Verified") == "False";
+                // A catalog tool can also be registered from an existing folder; only an explicit pinned install is verified.
+                bool verified = have != null && IsVerified(have);
                 rows.Add(new ToolListRow
                 {
                     Name = entry.Name,
@@ -55,12 +55,12 @@ namespace Foton.Tools
                         // Not installed: nothing is recorded yet, and no version is invented. Say only that the pinned release
                         // bundles rules; Install records the rule set it actually finds (a rules folder, or its git commit).
                         : entry.RulesRelativePath.Length > 0 ? "bundled with release (on install)" : "",
-                    Source = have == null ? "Catalog" : registered ? "Registered" : "Installed",
+                    Source = have == null ? "Catalog" : verified ? "Installed" : "Registered",
                     Location = have != null ? ToolManifest.Get(have, "ExecutablePath") : entry.DownloadUrl,
-                    Verified = have != null && !registered,
+                    Verified = verified,
                     License = entry.License,
                     ExpectedSha256 = entry.ExpectedSha256,
-                    Notes = registered ? Observed(have!) : entry.Notes,
+                    Notes = have != null && !verified ? Observed(have) : entry.Notes,
                 });
             }
             // Installs whose catalog entry is gone keep the verification they were recorded with: a pinned install stays Installed.
@@ -68,20 +68,27 @@ namespace Foton.Tools
                 .Where(r => !catalog.Any(c => string.Equals(c.Name, ToolManifest.Get(r, "Name"), StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(r => ToolManifest.Get(r, "Name"), StringComparer.OrdinalIgnoreCase))
             {
-                // Same rule as the catalog rows above: only an explicit "False" is a registration.
-                bool registered = ToolManifest.Get(have, "Verified") == "False";
+                var verified = IsVerified(have);
                 rows.Add(new ToolListRow
                 {
                     Name = ToolManifest.Get(have, "Name"),
                     Version = ToolManifest.Get(have, "Version"),
                     RulesVersion = InstalledRules(have),
-                    Source = registered ? "Registered" : "Installed",
-                    Verified = !registered,
+                    Source = verified ? "Installed" : "Registered",
+                    Verified = verified,
                     Location = ToolManifest.Get(have, "ExecutablePath"),
-                    Notes = registered ? Observed(have) : "Pinned install; no longer in the catalog.",
+                    Notes = verified ? "Pinned install; no longer in the catalog." : Observed(have),
                 });
             }
             return rows;
+        }
+
+        /// <summary>A pinned, hash-checked install. Install writes no Verified key (its pin is the archive hash), so no key or
+        /// "True" is verified; Register writes "False". Any other value is damaged or edited tools.json and is not trusted.</summary>
+        static bool IsVerified(Dictionary<string, object?> row)
+        {
+            var value = ToolManifest.Get(row, "Verified");
+            return value.Length == 0 || value == "True";
         }
 
         static string Observed(Dictionary<string, object?> row) =>
