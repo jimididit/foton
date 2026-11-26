@@ -303,23 +303,32 @@ namespace Foton.Tests
                 var src = Path.Combine(t.Path, "SRUDB.dat");
                 File.WriteAllBytes(src, new byte[] { 1, 2, 3, 4 });
 
-                // Exclusive lock briefly (as a host writer can hold), then release so a retry succeeds.
+                // Exclusive lock briefly (as a host writer can hold), then release so a retry succeeds. The holder
+                // catches its own exception: an unhandled one on a background thread would end the whole test run.
                 var held = new ManualResetEvent(false);
+                Exception? holderError = null;
                 var holder = new Thread(() =>
                 {
-                    using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                    try
                     {
-                        held.Set();
-                        Thread.Sleep(500);
+                        using (new FileStream(src, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                        {
+                            held.Set();
+                            Thread.Sleep(200);
+                        }
                     }
+                    catch (Exception ex) { holderError = ex; }
+                    finally { held.Set(); }
                 });
                 holder.IsBackground = true;
                 holder.Start();
                 Assert.True(held.WaitOne(5000));
                 var recovered = HostCopy.CopyFile(src, Path.Combine(t.Path, @"out\SRUDB.dat"), skipHashing: true);
                 holder.Join(10000);
+                Assert.Null(holderError);
                 Assert.Equal("Copied", recovered.Status);
-                Assert.Contains("attempts", recovered.Note);
+                // The retry path leaves its own note; a first-attempt copy would carry the plain one.
+                Assert.NotEqual("Copied with FileShare.ReadWrite. Do not parse the live path.", recovered.Note);
                 Assert.True(File.Exists(Path.Combine(t.Path, @"out\SRUDB.dat")));
 
                 // A lock that outlasts the retry budget is still CopyError, never Missing.
@@ -341,6 +350,7 @@ namespace Foton.Tests
             Assert.True(HostCopy.IsTransientLock(new IOException("in use", unchecked((int)0x80070020))));
             Assert.True(HostCopy.IsTransientLock(new IOException("locked", unchecked((int)0x80070021))));
             Assert.False(HostCopy.IsTransientLock(new IOException("denied", unchecked((int)0x80070005))));
+            Assert.False(HostCopy.IsTransientLock(new IOException("other facility", unchecked((int)0x80040020))));
             Assert.False(HostCopy.IsTransientLock(new FileNotFoundException("gone")));
             Assert.False(HostCopy.IsTransientLock(new UnauthorizedAccessException("no")));
         }

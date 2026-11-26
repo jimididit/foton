@@ -84,7 +84,9 @@ namespace Foton.Collect
                     // arguments are permanent for this run: record them at once instead of sleeping the budget.
                     if (!IsTransientLock(ex) || attempt >= CopyAttempts)
                         break;
-                    System.Threading.Thread.Sleep(200 * attempt);
+                    // Total wait across the budget is about 1 s (100+200+300+400 ms). A longer wait per locked file
+                    // would stall a capped run for minutes when many files are held.
+                    System.Threading.Thread.Sleep(100 * attempt);
                 }
             }
             row.Status = "CopyError";
@@ -92,9 +94,14 @@ namespace Foton.Collect
             return row;
         }
 
-        // Win32 ERROR_SHARING_VIOLATION (32) and ERROR_LOCK_VIOLATION (33), carried in the low word of HResult.
-        internal static bool IsTransientLock(Exception ex) =>
-            ex is IOException && ((ex.HResult & 0xFFFF) == 32 || (ex.HResult & 0xFFFF) == 33);
+        // Win32 ERROR_SHARING_VIOLATION (32) and ERROR_LOCK_VIOLATION (33) as HRESULTs in the FACILITY_WIN32 range
+        // (0x8007xxxx). Matching the low word alone would also retry unrelated HRESULTs that end in 0x20 or 0x21.
+        internal static bool IsTransientLock(Exception ex)
+        {
+            if (!(ex is IOException) || (ex.HResult & unchecked((int)0xFFFF0000)) != unchecked((int)0x80070000)) return false;
+            var code = ex.HResult & 0xFFFF;
+            return code == 32 || code == 33;
+        }
 
         static bool LeafExists(string path)
         {
