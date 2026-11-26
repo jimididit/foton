@@ -151,6 +151,37 @@ namespace Foton.Tests
                 Assert.Equal("Registered", hb.Source);
                 Assert.False(hb.Verified);
                 Assert.Contains("not verified", hb.Notes);
+                Assert.Equal("", hb.RulesVersion);
+            }
+        }
+
+        [Fact]
+        public void A_registered_tool_with_a_rules_folder_reports_its_rule_set_in_the_list()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"hb\hayabusa.exe"), "x");
+                Write(t.File(@"hb\rules\rule.yml"), "x");
+                ToolRegistry.Register("Hayabusa", t.File("hb"), t.File("tools"));
+                var hb = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "Hayabusa");
+                // Unpinned local rules: the rule set is recorded as unversioned, not as a release number.
+                Assert.Equal("local-unversioned", hb.RulesVersion);
+            }
+        }
+
+        [Fact]
+        public void Compose_names_the_selected_tools_that_are_missing_before_it_runs()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"));
+                var log = new StringWriter();
+                ComposeRunner.Run(pkg, new StatusLog(log), t.File("empty"), null, System32Only, new[] { "PECmd" });
+                var text = log.ToString();
+                Assert.Contains("1 selected tool(s) not found: PECmd", text);
+                Assert.Contains("recorded as NotOnPath", text);
+                // A tool the operator left out is not reported as missing.
+                Assert.DoesNotContain("Hayabusa", text);
             }
         }
 

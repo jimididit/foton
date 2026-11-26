@@ -14,6 +14,8 @@ namespace Foton.Tools
     {
         public string Name { get; set; } = "";
         public string Version { get; set; } = "";
+        /// <summary>Rule set the tool runs with (Hayabusa / Chainsaw), as recorded in tools.json; empty when none.</summary>
+        public string RulesVersion { get; set; } = "";
         /// <summary>Installed (pinned, hash-verified), Registered (existing install, observed hash), or Catalog (not installed).</summary>
         public string Source { get; set; } = "";
         /// <summary>The executable compose will run, or the download URL for a catalog tool not yet installed.</summary>
@@ -45,6 +47,7 @@ namespace Foton.Tools
                 {
                     Name = entry.Name,
                     Version = have != null ? ToolManifest.Get(have, "Version") : entry.Version,
+                    RulesVersion = have != null ? ToolManifest.Get(have, "RulesVersion") : "",
                     Source = have == null ? "Catalog" : registered ? "Registered" : "Installed",
                     Location = have != null ? ToolManifest.Get(have, "ExecutablePath") : entry.DownloadUrl,
                     Verified = have != null && !registered,
@@ -60,6 +63,7 @@ namespace Foton.Tools
                 {
                     Name = ToolManifest.Get(have, "Name"),
                     Version = ToolManifest.Get(have, "Version"),
+                    RulesVersion = ToolManifest.Get(have, "RulesVersion"),
                     Source = "Registered",
                     Location = ToolManifest.Get(have, "ExecutablePath"),
                     Notes = Observed(have),

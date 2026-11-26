@@ -4,6 +4,11 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
+## [3.4.0] - 2026-11-26
+
+- Compose logs the selected tools it cannot find before the run starts (`N selected tool(s) not found: ...`), so a gap shows up first. Each still gets its `NotOnPath` row; no status changes.
+- The rule-set version (`RulesVersion`: Hayabusa and Chainsaw rules, `local-unversioned` for a local rules folder) is shown in the console's Tools tab and in `foton tools`.
+
 ## [3.3.2] - 2026-11-26
 
 - Collect retries a locked host-file copy a few times before recording `CopyError`. A brief exclusive lock (seen once on `SRUDB.dat` during SrumECmd prep) no longer leaves the package without the file when the lock clears within about a second. A lock that lasts longer is still `CopyError` with the failure note; statuses and schema are unchanged. Each collection call caps its total waiting on held locks at 5 seconds. Every file still gets its full retry budget until that cap is reached; after it, further locked files in that call get one attempt, so many held files cost about the cap in total, not one budget each.
