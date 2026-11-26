@@ -180,18 +180,30 @@ namespace Foton.Tools
                     // An earlier version's folder, or a stray file in the way, is moved aside even when this release has no such
                     // folder, so a stale rules\ is never used (or recorded) and the release's copy is never silently skipped.
                     // Kept, not deleted: local edits stay recoverable.
-                    if (File.Exists(dst) || Directory.Exists(dst))
+                    string? kept = null;
+                    var isFolder = Directory.Exists(dst);
+                    if (File.Exists(dst) || isFolder)
                     {
-                        var isFolder = Directory.Exists(dst);
-                        var kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
+                        kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
                         for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
                         if (isFolder) Directory.Move(dst, kept); else File.Move(dst, kept);
+                    }
+                    try
+                    {
+                        if (Directory.Exists(src)) CopyDirectory(src, dst);
+                    }
+                    catch
+                    {
+                        // A failed copy must not leave the tool without the folder it had: remove the partial copy and put the
+                        // earlier one back, then let the install fail as before.
+                        try { if (Directory.Exists(dst)) Directory.Delete(dst, true); else if (File.Exists(dst)) File.Delete(dst); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                        if (kept != null) { if (isFolder) Directory.Move(kept, dst); else File.Move(kept, dst); }
+                        throw;
+                    }
+                    if (kept != null)
                         Log(Directory.Exists(src)
                             ? $"Moved the existing {leaf} to {Path.GetFileName(kept)} and installed the pinned release's copy."
                             : $"The pinned release has no {leaf} folder; moved the earlier {leaf} to {Path.GetFileName(kept)} so it is not used with this version.");
-                    }
-                    if (!Directory.Exists(src)) continue;
-                    CopyDirectory(src, dst);
                 }
                 exe = stable;
 
