@@ -113,8 +113,12 @@ namespace Foton.Tools
         public static Dictionary<string, object?> Install(CatalogTool entry, string? archivePath, string? toolRoot, StatusLog log)
         {
             // Support folders are deleted and replaced beside the tool, so each must be one plain folder name other than
-            // the version folder; checked before anything is downloaded, extracted, or deleted.
-            foreach (var leaf in entry.SupportFolders)
+            // the version folder; checked before anything is downloaded, extracted, or deleted. The rules folder is one of
+            // them even when SupportFolders leave it out, so it is checked here too (a nested path would otherwise fail later).
+            var folders = entry.SupportFolders.Count > 0 ? entry.SupportFolders.ToList() : new List<string> { "config", "rules" };
+            if (entry.RulesRelativePath.Length > 0 && !folders.Contains(entry.RulesRelativePath, StringComparer.OrdinalIgnoreCase))
+                folders.Add(entry.RulesRelativePath);
+            foreach (var leaf in folders)
                 if (!SupportFolderName.IsMatch(leaf ?? "") || string.Equals(leaf, entry.Version, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("Catalog support folder must be one plain folder name other than the version: '" + leaf + "'");
             var root = ToolManifest.Root(toolRoot);
@@ -166,11 +170,6 @@ namespace Foton.Tools
                 var stable = Path.Combine(stableDir, Path.GetFileName(exe));
                 File.Copy(exe, stable, true);
                 var exeDir = Path.GetDirectoryName(exe)!;
-                // The rules folder is part of the pinned release even when SupportFolders leave it out, so an earlier release's
-                // copy is replaced here too rather than recorded as this release's rule set.
-                var folders = entry.SupportFolders.Count > 0 ? entry.SupportFolders.ToList() : new List<string> { "config", "rules" };
-                if (entry.RulesRelativePath.Length > 0 && !folders.Contains(entry.RulesRelativePath, StringComparer.OrdinalIgnoreCase))
-                    folders.Add(entry.RulesRelativePath);
                 foreach (var leaf in folders)
                 {
                     var src = Path.Combine(exeDir, leaf!);
@@ -205,7 +204,8 @@ namespace Foton.Tools
                     if (Directory.Exists(rp) || File.Exists(rp))
                     {
                         rulesPath = Path.GetFullPath(rp);
-                        rulesVersion = GitRulesVersion(rp) ?? "bundled-" + entry.Version;
+                        // Not a rule-set identifier: with no git history, it only says the rules came with this release.
+                        rulesVersion = GitRulesVersion(rp) ?? "bundled with release " + entry.Version;
                     }
                 }
 

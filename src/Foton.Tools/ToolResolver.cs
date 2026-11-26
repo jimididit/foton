@@ -57,8 +57,12 @@ namespace Foton.Tools
             };
         }
 
-        static bool SameFile(string recorded, string path) =>
-            recorded.Length > 0 && string.Equals(Path.GetFullPath(recorded), path, StringComparison.OrdinalIgnoreCase);
+        static bool SameFile(string recorded, string path)
+        {
+            // File.Exists is checked first: a damaged ExecutablePath with invalid path characters must not make GetFullPath throw.
+            if (recorded.Length == 0 || !File.Exists(recorded)) return false;
+            return string.Equals(Path.GetFullPath(recorded), path, StringComparison.OrdinalIgnoreCase);
+        }
 
         /// <summary>An untracked executable has no recorded rule set. If a rules or sigma folder sits beside it, the rules
         /// are local and unversioned (the same convention ToolRegistry records); otherwise there are none to report. Only a

@@ -95,7 +95,7 @@ namespace Foton.Tests
                 Assert.NotNull(rules.SigmaPath);
                 Assert.EndsWith("sigma-event-logs-all.yml", rules.MappingPath);
                 // A pinned install records the rule set as bundled with the release, so the list shows it.
-                Assert.Equal("bundled-9.9.9-test", ToolInstaller.List(t.File("tools")).Single(r => r.Name == "Chainsaw").RulesVersion);
+                Assert.Equal("bundled with release 9.9.9-test", ToolInstaller.List(t.File("tools")).Single(r => r.Name == "Chainsaw").RulesVersion);
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\9.9.9-test\chainsaw\sigma\regression_data")));
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\sigma\regression_data")));
 
@@ -325,7 +325,7 @@ namespace Foton.Tests
                 Assert.Equal("9.9.9-test", ToolManifest.Get(installed, "Version"));
                 Assert.True(File.Exists(ToolManifest.Get(installed, "ExecutablePath")));
                 Assert.True(Directory.Exists(Path.Combine(root, "hayabusa", "rules")));
-                Assert.Equal("bundled-9.9.9-test", ToolManifest.Get(installed, "RulesVersion"));
+                Assert.Equal("bundled with release 9.9.9-test", ToolManifest.Get(installed, "RulesVersion"));
                 Assert.True(File.Exists(Path.Combine(root, "install.log")));
                 var resolved = ToolResolver.Resolve("Hayabusa", new[] { "hayabusa.exe" }, null, root, System32Only)!;
                 Assert.Equal("Manifest", resolved.Source);
@@ -409,18 +409,26 @@ namespace Foton.Tests
                 ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
                 {
                     ["Name"] = "Hayabusa", ["Version"] = "4.0.0",
-                    ["ExecutablePath"] = t.File(@"tools\hayabusa\hayabusa.exe"), ["RulesVersion"] = "bundled-4.0.0",
+                    ["ExecutablePath"] = t.File(@"tools\hayabusa\hayabusa.exe"), ["RulesVersion"] = "bundled with release 4.0.0",
                 });
                 var r = ToolResolver.Resolve("Hayabusa", new[] { "hayabusa.exe" }, t.File(@"tools\hayabusa\hayabusa.exe"), t.File("tools"), System32Only)!;
                 Assert.Equal("ToolPath", r.Source);
                 Assert.Equal("4.0.0", r.Version);
-                Assert.Equal("bundled-4.0.0", r.RulesVersion);
+                Assert.Equal("bundled with release 4.0.0", r.RulesVersion);
 
                 // A plain file named rules beside an executable is not a rule folder.
                 Write(t.File(@"bare\chainsaw.exe"), "x");
                 Write(t.File(@"bare\rules"), "not a folder");
                 var bare = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bare\chainsaw.exe"), t.File("tools"), System32Only)!;
                 Assert.Equal("", bare.RulesVersion);
+
+                // A damaged ExecutablePath with invalid path characters must not stop a valid explicit path.
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "Chainsaw", ["Version"] = "2.0.0", ["ExecutablePath"] = "bad<|name.exe",
+                });
+                var ok = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bare\chainsaw.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("ToolPath", ok.Source);
             }
         }
 
