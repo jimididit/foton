@@ -55,7 +55,7 @@ namespace Foton.Tools
                 var ver = VersionOf(tool.Name, exe);
                 var dir = Path.GetDirectoryName(exe)!;
                 var rulesPath = new[] { "rules", "sigma" }.Select(leaf => Path.Combine(dir, leaf))
-                    .FirstOrDefault(p => Directory.Exists(p) || File.Exists(p)) ?? "";
+                    .FirstOrDefault(Directory.Exists) ?? "";
                 var sha = Hashing.Sha256Hex(exe);
                 ToolManifest.Save(root, new Dictionary<string, object?>
                 {

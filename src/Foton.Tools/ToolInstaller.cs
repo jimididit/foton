@@ -178,17 +178,18 @@ namespace Foton.Tools
                     if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
                         || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
                         throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
-                    if (File.Exists(dst)) continue;
-                    // An earlier version's folder is moved aside even when this release has no such folder, so a stale rules\
-                    // is never used (or recorded) with a release that does not ship one. Kept, not deleted: local edits stay recoverable.
-                    if (Directory.Exists(dst))
+                    // An earlier version's folder, or a stray file in the way, is moved aside even when this release has no such
+                    // folder, so a stale rules\ is never used (or recorded) and the release's copy is never silently skipped.
+                    // Kept, not deleted: local edits stay recoverable.
+                    if (File.Exists(dst) || Directory.Exists(dst))
                     {
+                        var isFolder = Directory.Exists(dst);
                         var kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
                         for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
-                        Directory.Move(dst, kept);
+                        if (isFolder) Directory.Move(dst, kept); else File.Move(dst, kept);
                         Log(Directory.Exists(src)
-                            ? $"Moved the existing {leaf}\\ to {Path.GetFileName(kept)}\\ and installed the pinned release's copy."
-                            : $"The pinned release has no {leaf}\\ folder; moved the earlier one to {Path.GetFileName(kept)}\\ so it is not used with this version.");
+                            ? $"Moved the existing {leaf} to {Path.GetFileName(kept)} and installed the pinned release's copy."
+                            : $"The pinned release has no {leaf} folder; moved the earlier {leaf} to {Path.GetFileName(kept)} so it is not used with this version.");
                     }
                     if (!Directory.Exists(src)) continue;
                     CopyDirectory(src, dst);

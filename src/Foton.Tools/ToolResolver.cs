@@ -25,24 +25,18 @@ namespace Foton.Tools
             // Every output in the compose inventory names the tool version that wrote it: tools.json records it for
             // installs and registrations; anything else is read from the executable's version resource as found
             // (nothing is run here; compose asks a tool without one only when it is about to run it).
+            var installed = ToolManifest.Find(tool, toolRoot);
             if (!string.IsNullOrWhiteSpace(toolPath) && File.Exists(toolPath!.Trim()))
             {
                 var path = Path.GetFullPath(toolPath.Trim());
+                // An explicit path to the executable tools.json already records is that install: report what it recorded.
+                if (installed != null && SameFile(ToolManifest.Get(installed, "ExecutablePath"), path)) return FromManifest(installed, path, "ToolPath");
                 return new ResolvedTool { Path = path, Source = "ToolPath", Version = ToolRegistry.FileVersion(path), RulesVersion = LocalRules(path) };
             }
 
-            var installed = ToolManifest.Find(tool, toolRoot);
             var exe = installed != null ? ToolManifest.Get(installed, "ExecutablePath") : "";
             if (exe.Length > 0 && File.Exists(exe))
-            {
-                var path = Path.GetFullPath(exe);
-                var recorded = ToolManifest.Get(installed!, "Version");
-                return new ResolvedTool
-                {
-                    Path = path, Source = "Manifest",
-                    Version = recorded.Length > 0 ? recorded : ToolRegistry.FileVersion(path), RulesVersion = ToolManifest.Get(installed!, "RulesVersion"),
-                };
-            }
+                return FromManifest(installed!, Path.GetFullPath(exe), "Manifest");
 
             foreach (var name in executableNames)
             {
@@ -52,12 +46,28 @@ namespace Foton.Tools
             return null;
         }
 
+        static ResolvedTool FromManifest(Dictionary<string, object?> installed, string path, string source)
+        {
+            var recorded = ToolManifest.Get(installed, "Version");
+            return new ResolvedTool
+            {
+                Path = path, Source = source,
+                Version = recorded.Length > 0 ? recorded : ToolRegistry.FileVersion(path),
+                RulesVersion = ToolManifest.Get(installed, "RulesVersion"),
+            };
+        }
+
+        static bool SameFile(string recorded, string path) =>
+            recorded.Length > 0 && string.Equals(Path.GetFullPath(recorded), path, StringComparison.OrdinalIgnoreCase);
+
         /// <summary>An untracked executable has no recorded rule set. If a rules or sigma folder sits beside it, the rules
-        /// are local and unversioned (the same convention ToolRegistry records); otherwise there are none to report.</summary>
+        /// are local and unversioned (the same convention ToolRegistry records); otherwise there are none to report. Only a
+        /// folder counts: a plain file with that name is not a rule set. Presence, not attribution: a shared folder with an
+        /// unrelated rules\ is reported too, because that is what the tool itself loads from beside its executable.</summary>
         static string LocalRules(string exePath)
         {
             var dir = Path.GetDirectoryName(exePath) ?? "";
-            return new[] { "rules", "sigma" }.Any(leaf => Directory.Exists(Path.Combine(dir, leaf)) || File.Exists(Path.Combine(dir, leaf)))
+            return new[] { "rules", "sigma" }.Any(leaf => Directory.Exists(Path.Combine(dir, leaf)))
                 ? "local-unversioned" : "";
         }
 

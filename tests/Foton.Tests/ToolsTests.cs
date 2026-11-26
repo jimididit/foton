@@ -401,6 +401,30 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void An_explicit_path_to_a_tracked_install_reports_what_it_recorded_and_a_plain_file_is_no_rule_set()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"tools\hayabusa\hayabusa.exe"), "x");
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "Hayabusa", ["Version"] = "4.0.0",
+                    ["ExecutablePath"] = t.File(@"tools\hayabusa\hayabusa.exe"), ["RulesVersion"] = "bundled-4.0.0",
+                });
+                var r = ToolResolver.Resolve("Hayabusa", new[] { "hayabusa.exe" }, t.File(@"tools\hayabusa\hayabusa.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("ToolPath", r.Source);
+                Assert.Equal("4.0.0", r.Version);
+                Assert.Equal("bundled-4.0.0", r.RulesVersion);
+
+                // A plain file named rules beside an executable is not a rule folder.
+                Write(t.File(@"bare\chainsaw.exe"), "x");
+                Write(t.File(@"bare\rules"), "not a folder");
+                var bare = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bare\chainsaw.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("", bare.RulesVersion);
+            }
+        }
+
+        [Fact]
         public void An_explicit_tool_path_wins_over_the_manifest_and_PATH()
         {
             using (var t = new TempDir())
