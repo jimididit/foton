@@ -195,29 +195,31 @@ namespace Foton.Tools
                 Log("Hash matches catalog pin.");
 
                 var destVer = Destination(entry, root);
-                if (Directory.Exists(destVer)) Directory.Delete(destVer, true);
-                SafeZip.Extract(zip, destVer, entry.SkipArchivePrefixes);
-                Log("Expanded to " + destVer);
-
-                var exe = entry.ExecutableNames.Select(n => FileSearch.Find(destVer, n, int.MaxValue).FirstOrDefault()).FirstOrDefault(f => f != null)
-                    ?? throw new InvalidDataException($"Archive extracted but no executable named {string.Join("/", entry.ExecutableNames)} was found under {destVer}.");
-
-                // A stable copy at tool root\name\<exe> with its support folders beside it (catalog SupportFolders;
-                // config\ and rules\ when the entry names none), so the path in tools.json does not change shape between
-                // releases that nest the binary differently. Folders from an earlier version are replaced: rules are
-                // part of the pinned release.
-                var stableDir = Path.GetDirectoryName(destVer)!;
-                var stable = Path.Combine(stableDir, Path.GetFileName(exe));
-                var exeDir = Path.GetDirectoryName(exe)!;
-
-                // Every swap below is one transaction. Each earlier file or folder is moved aside before its replacement is
-                // written, and if any step fails all of them are put back, so a failed reinstall leaves the tool as it was.
-                // tools.json is written last, only after every copy succeeded.
+                // Every swap below is one transaction. An earlier install of this same version, the earlier executable, and the
+                // earlier support folders are each moved aside before their replacement is written. If any step fails, all of
+                // them are put back, so a failed reinstall leaves the tool as it was. tools.json is written last.
                 var moved = new List<Moved>();
                 var copied = new List<string>();
                 var notes = new List<string>();
+                string exe = "", stable = "", stableDir = "", exeDir = "";
                 try
                 {
+                    MoveAside(destVer, moved);
+                    copied.Add(destVer);
+                    SafeZip.Extract(zip, destVer, entry.SkipArchivePrefixes);
+                    Log("Expanded to " + destVer);
+
+                    exe = entry.ExecutableNames.Select(n => FileSearch.Find(destVer, n, int.MaxValue).FirstOrDefault()).FirstOrDefault(f => f != null)
+                        ?? throw new InvalidDataException($"Archive extracted but no executable named {string.Join("/", entry.ExecutableNames)} was found under {destVer}.");
+
+                    // A stable copy at tool root\name\<exe> with its support folders beside it (catalog SupportFolders;
+                    // config\ and rules\ when the entry names none), so the path in tools.json does not change shape between
+                    // releases that nest the binary differently. Folders from an earlier version are replaced: rules are
+                    // part of the pinned release.
+                    stableDir = Path.GetDirectoryName(destVer)!;
+                    stable = Path.Combine(stableDir, Path.GetFileName(exe));
+                    exeDir = Path.GetDirectoryName(exe)!;
+
                     var exeKept = MoveAside(stable, moved);
                     copied.Add(stable);
                     File.Copy(exe, stable, true);

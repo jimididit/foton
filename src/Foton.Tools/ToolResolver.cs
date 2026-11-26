@@ -25,15 +25,17 @@ namespace Foton.Tools
             // Every output in the compose inventory names the tool version that wrote it: tools.json records it for
             // installs and registrations; anything else is read from the executable's version resource as found
             // (nothing is run here; compose asks a tool without one only when it is about to run it).
-            var installed = ToolManifest.Find(tool, toolRoot);
             if (!string.IsNullOrWhiteSpace(toolPath) && File.Exists(toolPath!.Trim()))
             {
                 var path = Path.GetFullPath(toolPath.Trim());
                 // An explicit path to the executable tools.json already records is that install: report what it recorded.
-                if (installed != null && SameFile(ToolManifest.Get(installed, "ExecutablePath"), path)) return FromManifest(installed, path, "ToolPath");
+                // A damaged tool root must not stop a valid explicit path, so this lookup is best effort.
+                var recorded = TryFind(tool, toolRoot);
+                if (recorded != null && SameFile(ToolManifest.Get(recorded, "ExecutablePath"), path)) return FromManifest(recorded, path, "ToolPath");
                 return new ResolvedTool { Path = path, Source = "ToolPath", Version = ToolRegistry.FileVersion(path), RulesVersion = LocalRules(path) };
             }
 
+            var installed = ToolManifest.Find(tool, toolRoot);
             var exe = installed != null ? ToolManifest.Get(installed, "ExecutablePath") : "";
             if (exe.Length > 0 && File.Exists(exe))
                 return FromManifest(installed!, Path.GetFullPath(exe), "Manifest");
@@ -44,6 +46,12 @@ namespace Foton.Tools
                 if (hit != null) return new ResolvedTool { Path = hit, Source = "PATH", Version = ToolRegistry.FileVersion(hit), RulesVersion = LocalRules(hit) };
             }
             return null;
+        }
+
+        static Dictionary<string, object?>? TryFind(string tool, string? toolRoot)
+        {
+            try { return ToolManifest.Find(tool, toolRoot); }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return null; }
         }
 
         static ResolvedTool FromManifest(Dictionary<string, object?> installed, string path, string source)

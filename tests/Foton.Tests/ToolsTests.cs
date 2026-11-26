@@ -482,6 +482,62 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_failed_reinstall_of_the_same_version_keeps_the_earlier_version_folder()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"v1\hayabusa-1.0.0.exe"), "v1");
+                ZipFile.CreateFromDirectory(t.File("v1"), t.File("v1.zip"));
+                // Same version, but the archive has no executable: the reinstall fails after the earlier folder was set aside.
+                Write(t.File(@"bad\readme.txt"), "no program here");
+                ZipFile.CreateFromDirectory(t.File("bad"), t.File("bad.zip"));
+                var hash1 = Hashing.Sha256Hex(t.File("v1.zip"));
+                var hashBad = Hashing.Sha256Hex(t.File("bad.zip"));
+
+                string Catalog(string sha)
+                {
+                    var file = t.File("catalog-" + sha.Substring(0, 8) + ".json");
+                    File.WriteAllText(file, Json.Indented(new Dictionary<string, object?>
+                    {
+                        ["Tools"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["Name"] = "Hayabusa", ["Version"] = "1.0.0", ["AssetName"] = "x.zip",
+                                ["DownloadUrl"] = "https://example.invalid/x.zip", ["ExpectedSha256"] = sha,
+                                ["License"] = "AGPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                                ["ExecutableNames"] = new[] { "hayabusa.exe", "hayabusa-*.exe" }, ["RulesRelativePath"] = "rules", ["Notes"] = "test pin",
+                            },
+                        },
+                    }));
+                    return file;
+                }
+                var root = t.File("tools");
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog(hash1)), t.File("v1.zip"), root, Quiet());
+
+                Assert.Throws<InvalidDataException>(() =>
+                    ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog(hashBad)), t.File("bad.zip"), root, Quiet()));
+
+                // The earlier 1.0.0 folder is back with its executable, and no partial extraction is left behind.
+                Assert.Equal("v1", File.ReadAllText(Path.Combine(root, "hayabusa", "1.0.0", "hayabusa-1.0.0.exe")));
+                Assert.Empty(Directory.GetDirectories(Path.Combine(root, "hayabusa"), "1.0.0.replaced-*"));
+                Assert.Equal("1.0.0", ToolManifest.Get(ToolManifest.Find("Hayabusa", root)!, "Version"));
+            }
+        }
+
+        [Fact]
+        public void A_damaged_tool_root_does_not_stop_a_valid_explicit_tool_path()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"bin\chainsaw.exe"), "x");
+                var r = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bin\chainsaw.exe"), "bad<|root", System32Only)!;
+                Assert.Equal("ToolPath", r.Source);
+                Assert.Equal(t.File(@"bin\chainsaw.exe"), r.Path);
+            }
+        }
+
+        [Fact]
         public void An_explicit_tool_path_wins_over_the_manifest_and_PATH()
         {
             using (var t = new TempDir())
