@@ -174,12 +174,13 @@ namespace Foton.Tools
 
             // Each tool's resolution is deferred and cached. The pre-pass below only asks which selected tools are missing,
             // so the log names them before any tool runs. A resolution that throws is raised again at that tool's own turn,
-            // as before: one bad tools.json entry does not stop the tools ahead of it. A duplicate name shares one entry.
-            var resolvedBy = new Dictionary<string, Lazy<ResolvedTool?>>(StringComparer.OrdinalIgnoreCase);
+            // as before: one bad tools.json entry does not stop the tools ahead of it. Keyed by job, so two jobs that name
+            // the same tool each resolve with their own names.
+            var resolvedBy = new Dictionary<Job, Lazy<ResolvedTool?>>();
             foreach (var j in jobs)
             {
                 var job = j;
-                resolvedBy[job.Tool] = new Lazy<ResolvedTool?>(() =>
+                resolvedBy[job] = new Lazy<ResolvedTool?>(() =>
                 {
                     overrides.TryGetValue(job.Tool, out var over);
                     return ToolResolver.Resolve(job.Tool, job.Names, over, toolRoot, pathEnv);
@@ -192,7 +193,7 @@ namespace Foton.Tools
                 if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) continue;
                 try
                 {
-                    if (resolvedBy[j.Tool].Value == null && !missing.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) missing.Add(j.Tool);
+                    if (resolvedBy[j].Value == null && !missing.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) missing.Add(j.Tool);
                 }
                 catch (Exception)
                 {
@@ -207,7 +208,7 @@ namespace Foton.Tools
             bool anyTool = false;
             foreach (var j in jobs)
             {
-                var resolved = resolvedBy[j.Tool].Value;
+                var resolved = resolvedBy[j].Value;
                 var exe = resolved?.Path;
                 var ver = resolved?.Version ?? "";
                 var rulesVer = resolved?.RulesVersion ?? "";
