@@ -171,6 +171,17 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_catalog_tool_that_is_not_installed_shows_the_rule_set_its_install_would_bring()
+        {
+            using (var t = new TempDir())
+            {
+                var hb = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "Hayabusa");
+                Assert.Equal("Catalog", hb.Source);
+                Assert.Equal("bundled-" + ToolCatalog.Load().Single(c => c.Name == "Hayabusa").Version, hb.RulesVersion);
+            }
+        }
+
+        [Fact]
         public void Compose_names_the_selected_tools_that_are_missing_before_it_runs()
         {
             using (var t = new TempDir())
@@ -181,8 +192,9 @@ namespace Foton.Tests
                 var text = log.ToString();
                 Assert.Contains("1 selected tool(s) not found: PECmd", text);
                 Assert.Contains("recorded as NotOnPath", text);
-                // A tool the operator left out is not reported as missing.
-                Assert.DoesNotContain("Hayabusa", text);
+                // A tool the operator left out is not named in the warning (checked on that line only).
+                var warning = text.Split('\n').Single(l => l.Contains("selected tool(s) not found"));
+                Assert.DoesNotContain("Hayabusa", warning);
             }
         }
 
@@ -199,7 +211,8 @@ namespace Foton.Tests
                     new Dictionary<string, string> { ["EvtxECmd"] = t.File(@"bin\evtxecmd.cmd") }, System32Only, new[] { "PECmd", "EvtxECmd" });
                 var text = log.ToString();
                 var warnAt = text.IndexOf("1 selected tool(s) not found: PECmd", StringComparison.Ordinal);
-                var runAt = text.IndexOf("EvtxECmd: ", StringComparison.Ordinal);
+                // The run line is "<Tool>: <resolved path> <args>"; match the exact path so no other line can stand in for it.
+                var runAt = text.IndexOf("EvtxECmd: " + t.File(@"bin\evtxecmd.cmd"), StringComparison.Ordinal);
                 Assert.True(warnAt >= 0, text);
                 Assert.True(runAt > warnAt, text);
                 Assert.True(File.Exists(t.File(@"bin\args_evtxecmd.txt")));

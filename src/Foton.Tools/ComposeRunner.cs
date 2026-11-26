@@ -189,6 +189,7 @@ namespace Foton.Tools
             // A missing tool still gets its NotOnPath row in the loop; this only makes the gap visible before the run starts.
             var missing = new List<string>();
             var broken = new List<string>();
+            var brokenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var j in jobs)
             {
                 if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) continue;
@@ -198,8 +199,8 @@ namespace Foton.Tools
                 }
                 catch (Exception ex)
                 {
-                    // Raised again at this tool's turn in the loop; named here too, so the operator sees it before the run.
-                    broken.Add($"{j.Tool} ({ex.Message})");
+                    // Raised again at this tool's turn in the loop; named here too, once, so the operator sees it before the run.
+                    if (brokenNames.Add(j.Tool)) broken.Add($"{j.Tool} ({ex.Message})");
                 }
             }
             if (missing.Count > 0)
@@ -212,8 +213,9 @@ namespace Foton.Tools
             bool anyTool = false;
             foreach (var j in jobs)
             {
-                // A selected tool that cannot be looked up stops the run at its turn, as before. An unselected tool keeps
-                // its NotSelected row (with no version) so a broken entry for a tool the operator left out cannot stop the run.
+                // A selected tool that cannot be looked up stops the run at its turn, as before. For an unselected tool the
+                // lookup error is swallowed so it cannot stop the run; its NotSelected row then has no version. A tool that
+                // resolves keeps its version on that row, as it always has (the status says it was not selected).
                 var selected = onlyTools == null || onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase);
                 ResolvedTool? resolved = null;
                 try { resolved = resolvedBy[j].Value; }
