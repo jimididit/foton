@@ -61,16 +61,16 @@ namespace Foton.Gui
         void RefreshTools()
         {
             var table = new System.Data.DataTable();
-            foreach (var c in new[] { "Name", "Version", "Source", "Verified", "Location", "Notes" }) table.Columns.Add(c);
+            foreach (var c in new[] { "Name", "Version", "Rules", "Source", "Verified", "Location", "Notes" }) table.Columns.Add(c);
             foreach (var r in ToolInstaller.List(null))
-                table.Rows.Add(r.Name, r.Version, r.Source, r.Verified ? "Yes" : "No", r.Location, r.Notes);
+                table.Rows.Add(r.Name, r.Version, r.RulesVersion, r.Source, r.Verified ? "Yes" : "No", r.Location, r.Notes);
             _toolGrid.DataSource = table;
         }
 
         /// <summary>Columns exist only once the grid is bound on a shown form, so widths are set when binding completes.</summary>
         void SizeToolColumns()
         {
-            var weights = new Dictionary<string, float> { ["Name"] = 12, ["Version"] = 10, ["Source"] = 9, ["Verified"] = 7, ["Location"] = 40, ["Notes"] = 40 };
+            var weights = new Dictionary<string, float> { ["Name"] = 12, ["Version"] = 10, ["Rules"] = 10, ["Source"] = 9, ["Verified"] = 7, ["Location"] = 40, ["Notes"] = 40 };
             foreach (DataGridViewColumn c in _toolGrid.Columns)
                 if (weights.TryGetValue(c.Name, out var w)) c.FillWeight = w;
         }

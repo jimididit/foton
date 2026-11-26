@@ -172,13 +172,56 @@ namespace Foton.Tools
                 },
             };
 
+            // Each job's lookup runs at most once and is cached. The pre-pass below looks up every selected job before the
+            // first tool runs, so the log can name the missing ones up front. A lookup that throws is raised again at that
+            // job's own turn, as before: one bad tools.json entry does not stop the tools ahead of it. Keyed by job, so two
+            // jobs that name the same tool each resolve with their own names.
+            var resolvedBy = new Dictionary<Job, Lazy<ResolvedTool?>>();
+            foreach (var j in jobs)
+            {
+                resolvedBy[j] = new Lazy<ResolvedTool?>(() =>
+                {
+                    overrides.TryGetValue(j.Tool, out var over);
+                    return ToolResolver.Resolve(j.Tool, j.Names, over, toolRoot, pathEnv);
+                });
+            }
+            // A missing tool still gets its NotOnPath row in the loop; this only makes the gap visible before the run starts.
+            var missing = new List<string>();
+            var broken = new List<string>();
+            var brokenSeen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var j in jobs)
+            {
+                if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) continue;
+                try
+                {
+                    // Same test as the loop's NotOnPath decision (no resolved path), so the warning and the rows cannot disagree.
+                    if (resolvedBy[j].Value?.Path == null && !missing.Contains(j.Tool, StringComparer.OrdinalIgnoreCase)) missing.Add(j.Tool);
+                }
+                catch (Exception ex)
+                {
+                    // Raised again at this job's turn in the loop; named here too, once per distinct message, before the run.
+                    var message = $"{j.Tool} ({ex.Message})";
+                    if (brokenSeen.Add(message)) broken.Add(message);
+                }
+            }
+            if (missing.Count > 0)
+                log.Write($"{missing.Count} selected tool(s) not found: {string.Join(", ", missing)}. Each is recorded as NotOnPath, not as a parse error. Install or register them on the Tools tab (or foton tools), then compose again.", StatusLevel.Warn);
+            if (broken.Count > 0)
+                log.Write($"{broken.Count} selected tool(s) could not be looked up: {string.Join("; ", broken)}. Compose stops at the first of them, after the tools before it have run.", StatusLevel.Warn);
+
             var run = new ComposeRun();
             var rows = run.Rows;
             bool anyTool = false;
             foreach (var j in jobs)
             {
-                overrides.TryGetValue(j.Tool, out var over);
-                var resolved = ToolResolver.Resolve(j.Tool, j.Names, over, toolRoot, pathEnv);
+                // A selected tool that cannot be looked up stops the run at its turn, as before. For an unselected tool the
+                // lookup error is swallowed so it cannot stop the run; its NotSelected row then has no version. A tool that
+                // resolves keeps its version on that row, as it always has (the status says it was not selected).
+                var selected = onlyTools == null || onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase);
+                ResolvedTool? resolved = null;
+                string? unselectedLookupError = null;
+                try { resolved = resolvedBy[j].Value; }
+                catch (Exception ex) when (!selected) { unselectedLookupError = ex.Message; }
                 var exe = resolved?.Path;
                 var ver = resolved?.Version ?? "";
                 var rulesVer = resolved?.RulesVersion ?? "";
@@ -202,7 +245,10 @@ namespace Foton.Tools
 
                 if (onlyTools != null && !onlyTools.Contains(j.Tool, StringComparer.OrdinalIgnoreCase))
                 {
-                    rows.Add(Row("NotSelected", "", $"{j.Tool} was not selected for this compose run."));
+                    var note = $"{j.Tool} was not selected for this compose run.";
+                    if (unselectedLookupError != null)
+                        note += $" Its tools.json lookup also failed ({unselectedLookupError}), so no version is shown.";
+                    rows.Add(Row("NotSelected", "", note));
                     Retained("not selected");
                     continue;
                 }

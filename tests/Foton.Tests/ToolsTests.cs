@@ -94,6 +94,8 @@ namespace Foton.Tests
                 Assert.NotNull(rules.RulesPath);
                 Assert.NotNull(rules.SigmaPath);
                 Assert.EndsWith("sigma-event-logs-all.yml", rules.MappingPath);
+                // A pinned install records the rule set as bundled with the release, so the list shows it.
+                Assert.Equal("bundled with release 9.9.9-test", ToolInstaller.List(t.File("tools")).Single(r => r.Name == "Chainsaw").RulesVersion);
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\9.9.9-test\chainsaw\sigma\regression_data")));
                 Assert.False(Directory.Exists(t.File(@"tools\chainsaw\sigma\regression_data")));
 
@@ -155,6 +157,119 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Damaged_or_hand_edited_rows_are_listed_as_registered_not_installed()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"ez\PECmd.exe"), "x");
+                // Only an Install-shaped row (no Verified key, a recorded ArchiveSha256) is a pinned install. A present
+                // but empty Verified, and a row with neither the key nor a hash, are damaged and must read as Registered.
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "PECmd",
+                    ["ExecutablePath"] = t.File(@"ez\PECmd.exe"),
+                    ["Version"] = "1.0",
+                    // A full-length hash, so the empty Verified value is the only reason this row is not a pin.
+                    ["ArchiveSha256"] = new string('A', 64),
+                    ["Verified"] = "",
+                });
+                var pe = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "PECmd");
+                Assert.Equal("Registered", pe.Source);
+                Assert.False(pe.Verified);
+
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "PECmd",
+                    ["ExecutablePath"] = t.File(@"ez\PECmd.exe"),
+                    ["Version"] = "1.0",
+                    ["ArchiveSha256"] = "",
+                });
+                pe = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "PECmd");
+                Assert.Equal("Registered", pe.Source);
+                Assert.False(pe.Verified);
+
+                // An edited Verified = True without a recorded hash is not a pin either.
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "PECmd",
+                    ["ExecutablePath"] = t.File(@"ez\PECmd.exe"),
+                    ["Version"] = "1.0",
+                    ["ArchiveSha256"] = "",
+                    ["Verified"] = "True",
+                });
+                pe = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "PECmd");
+                Assert.Equal("Registered", pe.Source);
+                Assert.False(pe.Verified);
+            }
+        }
+
+        [Fact]
+        public void A_registered_tool_with_a_rules_folder_reports_its_rule_set_in_the_list()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"hb\hayabusa.exe"), "x");
+                Write(t.File(@"hb\rules\rule.yml"), "x");
+                ToolRegistry.Register("Hayabusa", t.File("hb"), t.File("tools"));
+                var hb = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "Hayabusa");
+                // Unpinned local rules: the rule set is recorded as unversioned, not as a release number.
+                Assert.Equal("local-unversioned", hb.RulesVersion);
+            }
+        }
+
+        [Fact]
+        public void A_catalog_tool_that_is_not_installed_shows_the_rule_set_its_install_would_bring()
+        {
+            using (var t = new TempDir())
+            {
+                var hb = ToolInstaller.List(t.File("tools")).Single(r => r.Name == "Hayabusa");
+                Assert.Equal("Catalog", hb.Source);
+                // No version is invented before install: only that the pinned release bundles its rules.
+                Assert.Equal("bundled with release (on install)", hb.RulesVersion);
+            }
+        }
+
+        [Fact]
+        public void Compose_names_the_selected_tools_that_are_missing_before_it_runs()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"));
+                var log = new StringWriter();
+                var run = ComposeRunner.Run(pkg, new StatusLog(log), t.File("empty"), new Dictionary<string, string>(), System32Only, new[] { "PECmd" });
+                // Checked on the warning line itself, so no other line in the log can stand in for it.
+                var warning = log.ToString().Split('\n').Single(l => l.Contains("selected tool(s) not found"));
+                Assert.Contains("1 selected tool(s) not found: PECmd", warning);
+                Assert.Contains("recorded as NotOnPath", warning);
+                // A tool the operator left out is not named in the warning.
+                Assert.DoesNotContain("Hayabusa", warning);
+                // The inventory row the warning describes.
+                Assert.Equal("NotOnPath", run.Rows.Single(r => r.Tool == "PECmd").Status);
+            }
+        }
+
+        [Fact]
+        public void The_missing_tool_warning_is_logged_before_a_selected_tool_runs()
+        {
+            using (var t = new TempDir())
+            {
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"07_Event_Logs\evtx");
+                Write(Path.Combine(pkg, @"07_Event_Logs\evtx\Security.evtx"), "x");
+                Write(t.File(@"bin\evtxecmd.cmd"), ArgsRecorder(0));
+                var log = new StringWriter();
+                ComposeRunner.Run(pkg, new StatusLog(log), t.File("empty"),
+                    new Dictionary<string, string> { ["EvtxECmd"] = t.File(@"bin\evtxecmd.cmd") }, System32Only, new[] { "PECmd", "EvtxECmd" });
+                var text = log.ToString();
+                var warnAt = text.IndexOf("1 selected tool(s) not found: PECmd", StringComparison.Ordinal);
+                // The run line is "<Tool>: <resolved path> <args>"; match the exact path so no other line can stand in for it.
+                var runAt = text.IndexOf("EvtxECmd: " + t.File(@"bin\evtxecmd.cmd"), StringComparison.Ordinal);
+                Assert.True(warnAt >= 0, text);
+                Assert.True(runAt > warnAt, text);
+                Assert.True(File.Exists(t.File(@"bin\args_evtxecmd.txt")));
+            }
+        }
+
+        [Fact]
         public void Version_is_read_from_the_tool_when_the_binary_has_no_version_resource()
         {
             using (var t = new TempDir())
@@ -210,7 +325,7 @@ namespace Foton.Tests
                 Assert.Equal("9.9.9-test", ToolManifest.Get(installed, "Version"));
                 Assert.True(File.Exists(ToolManifest.Get(installed, "ExecutablePath")));
                 Assert.True(Directory.Exists(Path.Combine(root, "hayabusa", "rules")));
-                Assert.Equal("bundled-9.9.9-test", ToolManifest.Get(installed, "RulesVersion"));
+                Assert.Equal("bundled with release 9.9.9-test", ToolManifest.Get(installed, "RulesVersion"));
                 Assert.True(File.Exists(Path.Combine(root, "install.log")));
                 var resolved = ToolResolver.Resolve("Hayabusa", new[] { "hayabusa.exe" }, null, root, System32Only)!;
                 Assert.Equal("Manifest", resolved.Source);
@@ -220,6 +335,274 @@ namespace Foton.Tests
                 var bad = hash.Substring(0, 63) + (hash[63] == '0' ? "1" : "0");
                 var badEntry = ToolCatalog.Entry("Hayabusa", Catalog("catalog-bad.json", bad));
                 Assert.Contains("SHA-256 mismatch", Assert.Throws<InvalidDataException>(() => ToolInstaller.Install(badEntry, zip, root, Quiet())).Message);
+            }
+        }
+
+        [Fact]
+        public void A_release_without_rules_moves_the_earlier_rules_aside_and_records_no_rule_set()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"v1\hayabusa-1.0.0.exe"), "v1");
+                Write(t.File(@"v1\rules\dummy.yml"), "title: v1");
+                ZipFile.CreateFromDirectory(t.File("v1"), t.File("v1.zip"));
+                Write(t.File(@"v2\hayabusa-2.0.0.exe"), "v2");
+                ZipFile.CreateFromDirectory(t.File("v2"), t.File("v2.zip"));
+                var hash1 = Hashing.Sha256Hex(t.File("v1.zip"));
+                var hash2 = Hashing.Sha256Hex(t.File("v2.zip"));
+
+                string Catalog(string version, string sha)
+                {
+                    var file = t.File("catalog-" + version + ".json");
+                    File.WriteAllText(file, Json.Indented(new Dictionary<string, object?>
+                    {
+                        ["Tools"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["Name"] = "Hayabusa", ["Version"] = version, ["AssetName"] = "x.zip",
+                                ["DownloadUrl"] = "https://example.invalid/x.zip", ["ExpectedSha256"] = sha,
+                                ["License"] = "AGPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                                ["ExecutableNames"] = new[] { "hayabusa.exe", "hayabusa-*.exe" }, ["RulesRelativePath"] = "rules", ["Notes"] = "test pin",
+                            },
+                        },
+                    }));
+                    return file;
+                }
+                var root = t.File("tools");
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("1.0.0", hash1)), t.File("v1.zip"), root, Quiet());
+                Assert.True(Directory.Exists(Path.Combine(root, "hayabusa", "rules")));
+
+                // The next release ships no rules folder: the earlier one must not stay beside the tool and be recorded.
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("2.0.0", hash2)), t.File("v2.zip"), root, Quiet());
+                var installed = ToolManifest.Find("Hayabusa", root)!;
+                Assert.Equal("2.0.0", ToolManifest.Get(installed, "Version"));
+                Assert.False(Directory.Exists(Path.Combine(root, "hayabusa", "rules")));
+                Assert.Single(Directory.GetDirectories(Path.Combine(root, "hayabusa"), "rules.replaced-*"));
+                Assert.Equal("", ToolManifest.Get(installed, "RulesVersion"));
+                Assert.Equal("", ToolManifest.Get(installed, "RulesPath"));
+            }
+        }
+
+        [Fact]
+        public void An_untracked_tool_reports_an_unversioned_rule_set_only_when_rules_sit_beside_it()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"bin\chainsaw.exe"), "x");
+                Write(t.File(@"bin\rules\r.yml"), "x");
+                var withRules = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bin\chainsaw.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("local-unversioned", withRules.RulesVersion);
+
+                Write(t.File(@"bare\chainsaw.exe"), "x");
+                var bare = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bare\chainsaw.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("", bare.RulesVersion);
+            }
+        }
+
+        [Fact]
+        public void An_explicit_path_to_a_tracked_install_reports_what_it_recorded_and_a_plain_file_is_no_rule_set()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"tools\hayabusa\hayabusa.exe"), "x");
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "Hayabusa", ["Version"] = "4.0.0",
+                    ["ExecutablePath"] = t.File(@"tools\hayabusa\hayabusa.exe"), ["RulesVersion"] = "bundled with release 4.0.0",
+                });
+                var r = ToolResolver.Resolve("Hayabusa", new[] { "hayabusa.exe" }, t.File(@"tools\hayabusa\hayabusa.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("ToolPath", r.Source);
+                Assert.Equal("4.0.0", r.Version);
+                Assert.Equal("bundled with release 4.0.0", r.RulesVersion);
+
+                // A plain file named rules beside an executable is not a rule folder.
+                Write(t.File(@"bare\chainsaw.exe"), "x");
+                Write(t.File(@"bare\rules"), "not a folder");
+                var bare = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bare\chainsaw.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("", bare.RulesVersion);
+
+                // A damaged ExecutablePath with invalid path characters must not stop a valid explicit path.
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "Chainsaw", ["Version"] = "2.0.0", ["ExecutablePath"] = "bad<|name.exe",
+                });
+                var ok = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bare\chainsaw.exe"), t.File("tools"), System32Only)!;
+                Assert.Equal("ToolPath", ok.Source);
+            }
+        }
+
+        [Fact]
+        public void A_failed_reinstall_puts_back_the_earlier_folders_and_leaves_the_manifest_alone()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"v1\hayabusa-1.0.0.exe"), "v1");
+                Write(t.File(@"v1\rules\dummy.yml"), "title: v1");
+                ZipFile.CreateFromDirectory(t.File("v1"), t.File("v1.zip"));
+                // The next release ships a valid rules folder, then a plain file where the sigma folder belongs.
+                Write(t.File(@"v2\hayabusa-2.0.0.exe"), "v2");
+                Write(t.File(@"v2\rules\dummy.yml"), "title: v2");
+                Write(t.File(@"v2\sigma"), "a file, not a folder");
+                ZipFile.CreateFromDirectory(t.File("v2"), t.File("v2.zip"));
+                var hash1 = Hashing.Sha256Hex(t.File("v1.zip"));
+                var hash2 = Hashing.Sha256Hex(t.File("v2.zip"));
+
+                string Catalog(string version, string sha)
+                {
+                    var file = t.File("catalog-" + version + ".json");
+                    File.WriteAllText(file, Json.Indented(new Dictionary<string, object?>
+                    {
+                        ["Tools"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["Name"] = "Hayabusa", ["Version"] = version, ["AssetName"] = "x.zip",
+                                ["DownloadUrl"] = "https://example.invalid/x.zip", ["ExpectedSha256"] = sha,
+                                ["License"] = "AGPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                                ["ExecutableNames"] = new[] { "hayabusa.exe", "hayabusa-*.exe" },
+                                ["RulesRelativePath"] = "rules", ["SupportFolders"] = new[] { "rules", "sigma" }, ["Notes"] = "test pin",
+                            },
+                        },
+                    }));
+                    return file;
+                }
+                var root = t.File("tools");
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("1.0.0", hash1)), t.File("v1.zip"), root, Quiet());
+
+                Assert.Throws<InvalidDataException>(() =>
+                    ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("2.0.0", hash2)), t.File("v2.zip"), root, Quiet()));
+
+                // The earlier rules folder is back with its own content, nothing was left behind, and tools.json still says 1.0.0.
+                Assert.Equal("title: v1", File.ReadAllText(Path.Combine(root, "hayabusa", "rules", "dummy.yml")));
+                Assert.Empty(Directory.GetDirectories(Path.Combine(root, "hayabusa"), "rules.replaced-*"));
+                Assert.False(File.Exists(Path.Combine(root, "hayabusa", "hayabusa-2.0.0.exe")));
+                Assert.False(Directory.Exists(Path.Combine(root, "hayabusa", "2.0.0")));
+                Assert.Equal("1.0.0", ToolManifest.Get(ToolManifest.Find("Hayabusa", root)!, "Version"));
+            }
+        }
+
+        [Fact]
+        public void A_failed_reinstall_of_the_same_version_keeps_the_earlier_version_folder()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"v1\hayabusa-1.0.0.exe"), "v1");
+                ZipFile.CreateFromDirectory(t.File("v1"), t.File("v1.zip"));
+                // Same version, but the archive has no executable: the reinstall fails after the earlier folder was set aside.
+                Write(t.File(@"bad\readme.txt"), "no program here");
+                ZipFile.CreateFromDirectory(t.File("bad"), t.File("bad.zip"));
+                var hash1 = Hashing.Sha256Hex(t.File("v1.zip"));
+                var hashBad = Hashing.Sha256Hex(t.File("bad.zip"));
+
+                string Catalog(string sha)
+                {
+                    var file = t.File("catalog-" + sha.Substring(0, 8) + ".json");
+                    File.WriteAllText(file, Json.Indented(new Dictionary<string, object?>
+                    {
+                        ["Tools"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["Name"] = "Hayabusa", ["Version"] = "1.0.0", ["AssetName"] = "x.zip",
+                                ["DownloadUrl"] = "https://example.invalid/x.zip", ["ExpectedSha256"] = sha,
+                                ["License"] = "AGPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                                ["ExecutableNames"] = new[] { "hayabusa.exe", "hayabusa-*.exe" }, ["RulesRelativePath"] = "rules", ["Notes"] = "test pin",
+                            },
+                        },
+                    }));
+                    return file;
+                }
+                var root = t.File("tools");
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog(hash1)), t.File("v1.zip"), root, Quiet());
+
+                Assert.Throws<InvalidDataException>(() =>
+                    ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog(hashBad)), t.File("bad.zip"), root, Quiet()));
+
+                // The earlier 1.0.0 folder is back with its executable, and no partial extraction is left behind.
+                Assert.Equal("v1", File.ReadAllText(Path.Combine(root, "hayabusa", "1.0.0", "hayabusa-1.0.0.exe")));
+                Assert.Empty(Directory.GetDirectories(Path.Combine(root, "hayabusa"), "1.0.0.replaced-*"));
+                Assert.Equal("1.0.0", ToolManifest.Get(ToolManifest.Find("Hayabusa", root)!, "Version"));
+            }
+        }
+
+        [Fact]
+        public void A_damaged_tool_root_does_not_stop_a_valid_explicit_tool_path()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"bin\chainsaw.exe"), "x");
+                var r = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, t.File(@"bin\chainsaw.exe"), "bad<|root", System32Only)!;
+                Assert.Equal("ToolPath", r.Source);
+                Assert.Equal(t.File(@"bin\chainsaw.exe"), r.Path);
+            }
+        }
+
+        [Fact]
+        public void A_locked_manifest_undoes_the_swap_when_the_reinstall_cannot_record_it()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"v1\hayabusa-1.0.0.exe"), "v1");
+                Write(t.File(@"v1\rules\dummy.yml"), "title: v1");
+                ZipFile.CreateFromDirectory(t.File("v1"), t.File("v1.zip"));
+                Write(t.File(@"v2\hayabusa-2.0.0.exe"), "v2");
+                Write(t.File(@"v2\rules\dummy.yml"), "title: v2");
+                ZipFile.CreateFromDirectory(t.File("v2"), t.File("v2.zip"));
+                var hash1 = Hashing.Sha256Hex(t.File("v1.zip"));
+                var hash2 = Hashing.Sha256Hex(t.File("v2.zip"));
+
+                string Catalog(string version, string sha)
+                {
+                    var file = t.File("catalog-" + version + ".json");
+                    File.WriteAllText(file, Json.Indented(new Dictionary<string, object?>
+                    {
+                        ["Tools"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["Name"] = "Hayabusa", ["Version"] = version, ["AssetName"] = "x.zip",
+                                ["DownloadUrl"] = "https://example.invalid/x.zip", ["ExpectedSha256"] = sha,
+                                ["License"] = "AGPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                                ["ExecutableNames"] = new[] { "hayabusa.exe", "hayabusa-*.exe" }, ["RulesRelativePath"] = "rules", ["Notes"] = "test pin",
+                            },
+                        },
+                    }));
+                    return file;
+                }
+                var root = t.File("tools");
+                ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("1.0.0", hash1)), t.File("v1.zip"), root, Quiet());
+
+                // tools.json cannot be read or rewritten while held open, so the reinstall cannot record the new version.
+                using (new FileStream(ToolManifest.PathOf(root), FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    Assert.ThrowsAny<IOException>(() =>
+                        ToolInstaller.Install(ToolCatalog.Entry("Hayabusa", Catalog("2.0.0", hash2)), t.File("v2.zip"), root, Quiet()));
+                }
+
+                Assert.Equal("title: v1", File.ReadAllText(Path.Combine(root, "hayabusa", "rules", "dummy.yml")));
+                Assert.Empty(Directory.GetDirectories(Path.Combine(root, "hayabusa"), "rules.replaced-*"));
+                Assert.False(Directory.Exists(Path.Combine(root, "hayabusa", "2.0.0")));
+                Assert.False(File.Exists(Path.Combine(root, "hayabusa", "hayabusa-2.0.0.exe")));
+                Assert.Equal("1.0.0", ToolManifest.Get(ToolManifest.Find("Hayabusa", root)!, "Version"));
+            }
+        }
+
+        [Fact]
+        public void A_manifest_row_from_before_the_rules_field_reads_local_rules_beside_its_executable()
+        {
+            using (var t = new TempDir())
+            {
+                Write(t.File(@"tools\hayabusa\hayabusa.exe"), "x");
+                Write(t.File(@"tools\hayabusa\rules\r.yml"), "x");
+                // No RulesVersion key at all: written before the field existed.
+                ToolManifest.Save(t.File("tools"), new Dictionary<string, object?>
+                {
+                    ["Name"] = "Hayabusa", ["Version"] = "4.0.0", ["ExecutablePath"] = t.File(@"tools\hayabusa\hayabusa.exe"),
+                });
+                var r = ToolResolver.Resolve("Hayabusa", new[] { "hayabusa.exe" }, null, t.File("tools"), System32Only)!;
+                Assert.Equal("Manifest", r.Source);
+                Assert.Equal("local-unversioned", r.RulesVersion);
             }
         }
 

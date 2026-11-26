@@ -14,6 +14,13 @@ namespace Foton.Tools
     {
         public string Name { get; set; } = "";
         public string Version { get; set; } = "";
+        /// <summary>
+        /// Rule set the tool runs with (Hayabusa / Chainsaw), as recorded in tools.json. For a catalog tool that is not
+        /// installed, a generic note that the pinned release bundles rules, marked "(on install)". No version is shown there:
+        /// the rule set is only known once the archive is downloaded, and Install records what it actually finds.
+        /// Empty when the tool has no rules.
+        /// </summary>
+        public string RulesVersion { get; set; } = "";
         /// <summary>Installed (pinned, hash-verified), Registered (existing install, observed hash), or Catalog (not installed).</summary>
         public string Source { get; set; } = "";
         /// <summary>The executable compose will run, or the download URL for a catalog tool not yet installed.</summary>
@@ -39,36 +46,101 @@ namespace Foton.Tools
             foreach (var entry in catalog)
             {
                 var have = installed.FirstOrDefault(r => string.Equals(ToolManifest.Get(r, "Name"), entry.Name, StringComparison.OrdinalIgnoreCase));
-                // A catalog tool can also be registered from an existing folder; only a pinned install is verified.
-                bool registered = have != null && ToolManifest.Get(have, "Verified") == "False";
+                // A catalog tool can also be registered from an existing folder; only an explicit pinned install is verified.
+                bool verified = have != null && IsVerified(have);
                 rows.Add(new ToolListRow
                 {
                     Name = entry.Name,
                     Version = have != null ? ToolManifest.Get(have, "Version") : entry.Version,
-                    Source = have == null ? "Catalog" : registered ? "Registered" : "Installed",
+                    RulesVersion = have != null ? InstalledRules(have)
+                        // Not installed: nothing is recorded yet, and no version is invented. Say only that the pinned release
+                        // bundles rules; Install records the rule set it actually finds (a rules folder, or its git commit).
+                        : entry.RulesRelativePath.Length > 0 ? "bundled with release (on install)" : "",
+                    Source = have == null ? "Catalog" : verified ? "Installed" : "Registered",
                     Location = have != null ? ToolManifest.Get(have, "ExecutablePath") : entry.DownloadUrl,
-                    Verified = have != null && !registered,
+                    Verified = verified,
                     License = entry.License,
                     ExpectedSha256 = entry.ExpectedSha256,
-                    Notes = registered ? Observed(have!) : entry.Notes,
+                    Notes = have != null && !verified ? Observed(have) : entry.Notes,
                 });
             }
+            // Installs whose catalog entry is gone keep the verification they were recorded with: a pinned install stays Installed.
             foreach (var have in installed
                 .Where(r => !catalog.Any(c => string.Equals(c.Name, ToolManifest.Get(r, "Name"), StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(r => ToolManifest.Get(r, "Name"), StringComparer.OrdinalIgnoreCase))
+            {
+                var verified = IsVerified(have);
                 rows.Add(new ToolListRow
                 {
                     Name = ToolManifest.Get(have, "Name"),
                     Version = ToolManifest.Get(have, "Version"),
-                    Source = "Registered",
+                    RulesVersion = InstalledRules(have),
+                    Source = verified ? "Installed" : "Registered",
+                    Verified = verified,
                     Location = ToolManifest.Get(have, "ExecutablePath"),
-                    Notes = Observed(have),
+                    Notes = verified ? "Pinned install; no longer in the catalog." : Observed(have),
                 });
+            }
             return rows;
         }
 
-        static string Observed(Dictionary<string, object?> row) =>
-            $"Registered existing install; observed SHA-256 {ToolManifest.Get(row, "ObservedSha256")}, not verified against upstream.";
+        /// <summary>A pinned, hash-checked install. Install writes no Verified key and records the archive hash it matched
+        /// against the pin; Register writes Verified = False and an empty ArchiveSha256. So a row is verified only when it
+        /// has no Verified key AND a non-empty ArchiveSha256. Any other shape (a damaged or hand-edited row, including an
+        /// edited Verified = True with no hash) is unverified. Get alone cannot tell absent from empty, so the key is checked directly.</summary>
+        static bool IsVerified(Dictionary<string, object?> row) =>
+            !row.ContainsKey("Verified") && ToolManifest.Get(row, "ArchiveSha256").Length > 0;
+
+        static string Observed(Dictionary<string, object?> row)
+        {
+            var sha = ToolManifest.Get(row, "ObservedSha256");
+            return $"Registered existing install; observed SHA-256 {(sha.Length > 0 ? sha : "not recorded")}, not verified against upstream.";
+        }
+
+        /// <summary>Moves an existing file or folder aside to a timestamped .replaced- name and records it for rollback.
+        /// Returns the kept name, or null when nothing was there. Kept, not deleted, so local edits stay recoverable.</summary>
+        static string? MoveAside(string target, List<Moved> moved)
+        {
+            var isFolder = Directory.Exists(target);
+            if (!isFolder && !File.Exists(target)) return null;
+            var kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
+            for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
+            if (isFolder) Directory.Move(target, kept); else File.Move(target, kept);
+            moved.Add(new Moved { Original = target, Kept = kept, IsFolder = isFolder });
+            return kept;
+        }
+
+        /// <summary>An earlier file or folder moved aside during an install swap, recorded so a failed swap can put it back.</summary>
+        sealed class Moved
+        {
+            public string Original = "";
+            public string Kept = "";
+            public bool IsFolder;
+        }
+
+        /// <summary>Undoes a failed swap: removes what was written, then puts the earlier copies back. A failure here is
+        /// logged and does not replace the original error, which the caller rethrows.</summary>
+        static void RollBack(List<Moved> moved, List<string> copied, Action<string> log)
+        {
+            foreach (var written in copied)
+            {
+                try { if (Directory.Exists(written)) Directory.Delete(written, true); else if (File.Exists(written)) File.Delete(written); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                { log($"Could not remove the partial copy {written}: {ex.Message}"); }
+            }
+            for (int i = moved.Count - 1; i >= 0; i--)
+            {
+                var m = moved[i];
+                try { if (m.IsFolder) Directory.Move(m.Kept, m.Original); else File.Move(m.Kept, m.Original); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                { log($"Could not restore {m.Original}; the earlier copy is at {m.Kept}: {ex.Message}"); }
+            }
+        }
+
+        /// <summary>The rule set recorded at install. A manifest with no RulesVersion key predates the field, so it says
+        /// "not recorded" rather than reading as "no rules". A key that is present but empty means the install found none.</summary>
+        static string InstalledRules(Dictionary<string, object?> have) =>
+            have.ContainsKey("RulesVersion") ? ToolManifest.Get(have, "RulesVersion") : "not recorded";
 
         /// <summary>Where a pinned release unpacks: tool root\name\version.</summary>
         public static string Destination(CatalogTool entry, string? toolRoot) =>
@@ -81,8 +153,12 @@ namespace Foton.Tools
         public static Dictionary<string, object?> Install(CatalogTool entry, string? archivePath, string? toolRoot, StatusLog log)
         {
             // Support folders are deleted and replaced beside the tool, so each must be one plain folder name other than
-            // the version folder; checked before anything is downloaded, extracted, or deleted.
-            foreach (var leaf in entry.SupportFolders)
+            // the version folder; checked before anything is downloaded, extracted, or deleted. The rules folder is one of
+            // them even when SupportFolders leave it out, so it is checked here too (a nested path would otherwise fail later).
+            var folders = entry.SupportFolders.Count > 0 ? entry.SupportFolders.ToList() : new List<string> { "config", "rules" };
+            if (entry.RulesRelativePath.Length > 0 && !folders.Contains(entry.RulesRelativePath, StringComparer.OrdinalIgnoreCase))
+                folders.Add(entry.RulesRelativePath);
+            foreach (var leaf in folders)
                 if (!SupportFolderName.IsMatch(leaf ?? "") || string.Equals(leaf, entry.Version, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("Catalog support folder must be one plain folder name other than the version: '" + leaf + "'");
             var root = ToolManifest.Root(toolRoot);
@@ -119,42 +195,71 @@ namespace Foton.Tools
                 Log("Hash matches catalog pin.");
 
                 var destVer = Destination(entry, root);
-                if (Directory.Exists(destVer)) Directory.Delete(destVer, true);
-                SafeZip.Extract(zip, destVer, entry.SkipArchivePrefixes);
-                Log("Expanded to " + destVer);
-
-                var exe = entry.ExecutableNames.Select(n => FileSearch.Find(destVer, n, int.MaxValue).FirstOrDefault()).FirstOrDefault(f => f != null)
-                    ?? throw new InvalidDataException($"Archive extracted but no executable named {string.Join("/", entry.ExecutableNames)} was found under {destVer}.");
-
-                // A stable copy at tool root\name\<exe> with its support folders beside it (catalog SupportFolders;
-                // config\ and rules\ when the entry names none), so the path in tools.json does not change shape between
-                // releases that nest the binary differently. Folders from an earlier version are replaced: rules are
-                // part of the pinned release.
-                var stableDir = Path.GetDirectoryName(destVer)!;
-                var stable = Path.Combine(stableDir, Path.GetFileName(exe));
-                File.Copy(exe, stable, true);
-                var exeDir = Path.GetDirectoryName(exe)!;
-                foreach (var leaf in entry.SupportFolders.Count > 0 ? entry.SupportFolders : new[] { "config", "rules" })
+                // Every swap below is one transaction. An earlier install of this same version, the earlier executable, and the
+                // earlier support folders are each moved aside before their replacement is written. If any step fails, all of
+                // them are put back, so a failed reinstall leaves the tool as it was. tools.json is written last.
+                var moved = new List<Moved>();
+                var copied = new List<string>();
+                var notes = new List<string>();
+                string exe = "", stable = "", stableDir = "", exeDir = "";
+                try
                 {
-                    var src = Path.Combine(exeDir, leaf!);
-                    var dst = Path.GetFullPath(Path.Combine(stableDir, leaf!));
-                    if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
-                    if (!Directory.Exists(src) || File.Exists(dst)) continue;
-                    if (Directory.Exists(dst))
+                    MoveAside(destVer, moved);
+                    copied.Add(destVer);
+                    SafeZip.Extract(zip, destVer, entry.SkipArchivePrefixes);
+                    Log("Expanded to " + destVer);
+
+                    exe = entry.ExecutableNames.Select(n => FileSearch.Find(destVer, n, int.MaxValue).FirstOrDefault()).FirstOrDefault(f => f != null)
+                        ?? throw new InvalidDataException($"Archive extracted but no executable named {string.Join("/", entry.ExecutableNames)} was found under {destVer}.");
+
+                    // A stable copy at tool root\name\<exe> with its support folders beside it (catalog SupportFolders;
+                    // config\ and rules\ when the entry names none), so the path in tools.json does not change shape between
+                    // releases that nest the binary differently. Folders from an earlier version are replaced: rules are
+                    // part of the pinned release.
+                    stableDir = Path.GetDirectoryName(destVer)!;
+                    stable = Path.Combine(stableDir, Path.GetFileName(exe));
+                    exeDir = Path.GetDirectoryName(exe)!;
+
+                    var exeKept = MoveAside(stable, moved);
+                    copied.Add(stable);
+                    File.Copy(exe, stable, true);
+                    if (exeKept != null) notes.Add($"Kept the earlier executable as {Path.GetFileName(exeKept)}.");
+
+                    foreach (var leaf in folders)
                     {
-                        // Kept, not deleted: local edits (a tuned config, extra rules) stay recoverable beside the tool.
-                        var kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
-                        for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = dst + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
-                        Directory.Move(dst, kept);
-                        Log($"Moved the existing {leaf}\\ to {Path.GetFileName(kept)}\\ and installed the pinned release's copy.");
+                        var src = Path.Combine(exeDir, leaf!);
+                        var dst = Path.GetFullPath(Path.Combine(stableDir, leaf!));
+                        if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
+                        // A file where the release ships a folder would be skipped silently; refuse it instead.
+                        if (File.Exists(src)) throw new InvalidDataException($"The pinned release ships '{leaf}' as a file, not a folder.");
+
+                        // An earlier version's folder, or a stray file in the way, is moved aside even when this release has no
+                        // such folder, so a stale rules\ is never used (or recorded). Kept, not deleted: local edits stay recoverable.
+                        var kept = MoveAside(dst, moved);
+                        var srcExists = Directory.Exists(src);
+                        if (srcExists)
+                        {
+                            copied.Add(dst);
+                            CopyDirectory(src, dst);
+                        }
+                        if (kept != null)
+                            notes.Add(srcExists
+                                ? $"Moved the existing {leaf} to {Path.GetFileName(kept)} and installed the pinned release's copy."
+                                : $"The pinned release has no {leaf} folder beside its executable; moved the earlier {leaf} to {Path.GetFileName(kept)} so it is not used with this version.");
                     }
-                    CopyDirectory(src, dst);
                 }
+                catch
+                {
+                    RollBack(moved, copied, Log);
+                    throw;
+                }
+                foreach (var note in notes) Log(note);
                 exe = stable;
 
-                var rulesVersion = "bundled-" + entry.Version;
+                // Empty unless the pinned release actually brought a rules folder: a tool with none records no rule set.
+                var rulesVersion = "";
                 var rulesPath = "";
                 if (entry.RulesRelativePath.Length > 0)
                 {
@@ -162,7 +267,8 @@ namespace Foton.Tools
                     if (Directory.Exists(rp) || File.Exists(rp))
                     {
                         rulesPath = Path.GetFullPath(rp);
-                        rulesVersion = GitRulesVersion(rp) ?? rulesVersion;
+                        // Not a rule-set identifier: with no git history, it only says the rules came with this release.
+                        rulesVersion = GitRulesVersion(rp) ?? "bundled with release " + entry.Version;
                     }
                 }
 
@@ -179,7 +285,30 @@ namespace Foton.Tools
                     ["RulesVersion"] = rulesVersion,
                     ["License"] = entry.License,
                 };
-                Log("Wrote manifest " + ToolManifest.Save(root, record));
+                // tools.json is rewritten in place, so a failed write can leave it short. The earlier bytes are kept and put back,
+                // and the swap is undone, so a failed save leaves the tool and its record as they were.
+                var manifestPath = ToolManifest.PathOf(root);
+                var manifestExisted = File.Exists(manifestPath);
+                byte[]? priorManifest = null;
+                try
+                {
+                    // The read is inside the try too: if it fails, the swap is still undone below.
+                    if (manifestExisted) priorManifest = File.ReadAllBytes(manifestPath);
+                    Log("Wrote manifest " + ToolManifest.Save(root, record));
+                }
+                catch
+                {
+                    try
+                    {
+                        // Restore only what was read. A failed read leaves tools.json as it was, since Save never ran.
+                        if (!manifestExisted) { if (File.Exists(manifestPath)) File.Delete(manifestPath); }
+                        else if (priorManifest != null) File.WriteAllBytes(manifestPath, priorManifest);
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    { Log($"Could not restore {manifestPath}: {ex.Message}"); }
+                    RollBack(moved, copied, Log);
+                    throw;
+                }
                 Log($"Installed {entry.Name} {entry.Version} -> {exe}");
                 return record;
             }

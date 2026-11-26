@@ -414,7 +414,7 @@ namespace Foton.Cli
             var log = new StatusLog();
             Banner.Write(log, Banner.Kind.Workstation);
             foreach (var r in Foton.Tools.ToolInstaller.List(null))
-                log.WriteConsole($"   {r.Name,-14} {r.Version,-16} {r.Source,-11} {r.Location}", ConsoleColor.White);
+                log.WriteConsole($"   {r.Name,-14} {r.Version,-16} {r.RulesVersion,-18} {r.Source,-11} {r.Location}", ConsoleColor.White);
             log.WriteConsole("     Location is what compose runs (or the pinned download). Tools only on PATH are not listed.", ConsoleColor.DarkGray);
             return 0;
         }
