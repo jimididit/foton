@@ -321,6 +321,16 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void LongPath_Full_leaves_a_bare_long_share_without_a_trailing_backslash()
+        {
+            // A share root (\\server\share) with a long name is returned as given; a path under it keeps the dot-segment rules.
+            var share = @"\\" + new string('a', 120) + @"\" + new string('b', 120);
+            Assert.True(share.Length >= 240);
+            Assert.Equal(share, LongPath.Full(share));
+            Assert.Equal(share + @"\tool.exe", LongPath.Full(share + @"\x\..\tool.exe"));
+        }
+
+        [Fact]
         public void Register_finds_a_tool_under_a_folder_past_260_characters()
         {
             // Directory.Exists and File.Exists answer "missing" past 260 characters without the prefix, so registration threw

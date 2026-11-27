@@ -71,7 +71,10 @@ namespace Foton.Core
                 // \\server\share\rest: the share is the root, and . and .. are resolved in the rest only.
                 var segs = absolute.Substring(2).Split('\\');
                 if (segs.Length < 2) return absolute;
-                return Normalize(@"\\" + segs[0] + "\\" + segs[1] + "\\", string.Join("\\", segs, 2, segs.Length - 2));
+                var share = @"\\" + segs[0] + "\\" + segs[1];
+                var tail = string.Join("\\", segs, 2, segs.Length - 2);
+                // A bare share keeps its form (no trailing backslash added); only a path under the share gets one.
+                return tail.Length == 0 ? share : Normalize(share + "\\", tail);
             }
             // C:folder\tool is relative to the current folder of drive C, which Windows keeps per drive in the =C: variable
             // (the root when the variable is not set). Resolve it there, so the prefix can go on.
