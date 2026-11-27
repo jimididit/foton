@@ -16,6 +16,7 @@ namespace Foton.Core
     {
         const string Prefix = @"\\?\";
         const string UncPrefix = @"\\?\UNC\";
+        const string DevicePrefix = @"\\.\";
 
         // Short paths are passed through untouched, so every path that worked before still goes down the same call.
         const int Threshold = 240;
@@ -30,6 +31,8 @@ namespace Foton.Core
             // Windows reads / as \, but the prefixed form does not normalize, so a C:/... path would be sent as is.
             if (path.IndexOf('/') >= 0) path = path.Replace('/', '\\');
             if (path.StartsWith(Prefix, StringComparison.Ordinal)) return path;
+            // A device path (\\.\C:\...) names the same drive; it is not a share, so it maps to the drive form.
+            if (path.StartsWith(DevicePrefix, StringComparison.Ordinal)) return Prefix + path.Substring(DevicePrefix.Length);
             if (path.StartsWith(@"\\", StringComparison.Ordinal)) return UncPrefix + path.Substring(2);
             // Length is already 240 or more here, so only the drive form needs checking.
             if (path[1] != ':' || path[2] != '\\') return path;
@@ -79,6 +82,12 @@ namespace Foton.Core
             var cut = path.LastIndexOf('\\');
             if (cut < 0) return "";
             if (cut == 2 && path[1] == ':') return path.Substring(0, 3);
+            if (path.StartsWith(@"\\", StringComparison.Ordinal))
+            {
+                // \\server\share has no folder above it: its last backslash is the one after the server, not a parent.
+                var server = path.IndexOf('\\', 2);
+                if (server < 0 || path.IndexOf('\\', server + 1) < 0) return "";
+            }
             return path.Substring(0, cut);
         }
 

@@ -23,6 +23,7 @@ namespace Foton.Tools
         public static string? RecmdBatch(string recmdPath)
         {
             var dir = FolderOf(recmdPath);
+            if (dir.Length == 0) return null;
             return new[] { "DFIRBatch.reb", "Kroll_Batch.reb" }
                 .Select(leaf => Path.Combine(dir, "BatchExamples", leaf))
                 .FirstOrDefault(p => File.Exists(LongPath.For(p)));
@@ -36,6 +37,8 @@ namespace Foton.Tools
         {
             var dir = FolderOf(chainsawPath);
             var result = new ChainsawRules();
+            // No folder to look in (a bare name): report nothing rather than search the working folder.
+            if (dir.Length == 0) return result;
             var rules = Path.Combine(dir, "rules");
             if (Directory.Exists(LongPath.For(rules))) result.RulesPath = rules;
             var sigma = Path.Combine(dir, "sigma");

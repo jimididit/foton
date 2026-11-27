@@ -105,6 +105,7 @@ namespace Foton.Tools
         static string LocalRules(string exePath)
         {
             var dir = LongPath.ParentOf(exePath);
+            if (dir.Length == 0) return "";
             return new[] { "rules", "sigma" }.Any(leaf => Directory.Exists(LongPath.For(Path.Combine(dir, leaf))))
                 ? "local-unversioned" : "";
         }

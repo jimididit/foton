@@ -117,12 +117,22 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void LongPath_For_maps_a_device_path_to_the_drive_form_not_a_share()
+        {
+            // \\.\C:\... names the drive; treating it as \\server\share would rewrite it as a UNC share and break the path.
+            var drive = @"C:\" + string.Join(@"\", Enumerable.Repeat(new string('b', 60), 5));
+            Assert.Equal(@"\\?\" + drive, LongPath.For(@"\\.\" + drive));
+        }
+
+        [Fact]
         public void LongPath_ParentOf_keeps_the_backslash_of_a_drive_root()
         {
             // Cut at the last backslash, the parent of C:\tool.exe is "C:", which is drive-relative (a different folder).
             Assert.Equal(@"C:\", LongPath.ParentOf(@"C:\tool.exe"));
             Assert.Equal(@"C:\a", LongPath.ParentOf(@"C:\a\tool.exe"));
             Assert.Equal(@"\\server\share", LongPath.ParentOf(@"\\server\share\tool.exe"));
+            // A share root has no parent folder: \\server is not a valid path to hand to a file call.
+            Assert.Equal("", LongPath.ParentOf(@"\\server\share"));
             Assert.Equal("", LongPath.ParentOf("tool.exe"));
         }
 
