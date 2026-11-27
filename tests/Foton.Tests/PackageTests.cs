@@ -300,6 +300,10 @@ namespace Foton.Tests
         [InlineData("../escape.txt")]
         [InlineData("a/../../escape.txt")]
         [InlineData("C:/Windows/escape.txt")]
+        // Windows drops trailing dots and spaces from a name, so these reach the parent folder when a path is normalized.
+        [InlineData("a/.. /escape.txt")]
+        [InlineData("a/.../escape.txt")]
+        [InlineData("a/ ../escape.txt")]
         public void Refuses_zip_entries_outside_the_extraction_folder(string entryName)
         {
             using (var t = new TempDir())

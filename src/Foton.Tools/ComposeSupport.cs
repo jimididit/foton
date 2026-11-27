@@ -22,10 +22,10 @@ namespace Foton.Tools
         /// </summary>
         public static string? RecmdBatch(string recmdPath)
         {
-            var dir = Path.GetDirectoryName(Path.GetFullPath(recmdPath)) ?? "";
+            var dir = FolderOf(recmdPath);
             return new[] { "DFIRBatch.reb", "Kroll_Batch.reb" }
                 .Select(leaf => Path.Combine(dir, "BatchExamples", leaf))
-                .FirstOrDefault(File.Exists);
+                .FirstOrDefault(p => File.Exists(LongPath.For(p)));
         }
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace Foton.Tools
         /// </summary>
         public static ChainsawRules ChainsawRulesFor(string chainsawPath)
         {
-            var dir = Path.GetDirectoryName(Path.GetFullPath(chainsawPath)) ?? "";
+            var dir = FolderOf(chainsawPath);
             var result = new ChainsawRules();
             var rules = Path.Combine(dir, "rules");
             if (Directory.Exists(LongPath.For(rules))) result.RulesPath = rules;
@@ -64,6 +64,17 @@ namespace Foton.Tools
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
             return false;
+        }
+
+        /// <summary>
+        /// The folder a tool's executable sits in. Full path first (GetFullPath throws on 260 characters or more under
+        /// net462), then the text before its last backslash, so a deep tool folder still resolves.
+        /// </summary>
+        static string FolderOf(string exePath)
+        {
+            var full = LongPath.Full(exePath);
+            var cut = full.LastIndexOf('\\');
+            return cut < 0 ? "" : full.Substring(0, cut);
         }
     }
 }

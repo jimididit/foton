@@ -76,7 +76,8 @@ namespace Foton.Package
             foreach (var seg in name.Split('\\'))
             {
                 if (seg.Length == 0 || seg == ".") continue;
-                if (seg == "..") throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + stored);
+                // Windows drops trailing dots and spaces from a name, so ".. " and "..." reach the parent folder as "..".
+                if (seg.Trim('.', ' ').Length == 0) throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + stored);
                 target += "\\" + seg;
                 any = true;
             }

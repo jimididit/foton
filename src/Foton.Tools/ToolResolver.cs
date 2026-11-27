@@ -26,7 +26,7 @@ namespace Foton.Tools
             // Every output in the compose inventory names the tool version that wrote it: tools.json records it for
             // installs and registrations; anything else is read from the executable's version resource as found
             // (nothing is run here; compose asks a tool without one only when it is about to run it).
-            if (!string.IsNullOrWhiteSpace(toolPath) && File.Exists(toolPath!.Trim()))
+            if (!string.IsNullOrWhiteSpace(toolPath) && File.Exists(LongPath.For(toolPath!.Trim())))
             {
                 var path = LongPath.Full(toolPath.Trim());
                 // An explicit path to the executable tools.json already records is that install: report what it recorded.
