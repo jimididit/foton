@@ -12,7 +12,7 @@ namespace Foton.Core
         public static string Sha256Hex(string path)
         {
             using (var sha = SHA256.Create())
-            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var fs = new FileStream(LongPath.For(path), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 return ToHex(sha.ComputeHash(fs));
         }
 

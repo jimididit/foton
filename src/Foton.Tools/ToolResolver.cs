@@ -28,7 +28,7 @@ namespace Foton.Tools
             // (nothing is run here; compose asks a tool without one only when it is about to run it).
             if (!string.IsNullOrWhiteSpace(toolPath) && File.Exists(toolPath!.Trim()))
             {
-                var path = Path.GetFullPath(toolPath.Trim());
+                var path = LongPath.Full(toolPath.Trim());
                 // An explicit path to the executable tools.json already records is that install: report what it recorded.
                 // A damaged tool root must not stop a valid explicit path, so this lookup is best effort.
                 var recorded = TryFind(tool, toolRoot);
@@ -40,7 +40,7 @@ namespace Foton.Tools
             var installed = ToolManifest.Find(tool, toolRoot);
             var exe = installed != null ? ToolManifest.Get(installed, "ExecutablePath") : "";
             if (exe.Length > 0 && File.Exists(LongPath.For(exe)))
-                return FromManifest(installed!, Path.GetFullPath(exe), "Manifest");
+                return FromManifest(installed!, LongPath.Full(exe), "Manifest");
 
             foreach (var name in executableNames)
             {
@@ -85,7 +85,7 @@ namespace Foton.Tools
         {
             // File.Exists is checked first: a damaged ExecutablePath with invalid path characters must not make GetFullPath throw.
             if (recorded.Length == 0 || !File.Exists(LongPath.For(recorded))) return false;
-            return string.Equals(Path.GetFullPath(recorded), path, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(LongPath.Full(recorded), path, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>An untracked executable has no recorded rule set. If a rules or sigma folder sits beside it, the rules

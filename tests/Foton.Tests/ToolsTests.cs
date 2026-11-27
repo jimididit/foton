@@ -99,6 +99,8 @@ namespace Foton.Tests
                     Assert.DoesNotContain(@"\\?\", exe);
                     Assert.Equal(Path.Combine(deepRoot, @"chainsaw\chainsaw_x86_64-pc-windows-msvc.exe"), exe);
                     Assert.True(File.Exists(LongPath.For(Path.Combine(deepRoot, @"chainsaw\sigma\" + deepFolders + @"\rule.yml"))));
+                    // The installed executable hashes to the bytes on disk (its path is near the limit, not past it).
+                    Assert.Equal(Hashing.Sha256Hex(File.ReadAllBytes(exe)), Hashing.Sha256Hex(exe));
                     var rules = ComposeSupport.ChainsawRulesFor(exe);
                     Assert.NotNull(rules.RulesPath);
                     Assert.NotNull(rules.SigmaPath);
@@ -119,7 +121,7 @@ namespace Foton.Tests
             // Short and relative paths pass through untouched; a long drive path gets the \\?\ prefix; Plain undoes it.
             Assert.Equal(@"C:\tools\x.exe", LongPath.For(@"C:\tools\x.exe"));
             Assert.Equal(@"relative\" + new string('a', 300), LongPath.For(@"relative\" + new string('a', 300)));
-            Assert.Equal(@"\\server\share\" + new string('a', 300), LongPath.For(@"\\server\share\" + new string('a', 300)));
+            Assert.Equal(@"\\?\UNC\server\share\" + new string('a', 300), LongPath.For(@"\\server\share\" + new string('a', 300)));
             var longPath = @"C:\" + string.Join(@"\", Enumerable.Repeat(new string('b', 60), 5));
             Assert.Equal(@"\\?\" + longPath, LongPath.For(longPath));
             Assert.Equal(longPath, LongPath.Plain(LongPath.For(longPath)));

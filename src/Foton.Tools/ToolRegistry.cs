@@ -53,7 +53,7 @@ namespace Foton.Tools
                 }
 
                 var ver = VersionOf(tool.Name, exe);
-                var dir = Path.GetDirectoryName(exe)!;
+                var dir = exe.Substring(0, exe.LastIndexOf('\\'));
                 var rulesPath = new[] { "rules", "sigma" }.Select(leaf => Path.Combine(dir, leaf))
                     .FirstOrDefault(p => Directory.Exists(LongPath.For(p))) ?? "";
                 var sha = Hashing.Sha256Hex(exe);
@@ -87,7 +87,7 @@ namespace Foton.Tools
         /// <summary>The version resource only; runs nothing. "" when the file has none.</summary>
         public static string FileVersion(string exe)
         {
-            try { return (FileVersionInfo.GetVersionInfo(exe).FileVersion ?? "").Trim(); }
+            try { return (FileVersionInfo.GetVersionInfo(LongPath.For(exe)).FileVersion ?? "").Trim(); }
             catch (Exception ex) when (ex is IOException || ex is ArgumentException) { return ""; }
         }
 
