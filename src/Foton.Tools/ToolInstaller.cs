@@ -350,7 +350,8 @@ namespace Foton.Tools
                     // The ref is joined under .git\refs\heads. A rooted or drive value would make Path.Combine return that path itself,
                     // so only plain relative names (letters, digits, . _ - and /) are read.
                     var branch = m.Groups[1].Value;
-                    if (branch.Contains("..") || !Regex.IsMatch(branch, @"^[A-Za-z0-9._/-]+$")) return null;
+                    // No leading or doubled slash either: a leading slash makes the segment rooted, and Path.Combine would drop the folder.
+                    if (branch.Contains("..") || !Regex.IsMatch(branch, @"^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$")) return null;
                     var refPath = LongPath.For(Path.Combine(rulesDir, ".git", "refs", "heads", branch));
                     if (!File.Exists(refPath)) return null;
                     commit = (File.ReadLines(refPath).FirstOrDefault() ?? "").Trim();

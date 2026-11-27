@@ -344,6 +344,11 @@ namespace Foton.Tests
         [InlineData("a/.. /escape.txt")]
         [InlineData("a/.../escape.txt")]
         [InlineData("a/ ../escape.txt")]
+        // Windows device names write to the device even with an extension: nul.txt is the null device, not a file.
+        [InlineData("nul.txt")]
+        [InlineData("dir/CON")]
+        [InlineData("a/com1.log")]
+        [InlineData("a/Nul .log")]
         public void Refuses_zip_entries_outside_the_extraction_folder(string entryName)
         {
             using (var t = new TempDir())

@@ -71,6 +71,13 @@ namespace Foton.Package
         /// above the folder is refused (the entry would leave it). Returns null for an entry that names the folder itself.
         /// Root ends with a backslash.
         /// </summary>
+        static readonly HashSet<string> DeviceNames = new HashSet<string>(new[]
+        {
+            "CON", "PRN", "AUX", "NUL",
+            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        }, StringComparer.OrdinalIgnoreCase);
+
         static string? Contained(string root, string name, string stored)
         {
             var parts = new List<string>();
@@ -83,6 +90,10 @@ namespace Foton.Package
                     parts.RemoveAt(parts.Count - 1);
                     continue;
                 }
+                // Windows maps CON, NUL, COM1 and the like to devices even with an extension (nul.txt is the null device), so such a
+                // segment would write to a device instead of a file. Trailing spaces are ignored by Windows, so they are trimmed too.
+                if (DeviceNames.Contains(seg.Split('.')[0].TrimEnd(' ')))
+                    throw new InvalidDataException("Unsafe ZIP entry (Windows device name): " + stored);
                 // Windows drops trailing dots and spaces from a name, so "... " or ".. x" style segments are refused rather than guessed at.
                 if (seg.Trim('.', ' ').Length == 0) throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + stored);
                 parts.Add(seg);

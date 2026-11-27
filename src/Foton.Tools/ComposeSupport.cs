@@ -62,8 +62,9 @@ namespace Foton.Tools
         {
             foreach (var p in outputFiles)
             {
-                if (string.IsNullOrEmpty(p) || !File.Exists(p)) continue;
-                try { if (MissingRuntimeText.IsMatch(File.ReadAllText(p))) return true; }
+                // Prefixed for the disk calls: a captured output path past 260 characters would otherwise read as absent.
+                if (string.IsNullOrEmpty(p) || !File.Exists(LongPath.For(p))) continue;
+                try { if (MissingRuntimeText.IsMatch(File.ReadAllText(LongPath.For(p)))) return true; }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
             return false;
