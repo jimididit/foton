@@ -16,6 +16,15 @@ namespace Foton.Tools
     /// <summary>Starting an external tool. Standard input is closed so a tool that prompts fails instead of waiting forever.</summary>
     static class ToolProcess
     {
+        /// <summary>
+        /// The longest executable path Windows will start a program from without the long-path opt-in. Foton.exe is not
+        /// long-path aware, and a \\?\ prefix does not help: Process.Start fails with the prefix, a long working
+        /// directory, or none (checked on net472). Compose refuses such a tool with a row instead of trying.
+        /// </summary>
+        public const int MaxStartPath = 259;
+
+        public static bool CanStart(string exe) => exe.Length <= MaxStartPath;
+
         static ProcessStartInfo Info(string exe, string arguments, string? workDir) => new ProcessStartInfo(exe, arguments)
         {
             UseShellExecute = false,

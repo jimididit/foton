@@ -274,6 +274,13 @@ namespace Foton.Tools
                     Retained("NoInput");
                     continue;
                 }
+                // Checked before Pre, which may run the tool. Install still works under a long root; only starting it is refused.
+                if (!ToolProcess.CanStart(exe))
+                {
+                    rows.Add(Row("TooLongToStart", "", $"{j.Tool} is installed at a path of {exe.Length} characters. Windows starts a program only from a path under {ToolProcess.MaxStartPath + 1} characters, so {j.Tool} did not run. Install it under a shorter tool root, then run compose again."));
+                    Retained("TooLongToStart");
+                    continue;
+                }
                 var skip = j.Pre?.Invoke(exe);
                 if (skip != null)
                 {

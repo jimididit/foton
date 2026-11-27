@@ -308,6 +308,36 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_tool_at_a_path_too_long_to_start_is_refused_with_a_row_and_never_launched()
+        {
+            using (var t = new TempDir())
+            {
+                // One folder name of 210 characters pushes the executable past the 259-character start limit.
+                var deepDir = Path.Combine(t.Path, new string('d', 210));
+                var exe = Path.Combine(deepDir, "evtxecmd.cmd");
+                Directory.CreateDirectory(LongPath.For(deepDir));
+                File.WriteAllText(LongPath.For(exe), ArgsRecorder(0), Encoding.ASCII);
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"07_Event_Logs\evtx");
+                Write(Path.Combine(pkg, @"07_Event_Logs\evtx\Security.evtx"), "x");
+                try
+                {
+                    Assert.True(exe.Length > ToolProcess.MaxStartPath);
+                    var run = ComposeRunner.Run(pkg, Quiet(), t.File("empty"),
+                        new Dictionary<string, string> { ["EvtxECmd"] = exe }, System32Only, new[] { "EvtxECmd" });
+                    var row = run.Rows.Single(r => r.Tool == "EvtxECmd");
+                    Assert.Equal("TooLongToStart", row.Status);
+                    Assert.Contains("shorter tool root", row.Note);
+                    // Refused before anything ran: the recorder's arguments file was never written.
+                    Assert.False(File.Exists(LongPath.For(Path.Combine(deepDir, "args_evtxecmd.txt"))));
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(deepDir), true); } catch (IOException) { }
+                }
+            }
+        }
+
+        [Fact]
         public void Compose_names_the_selected_tools_that_are_missing_before_it_runs()
         {
             using (var t = new TempDir())

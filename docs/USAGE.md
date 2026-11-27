@@ -292,7 +292,7 @@ EZ Tools unpacks several tools into subfolders (`EvtxeCmd\`, `RECmd\`, `AmcacheP
 
 Each tool writes into a staging folder first. Compose replaces that tool's earlier output only when the run produces files, so those rows describe this run. When a tool does not run or produces nothing, earlier output is kept and listed as `Retained` with its hash, so the inventory still covers every file analyze reads. On a ZIP, compose works in the ZIP's `-extracted` folder like every other verb.
 
-Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are inventory rows (`NotOnPath`), not failures; a tool unchecked in the console's **Compose runs** list is `NotSelected`. Before the run starts, compose logs the selected tools it cannot find, so the gap shows up first. `foton tools` and the Tools tab show each tool's rule-set version (`RulesVersion`, `local-unversioned` for a local rules folder).
+Outputs land under `analysis\external\<tool>\` and are hashed. Missing tools are inventory rows (`NotOnPath`), not failures; a tool installed at a path of 260 characters or more is `TooLongToStart` (Windows cannot start it from there; install it under a shorter tool root); a tool unchecked in the console's **Compose runs** list is `NotSelected`. Before the run starts, compose logs the selected tools it cannot find, so the gap shows up first. `foton tools` and the Tools tab show each tool's rule-set version (`RulesVersion`, `local-unversioned` for a local rules folder).
 
 `analyze` then reads each tool's CSVs. The following table lists what it reports for each tool, and how to read it:
 
