@@ -291,7 +291,7 @@ namespace Foton.Tools
                 // Run in the tool's own install tree: Hayabusa resolves config\ relative to the working directory. Every
                 // path passed in is absolute, so this is safe for the EZ Tools too.
                 var workDir = Path.GetDirectoryName(exe);
-                if (string.IsNullOrEmpty(workDir) || !Directory.Exists(workDir)) workDir = toolDir;
+                if (string.IsNullOrEmpty(workDir) || !Directory.Exists(LongPath.For(workDir))) workDir = toolDir;
                 try
                 {
                     var args = CommandLine.Join(j.Args(exe, j.NeedDir, stage));
@@ -397,11 +397,11 @@ namespace Foton.Tools
             // directory, so point -r/-c at the install tree next to the binary.
             var a = new List<string> { sub, "-d", input, "-o", Path.Combine(output, "hayabusa.csv"), "-w", "-C", "-U" };
             var rules = Path.Combine(exeDir ?? "", "rules");
-            if (Directory.Exists(rules) || File.Exists(rules))
+            if (Directory.Exists(LongPath.For(rules)) || File.Exists(LongPath.For(rules)))
             {
                 a.AddRange(new[] { "-r", rules });
                 var cfg = Path.Combine(rules, "config");
-                if (Directory.Exists(cfg) || File.Exists(cfg)) a.AddRange(new[] { "-c", cfg });
+                if (Directory.Exists(LongPath.For(cfg)) || File.Exists(LongPath.For(cfg))) a.AddRange(new[] { "-c", cfg });
             }
             return a;
         }

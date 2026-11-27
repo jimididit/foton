@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Foton.Core;
 
 namespace Foton.Tools
 {
@@ -38,7 +39,7 @@ namespace Foton.Tools
 
             var installed = ToolManifest.Find(tool, toolRoot);
             var exe = installed != null ? ToolManifest.Get(installed, "ExecutablePath") : "";
-            if (exe.Length > 0 && File.Exists(exe))
+            if (exe.Length > 0 && File.Exists(LongPath.For(exe)))
                 return FromManifest(installed!, Path.GetFullPath(exe), "Manifest");
 
             foreach (var name in executableNames)
@@ -83,7 +84,7 @@ namespace Foton.Tools
         static bool SameFile(string recorded, string path)
         {
             // File.Exists is checked first: a damaged ExecutablePath with invalid path characters must not make GetFullPath throw.
-            if (recorded.Length == 0 || !File.Exists(recorded)) return false;
+            if (recorded.Length == 0 || !File.Exists(LongPath.For(recorded))) return false;
             return string.Equals(Path.GetFullPath(recorded), path, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -93,8 +94,9 @@ namespace Foton.Tools
         /// unrelated rules\ is reported too, because that is what the tool itself loads from beside its executable.</summary>
         static string LocalRules(string exePath)
         {
-            var dir = Path.GetDirectoryName(exePath) ?? "";
-            return new[] { "rules", "sigma" }.Any(leaf => Directory.Exists(Path.Combine(dir, leaf)))
+            var cut = exePath.LastIndexOf('\\');
+            var dir = cut < 0 ? "" : exePath.Substring(0, cut);
+            return new[] { "rules", "sigma" }.Any(leaf => Directory.Exists(LongPath.For(Path.Combine(dir, leaf))))
                 ? "local-unversioned" : "";
         }
 

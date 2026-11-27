@@ -8,6 +8,7 @@ Each release (tags `v2.*` and later) takes its "What's new" notes from the secti
 
 - Compose logs the selected tools it cannot find before the run starts (`N selected tool(s) not found: ...`), so a gap shows up first. Each still gets its `NotOnPath` row; no status changes.
 - The rule-set version (`RulesVersion`: Hayabusa and Chainsaw rules, `local-unversioned` for a local rules folder) is shown in the console's Tools tab and in `foton tools`.
+- `foton tools` installs no longer fail when the tool folder is deep. Under a long profile path, the pinned Chainsaw Sigma rules passed the 260-character limit and the install stopped with `Could not find a part of the path`. Tool file operations now use the long-path form where a path is long, and a failed reinstall removes its partial copy under a long folder and restores the earlier one. Recorded paths keep the normal form.
 
 ## [3.3.2] - 2026-11-26
 

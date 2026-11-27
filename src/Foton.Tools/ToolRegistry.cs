@@ -55,7 +55,7 @@ namespace Foton.Tools
                 var ver = VersionOf(tool.Name, exe);
                 var dir = Path.GetDirectoryName(exe)!;
                 var rulesPath = new[] { "rules", "sigma" }.Select(leaf => Path.Combine(dir, leaf))
-                    .FirstOrDefault(Directory.Exists) ?? "";
+                    .FirstOrDefault(p => Directory.Exists(LongPath.For(p))) ?? "";
                 var sha = Hashing.Sha256Hex(exe);
                 ToolManifest.Save(root, new Dictionary<string, object?>
                 {
@@ -120,12 +120,21 @@ namespace Foton.Tools
             {
                 var item = pending.Pop();
                 string[] files, dirs;
-                try { files = Directory.GetFiles(item.Key); dirs = Directory.GetDirectories(item.Key); }
+                // Enumerated with the long-path form (a rule tree under the tool root is often past 260 characters); the
+                // names handed back and pushed are the normal form, so callers and tools.json never see the prefix.
+                try { files = Directory.GetFiles(LongPath.For(item.Key)); dirs = Directory.GetDirectories(LongPath.For(item.Key)); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { continue; }
-                foreach (var f in files.Where(f => Like(Path.GetFileName(f), pattern))) yield return f;
+                foreach (var found in files)
+                {
+                    var f = LongPath.Plain(found);
+                    if (Like(f.Substring(f.LastIndexOf('\\') + 1), pattern)) yield return f;
+                }
                 if (item.Value >= maxDepth) continue;
                 for (int i = dirs.Length - 1; i >= 0; i--)
-                    if (!Reparse(dirs[i])) pending.Push(new KeyValuePair<string, int>(dirs[i], item.Value + 1));
+                {
+                    var d = LongPath.Plain(dirs[i]);
+                    if (!Reparse(d)) pending.Push(new KeyValuePair<string, int>(d, item.Value + 1));
+                }
             }
         }
 
@@ -135,7 +144,7 @@ namespace Foton.Tools
 
         static bool Reparse(string path)
         {
-            try { return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0; }
+            try { return (File.GetAttributes(LongPath.For(path)) & FileAttributes.ReparsePoint) != 0; }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return true; }
         }
     }

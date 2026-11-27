@@ -58,6 +58,82 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_tool_root_past_260_characters_still_installs_a_release_with_deep_rule_files()
+        {
+            // The Chainsaw Sigma tree is several folders deep. Under a long profile path the extracted and copied rule files
+            // pass 260 characters, which net462 rejects unless the path carries the \\?\ prefix (LongPath). The zip is built
+            // directly: writing the long payload with the test helper would hit the same limit.
+            using (var t = new TempDir())
+            {
+                var deepRoot = t.File(new string('s', 60) + @"\" + new string('t', 60) + @"\tools");
+                var deepFolders = string.Join(@"\", Enumerable.Repeat(new string('r', 60), 4));
+                var zip = t.File("chainsaw-deep.zip");
+                using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    WriteEntry(archive, "chainsaw/chainsaw_x86_64-pc-windows-msvc.exe", "fake-chainsaw");
+                    WriteEntry(archive, "chainsaw/sigma/" + deepFolders.Replace('\\', '/') + "/rule.yml", "title: deep");
+                    WriteEntry(archive, "chainsaw/rules/evtx/log_tampering.yml", "title: test");
+                    WriteEntry(archive, "chainsaw/mappings/sigma-event-logs-all.yml", "name: test");
+                }
+                File.WriteAllText(t.File("catalog.json"), Json.Indented(new Dictionary<string, object?>
+                {
+                    ["Tools"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["Name"] = "Chainsaw", ["Version"] = "9.9.9-test", ["AssetName"] = "chainsaw-deep.zip",
+                            ["DownloadUrl"] = "https://example.invalid/chainsaw-deep.zip", ["ExpectedSha256"] = Hashing.Sha256Hex(zip),
+                            ["License"] = "GPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                            ["ExecutableNames"] = new[] { "chainsaw_x86_64-pc-windows-msvc.exe", "chainsaw.exe" }, ["RulesRelativePath"] = "rules",
+                            ["SupportFolders"] = new[] { "rules", "sigma", "mappings" },
+                            ["Notes"] = "test pin",
+                        },
+                    },
+                }));
+                try
+                {
+                    var entry = ToolCatalog.Entry("Chainsaw", t.File("catalog.json"));
+                    var record = ToolInstaller.Install(entry, zip, deepRoot, Quiet());
+                    var exe = (string)record["ExecutablePath"]!;
+                    // The record holds the normal form, never the prefix.
+                    Assert.DoesNotContain(@"\\?\", exe);
+                    Assert.Equal(Path.Combine(deepRoot, @"chainsaw\chainsaw_x86_64-pc-windows-msvc.exe"), exe);
+                    Assert.True(File.Exists(LongPath.For(Path.Combine(deepRoot, @"chainsaw\sigma\" + deepFolders + @"\rule.yml"))));
+                    var rules = ComposeSupport.ChainsawRulesFor(exe);
+                    Assert.NotNull(rules.RulesPath);
+                    Assert.NotNull(rules.SigmaPath);
+                    Assert.EndsWith("sigma-event-logs-all.yml", rules.MappingPath);
+                    Assert.Equal("bundled with release 9.9.9-test", ToolInstaller.List(deepRoot).Single(r => r.Name == "Chainsaw").RulesVersion);
+                }
+                finally
+                {
+                    // TempDir cannot delete past 260 characters; remove the deep tool root here.
+                    try { Directory.Delete(LongPath.For(deepRoot), true); } catch (IOException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void LongPath_prefixes_only_long_local_paths_and_Plain_gives_the_normal_form_back()
+        {
+            // Short and relative paths pass through untouched; a long drive path gets the \\?\ prefix; Plain undoes it.
+            Assert.Equal(@"C:\tools\x.exe", LongPath.For(@"C:\tools\x.exe"));
+            Assert.Equal(@"relative\" + new string('a', 300), LongPath.For(@"relative\" + new string('a', 300)));
+            Assert.Equal(@"\\server\share\" + new string('a', 300), LongPath.For(@"\\server\share\" + new string('a', 300)));
+            var longPath = @"C:\" + string.Join(@"\", Enumerable.Repeat(new string('b', 60), 5));
+            Assert.Equal(@"\\?\" + longPath, LongPath.For(longPath));
+            Assert.Equal(longPath, LongPath.Plain(LongPath.For(longPath)));
+            Assert.Equal(longPath, LongPath.Plain(longPath));
+            Assert.Equal(@"\\?\" + longPath, LongPath.For(LongPath.For(longPath)));
+        }
+
+        static void WriteEntry(ZipArchive archive, string name, string text)
+        {
+            using (var writer = new StreamWriter(archive.CreateEntry(name).Open()))
+                writer.Write(text);
+        }
+
+        [Fact]
         public void A_Chainsaw_archive_installs_with_rules_sigma_and_mappings_beside_the_binary()
         {
             using (var t = new TempDir())

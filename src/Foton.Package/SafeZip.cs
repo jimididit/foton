@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using Foton.Core;
 
 namespace Foton.Package
 {
@@ -45,20 +46,41 @@ namespace Foton.Package
                     // Skipped entries are never written, so they skip the containment check (and any over-long path).
                     var stored = entry.FullName.Replace('\\', '/');
                     if (skipPrefixes != null && skipPrefixes.Any(p => stored.StartsWith(p, StringComparison.OrdinalIgnoreCase))) continue;
-                    var target = Path.GetFullPath(Path.Combine(root, name));
-                    if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + entry.FullName);
+                    // Built lexically: GetFullPath throws for a path of 260 characters or more under net462, and the
+                    // tool root's rule files are that long. A ".." segment is refused outright, so the result stays inside root.
+                    var target = Contained(root, name, entry.FullName);
+                    if (target == null) continue;
                     var measured = measureRoot + target.Substring(root.Length);
-                    if (tooLong != null && (Math.Max(target.Length, measured.Length) > 259 || Path.GetDirectoryName(measured)!.Length > 247 || Path.GetDirectoryName(target)!.Length > 247))
+                    var parent = target.Substring(0, target.LastIndexOf('\\'));
+                    if (tooLong != null && (Math.Max(target.Length, measured.Length) > 259 || measured.Substring(0, measured.LastIndexOf('\\')).Length > 247 || parent.Length > 247))
                     {
                         tooLong.Add(entry.FullName);
                         continue;
                     }
-                    if (name.EndsWith("\\", StringComparison.Ordinal)) { Directory.CreateDirectory(target); continue; }
-                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                    entry.ExtractToFile(target, overwrite: false);
+                    if (name.EndsWith("\\", StringComparison.Ordinal)) { Directory.CreateDirectory(LongPath.For(target)); continue; }
+                    Directory.CreateDirectory(LongPath.For(parent));
+                    entry.ExtractToFile(LongPath.For(target), overwrite: false);
                 }
             }
+        }
+
+        /// <summary>
+        /// The full path an entry lands on, built from its segments without touching the file system. Empty and "."
+        /// segments are dropped; a ".." segment is refused (the entry would leave the folder). Returns null for an entry
+        /// that names the folder itself. Root ends with a backslash.
+        /// </summary>
+        static string? Contained(string root, string name, string stored)
+        {
+            var target = root.TrimEnd('\\');
+            var any = false;
+            foreach (var seg in name.Split('\\'))
+            {
+                if (seg.Length == 0 || seg == ".") continue;
+                if (seg == "..") throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + stored);
+                target += "\\" + seg;
+                any = true;
+            }
+            return any ? target : null;
         }
     }
 }

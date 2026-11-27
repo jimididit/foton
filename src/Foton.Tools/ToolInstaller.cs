@@ -101,11 +101,11 @@ namespace Foton.Tools
         /// Returns the kept name, or null when nothing was there. Kept, not deleted, so local edits stay recoverable.</summary>
         static string? MoveAside(string target, List<Moved> moved)
         {
-            var isFolder = Directory.Exists(target);
-            if (!isFolder && !File.Exists(target)) return null;
+            var isFolder = Directory.Exists(LongPath.For(target));
+            if (!isFolder && !File.Exists(LongPath.For(target))) return null;
             var kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
-            for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
-            if (isFolder) Directory.Move(target, kept); else File.Move(target, kept);
+            for (int n = 2; Directory.Exists(LongPath.For(kept)) || File.Exists(LongPath.For(kept)); n++) kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
+            if (isFolder) Directory.Move(LongPath.For(target), LongPath.For(kept)); else File.Move(LongPath.For(target), LongPath.For(kept));
             moved.Add(new Moved { Original = target, Kept = kept, IsFolder = isFolder });
             return kept;
         }
@@ -124,14 +124,14 @@ namespace Foton.Tools
         {
             foreach (var written in copied)
             {
-                try { if (Directory.Exists(written)) Directory.Delete(written, true); else if (File.Exists(written)) File.Delete(written); }
+                try { if (Directory.Exists(LongPath.For(written))) DeleteTree(written); else if (File.Exists(LongPath.For(written))) File.Delete(LongPath.For(written)); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 { log($"Could not remove the partial copy {written}: {ex.Message}"); }
             }
             for (int i = moved.Count - 1; i >= 0; i--)
             {
                 var m = moved[i];
-                try { if (m.IsFolder) Directory.Move(m.Kept, m.Original); else File.Move(m.Kept, m.Original); }
+                try { if (m.IsFolder) Directory.Move(LongPath.For(m.Kept), LongPath.For(m.Original)); else File.Move(LongPath.For(m.Kept), LongPath.For(m.Original)); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 { log($"Could not restore {m.Original}; the earlier copy is at {m.Kept}: {ex.Message}"); }
             }
@@ -216,29 +216,29 @@ namespace Foton.Tools
                     // config\ and rules\ when the entry names none), so the path in tools.json does not change shape between
                     // releases that nest the binary differently. Folders from an earlier version are replaced: rules are
                     // part of the pinned release.
-                    stableDir = Path.GetDirectoryName(destVer)!;
-                    stable = Path.Combine(stableDir, Path.GetFileName(exe));
-                    exeDir = Path.GetDirectoryName(exe)!;
+                    // Parent and leaf are cut from the string, not Path.GetDirectoryName: the version folder can be past 260
+                    // characters under net462 and the path APIs here reject that.
+                    stableDir = Parent(destVer);
+                    stable = Path.Combine(stableDir, Leaf(exe));
+                    exeDir = Parent(exe);
 
                     var exeKept = MoveAside(stable, moved);
                     copied.Add(stable);
-                    File.Copy(exe, stable, true);
+                    File.Copy(LongPath.For(exe), LongPath.For(stable), true);
                     if (exeKept != null) notes.Add($"Kept the earlier executable as {Path.GetFileName(exeKept)}.");
 
                     foreach (var leaf in folders)
                     {
+                        // leaf passed SupportFolderName and is not the version, so dst is one folder directly under stableDir.
                         var src = Path.Combine(exeDir, leaf!);
-                        var dst = Path.GetFullPath(Path.Combine(stableDir, leaf!));
-                        if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
-                            || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
-                            throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
+                        var dst = Path.Combine(stableDir, leaf!);
                         // A file where the release ships a folder would be skipped silently; refuse it instead.
-                        if (File.Exists(src)) throw new InvalidDataException($"The pinned release ships '{leaf}' as a file, not a folder.");
+                        if (File.Exists(LongPath.For(src))) throw new InvalidDataException($"The pinned release ships '{leaf}' as a file, not a folder.");
 
                         // An earlier version's folder, or a stray file in the way, is moved aside even when this release has no
                         // such folder, so a stale rules\ is never used (or recorded). Kept, not deleted: local edits stay recoverable.
                         var kept = MoveAside(dst, moved);
-                        var srcExists = Directory.Exists(src);
+                        var srcExists = Directory.Exists(LongPath.For(src));
                         if (srcExists)
                         {
                             copied.Add(dst);
@@ -264,9 +264,9 @@ namespace Foton.Tools
                 if (entry.RulesRelativePath.Length > 0)
                 {
                     var rp = Path.Combine(stableDir, entry.RulesRelativePath);
-                    if (Directory.Exists(rp) || File.Exists(rp))
+                    if (Directory.Exists(LongPath.For(rp)) || File.Exists(LongPath.For(rp)))
                     {
-                        rulesPath = Path.GetFullPath(rp);
+                        rulesPath = rp;
                         // Not a rule-set identifier: with no git history, it only says the rules came with this release.
                         rulesVersion = GitRulesVersion(rp) ?? "bundled with release " + entry.Version;
                     }
@@ -340,7 +340,7 @@ namespace Foton.Tools
         {
             try
             {
-                var head = Path.Combine(rulesDir, ".git", "HEAD");
+                var head = LongPath.For(Path.Combine(rulesDir, ".git", "HEAD"));
                 if (!File.Exists(head)) return null;
                 var h = (File.ReadLines(head).FirstOrDefault() ?? "").Trim();
                 var m = Regex.Match(h, @"ref:\s*refs/heads/(.+)$");
@@ -348,7 +348,7 @@ namespace Foton.Tools
                 if (m.Success)
                 {
                     if (m.Groups[1].Value.Contains("..")) return null;
-                    var refPath = Path.Combine(rulesDir, ".git", "refs", "heads", m.Groups[1].Value);
+                    var refPath = LongPath.For(Path.Combine(rulesDir, ".git", "refs", "heads", m.Groups[1].Value));
                     if (!File.Exists(refPath)) return null;
                     commit = (File.ReadLines(refPath).FirstOrDefault() ?? "").Trim();
                 }
@@ -360,9 +360,47 @@ namespace Foton.Tools
 
         static void CopyDirectory(string src, string dst)
         {
-            Directory.CreateDirectory(dst);
-            foreach (var f in Directory.GetFiles(src)) File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), true);
-            foreach (var d in Directory.GetDirectories(src)) CopyDirectory(d, Path.Combine(dst, Path.GetFileName(d)));
+            // Names come back prefixed from a prefixed folder; they are turned back to the normal form before they are
+            // joined with dst, so the destination is built from the same plain strings as everything else.
+            Directory.CreateDirectory(LongPath.For(dst));
+            foreach (var found in Directory.GetFiles(LongPath.For(src)))
+            {
+                var f = LongPath.Plain(found);
+                File.Copy(LongPath.For(f), LongPath.For(Path.Combine(dst, Leaf(f))), true);
+            }
+            foreach (var found in Directory.GetDirectories(LongPath.For(src)))
+            {
+                var d = LongPath.Plain(found);
+                CopyDirectory(d, Path.Combine(dst, Leaf(d)));
+            }
         }
+
+        /// <summary>
+        /// Recursive delete that works past 260 characters. On net462, Directory.Delete(path, true) rebuilds child names
+        /// without the prefix and fails on a deep tree, so the walk is done here with the prefix on every call. Links
+        /// (junctions, symlinks) are removed as links and never followed, so nothing outside the tree is touched.
+        /// </summary>
+        static void DeleteTree(string path)
+        {
+            // Every call takes LongPath.For on the name it is given. A short folder can list children past 260
+            // characters (the threshold is on the folder's own length), so each child is prefixed by its own length.
+            foreach (var file in Directory.GetFiles(LongPath.For(path)))
+            {
+                File.SetAttributes(LongPath.For(file), FileAttributes.Normal);
+                File.Delete(LongPath.For(file));
+            }
+            foreach (var dir in Directory.GetDirectories(LongPath.For(path)))
+            {
+                if ((File.GetAttributes(LongPath.For(dir)) & FileAttributes.ReparsePoint) != 0) Directory.Delete(LongPath.For(dir));
+                else DeleteTree(dir);
+            }
+            Directory.Delete(LongPath.For(path));
+        }
+
+        /// <summary>The text after the last backslash. A substring, not Path.GetFileName, so it works on any length.</summary>
+        static string Leaf(string path) => path.Substring(path.LastIndexOf('\\') + 1);
+
+        /// <summary>The text before the last backslash. A substring, not Path.GetDirectoryName, so it works on any length.</summary>
+        static string Parent(string path) => path.Substring(0, path.LastIndexOf('\\'));
     }
 }

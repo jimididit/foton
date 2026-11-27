@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Foton.Core;
 
 namespace Foton.Tools
 {
@@ -36,11 +37,11 @@ namespace Foton.Tools
             var dir = Path.GetDirectoryName(Path.GetFullPath(chainsawPath)) ?? "";
             var result = new ChainsawRules();
             var rules = Path.Combine(dir, "rules");
-            if (Directory.Exists(rules)) result.RulesPath = rules;
+            if (Directory.Exists(LongPath.For(rules))) result.RulesPath = rules;
             var sigma = Path.Combine(dir, "sigma");
             var mapping = new[] { Path.Combine(dir, "mappings", "sigma-event-logs-all.yml"), Path.Combine(dir, "sigma-event-logs-all.yml") }
-                .FirstOrDefault(File.Exists);
-            if (Directory.Exists(sigma) && mapping != null)
+                .FirstOrDefault(p => File.Exists(LongPath.For(p)));
+            if (Directory.Exists(LongPath.For(sigma)) && mapping != null)
             {
                 result.SigmaPath = sigma;
                 result.MappingPath = mapping;
