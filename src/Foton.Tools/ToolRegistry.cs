@@ -53,7 +53,7 @@ namespace Foton.Tools
                 }
 
                 var ver = VersionOf(tool.Name, exe);
-                var dir = exe.Substring(0, exe.LastIndexOf('\\'));
+                var dir = LongPath.ParentOf(exe);
                 var rulesPath = new[] { "rules", "sigma" }.Select(leaf => Path.Combine(dir, leaf))
                     .FirstOrDefault(p => Directory.Exists(LongPath.For(p))) ?? "";
                 var sha = Hashing.Sha256Hex(exe);

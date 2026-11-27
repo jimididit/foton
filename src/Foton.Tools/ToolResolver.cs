@@ -104,8 +104,7 @@ namespace Foton.Tools
         /// unrelated rules\ is reported too, because that is what the tool itself loads from beside its executable.</summary>
         static string LocalRules(string exePath)
         {
-            var cut = exePath.LastIndexOf('\\');
-            var dir = cut < 0 ? "" : exePath.Substring(0, cut);
+            var dir = LongPath.ParentOf(exePath);
             return new[] { "rules", "sigma" }.Any(leaf => Directory.Exists(LongPath.For(Path.Combine(dir, leaf))))
                 ? "local-unversioned" : "";
         }

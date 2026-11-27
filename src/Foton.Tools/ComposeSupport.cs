@@ -72,9 +72,7 @@ namespace Foton.Tools
         /// </summary>
         static string FolderOf(string exePath)
         {
-            var full = LongPath.Full(exePath);
-            var cut = full.LastIndexOf('\\');
-            return cut < 0 ? "" : full.Substring(0, cut);
+            return LongPath.ParentOf(LongPath.Full(exePath));
         }
     }
 }

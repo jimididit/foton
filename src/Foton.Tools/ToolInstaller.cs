@@ -401,6 +401,6 @@ namespace Foton.Tools
         static string Leaf(string path) => path.Substring(path.LastIndexOf('\\') + 1);
 
         /// <summary>The text before the last backslash. A substring, not Path.GetDirectoryName, so it works on any length.</summary>
-        static string Parent(string path) => path.Substring(0, path.LastIndexOf('\\'));
+        static string Parent(string path) => LongPath.ParentOf(path);
     }
 }

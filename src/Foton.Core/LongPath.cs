@@ -31,7 +31,8 @@ namespace Foton.Core
             if (path.IndexOf('/') >= 0) path = path.Replace('/', '\\');
             if (path.StartsWith(Prefix, StringComparison.Ordinal)) return path;
             if (path.StartsWith(@"\\", StringComparison.Ordinal)) return UncPrefix + path.Substring(2);
-            if (path.Length < 3 || path[1] != ':' || path[2] != '\\') return path;
+            // Length is already 240 or more here, so only the drive form needs checking.
+            if (path[1] != ':' || path[2] != '\\') return path;
             return Prefix + path;
         }
 
@@ -56,15 +57,43 @@ namespace Foton.Core
             // name too when the folder is long (about 250 characters or more).
             var absolute = Path.IsPathRooted(path) ? path : Path.Combine(Directory.GetCurrentDirectory(), path);
             if (absolute.Length < Threshold) return Path.GetFullPath(absolute);
-            if (absolute.Length < 3 || absolute[1] != ':' || absolute[2] != '\\') return absolute;
+            if (absolute.StartsWith(Prefix, StringComparison.Ordinal)) return absolute;
+            absolute = absolute.Replace('/', '\\');
+            if (absolute.StartsWith(@"\\", StringComparison.Ordinal))
+            {
+                // \\server\share\rest: the share is the root, and . and .. are resolved in the rest only.
+                var segs = absolute.Substring(2).Split('\\');
+                if (segs.Length < 2) return absolute;
+                return Normalize(@"\\" + segs[0] + "\\" + segs[1] + "\\", string.Join("\\", segs, 2, segs.Length - 2));
+            }
+            if (absolute[1] != ':' || absolute[2] != '\\') return absolute;
+            return Normalize(absolute.Substring(0, 3), absolute.Substring(3));
+        }
+
+        /// <summary>
+        /// The folder a path lies in, cut at its last backslash without touching the disk. A drive root keeps its
+        /// backslash: the parent of C:\tool.exe is C:\, not the drive-relative C:. Empty when there is no backslash.
+        /// </summary>
+        public static string ParentOf(string path)
+        {
+            var cut = path.LastIndexOf('\\');
+            if (cut < 0) return "";
+            if (cut == 2 && path[1] == ':') return path.Substring(0, 3);
+            return path.Substring(0, cut);
+        }
+
+        // Resolves . and .. in the segments of rest under root (which ends with a backslash). A .. above root stops at root,
+        // as Windows does, so the result stays under root.
+        static string Normalize(string root, string rest)
+        {
             var parts = new System.Collections.Generic.List<string>();
-            foreach (var seg in absolute.Substring(3).Split('\\'))
+            foreach (var seg in rest.Split('\\'))
             {
                 if (seg.Length == 0 || seg == ".") continue;
                 if (seg == "..") { if (parts.Count > 0) parts.RemoveAt(parts.Count - 1); continue; }
                 parts.Add(seg);
             }
-            return absolute.Substring(0, 3) + string.Join("\\", parts);
+            return root + string.Join("\\", parts);
         }
     }
 }

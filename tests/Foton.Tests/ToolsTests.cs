@@ -99,8 +99,8 @@ namespace Foton.Tests
                     Assert.DoesNotContain(@"\\?\", exe);
                     Assert.Equal(Path.Combine(deepRoot, @"chainsaw\chainsaw_x86_64-pc-windows-msvc.exe"), exe);
                     Assert.True(File.Exists(LongPath.For(Path.Combine(deepRoot, @"chainsaw\sigma\" + deepFolders + @"\rule.yml"))));
-                    // The installed executable hashes to the bytes on disk (its path is near the limit, not past it).
-                    Assert.Equal(Hashing.Sha256Hex(File.ReadAllBytes(exe)), Hashing.Sha256Hex(exe));
+                    // The installed executable hashes to the bytes the release shipped (the payload written into the zip above).
+                    Assert.Equal(Hashing.Sha256Hex(Encoding.UTF8.GetBytes("fake-chainsaw")), Hashing.Sha256Hex(exe));
                     var rules = ComposeSupport.ChainsawRulesFor(exe);
                     Assert.NotNull(rules.RulesPath);
                     Assert.NotNull(rules.SigmaPath);
@@ -110,7 +110,50 @@ namespace Foton.Tests
                 finally
                 {
                     // TempDir cannot delete past 260 characters; remove the deep tool root here.
-                    try { Directory.Delete(LongPath.For(deepRoot), true); } catch (IOException) { }
+                    try { Directory.Delete(LongPath.For(deepRoot), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void LongPath_ParentOf_keeps_the_backslash_of_a_drive_root()
+        {
+            // Cut at the last backslash, the parent of C:\tool.exe is "C:", which is drive-relative (a different folder).
+            Assert.Equal(@"C:\", LongPath.ParentOf(@"C:\tool.exe"));
+            Assert.Equal(@"C:\a", LongPath.ParentOf(@"C:\a\tool.exe"));
+            Assert.Equal(@"\\server\share", LongPath.ParentOf(@"\\server\share\tool.exe"));
+            Assert.Equal("", LongPath.ParentOf("tool.exe"));
+        }
+
+        [Fact]
+        public void LongPath_Full_resolves_dot_segments_in_a_long_share_path_without_GetFullPath()
+        {
+            // The share is the root: .. steps are resolved in the rest of the path, and a long UNC path keeps its share.
+            var share = @"\\server\share\";
+            var full = LongPath.Full(share + new string('a', 200) + @"\..\" + new string('b', 60) + @"\.\tool.exe");
+            Assert.Equal(share + new string('b', 60) + @"\tool.exe", full);
+        }
+
+        [Fact]
+        public void SafeHash_hashes_a_local_file_past_260_characters_instead_of_reporting_HashError()
+        {
+            using (var t = new TempDir())
+            {
+                // One folder name of 210 characters puts the file past the limit that FileInfo enforces without the prefix.
+                var deepDir = Path.Combine(t.Path, new string('h', 210));
+                var file = Path.Combine(deepDir, "payload.bin");
+                Directory.CreateDirectory(LongPath.For(deepDir));
+                File.WriteAllBytes(LongPath.For(file), Encoding.UTF8.GetBytes("payload"));
+                try
+                {
+                    Assert.True(file.Length > 259);
+                    Assert.Equal(Hashing.Sha256Hex(Encoding.UTF8.GetBytes("payload")), Hashing.SafeHash(file, false));
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(deepDir), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 }
             }
         }

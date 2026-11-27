@@ -36,7 +36,8 @@ namespace Foton.Core
             if (!IsLocalPath(path!)) return "SkippedNonLocalPath";
             try
             {
-                var fi = new FileInfo(path);
+                // FileInfo resolves the path first and throws for 260 characters or more under net462; the prefix is added here.
+                var fi = new FileInfo(LongPath.For(path!));
                 if (!fi.Exists) return "FileNotFound";
                 if (IsCloudPlaceholder(fi.Attributes)) return "SkippedCloudPlaceholder";
                 if (fi.Length > SafeHashLimitBytes) return "SkippedTooLarge";
