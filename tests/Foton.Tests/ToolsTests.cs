@@ -141,6 +141,9 @@ namespace Foton.Tests
             Assert.Equal(@"\\server\share", LongPath.ParentOf(@"\\server\share\tool.exe"));
             // A share root has no parent folder: \\server is not a valid path to hand to a file call.
             Assert.Equal("", LongPath.ParentOf(@"\\server\share"));
+            // A prefixed drive root keeps its backslash too: \\?\C: is drive-relative, \\?\C:\ is the root.
+            Assert.Equal(@"\\?\C:\", LongPath.ParentOf(@"\\?\C:\tool.exe"));
+            Assert.Equal(@"\\?\C:\a", LongPath.ParentOf(@"\\?\C:\a\tool.exe"));
             Assert.Equal("", LongPath.ParentOf("tool.exe"));
         }
 
@@ -300,6 +303,33 @@ namespace Foton.Tests
                 Assert.EndsWith(@"\ez\PECmd.exe", pe.Location);
                 Assert.False(pe.Verified);
                 Assert.Equal("Catalog", rows.Single(r => r.Name == "Hayabusa").Source);
+            }
+        }
+
+        [Fact]
+        public void Register_finds_a_tool_under_a_folder_past_260_characters()
+        {
+            // Directory.Exists and File.Exists answer "missing" past 260 characters without the prefix, so registration threw
+            // before it searched. Here the tool sits at the end of a 200-character folder.
+            using (var t = new TempDir())
+            {
+                var deepDir = Path.Combine(t.Path, new string('p', 200));
+                var exe = Path.Combine(deepDir, "PECmd.exe");
+                Directory.CreateDirectory(LongPath.For(deepDir));
+                File.WriteAllText(LongPath.For(exe), "x");
+                var root = t.File("tools");
+                try
+                {
+                    Assert.True(exe.Length > 259);
+                    ToolRegistry.Register("PECmd", exe, root);
+                    var pe = Assert.Single(ToolInstaller.List(root), r => r.Name == "PECmd");
+                    Assert.Equal("Registered", pe.Source);
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(deepDir), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
             }
         }
 

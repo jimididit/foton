@@ -29,9 +29,10 @@ namespace Foton.Tools
         public static IReadOnlyList<RegistrationRow> Register(string name, string path, string? toolRoot)
         {
             var wanted = ComposeTools.Expand(name);
-            bool isDir = Directory.Exists(path);
-            if (!isDir && !File.Exists(path)) throw new FileNotFoundException("Path not found: " + path, path);
-            var full = Path.GetFullPath(path);
+            // Full first (GetFullPath throws at 260 characters under net462), then the existence checks on the prefixed form.
+            var full = LongPath.Full(path);
+            bool isDir = Directory.Exists(LongPath.For(full));
+            if (!isDir && !File.Exists(LongPath.For(full))) throw new FileNotFoundException("Path not found: " + path, path);
             var root = ToolManifest.Root(toolRoot);
 
             var rows = new List<RegistrationRow>();

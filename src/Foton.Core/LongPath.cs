@@ -82,7 +82,9 @@ namespace Foton.Core
         {
             var cut = path.LastIndexOf('\\');
             if (cut < 0) return "";
-            if (cut == 2 && path[1] == ':') return path.Substring(0, 3);
+            // A drive root keeps its backslash, prefixed or not: \\?\C:\tool.exe lies in \\?\C:\, not \\?\C:.
+            var at = path.StartsWith(Prefix, StringComparison.Ordinal) ? Prefix.Length : 0;
+            if (cut == at + 2 && path.Length > at + 1 && path[at + 1] == ':') return path.Substring(0, at + 3);
             if (path.StartsWith(@"\\", StringComparison.Ordinal))
             {
                 // \\server\share has no folder above it: its last backslash is the one after the server, not a parent.
