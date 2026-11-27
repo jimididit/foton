@@ -18,7 +18,7 @@ namespace Foton.Package
 
         /// <summary>
         /// As Extract, skipping entries whose stored path (forward slashes) starts with one of <paramref name="skipPrefixes"/>.
-        /// Every entry is still checked for an unsafe path first.
+        /// A skipped entry is never written, so it is not checked for an unsafe path; every other entry is.
         /// </summary>
         public static void Extract(string zipPath, string destination, IReadOnlyCollection<string>? skipPrefixes) =>
             Extract(zipPath, destination, skipPrefixes, null);

@@ -125,16 +125,29 @@ namespace Foton.Tools
             foreach (var written in copied)
             {
                 try { if (Directory.Exists(LongPath.For(written))) DeleteTree(written); else if (File.Exists(LongPath.For(written))) File.Delete(LongPath.For(written)); }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                { log($"Could not remove the partial copy {written}: {ex.Message}"); }
+                catch (Exception ex) when (IsFileFailure(ex))
+                { TryLog(log, $"Could not remove the partial copy {written}: {ex.Message}"); }
             }
             for (int i = moved.Count - 1; i >= 0; i--)
             {
                 var m = moved[i];
                 try { if (m.IsFolder) Directory.Move(LongPath.For(m.Kept), LongPath.For(m.Original)); else File.Move(LongPath.For(m.Kept), LongPath.For(m.Original)); }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                { log($"Could not restore {m.Original}; the earlier copy is at {m.Kept}: {ex.Message}"); }
+                catch (Exception ex) when (IsFileFailure(ex))
+                { TryLog(log, $"Could not restore {m.Original}; the earlier copy is at {m.Kept}: {ex.Message}"); }
             }
+        }
+
+        static bool IsFileFailure(Exception ex) =>
+            ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException || ex is ArgumentException;
+
+        /// <summary>
+        /// Writes a rollback note. The log is install.log, which can fail for the same reason the install did (disk full,
+        /// locked file); that must not replace the error the caller is about to rethrow.
+        /// </summary>
+        static void TryLog(Action<string> log, string message)
+        {
+            try { log(message); }
+            catch (Exception ex) when (IsFileFailure(ex)) { }
         }
 
         /// <summary>The rule set recorded at install. A manifest with no RulesVersion key predates the field, so it says
@@ -304,8 +317,8 @@ namespace Foton.Tools
                         if (!manifestExisted) { if (File.Exists(LongPath.For(manifestPath))) File.Delete(LongPath.For(manifestPath)); }
                         else if (priorManifest != null) File.WriteAllBytes(LongPath.For(manifestPath), priorManifest);
                     }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                    { Log($"Could not restore {manifestPath}: {ex.Message}"); }
+                    catch (Exception ex) when (IsFileFailure(ex))
+                    { TryLog(Log, $"Could not restore {manifestPath}: {ex.Message}"); }
                     RollBack(moved, copied, Log);
                     throw;
                 }
@@ -386,6 +399,12 @@ namespace Foton.Tools
         /// </summary>
         static void DeleteTree(string path)
         {
+            // The top of the tree can itself be a link (a junction put where the folder was): remove the link, not its target.
+            if ((File.GetAttributes(LongPath.For(path)) & FileAttributes.ReparsePoint) != 0)
+            {
+                Directory.Delete(LongPath.For(path));
+                return;
+            }
             // Every call takes LongPath.For on the name it is given. A short folder can list children past 260
             // characters (the threshold is on the folder's own length), so each child is prefixed by its own length.
             foreach (var file in Directory.GetFiles(LongPath.For(path)))

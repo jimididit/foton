@@ -274,10 +274,15 @@ namespace Foton.Tools
                     Retained("NoInput");
                     continue;
                 }
+                // Run in the tool's own install tree: Hayabusa resolves config\ relative to the working directory. Every
+                // path passed in is absolute, so this is safe for the EZ Tools too. ParentOf, not GetDirectoryName: the
+                // exe path can be past 260 characters here, and GetDirectoryName would throw before the check below.
+                var workDir = LongPath.ParentOf(exe);
+                if (workDir.Length == 0 || !Directory.Exists(LongPath.For(workDir))) workDir = toolDir;
                 // Checked before Pre, which may run the tool. Install still works under a long root; only starting it is refused.
-                if (!ToolProcess.CanStart(exe))
+                if (!ToolProcess.CanStart(exe, workDir))
                 {
-                    rows.Add(Row("TooLongToStart", "", $"{j.Tool} is installed at a path of {exe.Length} characters. Windows starts a program only from a path under {ToolProcess.MaxStartPath + 1} characters, so {j.Tool} did not run. Install it under a shorter tool root, then run compose again."));
+                    rows.Add(Row("TooLongToStart", "", $"{j.Tool} would start from a path of {Math.Max(exe.Length, workDir.Length)} characters (its executable or its working folder). Windows starts a program only from paths under {ToolProcess.MaxStartPath + 1} characters, so {j.Tool} did not run. Install it under a shorter tool root, then run compose again."));
                     Retained("TooLongToStart");
                     continue;
                 }
@@ -295,10 +300,6 @@ namespace Foton.Tools
                 var stage = Path.Combine(extRoot, $".{lower}.staging-{Guid.NewGuid():N}");
                 Directory.CreateDirectory(stage);
                 int? exitCode = null;
-                // Run in the tool's own install tree: Hayabusa resolves config\ relative to the working directory. Every
-                // path passed in is absolute, so this is safe for the EZ Tools too.
-                var workDir = Path.GetDirectoryName(exe);
-                if (string.IsNullOrEmpty(workDir) || !Directory.Exists(LongPath.For(workDir))) workDir = toolDir;
                 try
                 {
                     var args = CommandLine.Join(j.Args(exe, j.NeedDir, stage));

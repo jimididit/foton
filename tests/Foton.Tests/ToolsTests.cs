@@ -323,6 +323,28 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Concurrent_saves_to_one_manifest_keep_every_row()
+        {
+            // Each save reads the rows, adds its own, and swaps the file in. Without the lock, two saves read the same old
+            // rows and the later swap drops the earlier row.
+            using (var t = new TempDir())
+            {
+                var root = t.File("tools");
+                var names = Enumerable.Range(0, 8).Select(i => "Tool" + i).ToArray();
+                var failures = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+                var threads = names.Select(n => new System.Threading.Thread(() =>
+                {
+                    try { ToolManifest.Save(root, new Dictionary<string, object?> { ["Name"] = n }); }
+                    catch (Exception ex) { failures.Add(ex); }
+                })).ToArray();
+                foreach (var th in threads) th.Start();
+                foreach (var th in threads) th.Join();
+                Assert.Empty(failures);
+                Assert.Equal(names.OrderBy(n => n), ToolManifest.List(root).Select(r => ToolManifest.Get(r, "Name")).OrderBy(n => n));
+            }
+        }
+
+        [Fact]
         public void A_damaged_manifest_is_refused_by_a_save_and_left_as_it_was()
         {
             // An unreadable tools.json used to read as "no rows", so the next save wrote only its own row and dropped the rest.
@@ -571,9 +593,46 @@ namespace Foton.Tests
                 }
                 finally
                 {
-                    try { Directory.Delete(LongPath.For(deepDir), true); } catch (IOException) { }
+                    try { Directory.Delete(LongPath.For(deepDir), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 }
             }
+        }
+
+        [Fact]
+        public void A_tool_found_on_PATH_in_a_folder_past_260_characters_resolves()
+        {
+            using (var t = new TempDir())
+            {
+                var deepDir = Path.Combine(t.Path, new string('p', 220));
+                var exe = Path.Combine(deepDir, "chainsaw.exe");
+                Directory.CreateDirectory(LongPath.For(deepDir));
+                File.WriteAllText(LongPath.For(exe), "x");
+                try
+                {
+                    Assert.True(exe.Length > 259);
+                    var r = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, null, t.File("tools"), deepDir);
+                    Assert.NotNull(r);
+                    Assert.Equal("PATH", r!.Source);
+                    Assert.Equal(exe, r.Path);
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(deepDir), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void CanStart_measures_the_working_folder_as_well_as_the_executable()
+        {
+            var shortExe = @"C:\tools\x.exe";
+            Assert.True(ToolProcess.CanStart(shortExe));
+            Assert.True(ToolProcess.CanStart(shortExe, @"C:\tools"));
+            Assert.True(ToolProcess.CanStart(shortExe, @"C:\" + new string('w', ToolProcess.MaxStartPath - 3)));
+            Assert.False(ToolProcess.CanStart(shortExe, @"C:\" + new string('w', ToolProcess.MaxStartPath)));
+            Assert.False(ToolProcess.CanStart(@"C:\" + new string('e', ToolProcess.MaxStartPath), @"C:\tools"));
         }
 
         [Fact]

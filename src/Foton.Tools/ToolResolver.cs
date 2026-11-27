@@ -128,8 +128,10 @@ namespace Foton.Tools
                 {
                     try
                     {
-                        var candidate = Path.Combine(dir, name + ext);
-                        if (File.Exists(candidate)) return Path.GetFullPath(candidate);
+                        // Full, then the prefixed check: a PATH folder past 260 characters would otherwise be skipped (and
+                        // GetFullPath would throw for it).
+                        var candidate = LongPath.Full(Path.Combine(dir, name + ext));
+                        if (File.Exists(LongPath.For(candidate))) return candidate;
                     }
                     catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { }
                 }

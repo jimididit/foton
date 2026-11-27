@@ -23,7 +23,9 @@ namespace Foton.Tools
         /// </summary>
         public const int MaxStartPath = 259;
 
-        public static bool CanStart(string exe) => exe.Length <= MaxStartPath;
+        /// <summary>True when the executable path, and the working folder when one is given, are short enough to start from.</summary>
+        public static bool CanStart(string exe, string? workDir = null) =>
+            exe.Length <= MaxStartPath && (workDir == null || workDir.Length <= MaxStartPath);
 
         static ProcessStartInfo Info(string exe, string arguments, string? workDir) => new ProcessStartInfo(exe, arguments)
         {

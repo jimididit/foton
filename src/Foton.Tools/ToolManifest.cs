@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Foton.Core;
 
 namespace Foton.Tools
@@ -49,7 +50,9 @@ namespace Foton.Tools
                 if (!(doc is IDictionary d) || !d.Contains("Installed")) return null;
                 return Rows(doc);
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException)
+            // Broad on purpose: the serializer and the file read can throw several types, and a lookup of "what is installed"
+            // must report the file as unreadable, not fail the caller.
+            catch (Exception)
             {
                 return null;
             }
@@ -66,6 +69,21 @@ namespace Foton.Tools
         {
             var root = Root(toolRoot);
             Directory.CreateDirectory(LongPath.For(root));
+            // Read, change, and swap happen under one named lock, so two installs or registrations in the same user session
+            // cannot each read the old rows and overwrite the other's. The swap is atomic; the lock covers the read-modify-write.
+            using (var gate = new Mutex(false, @"Local\Foton-tools-" + Hashing.Sha256Hex(Encoding.UTF8.GetBytes(root.ToUpperInvariant())).Substring(0, 16)))
+            {
+                bool held;
+                try { held = gate.WaitOne(TimeSpan.FromSeconds(30)); }
+                catch (AbandonedMutexException) { held = true; }   // a process died holding it; the manifest is still swapped atomically
+                if (!held) throw new IOException("Another Foton process is writing the tool manifest under " + root + ". Try again in a moment.");
+                try { return SaveLocked(root, entry); }
+                finally { gate.ReleaseMutex(); }
+            }
+        }
+
+        static string SaveLocked(string root, Dictionary<string, object?> entry)
+        {
             var path = Path.Combine(root, FileName);
             // A manifest that exists but cannot be read is not "no rows": rewriting it would drop every other registration.
             var existing = File.Exists(LongPath.For(path)) ? TryRead(path) : new Dictionary<string, object?>[0];

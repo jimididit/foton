@@ -364,7 +364,8 @@ namespace Foton.Tests
         [InlineData("../escape.txt")]
         [InlineData("a/../../escape.txt")]
         [InlineData("C:/Windows/escape.txt")]
-        // Windows drops trailing dots and spaces from a name, so these reach the parent folder when a path is normalized.
+        // Windows drops trailing dots and spaces from a name, so ".. " and "..." name a parent step or another folder once the
+        // path is normalized. They may land inside the folder (a/.. /x is x), but the name is ambiguous, so it is refused.
         [InlineData("a/.. /escape.txt")]
         [InlineData("a/.../escape.txt")]
         [InlineData("a/ ../escape.txt")]
