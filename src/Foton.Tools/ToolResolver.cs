@@ -49,13 +49,18 @@ namespace Foton.Tools
 
             var installed = ToolManifest.Find(tool, toolRoot);
             var exe = installed != null ? ToolManifest.Get(installed, "ExecutablePath") : "";
-            if (exe.Length > 0 && File.Exists(LongPath.For(exe)))
-                return FromManifest(installed!, LongPath.Full(exe), "Manifest");
+            // Absolute before the check, as on the explicit branch: a long relative path can't be checked as it is.
+            var manifestExe = exe.Length > 0 ? AbsoluteOrNull(exe) : null;
+            if (manifestExe != null && File.Exists(LongPath.For(manifestExe)))
+                return FromManifest(installed!, manifestExe, "Manifest");
 
             foreach (var name in executableNames)
             {
                 var hit = OnPath(name, pathEnv ?? Environment.GetEnvironmentVariable("PATH") ?? "");
-                if (hit != null) return new ResolvedTool { Path = hit, Source = "PATH", Version = ToolRegistry.FileVersion(hit), RulesVersion = LocalRules(hit) };
+                if (hit == null) continue;
+                // A relative PATH entry resolves against the working folder; the absolute form is what gets checked and run.
+                var full = AbsoluteOrNull(hit) ?? hit;
+                return new ResolvedTool { Path = full, Source = "PATH", Version = ToolRegistry.FileVersion(full), RulesVersion = LocalRules(full) };
             }
             return null;
         }

@@ -117,6 +117,14 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void LongPath_Full_normalizes_a_prefixed_long_path_instead_of_returning_it_with_dot_segments()
+        {
+            // A prefixed path is not normalized on disk, so Full resolves its . and .. from the normal form.
+            var prefixed = @"\\?\C:\" + new string('a', 200) + @"\..\" + new string('b', 60) + @"\tool.exe";
+            Assert.Equal(@"C:\" + new string('b', 60) + @"\tool.exe", LongPath.Full(prefixed));
+        }
+
+        [Fact]
         public void LongPath_For_maps_a_device_path_to_the_drive_form_not_a_share()
         {
             // \\.\C:\... names the drive; treating it as \\server\share would rewrite it as a UNC share and break the path.

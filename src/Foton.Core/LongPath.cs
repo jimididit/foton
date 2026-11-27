@@ -59,8 +59,9 @@ namespace Foton.Core
             // Absolute first: GetFullPath on a relative name joins the working folder itself, and that throws for a short
             // name too when the folder is long (about 250 characters or more).
             var absolute = Path.IsPathRooted(path) ? path : Path.Combine(Directory.GetCurrentDirectory(), path);
+            // A prefixed path does not normalize on disk, so its . and .. are resolved here, from the normal form.
+            if (absolute.StartsWith(Prefix, StringComparison.Ordinal)) absolute = Plain(absolute);
             if (absolute.Length < Threshold) return Path.GetFullPath(absolute);
-            if (absolute.StartsWith(Prefix, StringComparison.Ordinal)) return absolute;
             absolute = absolute.Replace('/', '\\');
             if (absolute.StartsWith(@"\\", StringComparison.Ordinal))
             {

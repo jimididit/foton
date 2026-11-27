@@ -32,9 +32,10 @@ namespace Foton.Package
         public static void Extract(string zipPath, string destination, IReadOnlyCollection<string>? skipPrefixes, List<string>? tooLong,
             string? finalDestination = null)
         {
-            var root = Path.GetFullPath(destination).TrimEnd('\\') + "\\";
-            var measureRoot = finalDestination == null ? root : Path.GetFullPath(finalDestination).TrimEnd('\\') + "\\";
-            Directory.CreateDirectory(root);
+            // Full, not GetFullPath: a destination of 260 characters or more throws in GetFullPath, and the prefix is added at the call.
+            var root = LongPath.Full(destination).TrimEnd('\\') + "\\";
+            var measureRoot = finalDestination == null ? root : LongPath.Full(finalDestination).TrimEnd('\\') + "\\";
+            Directory.CreateDirectory(LongPath.For(root));
             using (var zip = ZipFile.OpenRead(zipPath))
             {
                 foreach (var entry in zip.Entries)

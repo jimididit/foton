@@ -297,6 +297,30 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Extract_into_a_destination_past_260_characters_writes_the_entry()
+        {
+            // GetFullPath on the destination threw at 260 characters under net462; the folder is created through the prefix.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("deep.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                using (var w = new StreamWriter(z.CreateEntry("tool.txt").Open())) w.Write("ok");
+                var deep = Path.Combine(t.Path, new string('d', 200), new string('e', 80));
+                try
+                {
+                    Assert.True(deep.Length > 259);
+                    SafeZip.Extract(zip, deep, null, null);
+                    Assert.Equal("ok", File.ReadAllText(LongPath.For(Path.Combine(deep, "tool.txt"))));
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(Path.Combine(t.Path, new string('d', 200))), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
         public void A_parent_step_that_stays_inside_the_folder_extracts_to_the_name_it_lands_on()
         {
             // tools\x\..\rules.txt is inside the folder and lands on tools\rules.txt; it must not fail the whole ZIP.
