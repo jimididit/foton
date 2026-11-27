@@ -155,6 +155,9 @@ namespace Foton.Tests
             var drive = Path.GetPathRoot(Directory.GetCurrentDirectory()).TrimEnd('\\');
             var deep = new string('x', 250);
             Assert.Equal(drive + @"\" + deep + @"\tool.exe", LongPath.Full(@"\" + deep + @"\tool.exe"));
+            // A drive-relative long path (E:folder\...) starts in that drive's current folder, which Windows keeps per drive.
+            var driveCwd = Environment.GetEnvironmentVariable("=" + drive) ?? drive + @"\";
+            Assert.Equal(driveCwd.TrimEnd('\\') + @"\" + deep + @"\tool.exe", LongPath.Full(drive + deep + @"\tool.exe"));
             Assert.Equal("", LongPath.ParentOf("tool.exe"));
         }
 

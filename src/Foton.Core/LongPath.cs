@@ -73,6 +73,14 @@ namespace Foton.Core
                 if (segs.Length < 2) return absolute;
                 return Normalize(@"\\" + segs[0] + "\\" + segs[1] + "\\", string.Join("\\", segs, 2, segs.Length - 2));
             }
+            // C:folder\tool is relative to the current folder of drive C, which Windows keeps per drive in the =C: variable
+            // (the root when the variable is not set). Resolve it there, so the prefix can go on.
+            if (absolute[1] == ':' && absolute[2] != '\\')
+            {
+                var driveCwd = Environment.GetEnvironmentVariable("=" + absolute.Substring(0, 2));
+                if (string.IsNullOrEmpty(driveCwd)) driveCwd = absolute.Substring(0, 2) + "\\";
+                absolute = driveCwd.TrimEnd('\\') + "\\" + absolute.Substring(2);
+            }
             if (absolute[1] != ':' || absolute[2] != '\\') return absolute;
             return Normalize(absolute.Substring(0, 3), absolute.Substring(3));
         }
