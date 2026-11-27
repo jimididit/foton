@@ -41,9 +41,24 @@ namespace Foton.Core
         }
 
         /// <summary>
-        /// GetFullPath for a path that is already absolute and normalized (a recorded install path, for example). GetFullPath
-        /// throws on 260 characters or more under net462, so a path that long is returned as it is.
+        /// GetFullPath for a path that may be long. GetFullPath throws on 260 characters or more under net462, so a long
+        /// path is made absolute here: a relative one joins the current folder, and a drive path has its . and .. segments
+        /// removed lexically (no disk access, so it works on a folder that is not there). Other long forms (UNC) are
+        /// returned joined but not normalized.
         /// </summary>
-        public static string Full(string path) => path.Length < Threshold ? Path.GetFullPath(path) : path;
+        public static string Full(string path)
+        {
+            if (path.Length < Threshold) return Path.GetFullPath(path);
+            var absolute = Path.IsPathRooted(path) ? path : Path.Combine(Directory.GetCurrentDirectory(), path);
+            if (absolute.Length < 3 || absolute[1] != ':' || absolute[2] != '\\') return absolute;
+            var parts = new System.Collections.Generic.List<string>();
+            foreach (var seg in absolute.Substring(3).Split('\\'))
+            {
+                if (seg.Length == 0 || seg == ".") continue;
+                if (seg == "..") { if (parts.Count > 0) parts.RemoveAt(parts.Count - 1); continue; }
+                parts.Add(seg);
+            }
+            return absolute.Substring(0, 3) + string.Join("\\", parts);
+        }
     }
 }

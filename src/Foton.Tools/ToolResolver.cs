@@ -21,14 +21,24 @@ namespace Foton.Tools
     /// </summary>
     public static class ToolResolver
     {
+        static string? AbsoluteOrNull(string? toolPath)
+        {
+            if (string.IsNullOrWhiteSpace(toolPath)) return null;
+            try { return LongPath.Full(toolPath!.Trim()); }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is IOException) { return null; }
+        }
+
         public static ResolvedTool? Resolve(string tool, IEnumerable<string> executableNames, string? toolPath, string? toolRoot, string? pathEnv = null)
         {
             // Every output in the compose inventory names the tool version that wrote it: tools.json records it for
             // installs and registrations; anything else is read from the executable's version resource as found
             // (nothing is run here; compose asks a tool without one only when it is about to run it).
-            if (!string.IsNullOrWhiteSpace(toolPath) && File.Exists(LongPath.For(toolPath!.Trim())))
+            // Made absolute before the existence check: a long relative path can't be checked as it is, and the record
+            // match below needs the absolute form. A path that can't be normalized is treated as absent.
+            var explicitPath = AbsoluteOrNull(toolPath);
+            if (explicitPath != null && File.Exists(LongPath.For(explicitPath)))
             {
-                var path = LongPath.Full(toolPath.Trim());
+                var path = explicitPath;
                 // An explicit path to the executable tools.json already records is that install: report what it recorded.
                 // A damaged tool root must not stop a valid explicit path, so this lookup is best effort.
                 var recorded = TryFind(tool, toolRoot);

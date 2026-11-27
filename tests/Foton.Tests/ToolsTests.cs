@@ -129,6 +129,25 @@ namespace Foton.Tests
             Assert.Equal(@"\\?\" + longPath, LongPath.For(LongPath.For(longPath)));
         }
 
+        [Fact]
+        public void LongPath_Full_makes_a_long_relative_path_absolute_and_drops_dot_segments()
+        {
+            // GetFullPath throws at 260 characters under net462, so a long relative path (274 here) used to come back
+            // unchanged, and a record match or existence check on it then failed.
+            using (var t = new TempDir())
+            {
+                var saved = Environment.CurrentDirectory;
+                try
+                {
+                    Environment.CurrentDirectory = t.Path;
+                    var relative = new string('a', 200) + @"\..\" + new string('b', 60) + @"\.\tool.exe";
+                    Assert.True(relative.Length >= 240);
+                    Assert.Equal(Path.Combine(t.Path, new string('b', 60), "tool.exe"), LongPath.Full(relative));
+                }
+                finally { Environment.CurrentDirectory = saved; }
+            }
+        }
+
         static void WriteEntry(ZipArchive archive, string name, string text)
         {
             using (var writer = new StreamWriter(archive.CreateEntry(name).Open()))
