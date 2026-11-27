@@ -162,11 +162,11 @@ namespace Foton.Tools
                 if (!SupportFolderName.IsMatch(leaf ?? "") || string.Equals(leaf, entry.Version, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("Catalog support folder must be one plain folder name other than the version: '" + leaf + "'");
             var root = ToolManifest.Root(toolRoot);
-            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(LongPath.For(root));
             var logPath = Path.Combine(root, "install.log");
             void Log(string msg)
             {
-                TextFile.AppendLine(logPath, FotonTime.Format(DateTime.UtcNow) + " UTC  " + msg);
+                TextFile.AppendLine(LongPath.For(logPath), FotonTime.Format(DateTime.UtcNow) + " UTC  " + msg);
                 log.Write(msg, StatusLevel.Info);
             }
 
@@ -176,8 +176,8 @@ namespace Foton.Tools
                 string zip;
                 if (archivePath != null)
                 {
-                    if (!File.Exists(archivePath)) throw new FileNotFoundException("Archive not found: " + archivePath, archivePath);
-                    zip = Path.GetFullPath(archivePath);
+                    if (!File.Exists(LongPath.For(LongPath.Full(archivePath)))) throw new FileNotFoundException("Archive not found: " + archivePath, archivePath);
+                    zip = LongPath.Full(archivePath);
                     Log("Using local archive " + zip);
                 }
                 else
@@ -288,12 +288,12 @@ namespace Foton.Tools
                 // tools.json is rewritten in place, so a failed write can leave it short. The earlier bytes are kept and put back,
                 // and the swap is undone, so a failed save leaves the tool and its record as they were.
                 var manifestPath = ToolManifest.PathOf(root);
-                var manifestExisted = File.Exists(manifestPath);
+                var manifestExisted = File.Exists(LongPath.For(manifestPath));
                 byte[]? priorManifest = null;
                 try
                 {
                     // The read is inside the try too: if it fails, the swap is still undone below.
-                    if (manifestExisted) priorManifest = File.ReadAllBytes(manifestPath);
+                    if (manifestExisted) priorManifest = File.ReadAllBytes(LongPath.For(manifestPath));
                     Log("Wrote manifest " + ToolManifest.Save(root, record));
                 }
                 catch
@@ -301,8 +301,8 @@ namespace Foton.Tools
                     try
                     {
                         // Restore only what was read. A failed read leaves tools.json as it was, since Save never ran.
-                        if (!manifestExisted) { if (File.Exists(manifestPath)) File.Delete(manifestPath); }
-                        else if (priorManifest != null) File.WriteAllBytes(manifestPath, priorManifest);
+                        if (!manifestExisted) { if (File.Exists(LongPath.For(manifestPath))) File.Delete(LongPath.For(manifestPath)); }
+                        else if (priorManifest != null) File.WriteAllBytes(LongPath.For(manifestPath), priorManifest);
                     }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                     { Log($"Could not restore {manifestPath}: {ex.Message}"); }
@@ -347,8 +347,11 @@ namespace Foton.Tools
                 string commit;
                 if (m.Success)
                 {
-                    if (m.Groups[1].Value.Contains("..")) return null;
-                    var refPath = LongPath.For(Path.Combine(rulesDir, ".git", "refs", "heads", m.Groups[1].Value));
+                    // The ref is joined under .git\refs\heads. A rooted or drive value would make Path.Combine return that path itself,
+                    // so only plain relative names (letters, digits, . _ - and /) are read.
+                    var branch = m.Groups[1].Value;
+                    if (branch.Contains("..") || !Regex.IsMatch(branch, @"^[A-Za-z0-9._/-]+$")) return null;
+                    var refPath = LongPath.For(Path.Combine(rulesDir, ".git", "refs", "heads", branch));
                     if (!File.Exists(refPath)) return null;
                     commit = (File.ReadLines(refPath).FirstOrDefault() ?? "").Trim();
                 }

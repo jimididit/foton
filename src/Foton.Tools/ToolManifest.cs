@@ -21,11 +21,12 @@ namespace Foton.Tools
         /// <summary>%LOCALAPPDATA%\Foton\tools unless overridden. Not PATH, not inside a case.</summary>
         public static string Root(string? toolRoot)
         {
-            if (!string.IsNullOrWhiteSpace(toolRoot)) return Path.GetFullPath(toolRoot!.Trim());
+            // LongPath.Full, not GetFullPath: a tool root of 260 characters or more is valid (install and compose work under it).
+            if (!string.IsNullOrWhiteSpace(toolRoot)) return LongPath.Full(toolRoot!.Trim());
             var baseDir = Environment.GetEnvironmentVariable("LOCALAPPDATA");
             if (string.IsNullOrEmpty(baseDir))
                 baseDir = Path.Combine(Environment.GetEnvironmentVariable("USERPROFILE") ?? "", "AppData", "Local");
-            return Path.GetFullPath(Path.Combine(baseDir, "Foton", "tools"));
+            return LongPath.Full(Path.Combine(baseDir, "Foton", "tools"));
         }
 
         public static string PathOf(string? toolRoot) => Path.Combine(Root(toolRoot), FileName);
@@ -34,8 +35,8 @@ namespace Foton.Tools
         public static IReadOnlyList<Dictionary<string, object?>> List(string? toolRoot)
         {
             var path = PathOf(toolRoot);
-            if (!File.Exists(path)) return new Dictionary<string, object?>[0];
-            try { return Rows(Json.Parse(File.ReadAllText(path, Encoding.UTF8))); }
+            if (!File.Exists(LongPath.For(path))) return new Dictionary<string, object?>[0];
+            try { return Rows(Json.Parse(File.ReadAllText(LongPath.For(path), Encoding.UTF8))); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException)
             {
                 return new Dictionary<string, object?>[0];
@@ -52,7 +53,7 @@ namespace Foton.Tools
         public static string Save(string? toolRoot, Dictionary<string, object?> entry)
         {
             var root = Root(toolRoot);
-            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(LongPath.For(root));
             var path = Path.Combine(root, FileName);
             var rows = List(root).Where(r => !string.Equals(Get(r, "Name"), Get(entry, "Name"), StringComparison.OrdinalIgnoreCase)).ToList();
             rows.Add(entry);
@@ -62,7 +63,7 @@ namespace Foton.Tools
                 ["UpdatedUtc"] = FotonTime.Format(DateTime.UtcNow),
                 ["Installed"] = rows,
             };
-            TextFile.Write(path, Json.Indented(doc));
+            TextFile.Write(LongPath.For(path), Json.Indented(doc));
             return path;
         }
 

@@ -425,6 +425,86 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Install_under_a_root_that_is_itself_past_260_characters_writes_the_log_and_manifest()
+        {
+            // Not the rule files: the tool root itself is 260+ characters. Root, install.log, the archive path and tools.json all
+            // go through LongPath, so every step of the install reaches the disk.
+            using (var t = new TempDir())
+            {
+                var deepRoot = t.File(new string('s', 120) + @"\" + new string('t', 120) + @"\tools");
+                Assert.True(deepRoot.Length >= 260);
+                var zip = t.File("chainsaw-root.zip");
+                using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+                    WriteEntry(archive, "chainsaw/chainsaw_x86_64-pc-windows-msvc.exe", "fake-chainsaw");
+                File.WriteAllText(t.File("catalog.json"), Json.Indented(new Dictionary<string, object?>
+                {
+                    ["Tools"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["Name"] = "Chainsaw", ["Version"] = "9.9.9-test", ["AssetName"] = "chainsaw-root.zip",
+                            ["DownloadUrl"] = "https://example.invalid/chainsaw-root.zip", ["ExpectedSha256"] = Hashing.Sha256Hex(zip),
+                            ["License"] = "GPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                            ["ExecutableNames"] = new[] { "chainsaw_x86_64-pc-windows-msvc.exe", "chainsaw.exe" }, ["RulesRelativePath"] = "",
+                            ["SupportFolders"] = new[] { "rules" },
+                            ["Notes"] = "test pin",
+                        },
+                    },
+                }));
+                try
+                {
+                    var entry = ToolCatalog.Entry("Chainsaw", t.File("catalog.json"));
+                    ToolInstaller.Install(entry, zip, deepRoot, Quiet());
+                    Assert.True(File.Exists(LongPath.For(Path.Combine(deepRoot, "install.log"))));
+                    var row = Assert.Single(ToolInstaller.List(deepRoot), r => r.Name == "Chainsaw");
+                    Assert.Equal("9.9.9-test", row.Version);
+                    Assert.Equal(Path.Combine(deepRoot, @"chainsaw\chainsaw_x86_64-pc-windows-msvc.exe"), row.Location);
+                }
+                finally
+                {
+                    // TempDir cannot delete past 260 characters; remove the deep tool root here.
+                    try { Directory.Delete(LongPath.For(deepRoot), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void A_rules_git_ref_that_points_outside_refs_heads_is_not_read_as_a_commit()
+        {
+            // A rooted ref (C:\...) made Path.Combine return that file, and its first 12 characters became the rules version.
+            using (var t = new TempDir())
+            {
+                var secret = t.File("not-a-commit.txt");
+                File.WriteAllText(secret, "0123456789abcdef0123456789abcdef\n");
+                var zip = t.File("chainsaw-ref.zip");
+                using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    WriteEntry(archive, "chainsaw/chainsaw_x86_64-pc-windows-msvc.exe", "fake-chainsaw");
+                    WriteEntry(archive, "chainsaw/rules/.git/HEAD", "ref: refs/heads/" + secret + "\n");
+                }
+                File.WriteAllText(t.File("catalog.json"), Json.Indented(new Dictionary<string, object?>
+                {
+                    ["Tools"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["Name"] = "Chainsaw", ["Version"] = "9.9.9-test", ["AssetName"] = "chainsaw-ref.zip",
+                            ["DownloadUrl"] = "https://example.invalid/chainsaw-ref.zip", ["ExpectedSha256"] = Hashing.Sha256Hex(zip),
+                            ["License"] = "GPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                            ["ExecutableNames"] = new[] { "chainsaw_x86_64-pc-windows-msvc.exe", "chainsaw.exe" }, ["RulesRelativePath"] = "rules",
+                            ["SupportFolders"] = new[] { "rules" },
+                            ["Notes"] = "test pin",
+                        },
+                    },
+                }));
+                var entry = ToolCatalog.Entry("Chainsaw", t.File("catalog.json"));
+                var record = ToolInstaller.Install(entry, zip, t.File("tools"), Quiet());
+                Assert.Equal("bundled with release 9.9.9-test", record["RulesVersion"]);
+            }
+        }
+
+        [Fact]
         public void A_tool_at_a_path_too_long_to_start_is_refused_with_a_row_and_never_launched()
         {
             using (var t = new TempDir())
