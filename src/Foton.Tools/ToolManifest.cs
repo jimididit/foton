@@ -42,7 +42,13 @@ namespace Foton.Tools
         /// <summary>The rows in the file at path; null when it cannot be read or parsed (never "no rows").</summary>
         static IReadOnlyList<Dictionary<string, object?>>? TryRead(string path)
         {
-            try { return Rows(Json.Parse(File.ReadAllText(LongPath.For(path), Encoding.UTF8))); }
+            try
+            {
+                var doc = Json.Parse(File.ReadAllText(LongPath.For(path), Encoding.UTF8));
+                // A file with no Installed list is not one this version (or 1.38.x) wrote; refuse it rather than read it as empty.
+                if (!(doc is IDictionary d) || !d.Contains("Installed")) return null;
+                return Rows(doc);
+            }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException)
             {
                 return null;
@@ -73,7 +79,19 @@ namespace Foton.Tools
                 ["UpdatedUtc"] = FotonTime.Format(DateTime.UtcNow),
                 ["Installed"] = rows,
             };
-            TextFile.Write(LongPath.For(path), Json.Indented(doc));
+            // Written beside the file and then swapped in, so a crash mid-write leaves the old manifest, never a half-written one.
+            var temp = LongPath.For(path + ".tmp-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                TextFile.Write(temp, Json.Indented(doc));
+                if (File.Exists(LongPath.For(path))) File.Replace(temp, LongPath.For(path), null);
+                else File.Move(temp, LongPath.For(path));
+            }
+            finally
+            {
+                try { if (File.Exists(temp)) File.Delete(temp); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
             return path;
         }
 

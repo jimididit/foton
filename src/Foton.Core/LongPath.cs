@@ -101,6 +101,12 @@ namespace Foton.Core
                 var uncParent = ParentOf(@"\\" + path.Substring(UncPrefix.Length));
                 return uncParent.Length == 0 ? "" : UncPrefix + uncParent.Substring(2);
             }
+            // A device path (\\.\C:\tool.exe) keeps its prefix; its folder is worked out from the drive form.
+            if (path.StartsWith(DevicePrefix, StringComparison.Ordinal))
+            {
+                var deviceParent = ParentOf(path.Substring(DevicePrefix.Length));
+                return deviceParent.Length == 0 ? "" : DevicePrefix + deviceParent;
+            }
             var cut = path.LastIndexOf('\\');
             if (cut < 0) return "";
             // A drive root keeps its backslash, prefixed or not: \\?\C:\tool.exe lies in \\?\C:\, not \\?\C:.

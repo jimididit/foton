@@ -143,6 +143,8 @@ namespace Foton.Tests
             Assert.Equal("", LongPath.ParentOf(@"\\server\share"));
             // A prefixed drive root keeps its backslash too: \\?\C: is drive-relative, \\?\C:\ is the root.
             Assert.Equal(@"\\?\C:\", LongPath.ParentOf(@"\\?\C:\tool.exe"));
+            Assert.Equal(@"\\.\C:\", LongPath.ParentOf(@"\\.\C:\tool.exe"));
+            Assert.Equal(@"\\.\C:\a", LongPath.ParentOf(@"\\.\C:\a\tool.exe"));
             Assert.Equal(@"\\?\C:\a", LongPath.ParentOf(@"\\?\C:\a\tool.exe"));
             // A prefixed share root has no parent; a file under it lies in the share root, not in \\?\UNC.
             Assert.Equal("", LongPath.ParentOf(@"\\?\UNC\server\share"));
@@ -332,6 +334,11 @@ namespace Foton.Tests
                 File.WriteAllText(path, "{ not json");
                 Assert.Throws<InvalidDataException>(() => ToolManifest.Save(root, new Dictionary<string, object?> { ["Name"] = "PECmd" }));
                 Assert.Equal("{ not json", File.ReadAllText(path));
+                // Parses, but has no Installed list: also refused, not read as empty.
+                File.WriteAllText(path, "{\"Other\": 1}");
+                Assert.Throws<InvalidDataException>(() => ToolManifest.Save(root, new Dictionary<string, object?> { ["Name"] = "PECmd" }));
+                Assert.Equal("{\"Other\": 1}", File.ReadAllText(path));
+                Assert.Empty(Directory.GetFiles(root, "tools.json.tmp-*"));
             }
         }
 
