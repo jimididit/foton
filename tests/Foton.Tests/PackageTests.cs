@@ -296,6 +296,22 @@ namespace Foton.Tests
             }
         }
 
+        [Fact]
+        public void A_parent_step_that_stays_inside_the_folder_extracts_to_the_name_it_lands_on()
+        {
+            // tools\x\..\rules.txt is inside the folder and lands on tools\rules.txt; it must not fail the whole ZIP.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("inside.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                using (var w = new StreamWriter(z.CreateEntry("tools/x/../rules.txt").Open())) w.Write("ok");
+                var extract = Path.Combine(t.Path, "x");
+                SafeZip.Extract(zip, extract);
+                Assert.Equal("ok", File.ReadAllText(Path.Combine(extract, "tools", "rules.txt")));
+                Assert.False(Directory.Exists(Path.Combine(extract, "tools", "x")));
+            }
+        }
+
         [Theory]
         [InlineData("../escape.txt")]
         [InlineData("a/../../escape.txt")]

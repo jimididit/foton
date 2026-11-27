@@ -47,7 +47,7 @@ namespace Foton.Package
                     var stored = entry.FullName.Replace('\\', '/');
                     if (skipPrefixes != null && skipPrefixes.Any(p => stored.StartsWith(p, StringComparison.OrdinalIgnoreCase))) continue;
                     // Built lexically: GetFullPath throws for a path of 260 characters or more under net462, and the
-                    // tool root's rule files are that long. A ".." segment is refused outright, so the result stays inside root.
+                    // tool root's rule files are that long. A ".." step above root is refused, so the result stays inside root.
                     var target = Contained(root, name, entry.FullName);
                     if (target == null) continue;
                     var measured = measureRoot + target.Substring(root.Length);
@@ -66,22 +66,27 @@ namespace Foton.Package
 
         /// <summary>
         /// The full path an entry lands on, built from its segments without touching the file system. Empty and "."
-        /// segments are dropped; a ".." segment is refused (the entry would leave the folder). Returns null for an entry
-        /// that names the folder itself. Root ends with a backslash.
+        /// segments are dropped. A ".." segment steps back one segment, so a\..\b lands on b, as it does on disk; a step
+        /// above the folder is refused (the entry would leave it). Returns null for an entry that names the folder itself.
+        /// Root ends with a backslash.
         /// </summary>
         static string? Contained(string root, string name, string stored)
         {
-            var target = root.TrimEnd('\\');
-            var any = false;
+            var parts = new List<string>();
             foreach (var seg in name.Split('\\'))
             {
                 if (seg.Length == 0 || seg == ".") continue;
-                // Windows drops trailing dots and spaces from a name, so ".. " and "..." reach the parent folder as "..".
+                if (seg == "..")
+                {
+                    if (parts.Count == 0) throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + stored);
+                    parts.RemoveAt(parts.Count - 1);
+                    continue;
+                }
+                // Windows drops trailing dots and spaces from a name, so "... " or ".. x" style segments are refused rather than guessed at.
                 if (seg.Trim('.', ' ').Length == 0) throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + stored);
-                target += "\\" + seg;
-                any = true;
+                parts.Add(seg);
             }
-            return any ? target : null;
+            return parts.Count == 0 ? null : root.TrimEnd('\\') + "\\" + string.Join("\\", parts);
         }
     }
 }

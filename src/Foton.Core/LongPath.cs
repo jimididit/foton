@@ -26,7 +26,10 @@ namespace Foton.Core
         /// </summary>
         public static string For(string path)
         {
-            if (string.IsNullOrEmpty(path) || path.Length < Threshold || path.StartsWith(Prefix, StringComparison.Ordinal)) return path;
+            if (string.IsNullOrEmpty(path) || path.Length < Threshold) return path;
+            // Windows reads / as \, but the prefixed form does not normalize, so a C:/... path would be sent as is.
+            if (path.IndexOf('/') >= 0) path = path.Replace('/', '\\');
+            if (path.StartsWith(Prefix, StringComparison.Ordinal)) return path;
             if (path.StartsWith(@"\\", StringComparison.Ordinal)) return UncPrefix + path.Substring(2);
             if (path.Length < 3 || path[1] != ':' || path[2] != '\\') return path;
             return Prefix + path;
@@ -48,8 +51,11 @@ namespace Foton.Core
         /// </summary>
         public static string Full(string path)
         {
-            if (path.Length < Threshold) return Path.GetFullPath(path);
+            if (path == null) throw new ArgumentNullException(nameof(path));
+            // Absolute first: GetFullPath on a relative name joins the working folder itself, and that throws for a short
+            // name too when the folder is long (about 250 characters or more).
             var absolute = Path.IsPathRooted(path) ? path : Path.Combine(Directory.GetCurrentDirectory(), path);
+            if (absolute.Length < Threshold) return Path.GetFullPath(absolute);
             if (absolute.Length < 3 || absolute[1] != ':' || absolute[2] != '\\') return absolute;
             var parts = new System.Collections.Generic.List<string>();
             foreach (var seg in absolute.Substring(3).Split('\\'))

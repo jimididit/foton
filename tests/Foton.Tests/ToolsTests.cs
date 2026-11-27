@@ -134,18 +134,21 @@ namespace Foton.Tests
         {
             // GetFullPath throws at 260 characters under net462, so a long relative path (274 here) used to come back
             // unchanged, and a record match or existence check on it then failed.
-            using (var t = new TempDir())
-            {
-                var saved = Environment.CurrentDirectory;
-                try
-                {
-                    Environment.CurrentDirectory = t.Path;
-                    var relative = new string('a', 200) + @"\..\" + new string('b', 60) + @"\.\tool.exe";
-                    Assert.True(relative.Length >= 240);
-                    Assert.Equal(Path.Combine(t.Path, new string('b', 60), "tool.exe"), LongPath.Full(relative));
-                }
-                finally { Environment.CurrentDirectory = saved; }
-            }
+            // The working folder is read, not changed: tests run in parallel, and another test may use a relative path.
+            var relative = new string('a', 200) + @"\..\" + new string('b', 60) + @"\.\tool.exe";
+            Assert.True(relative.Length >= 240);
+            Assert.Equal(Path.Combine(Directory.GetCurrentDirectory(), new string('b', 60), "tool.exe"), LongPath.Full(relative));
+            // A short relative name is joined the same way, and null is the documented ArgumentNullException.
+            Assert.Equal(Path.Combine(Directory.GetCurrentDirectory(), "rule.yml"), LongPath.Full("rule.yml"));
+            Assert.Throws<ArgumentNullException>(() => LongPath.Full(null!));
+        }
+
+        [Fact]
+        public void LongPath_For_prefixes_a_forward_slash_drive_path_after_turning_the_slashes_into_backslashes()
+        {
+            var longPath = @"C:\" + string.Join(@"\", Enumerable.Repeat(new string('b', 60), 5));
+            Assert.Equal(@"\\?\" + longPath, LongPath.For(longPath.Replace('\\', '/')));
+            Assert.Equal(@"\\?\UNC\server\share\" + new string('a', 300), LongPath.For(@"//server/share/" + new string('a', 300)));
         }
 
         static void WriteEntry(ZipArchive archive, string name, string text)
