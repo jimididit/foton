@@ -144,6 +144,10 @@ namespace Foton.Tests
             // A prefixed drive root keeps its backslash too: \\?\C: is drive-relative, \\?\C:\ is the root.
             Assert.Equal(@"\\?\C:\", LongPath.ParentOf(@"\\?\C:\tool.exe"));
             Assert.Equal(@"\\?\C:\a", LongPath.ParentOf(@"\\?\C:\a\tool.exe"));
+            // A prefixed share root has no parent; a file under it lies in the share root, not in \\?\UNC.
+            Assert.Equal("", LongPath.ParentOf(@"\\?\UNC\server\share"));
+            Assert.Equal(@"\\?\UNC\server\share", LongPath.ParentOf(@"\\?\UNC\server\share\tool.exe"));
+            Assert.Equal(@"\\?\UNC\server\share\a", LongPath.ParentOf(@"\\?\UNC\server\share\a\tool.exe"));
             Assert.Equal("", LongPath.ParentOf("tool.exe"));
         }
 

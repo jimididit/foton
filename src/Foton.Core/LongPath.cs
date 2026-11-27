@@ -80,6 +80,12 @@ namespace Foton.Core
         /// </summary>
         public static string ParentOf(string path)
         {
+            // A prefixed share works on its normal form: \\?\UNC\server\share\x lies in \\?\UNC\server\share, and the share has no parent.
+            if (path.StartsWith(UncPrefix, StringComparison.Ordinal))
+            {
+                var uncParent = ParentOf(@"\\" + path.Substring(UncPrefix.Length));
+                return uncParent.Length == 0 ? "" : UncPrefix + uncParent.Substring(2);
+            }
             var cut = path.LastIndexOf('\\');
             if (cut < 0) return "";
             // A drive root keeps its backslash, prefixed or not: \\?\C:\tool.exe lies in \\?\C:\, not \\?\C:.
