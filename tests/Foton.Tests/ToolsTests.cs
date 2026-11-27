@@ -321,6 +321,21 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_damaged_manifest_is_refused_by_a_save_and_left_as_it_was()
+        {
+            // An unreadable tools.json used to read as "no rows", so the next save wrote only its own row and dropped the rest.
+            using (var t = new TempDir())
+            {
+                var root = t.File("tools");
+                Directory.CreateDirectory(root);
+                var path = Path.Combine(root, ToolManifest.FileName);
+                File.WriteAllText(path, "{ not json");
+                Assert.Throws<InvalidDataException>(() => ToolManifest.Save(root, new Dictionary<string, object?> { ["Name"] = "PECmd" }));
+                Assert.Equal("{ not json", File.ReadAllText(path));
+            }
+        }
+
+        [Fact]
         public void LongPath_Full_leaves_a_bare_long_share_without_a_trailing_backslash()
         {
             // A share root (\\server\share) with a long name is returned as given; a path under it keeps the dot-segment rules.

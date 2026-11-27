@@ -36,10 +36,16 @@ namespace Foton.Tools
         {
             var path = PathOf(toolRoot);
             if (!File.Exists(LongPath.For(path))) return new Dictionary<string, object?>[0];
+            return TryRead(path) ?? new Dictionary<string, object?>[0];
+        }
+
+        /// <summary>The rows in the file at path; null when it cannot be read or parsed (never "no rows").</summary>
+        static IReadOnlyList<Dictionary<string, object?>>? TryRead(string path)
+        {
             try { return Rows(Json.Parse(File.ReadAllText(LongPath.For(path), Encoding.UTF8))); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException)
             {
-                return new Dictionary<string, object?>[0];
+                return null;
             }
         }
 
@@ -55,7 +61,11 @@ namespace Foton.Tools
             var root = Root(toolRoot);
             Directory.CreateDirectory(LongPath.For(root));
             var path = Path.Combine(root, FileName);
-            var rows = List(root).Where(r => !string.Equals(Get(r, "Name"), Get(entry, "Name"), StringComparison.OrdinalIgnoreCase)).ToList();
+            // A manifest that exists but cannot be read is not "no rows": rewriting it would drop every other registration.
+            var existing = File.Exists(LongPath.For(path)) ? TryRead(path) : new Dictionary<string, object?>[0];
+            if (existing == null)
+                throw new InvalidDataException("The tool manifest at " + path + " exists but cannot be read, so it was not overwritten. Move or repair the file, then try again.");
+            var rows = existing.Where(r => !string.Equals(Get(r, "Name"), Get(entry, "Name"), StringComparison.OrdinalIgnoreCase)).ToList();
             rows.Add(entry);
             var doc = new Dictionary<string, object?>
             {
