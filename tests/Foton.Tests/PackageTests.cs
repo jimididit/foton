@@ -297,6 +297,30 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void Extract_reads_an_archive_whose_own_path_is_past_260_characters()
+        {
+            // The archive itself sits in a folder past 260 characters (a deep local copy): the open takes the prefixed form.
+            using (var t = new TempDir())
+            {
+                var zip = t.File(new string('z', 250) + ".zip");
+                Assert.True(zip.Length > 259);
+                using (var z = ZipFile.Open(LongPath.For(zip), ZipArchiveMode.Create))
+                using (var w = new StreamWriter(z.CreateEntry("tool.txt").Open())) w.Write("ok");
+                var extract = t.File("out");
+                try
+                {
+                    SafeZip.Extract(zip, extract);
+                    Assert.Equal("ok", File.ReadAllText(Path.Combine(extract, "tool.txt")));
+                }
+                finally
+                {
+                    try { File.Delete(LongPath.For(zip)); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
         public void Extract_into_a_destination_past_260_characters_writes_the_entry()
         {
             // GetFullPath on the destination threw at 260 characters under net462; the folder is created through the prefix.

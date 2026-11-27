@@ -226,7 +226,7 @@ namespace Foton.Package
             var extracted = ExtractedTo!.TrimEnd('\\');
             var prefix = CaseRoot.Length > extracted.Length ? CaseRoot.Substring(extracted.Length).Trim('\\') + "\\" : "";
             var nested = NestedDuplicate == null ? null : NestedDuplicate.Substring(CaseRoot.TrimEnd('\\').Length).Trim('\\') + "\\";
-            using (var zip = ZipFile.OpenRead(SourcePath))
+            using (var zip = ZipFile.OpenRead(LongPath.For(LongPath.Full(SourcePath))))
             {
                 // Entries by path relative to the case root, as hashes.csv lists them.
                 var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.OrdinalIgnoreCase);

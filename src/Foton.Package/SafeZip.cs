@@ -36,7 +36,8 @@ namespace Foton.Package
             var root = LongPath.Full(destination).TrimEnd('\\') + "\\";
             var measureRoot = finalDestination == null ? root : LongPath.Full(finalDestination).TrimEnd('\\') + "\\";
             Directory.CreateDirectory(LongPath.For(root));
-            using (var zip = ZipFile.OpenRead(zipPath))
+            // The archive path can be past 260 characters too (a deep local copy); the open takes the prefixed form.
+            using (var zip = ZipFile.OpenRead(LongPath.For(LongPath.Full(zipPath))))
             {
                 foreach (var entry in zip.Entries)
                 {
