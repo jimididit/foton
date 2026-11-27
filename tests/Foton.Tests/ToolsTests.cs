@@ -148,6 +148,13 @@ namespace Foton.Tests
             Assert.Equal("", LongPath.ParentOf(@"\\?\UNC\server\share"));
             Assert.Equal(@"\\?\UNC\server\share", LongPath.ParentOf(@"\\?\UNC\server\share\tool.exe"));
             Assert.Equal(@"\\?\UNC\server\share\a", LongPath.ParentOf(@"\\?\UNC\server\share\a\tool.exe"));
+            // A null path is an argument error, as in Full, not a NullReferenceException.
+            Assert.Throws<ArgumentNullException>(() => LongPath.ParentOf(null!));
+
+            // A root-relative long path (\folder\...) gets the current drive, so a later call can take the prefix.
+            var drive = Path.GetPathRoot(Directory.GetCurrentDirectory()).TrimEnd('\\');
+            var deep = new string('x', 250);
+            Assert.Equal(drive + @"\" + deep + @"\tool.exe", LongPath.Full(@"\" + deep + @"\tool.exe"));
             Assert.Equal("", LongPath.ParentOf("tool.exe"));
         }
 

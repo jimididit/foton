@@ -75,6 +75,8 @@ namespace Foton.Tools
         /// </summary>
         static string FolderOf(string exePath)
         {
+            // A bare name has no folder of its own. Full would resolve it against the working folder and pick up files there.
+            if (exePath.IndexOf('\\') < 0 && exePath.IndexOf('/') < 0) return "";
             return LongPath.ParentOf(LongPath.Full(exePath));
         }
     }

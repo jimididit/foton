@@ -63,6 +63,9 @@ namespace Foton.Core
             if (absolute.StartsWith(Prefix, StringComparison.Ordinal)) absolute = Plain(absolute);
             if (absolute.Length < Threshold) return Path.GetFullPath(absolute);
             absolute = absolute.Replace('/', '\\');
+            // \folder\tool names the current drive but is not drive-qualified; give it the drive so the prefix can go on later.
+            if (absolute[0] == '\\' && !absolute.StartsWith(@"\\", StringComparison.Ordinal))
+                absolute = Path.GetPathRoot(Directory.GetCurrentDirectory()).TrimEnd('\\') + absolute;
             if (absolute.StartsWith(@"\\", StringComparison.Ordinal))
             {
                 // \\server\share\rest: the share is the root, and . and .. are resolved in the rest only.
@@ -80,6 +83,7 @@ namespace Foton.Core
         /// </summary>
         public static string ParentOf(string path)
         {
+            if (path == null) throw new ArgumentNullException(nameof(path));
             // A prefixed share works on its normal form: \\?\UNC\server\share\x lies in \\?\UNC\server\share, and the share has no parent.
             if (path.StartsWith(UncPrefix, StringComparison.Ordinal))
             {
