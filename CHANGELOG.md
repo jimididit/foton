@@ -4,11 +4,13 @@ Notable changes to Foton, newest first. The format follows [Keep a Changelog](ht
 
 Each release (tags `v2.*` and later) takes its "What's new" notes from the section whose heading matches the tag. A change that alters behavior or output adds a line to the section for the current `FotonVersion` in `Directory.Build.props`. If that version has already been released, bump it first. A test fails when that section is missing or its date differs from `FotonReleaseDate`.
 
-## [3.4.0] - 2026-11-26
+## [3.4.0] - 2026-11-28
 
 - Compose logs the selected tools it cannot find before the run starts (`N selected tool(s) not found: ...`), so a gap shows up first. Each still gets its `NotOnPath` row; no status changes.
 - The rule-set version (`RulesVersion`: Hayabusa and Chainsaw rules, `local-unversioned` for a local rules folder) is shown in the console's Tools tab and in `foton tools`.
 - `foton tools` installs no longer fail when the tool folder is deep. Under a long profile path, the pinned Chainsaw Sigma rules passed the 260-character limit and the install stopped with `Could not find a part of the path`. Tool file operations now use the long-path form where a path is long, and a failed reinstall removes its partial copy under a long folder and restores the earlier one. Recorded paths keep the normal form. Installing under a long folder works, but compose cannot start a tool from a path of 260 characters or more (Windows will not start a program from that path without the long-path opt-in, which `foton.exe` does not carry): compose records `TooLongToStart` for that tool and does not run it. Install the tool under a shorter tool root to run it.
+- ZIP extraction (a case ZIP opened by `foton`, and tool installs) now checks every entry before it writes any, so a refused archive writes nothing and creates no folder. New refusals, each reported as an unsafe-entry error: a Windows device name (`CON`, `NUL`, `COM1` and the like, even with an extension), a name made only of dots and spaces, a character Windows cannot use in a name, two entries for one file (including names that differ only by trailing dots or spaces), and a file and a folder with the same name. Path-escape (`..`) and rooted-path refusals are unchanged. An archive path or destination of 260 characters or more is now read.
+- `tools.json` saves are serialized with a lock file and swapped in atomically, so two Foton processes installing at once keep both rows. A `tools.json` that cannot be read is no longer overwritten by a save: the save stops with an error and leaves the file as it was.
 
 ## [3.3.2] - 2026-11-26
 
