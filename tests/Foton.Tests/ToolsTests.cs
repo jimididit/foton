@@ -707,7 +707,33 @@ namespace Foton.Tests
                 File.WriteAllBytes(LongPath.For(file), new byte[] { 1, 2, 3 });
                 var hash = Hashing.SafeHash(file, false);
                 Assert.Matches("^[0-9A-F]{64}$", hash);
+                // The same file named with forward slashes, or already prefixed, hashes the same: no HashError, no double prefix.
+                Assert.Equal(hash, Hashing.SafeHash(file.Replace('\\', '/'), false));
+                Assert.Equal(hash, Hashing.SafeHash(LongPath.For(file), false));
             }
+        }
+
+        [Fact]
+        public void LongPath_For_is_idempotent_and_leaves_relative_paths_alone()
+        {
+            var deep = new string('a', 250);
+            foreach (var p in new[] { @"C:\" + deep + @"\x.exe", @"\\server\share\" + deep + @"\x.exe", @"\\.\C:\" + deep + @"\x.exe" })
+                Assert.Equal(LongPath.For(p), LongPath.For(LongPath.For(p)));
+            Assert.Equal(@"\\?\C:\" + deep + @"\x.exe", LongPath.For("C:/" + deep + "/x.exe"));
+            Assert.Equal(@"\\?\UNC\server\share\" + deep + @"\x.exe", LongPath.For(@"\\server\share\" + deep + @"\x.exe"));
+            // Relative: no prefix (the prefix needs a full path), so Windows resolves it as before.
+            Assert.Equal(deep + @"\x.exe", LongPath.For(deep + @"\x.exe"));
+        }
+
+        [Fact]
+        public void CanStart_resolves_a_drive_relative_path_before_measuring_it()
+        {
+            // C:tool.exe counts as rooted to .NET but starts in drive C's current folder; measured as written it looked short.
+            var cwd = Directory.GetCurrentDirectory();
+            var drive = cwd.Substring(0, 2);
+            var fits = new string('r', ToolProcess.MaxStartPath - cwd.TrimEnd('\\').Length - 1);
+            Assert.True(ToolProcess.CanStart(drive + fits));
+            Assert.False(ToolProcess.CanStart(drive + fits + "rr"));
         }
 
         [Fact]

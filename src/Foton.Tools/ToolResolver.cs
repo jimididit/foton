@@ -59,11 +59,9 @@ namespace Foton.Tools
             {
                 var hit = OnPath(name, pathEnv ?? Environment.GetEnvironmentVariable("PATH") ?? "");
                 if (hit == null) continue;
-                // A relative PATH entry resolves against the working folder; the absolute form is what gets checked and run.
-                // A hit that cannot be made absolute is skipped, not run from its relative form.
-                var full = AbsoluteOrNull(hit);
-                if (full == null) continue;
-                return new ResolvedTool { Path = full, Source = "PATH", Version = ToolRegistry.FileVersion(full), RulesVersion = LocalRules(full) };
+                // OnPath returns the absolute form (a relative PATH entry resolved against the working folder), which is what
+                // gets checked and run.
+                return new ResolvedTool { Path = hit, Source = "PATH", Version = ToolRegistry.FileVersion(hit), RulesVersion = LocalRules(hit) };
             }
             return null;
         }

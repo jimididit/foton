@@ -43,9 +43,17 @@ namespace Foton.Tools
         /// <summary>The rows in the file at path; null when it cannot be read or parsed (never "no rows").</summary>
         static IReadOnlyList<Dictionary<string, object?>>? TryRead(string path)
         {
+            string text;
+            for (int attempt = 0; ; attempt++)
+            {
+                try { text = File.ReadAllText(LongPath.For(path), Encoding.UTF8); break; }
+                // A save swapping the file in holds it for a moment; a read then meets a sharing violation, not a damaged file.
+                catch (IOException) when (attempt < 25) { Thread.Sleep(20); }
+                catch (Exception) { return null; }
+            }
             try
             {
-                var doc = Json.Parse(File.ReadAllText(LongPath.For(path), Encoding.UTF8));
+                var doc = Json.Parse(text);
                 // A file with no Installed list is not one this version (or 1.38.x) wrote; refuse it rather than read it as empty.
                 if (!(doc is IDictionary d) || !d.Contains("Installed")) return null;
                 return Rows(doc);
@@ -125,7 +133,8 @@ namespace Foton.Tools
             {
                 TextFile.Write(temp, Json.Indented(doc));
                 // A process outside the lock (another Foton version, a hand edit) can create or remove tools.json between the
-                // check and the swap. Replace needs the file to exist and Move needs it not to, so try again with the other.
+                // check and the swap, and a reader (compose looking up a tool) holds it open for a moment. Replace needs the file
+                // to exist and Move needs it not to, so each retry checks again; about half a second covers a read.
                 for (int attempt = 0; ; attempt++)
                 {
                     try
@@ -134,7 +143,7 @@ namespace Foton.Tools
                         else File.Move(temp, LongPath.For(path));
                         break;
                     }
-                    catch (IOException) when (attempt < 2) { Thread.Sleep(20); }
+                    catch (IOException) when (attempt < 25) { Thread.Sleep(20); }
                 }
             }
             finally

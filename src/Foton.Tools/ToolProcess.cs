@@ -28,9 +28,17 @@ namespace Foton.Tools
         public static bool CanStart(string exe, string? workDir = null) =>
             Absolute(exe).Length <= MaxStartPath && (workDir == null || Absolute(workDir).Length <= MaxStartPath);
 
-        /// <summary>A relative path is measured as Windows will see it, joined to the working folder; a rooted one as given.</summary>
-        static string Absolute(string path) =>
-            path.Length == 0 || Path.IsPathRooted(path) ? path : Path.Combine(Directory.GetCurrentDirectory(), path);
+        /// <summary>
+        /// The path measured as Windows will see it. Path.IsPathRooted is not enough: C:tool.exe and \tool.exe count as rooted
+        /// but resolve against a current folder. LongPath.Full resolves every form; a path it cannot read is measured as given.
+        /// </summary>
+        static string Absolute(string path)
+        {
+            if (path.Length == 0) return path;
+            try { return LongPath.Full(path); }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is IOException || ex is System.Security.SecurityException)
+            { return path; }
+        }
 
         static ProcessStartInfo Info(string exe, string arguments, string? workDir) => new ProcessStartInfo(exe, arguments)
         {

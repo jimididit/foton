@@ -89,7 +89,7 @@ namespace Foton.Tools
         public static string FileVersion(string exe)
         {
             try { return (FileVersionInfo.GetVersionInfo(LongPath.For(exe)).FileVersion ?? "").Trim(); }
-            catch (Exception ex) when (ex is IOException || ex is ArgumentException) { return ""; }
+            catch (Exception ex) when (ex is IOException || ex is ArgumentException || ex is UnauthorizedAccessException || ex is NotSupportedException) { return ""; }
         }
 
         /// <summary>
