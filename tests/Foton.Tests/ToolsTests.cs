@@ -650,6 +650,46 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void CanStart_measures_a_relative_path_as_Windows_will_see_it()
+        {
+            // A relative name is joined to the working folder before it is started, so its length is that of the full path.
+            var cwd = Directory.GetCurrentDirectory();
+            var fits = new string('r', ToolProcess.MaxStartPath - cwd.Length - 1);
+            Assert.True(ToolProcess.CanStart(fits));
+            Assert.False(ToolProcess.CanStart(fits + "rr"));
+        }
+
+        [Fact]
+        public void RunToFiles_does_not_start_the_tool_when_an_output_file_cannot_be_created()
+        {
+            // The tool used to start first and keep running after the file error was thrown.
+            using (var t = new TempDir())
+            {
+                var marker = Path.Combine(t.Path, "ran.txt");
+                var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+                Assert.ThrowsAny<IOException>(() => ToolProcess.RunToFiles(cmd, "/c echo hi> \"" + marker + "\"", t.Path,
+                    Path.Combine(t.Path, "no-such-folder", "out.txt"), Path.Combine(t.Path, "err.txt")));
+                System.Threading.Thread.Sleep(700);
+                Assert.False(File.Exists(marker));
+            }
+        }
+
+        [Fact]
+        public void A_file_in_a_folder_past_250_characters_hashes()
+        {
+            using (var t = new TempDir())
+            {
+                var dir = t.Path;
+                while (dir.Length < 252) dir = Path.Combine(dir, new string('d', 50));
+                Directory.CreateDirectory(LongPath.For(dir));
+                var file = Path.Combine(dir, "x.bin");
+                File.WriteAllBytes(LongPath.For(file), new byte[] { 1, 2, 3 });
+                var hash = Hashing.SafeHash(file, false);
+                Assert.Matches("^[0-9A-F]{64}$", hash);
+            }
+        }
+
+        [Fact]
         public void Compose_names_the_selected_tools_that_are_missing_before_it_runs()
         {
             using (var t = new TempDir())

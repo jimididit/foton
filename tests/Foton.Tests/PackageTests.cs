@@ -335,6 +335,62 @@ namespace Foton.Tests
             }
         }
 
+        [Theory]
+        [InlineData('|')]
+        [InlineData('"')]
+        [InlineData('<')]
+        [InlineData('>')]
+        public void An_entry_name_with_a_character_Windows_cannot_use_is_refused_before_anything_is_written(char bad)
+        {
+            // .NET's own writer refuses these names, so the entry is written with a placeholder and the name bytes are patched,
+            // as an archive from another tool would carry them. net462's Path.IsPathRooted also throws on these characters;
+            // the refusal has to be the archive error, not that exception.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("badname.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("a/bXXc.txt").Open())) w.Write("2");
+                }
+                var bytes = File.ReadAllBytes(zip);
+                var target = System.Text.Encoding.ASCII.GetBytes("bXXc");
+                var patched = 0;
+                for (int i = 0; i + target.Length <= bytes.Length; i++)
+                {
+                    if (!bytes.Skip(i).Take(target.Length).SequenceEqual(target)) continue;
+                    bytes[i + 1] = (byte)bad;
+                    patched++;
+                }
+                Assert.Equal(2, patched);   // the local header and the central directory
+                File.WriteAllBytes(zip, bytes);
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.False(Directory.Exists(extract));
+            }
+        }
+
+        [Theory]
+        [InlineData("a/b.txt.")]
+        [InlineData("a/b.txt ")]
+        public void Two_entries_that_differ_only_by_trailing_dots_or_spaces_are_one_file(string second)
+        {
+            // Windows drops trailing dots and spaces, so both names are the same file and the second write would fail midway.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("dots.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("a/b.txt").Open())) w.Write("2");
+                    using (var w = new StreamWriter(z.CreateEntry(second).Open())) w.Write("3");
+                }
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.False(Directory.Exists(extract));
+            }
+        }
+
         [Fact]
         public void LongPath_ParentOf_reads_forward_slashes_as_backslashes()
         {
@@ -420,6 +476,9 @@ namespace Foton.Tests
         [InlineData("dir/CON")]
         [InlineData("a/com1.log")]
         [InlineData("a/Nul .log")]
+        // Characters Windows cannot put in a file name would fail at the write, after earlier entries were already extracted.
+        [InlineData("a/what?.txt")]
+        [InlineData("a/star*.txt")]
         public void Refuses_zip_entries_outside_the_extraction_folder(string entryName)
         {
             using (var t = new TempDir())

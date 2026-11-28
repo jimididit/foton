@@ -26,7 +26,11 @@ namespace Foton.Tools
 
         /// <summary>True when the executable path, and the working folder when one is given, are short enough to start from.</summary>
         public static bool CanStart(string exe, string? workDir = null) =>
-            exe.Length <= MaxStartPath && (workDir == null || workDir.Length <= MaxStartPath);
+            Absolute(exe).Length <= MaxStartPath && (workDir == null || Absolute(workDir).Length <= MaxStartPath);
+
+        /// <summary>A relative path is measured as Windows will see it, joined to the working folder; a rooted one as given.</summary>
+        static string Absolute(string path) =>
+            path.Length == 0 || Path.IsPathRooted(path) ? path : Path.Combine(Directory.GetCurrentDirectory(), path);
 
         static ProcessStartInfo Info(string exe, string arguments, string? workDir) => new ProcessStartInfo(exe, arguments)
         {
@@ -67,11 +71,32 @@ namespace Foton.Tools
         public static int RunToFiles(string exe, string arguments, string workDir, string stdoutPath, string stderrPath)
         {
             if (!CanStart(exe, workDir))
-                throw new IOException("The tool path is too long to start from (" + exe.Length + " characters); Windows starts a program only from paths under " + (MaxStartPath + 1) + ".");
-            // The output files sit in the case folder, which can be deep even when the tool path is not.
-            using (var p = Process.Start(Info(exe, arguments, workDir))!)
-            using (var so = File.Create(LongPath.For(stdoutPath)))
-            using (var se = File.Create(LongPath.For(stderrPath)))
+                throw new IOException("The tool's executable or working folder is too long to start from; Windows starts a program only from paths under " + (MaxStartPath + 1) + " characters.");
+            // The output files are opened first, with the long-path form (the case folder can be deep even when the tool path
+            // is not). If either cannot be created the tool is never started, instead of running on after the error.
+            FileStream so = File.Create(LongPath.For(stdoutPath));
+            FileStream? se = null;
+            Process p;
+            try
+            {
+                se = File.Create(LongPath.For(stderrPath));
+                p = Process.Start(Info(exe, arguments, workDir))!;
+            }
+            catch
+            {
+                // A tool that did not start wrote no log: compose reports the start error in stderr only, and an empty stdout
+                // left here would look like a log this run wrote.
+                so.Dispose();
+                se?.Dispose();
+                foreach (var path in new[] { stdoutPath, stderrPath })
+                {
+                    try { File.Delete(LongPath.For(path)); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+                throw;
+            }
+            using (so)
+            using (se)
+            using (p)
             {
                 p.StandardInput.Close();
                 var a = p.StandardOutput.BaseStream.CopyToAsync(so);

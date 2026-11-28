@@ -37,7 +37,7 @@ namespace Foton.Package
             var root = LongPath.Full(destination).TrimEnd('\\') + "\\";
             var measureRoot = finalDestination == null ? root : LongPath.Full(finalDestination).TrimEnd('\\') + "\\";
             // The archive path can be past 260 characters too (a deep local copy); the open takes the prefixed form.
-            using (var zip = ZipFile.OpenRead(LongPath.For(LongPath.Full(zipPath))))
+            using (var zip = OpenZip(zipPath))
             {
                 // Two passes. The first checks every entry and plans what to write; the second writes. A refused archive
                 // therefore writes nothing, instead of leaving the entries that came before the unsafe one.
@@ -48,7 +48,8 @@ namespace Foton.Package
                     var name = entry.FullName.Replace('/', '\\');
                     if (name.Length == 0) continue;
                     // A rooted or drive-qualified name refuses the archive even when the entry would be skipped.
-                    if (Path.IsPathRooted(name) || name.IndexOf(':') >= 0)
+                    // Not Path.IsPathRooted: on net462 it throws for | " < > in a name, which would escape as the wrong exception.
+                    if (name[0] == '\\' || name.IndexOf(':') >= 0)
                         throw new InvalidDataException("Unsafe ZIP entry (rooted path): " + entry.FullName);
                     // Skipped entries are never written, so they skip the containment check (and any over-long path).
                     var stored = entry.FullName.Replace('\\', '/');
@@ -67,7 +68,8 @@ namespace Foton.Package
                     var isFolder = name.EndsWith("\\", StringComparison.Ordinal);
                     // Two entries for one file (or a\b and a\.\b) would fail on the second write, after the first was already
                     // on disk. Refused here instead, with nothing written.
-                    if (!isFolder && !files.Add(target)) throw new InvalidDataException("Unsafe ZIP entry (two entries for one file): " + entry.FullName);
+                    // Windows drops trailing dots and spaces, so b.txt and "b.txt." (or "b.txt ") are one file: compare on that form.
+                    if (!isFolder && !files.Add(string.Join("\\", target.Split('\\').Select(s => s.TrimEnd('.', ' '))))) throw new InvalidDataException("Unsafe ZIP entry (two entries for one file): " + entry.FullName);
                     plan.Add(new Planned { Entry = entry, Target = target, Parent = parent, IsFolder = isFolder });
                 }
                 // The destination is created only now, so a refused archive leaves no folder behind either.
@@ -78,6 +80,28 @@ namespace Foton.Package
                     Directory.CreateDirectory(LongPath.For(p.Parent));
                     p.Entry.ExtractToFile(LongPath.For(p.Target), overwrite: false);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Opens the archive. net462's reader throws ArgumentException while reading the entry list when a name holds a character
+        /// Windows cannot use (| " &lt; &gt;). That happens before anything is written, so it is a refusal; it is reported as the
+        /// archive error callers already handle, not as an argument error.
+        /// </summary>
+        static ZipArchive OpenZip(string zipPath)
+        {
+            ZipArchive? zip = null;
+            try
+            {
+                zip = ZipFile.OpenRead(LongPath.For(LongPath.Full(zipPath)));
+                // The entry list is read on first use, so the error surfaces here, inside the guard.
+                if (zip.Entries.Count < 0) throw new InvalidDataException("unreachable");
+                return zip;
+            }
+            catch (ArgumentException ex)
+            {
+                zip?.Dispose();
+                throw new InvalidDataException("Unsafe ZIP entry (a name with a character Windows cannot use, or an unusable archive path): " + ex.Message, ex);
             }
         }
 
@@ -123,6 +147,10 @@ namespace Foton.Package
                 // names the folder or a parent. It is refused rather than guessed at. A name with other characters (".. x") is a
                 // plain name and is allowed.
                 if (seg.Trim('.', ' ').Length == 0) throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + stored);
+                // A character Windows cannot put in a name (| ? * " < > and control characters) would fail at the write, after
+                // earlier files were already on disk. Refused up front with the rest of the checks.
+                if (seg.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                    throw new InvalidDataException("Unsafe ZIP entry (character Windows cannot use in a name): " + stored);
                 parts.Add(seg);
             }
             return parts.Count == 0 ? null : root.TrimEnd('\\') + "\\" + string.Join("\\", parts);
