@@ -71,8 +71,9 @@ namespace Foton.Tools
         }
 
         /// <summary>
-        /// The folder a tool's executable sits in. Full path first (GetFullPath throws on 260 characters or more under
-        /// net462), then the text before its last backslash, so a deep tool folder still resolves.
+        /// The folder a tool's executable sits in, for any length: LongPath.Full makes the path absolute without GetFullPath
+        /// (which throws on 260 characters or more under net462), and LongPath.ParentOf cuts the text before its last
+        /// backslash. There is no fallback to try; neither step touches the disk or throws for length.
         /// </summary>
         static string FolderOf(string exePath)
         {

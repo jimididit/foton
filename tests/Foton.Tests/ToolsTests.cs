@@ -157,8 +157,9 @@ namespace Foton.Tests
             var drive = Path.GetPathRoot(Directory.GetCurrentDirectory()).TrimEnd('\\');
             var deep = new string('x', 250);
             Assert.Equal(drive + @"\" + deep + @"\tool.exe", LongPath.Full(@"\" + deep + @"\tool.exe"));
-            // A drive-relative long path (E:folder\...) starts in that drive's current folder, which Windows keeps per drive.
-            var driveCwd = Environment.GetEnvironmentVariable("=" + drive) ?? drive + @"\";
+            // A drive-relative long path (E:folder\...) starts in that drive's current folder. On the current drive that is the
+            // process folder (the =E: variable may be unset when the process was not started from a shell); other drives use =X:.
+            var driveCwd = Directory.GetCurrentDirectory();
             Assert.Equal(driveCwd.TrimEnd('\\') + @"\" + deep + @"\tool.exe", LongPath.Full(drive + deep + @"\tool.exe"));
             Assert.Equal("", LongPath.ParentOf("tool.exe"));
         }
@@ -555,11 +556,31 @@ namespace Foton.Tests
             {
                 var secret = t.File("not-a-commit.txt");
                 File.WriteAllText(secret, "0123456789abcdef0123456789abcdef\n");
+                Assert.Equal("bundled with release 9.9.9-test", RulesVersionFor(t, "ref: refs/heads/" + secret + "\n", null));
+            }
+        }
+
+        [Theory]
+        [InlineData("ref: refs/tags/v1.2.3\n", null, "bundled with release 9.9.9-test")]     // a tag ref is not a commit; its text used to be recorded
+        [InlineData("ref: refs/remotes/origin/main\n", null, "bundled with release 9.9.9-test")]
+        [InlineData("0123456789abcdef0123456789abcdef01234567\n", null, "0123456789ab")]    // detached HEAD holds the hash
+        [InlineData("ref: refs/heads/main\n", "fedcba9876543210fedcba9876543210fedcba98\n", "fedcba987654")]
+        [InlineData("ref: refs/heads/main\n", "not a hash at all\n", "bundled with release 9.9.9-test")]
+        public void The_rules_version_is_a_commit_hash_or_says_it_came_with_the_release(string head, string? mainRef, string expected)
+        {
+            using (var t = new TempDir())
+                Assert.Equal(expected, RulesVersionFor(t, head, mainRef));
+        }
+
+        static string RulesVersionFor(TempDir t, string head, string? refsHeadsMain)
+        {
+            {
                 var zip = t.File("chainsaw-ref.zip");
                 using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
                 {
                     WriteEntry(archive, "chainsaw/chainsaw_x86_64-pc-windows-msvc.exe", "fake-chainsaw");
-                    WriteEntry(archive, "chainsaw/rules/.git/HEAD", "ref: refs/heads/" + secret + "\n");
+                    WriteEntry(archive, "chainsaw/rules/.git/HEAD", head);
+                    if (refsHeadsMain != null) WriteEntry(archive, "chainsaw/rules/.git/refs/heads/main", refsHeadsMain);
                 }
                 File.WriteAllText(t.File("catalog.json"), Json.Indented(new Dictionary<string, object?>
                 {
@@ -578,7 +599,7 @@ namespace Foton.Tests
                 }));
                 var entry = ToolCatalog.Entry("Chainsaw", t.File("catalog.json"));
                 var record = ToolInstaller.Install(entry, zip, t.File("tools"), Quiet());
-                Assert.Equal("bundled with release 9.9.9-test", record["RulesVersion"]);
+                return (string)record["RulesVersion"]!;
             }
         }
 

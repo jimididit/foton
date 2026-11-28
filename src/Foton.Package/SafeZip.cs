@@ -42,7 +42,8 @@ namespace Foton.Package
                 // Two passes. The first checks every entry and plans what to write; the second writes. A refused archive
                 // therefore writes nothing, instead of leaving the entries that came before the unsafe one.
                 var plan = new List<Planned>();
-                var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var fileNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var entry in zip.Entries)
                 {
                     var name = entry.FullName.Replace('/', '\\');
@@ -68,10 +69,24 @@ namespace Foton.Package
                     var isFolder = name.EndsWith("\\", StringComparison.Ordinal);
                     // Two entries for one file (or a\b and a\.\b) would fail on the second write, after the first was already
                     // on disk. Refused here instead, with nothing written.
-                    // Windows drops trailing dots and spaces, so b.txt and "b.txt." (or "b.txt ") are one file: compare on that form.
-                    if (!isFolder && !files.Add(string.Join("\\", target.Split('\\').Select(s => s.TrimEnd('.', ' '))))) throw new InvalidDataException("Unsafe ZIP entry (two entries for one file): " + entry.FullName);
+                    // Compared the way the file system will see the name. A normal path loses trailing dots and spaces, so b.txt and
+                    // "b.txt." are one file. A path of 240 characters or more is written with the \\?\ prefix, which keeps them,
+                    // so there they are two files and both extract.
+                    var verbatim = LongPath.For(target) != target;
+                    var key = Key(target, verbatim);
+                    if (!isFolder)
+                    {
+                        if (fileNames.ContainsKey(key)) throw new InvalidDataException("Unsafe ZIP entry (two entries for one file): " + entry.FullName);
+                        fileNames[key] = entry.FullName;
+                    }
+                    else folders.Add(key);
+                    // Every folder above the entry must be a folder: a file named a cannot also hold a\b.
+                    for (var i = target.IndexOf('\\', root.Length); i >= 0; i = target.IndexOf('\\', i + 1))
+                        folders.Add(Key(target.Substring(0, i), verbatim));
                     plan.Add(new Planned { Entry = entry, Target = target, Parent = parent, IsFolder = isFolder });
                 }
+                foreach (var f in fileNames)
+                    if (folders.Contains(f.Key)) throw new InvalidDataException("Unsafe ZIP entry (a file and a folder share a name): " + f.Value);
                 // The destination is created only now, so a refused archive leaves no folder behind either.
                 Directory.CreateDirectory(LongPath.For(root));
                 foreach (var p in plan)
@@ -95,7 +110,7 @@ namespace Foton.Package
             {
                 zip = ZipFile.OpenRead(LongPath.For(LongPath.Full(zipPath)));
                 // The entry list is read on first use, so the error surfaces here, inside the guard.
-                if (zip.Entries.Count < 0) throw new InvalidDataException("unreachable");
+                _ = zip.Entries.Count;
                 return zip;
             }
             catch (ArgumentException ex)
@@ -104,6 +119,10 @@ namespace Foton.Package
                 throw new InvalidDataException("Unsafe ZIP entry (a name with a character Windows cannot use, or an unusable archive path): " + ex.Message, ex);
             }
         }
+
+        /// <summary>The name as the file system compares it: trailing dots and spaces dropped from each segment, unless the path is written verbatim.</summary>
+        static string Key(string path, bool verbatim) =>
+            verbatim ? path : string.Join("\\", path.Split('\\').Select(s => s.TrimEnd('.', ' ')));
 
         /// <summary>One entry that passed the checks, with where it goes.</summary>
         sealed class Planned

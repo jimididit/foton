@@ -392,6 +392,66 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void An_archive_with_a_file_and_a_folder_of_the_same_name_is_refused_before_anything_is_written()
+        {
+            // "a" as a file and "a\b.txt" cannot both exist; the second write used to fail after good.txt was already on disk.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("clash.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("a").Open())) w.Write("2");
+                    using (var w = new StreamWriter(z.CreateEntry("a/b.txt").Open())) w.Write("3");
+                }
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.False(Directory.Exists(extract));
+            }
+        }
+
+        [Fact]
+        public void Names_that_differ_only_by_a_trailing_dot_are_two_files_under_a_long_path()
+        {
+            // At 240 characters or more the file is written with the \\?\ prefix, which does not drop trailing dots, so b.txt and
+            // "b.txt." are distinct files there and both extract. (Below that Windows treats them as one; see the neighbouring test.)
+            using (var t = new TempDir())
+            {
+                var folder = t.Path;
+                while (folder.Length < 245) folder = Path.Combine(folder, new string('f', 40));
+                var zip = t.File("dots-long.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("b.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("b.txt.").Open())) w.Write("2");
+                }
+                SafeZip.Extract(zip, folder);
+                var verbatim = Foton.Core.LongPath.For(folder);
+                var names = Directory.GetFiles(verbatim).Select(Path.GetFileName).OrderBy(n => n).ToArray();
+                // Delete through the prefixed form: a trailing-dot name cannot be reached any other way.
+                foreach (var f in Directory.GetFiles(verbatim)) File.Delete(f);
+                Assert.Equal(new[] { "b.txt", "b.txt." }, names);
+            }
+        }
+
+        [Fact]
+        public void LongPath_Full_resolves_short_drive_relative_and_root_relative_paths_and_keeps_a_trailing_backslash()
+        {
+            var cwd = Directory.GetCurrentDirectory();
+            var drive = cwd.Substring(0, 2);
+            // Short drive-relative and root-relative forms no longer go through GetFullPath, which throws when the working folder is long.
+            Assert.Equal(cwd.TrimEnd('\\'), Foton.Core.LongPath.Full(drive).TrimEnd('\\'));
+            Assert.Equal(Path.Combine(cwd, "sub"), Foton.Core.LongPath.Full(drive + "sub"));
+            Assert.Equal(drive + @"\x\y", Foton.Core.LongPath.Full(@"\x\y"));
+            // A long folder path keeps its trailing backslash, as the short form does.
+            var longFolder = @"C:\" + new string('a', 250);
+            Assert.EndsWith(@"\", Foton.Core.LongPath.Full(longFolder + @"\"));
+            Assert.False(Foton.Core.LongPath.Full(longFolder).EndsWith(@"\"));
+            Assert.EndsWith(@"\", Path.GetFullPath(@"C:\x\"));
+            Assert.EndsWith(@"\", Foton.Core.LongPath.Full(@"C:\x\"));
+        }
+
+        [Fact]
         public void LongPath_ParentOf_reads_forward_slashes_as_backslashes()
         {
             Assert.Equal(@"C:\tools\x", Foton.Core.LongPath.ParentOf("C:/tools/x/tool.exe"));

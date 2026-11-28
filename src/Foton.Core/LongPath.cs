@@ -61,8 +61,10 @@ namespace Foton.Core
             var absolute = Path.IsPathRooted(path) ? path : Path.Combine(Directory.GetCurrentDirectory(), path);
             // A prefixed path does not normalize on disk, so its . and .. are resolved here, from the normal form.
             if (absolute.StartsWith(Prefix, StringComparison.Ordinal)) absolute = Plain(absolute);
-            if (absolute.Length < Threshold) return Path.GetFullPath(absolute);
-            absolute = absolute.Replace('/', '\\');
+            // GetFullPath for a path that names its drive and folder. \folder and C:folder depend on the current folder, and
+            // GetFullPath throws for them when that folder is long, so they go through the lexical path below even when short.
+            if (absolute.Length < Threshold && !DependsOnCurrentFolder(absolute)) return Path.GetFullPath(absolute);
+            var original = absolute = absolute.Replace('/', '\\');
             // \folder\tool names the current drive but is not drive-qualified; give it the drive so the prefix can go on later.
             if (absolute[0] == '\\' && !absolute.StartsWith(@"\\", StringComparison.Ordinal))
                 absolute = Path.GetPathRoot(Directory.GetCurrentDirectory()).TrimEnd('\\') + absolute;
@@ -74,19 +76,35 @@ namespace Foton.Core
                 var share = @"\\" + segs[0] + "\\" + segs[1];
                 var tail = string.Join("\\", segs, 2, segs.Length - 2);
                 // A bare share keeps its form (no trailing backslash added); only a path under the share gets one.
-                return tail.Length == 0 ? share : Normalize(share + "\\", tail);
+                return tail.Length == 0 ? share : KeepTrailingBackslash(original, Normalize(share + "\\", tail));
             }
             // C:folder\tool is relative to the current folder of drive C, which Windows keeps per drive in the =C: variable
             // (the root when the variable is not set). Resolve it there, so the prefix can go on.
-            if (absolute[1] == ':' && absolute[2] != '\\')
+            if (absolute.Length >= 2 && absolute[1] == ':' && (absolute.Length < 3 || absolute[2] != '\\'))
             {
-                var driveCwd = Environment.GetEnvironmentVariable("=" + absolute.Substring(0, 2));
-                if (string.IsNullOrEmpty(driveCwd)) driveCwd = absolute.Substring(0, 2) + "\\";
+                var drive = absolute.Substring(0, 2);
+                // On the current drive the process folder is the answer; for another drive, Windows keeps it in =X:.
+                var cwd = Directory.GetCurrentDirectory();
+                var driveCwd = cwd.StartsWith(drive, StringComparison.OrdinalIgnoreCase) ? cwd : Environment.GetEnvironmentVariable("=" + drive);
+                if (string.IsNullOrEmpty(driveCwd)) driveCwd = drive + "\\";
                 absolute = driveCwd.TrimEnd('\\') + "\\" + absolute.Substring(2);
+                original = absolute;
             }
-            if (absolute[1] != ':' || absolute[2] != '\\') return absolute;
-            return Normalize(absolute.Substring(0, 3), absolute.Substring(3));
+            if (absolute.Length < 3 || absolute[1] != ':' || absolute[2] != '\\') return absolute;
+            return KeepTrailingBackslash(original, Normalize(absolute.Substring(0, 3), absolute.Substring(3)));
         }
+
+        /// <summary>True for \folder (the current drive) and C:folder (the current folder of drive C): they need the current folder to resolve.</summary>
+        static bool DependsOnCurrentFolder(string path)
+        {
+            if (path.Length > 0 && (path[0] == '\\' || path[0] == '/'))
+                return path.Length < 2 || (path[1] != '\\' && path[1] != '/');   // \\server is a share, not the current drive
+            return path.Length >= 2 && path[1] == ':' && (path.Length < 3 || (path[2] != '\\' && path[2] != '/'));
+        }
+
+        /// <summary>GetFullPath keeps a trailing backslash; the lexical form does too, so a long folder path reads like a short one.</summary>
+        static string KeepTrailingBackslash(string original, string result) =>
+            original.EndsWith("\\", StringComparison.Ordinal) && !result.EndsWith("\\", StringComparison.Ordinal) ? result + "\\" : result;
 
         /// <summary>
         /// The folder a path lies in, cut at its last backslash without touching the disk. A drive root keeps its

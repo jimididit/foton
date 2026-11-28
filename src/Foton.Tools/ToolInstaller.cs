@@ -268,7 +268,9 @@ namespace Foton.Tools
                     RollBack(moved, copied, Log);
                     throw;
                 }
-                foreach (var note in notes) Log(note);
+                // The swap is done. A log line that cannot be written (a locked or full disk) must not undo or abort an install
+                // that has no record yet, so these are best effort; the run's own log still shows them.
+                foreach (var note in notes) TryLog(Log, note);
                 exe = stable;
 
                 // Empty unless the pinned release actually brought a rules folder: a tool with none records no rule set.
@@ -307,7 +309,9 @@ namespace Foton.Tools
                 {
                     // The read is inside the try too: if it fails, the swap is still undone below.
                     if (manifestExisted) priorManifest = File.ReadAllBytes(LongPath.For(manifestPath));
-                    Log("Wrote manifest " + ToolManifest.Save(root, record));
+                    var written = ToolManifest.Save(root, record);
+                    // Saved. If this line cannot be logged the install is still recorded, so it is not rolled back.
+                    TryLog(Log, "Wrote manifest " + written);
                 }
                 catch
                 {
@@ -322,7 +326,7 @@ namespace Foton.Tools
                     RollBack(moved, copied, Log);
                     throw;
                 }
-                Log($"Installed {entry.Name} {entry.Version} -> {exe}");
+                TryLog(Log, $"Installed {entry.Name} {entry.Version} -> {exe}");
                 return record;
             }
             finally
@@ -370,7 +374,9 @@ namespace Foton.Tools
                     commit = (File.ReadLines(refPath).FirstOrDefault() ?? "").Trim();
                 }
                 else commit = h;
-                return commit.Length >= 12 ? commit.Substring(0, 12) : null;
+                // Only a hash counts. HEAD can also point at a tag or a remote ref ("ref: refs/tags/..."), and its text is not a
+                // commit; a detached HEAD holds the hash itself.
+                return Regex.IsMatch(commit, "^[0-9a-fA-F]{12,}$") ? commit.Substring(0, 12) : null;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException) { return null; }
         }
