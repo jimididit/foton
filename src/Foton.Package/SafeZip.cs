@@ -36,13 +36,13 @@ namespace Foton.Package
             // Full, not GetFullPath: a destination of 260 characters or more throws in GetFullPath, and the prefix is added at the call.
             var root = LongPath.Full(destination).TrimEnd('\\') + "\\";
             var measureRoot = finalDestination == null ? root : LongPath.Full(finalDestination).TrimEnd('\\') + "\\";
-            Directory.CreateDirectory(LongPath.For(root));
             // The archive path can be past 260 characters too (a deep local copy); the open takes the prefixed form.
             using (var zip = ZipFile.OpenRead(LongPath.For(LongPath.Full(zipPath))))
             {
                 // Two passes. The first checks every entry and plans what to write; the second writes. A refused archive
                 // therefore writes nothing, instead of leaving the entries that came before the unsafe one.
                 var plan = new List<Planned>();
+                var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var entry in zip.Entries)
                 {
                     var name = entry.FullName.Replace('/', '\\');
@@ -64,8 +64,14 @@ namespace Foton.Package
                         tooLong.Add(entry.FullName);
                         continue;
                     }
-                    plan.Add(new Planned { Entry = entry, Target = target, Parent = parent, IsFolder = name.EndsWith("\\", StringComparison.Ordinal) });
+                    var isFolder = name.EndsWith("\\", StringComparison.Ordinal);
+                    // Two entries for one file (or a\b and a\.\b) would fail on the second write, after the first was already
+                    // on disk. Refused here instead, with nothing written.
+                    if (!isFolder && !files.Add(target)) throw new InvalidDataException("Unsafe ZIP entry (two entries for one file): " + entry.FullName);
+                    plan.Add(new Planned { Entry = entry, Target = target, Parent = parent, IsFolder = isFolder });
                 }
+                // The destination is created only now, so a refused archive leaves no folder behind either.
+                Directory.CreateDirectory(LongPath.For(root));
                 foreach (var p in plan)
                 {
                     if (p.IsFolder) { Directory.CreateDirectory(LongPath.For(p.Target)); continue; }

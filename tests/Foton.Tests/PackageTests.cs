@@ -311,9 +311,35 @@ namespace Foton.Tests
                 }
                 var extract = Path.Combine(t.Path, "x");
                 Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
-                Assert.Empty(Directory.GetFiles(extract, "*", SearchOption.AllDirectories));
+                Assert.False(Directory.Exists(extract));
                 Assert.False(File.Exists(Path.Combine(t.Path, "escape.txt")));
             }
+        }
+
+        [Fact]
+        public void An_archive_with_two_entries_for_one_file_is_refused_before_anything_is_written()
+        {
+            // The second write used to fail after the first file was already on disk; a\b and a\.\b are the same file.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("dup.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("a/b.txt").Open())) w.Write("2");
+                    using (var w = new StreamWriter(z.CreateEntry("a/./B.txt").Open())) w.Write("3");
+                }
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.False(Directory.Exists(extract));
+            }
+        }
+
+        [Fact]
+        public void LongPath_ParentOf_reads_forward_slashes_as_backslashes()
+        {
+            Assert.Equal(@"C:\tools\x", Foton.Core.LongPath.ParentOf("C:/tools/x/tool.exe"));
+            Assert.Equal(@"C:\", Foton.Core.LongPath.ParentOf("C:/tool.exe"));
         }
 
         [Fact]
@@ -404,8 +430,8 @@ namespace Foton.Tests
                 var extract = Path.Combine(t.Path, "x");
                 Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
                 Assert.False(File.Exists(Path.Combine(t.Path, "escape.txt")));
-                // Nothing was written into the folder it was asked to fill.
-                Assert.Empty(Directory.GetFiles(extract, "*", SearchOption.AllDirectories));
+                // Nothing was written, and the folder it was asked to fill was not even created.
+                Assert.False(Directory.Exists(extract));
 
                 Assert.Throws<InvalidDataException>(() => FotonPackage.Open(zip));
                 // A refused ZIP leaves no extraction and no staging folder behind.

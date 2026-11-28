@@ -25,7 +25,8 @@ namespace Foton.Tools
         {
             if (string.IsNullOrWhiteSpace(toolPath)) return null;
             try { return LongPath.Full(toolPath!.Trim()); }
-            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is IOException) { return null; }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is IOException
+                || ex is UnauthorizedAccessException || ex is System.Security.SecurityException) { return null; }
         }
 
         public static ResolvedTool? Resolve(string tool, IEnumerable<string> executableNames, string? toolPath, string? toolRoot, string? pathEnv = null)

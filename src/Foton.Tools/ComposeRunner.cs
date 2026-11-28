@@ -397,14 +397,15 @@ namespace Foton.Tools
         static List<string> HayabusaArgs(string exe, string input, string output)
         {
             // v4 renamed csv-timeline to dfir-timeline. Probe the built-in help rather than guessing, so both work.
-            var exeDir = Path.GetDirectoryName(exe);
+            // ParentOf, not GetDirectoryName, which throws for a path of 260 characters or more.
+            var exeDir = LongPath.ParentOf(exe);
             var help = ToolProcess.Capture(exe, "--help", exeDir, 30000);
             var sub = help != null && (help.StdOut + help.StdErr).Contains("csv-timeline") ? "csv-timeline" : "dfir-timeline";
             // -w skips the interactive rule wizard. -U writes UTC; the default is the workstation's local zone, which is
             // neither the host's zone nor the package's UTC convention. Rules resolve relative to the working
             // directory, so point -r/-c at the install tree next to the binary.
             var a = new List<string> { sub, "-d", input, "-o", Path.Combine(output, "hayabusa.csv"), "-w", "-C", "-U" };
-            var rules = Path.Combine(exeDir ?? "", "rules");
+            var rules = Path.Combine(exeDir, "rules");
             if (Directory.Exists(LongPath.For(rules)) || File.Exists(LongPath.For(rules)))
             {
                 a.AddRange(new[] { "-r", rules });

@@ -50,8 +50,8 @@ namespace Foton.Core
         /// <summary>
         /// GetFullPath for a path that may be long. GetFullPath throws on 260 characters or more under net462, so a long
         /// path is made absolute here: a relative one joins the current folder, and a drive path has its . and .. segments
-        /// removed lexically (no disk access, so it works on a folder that is not there). Other long forms (UNC) are
-        /// returned joined but not normalized.
+        /// removed lexically (no disk access, so it works on a folder that is not there). A UNC path is normalized the same
+        /// way below its share; a bare share is returned as given. Forms that are neither drive nor UNC are returned joined.
         /// </summary>
         public static string Full(string path)
         {
@@ -95,6 +95,8 @@ namespace Foton.Core
         public static string ParentOf(string path)
         {
             if (path == null) throw new ArgumentNullException(nameof(path));
+            // Windows reads / as \ in a normal path, so C:/tools/x.exe has the folder C:\tools, not none.
+            path = path.Replace('/', '\\');
             // A prefixed share works on its normal form: \\?\UNC\server\share\x lies in \\?\UNC\server\share, and the share has no parent.
             if (path.StartsWith(UncPrefix, StringComparison.Ordinal))
             {

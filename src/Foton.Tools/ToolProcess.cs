@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using Foton.Core;
 
 namespace Foton.Tools
 {
@@ -40,6 +41,8 @@ namespace Foton.Tools
         /// <summary>Output of a short probe (version, help); null when it fails to start or outlives the timeout.</summary>
         public static Captured? Capture(string exe, string arguments, string? workDir, int timeoutMs)
         {
+            // The same limit as compose enforces: a caller that forgot to check gets "did not run", not a launch that fails.
+            if (!CanStart(exe, workDir)) return null;
             try
             {
                 using (var p = Process.Start(Info(exe, arguments, workDir))!)
@@ -63,9 +66,12 @@ namespace Foton.Tools
         /// <summary>Runs a tool to completion with its stdout and stderr written byte-for-byte to files. Returns the exit code.</summary>
         public static int RunToFiles(string exe, string arguments, string workDir, string stdoutPath, string stderrPath)
         {
+            if (!CanStart(exe, workDir))
+                throw new IOException("The tool path is too long to start from (" + exe.Length + " characters); Windows starts a program only from paths under " + (MaxStartPath + 1) + ".");
+            // The output files sit in the case folder, which can be deep even when the tool path is not.
             using (var p = Process.Start(Info(exe, arguments, workDir))!)
-            using (var so = File.Create(stdoutPath))
-            using (var se = File.Create(stderrPath))
+            using (var so = File.Create(LongPath.For(stdoutPath)))
+            using (var se = File.Create(LongPath.For(stderrPath)))
             {
                 p.StandardInput.Close();
                 var a = p.StandardOutput.BaseStream.CopyToAsync(so);

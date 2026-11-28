@@ -94,8 +94,10 @@ namespace Foton.Tools
                     var waited = DateTime.UtcNow - started;
                     if (waited > TimeSpan.FromSeconds(30) || (ex is UnauthorizedAccessException && waited > TimeSpan.FromSeconds(1)))
                     {
-                        if (ex is UnauthorizedAccessException) throw;
-                        throw new IOException("Another Foton process is writing the tool manifest under " + root + ". Try again in a moment.", ex);
+                    // Access denied that does not clear in a second is a permissions problem, not a busy lock; say so.
+                    if (ex is UnauthorizedAccessException)
+                        throw new IOException("Foton cannot take the write lock for the tool manifest under " + root + " (access denied). Check that the tool folder is writable.", ex);
+                    throw new IOException("Another Foton process is writing the tool manifest under " + root + ". Try again in a moment.", ex);
                     }
                     Thread.Sleep(25);
                 }
@@ -132,7 +134,7 @@ namespace Foton.Tools
                         else File.Move(temp, LongPath.For(path));
                         break;
                     }
-                    catch (IOException) when (attempt < 2) { }
+                    catch (IOException) when (attempt < 2) { Thread.Sleep(20); }
                 }
             }
             finally
