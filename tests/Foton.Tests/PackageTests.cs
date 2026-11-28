@@ -297,6 +297,26 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_refused_archive_writes_nothing_even_when_good_entries_come_first()
+        {
+            // Entries used to be written as they were checked, so a bad entry late in the archive left the earlier ones behind.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("late-evil.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good/one.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("good/two.txt").Open())) w.Write("2");
+                    using (var w = new StreamWriter(z.CreateEntry("../escape.txt").Open())) w.Write("x");
+                }
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.Empty(Directory.GetFiles(extract, "*", SearchOption.AllDirectories));
+                Assert.False(File.Exists(Path.Combine(t.Path, "escape.txt")));
+            }
+        }
+
+        [Fact]
         public void Extract_reads_an_archive_whose_own_path_is_past_260_characters()
         {
             // The archive itself sits in a folder past 260 characters (a deep local copy): the open takes the prefixed form.
@@ -384,6 +404,8 @@ namespace Foton.Tests
                 var extract = Path.Combine(t.Path, "x");
                 Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
                 Assert.False(File.Exists(Path.Combine(t.Path, "escape.txt")));
+                // Nothing was written into the folder it was asked to fill.
+                Assert.Empty(Directory.GetFiles(extract, "*", SearchOption.AllDirectories));
 
                 Assert.Throws<InvalidDataException>(() => FotonPackage.Open(zip));
                 // A refused ZIP leaves no extraction and no staging folder behind.

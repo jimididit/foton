@@ -133,7 +133,9 @@ namespace Foton.Tools
                         var candidate = LongPath.Full(Path.Combine(dir, name + ext));
                         if (File.Exists(LongPath.For(candidate))) return candidate;
                     }
-                    catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { }
+                    // One unusable PATH entry (bad characters, no access, a dead network drive) must not stop the search.
+                    catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is IOException
+                        || ex is UnauthorizedAccessException || ex is System.Security.SecurityException) { }
                 }
             return null;
         }

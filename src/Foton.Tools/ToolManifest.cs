@@ -69,16 +69,36 @@ namespace Foton.Tools
         {
             var root = Root(toolRoot);
             Directory.CreateDirectory(LongPath.For(root));
-            // Read, change, and swap happen under one named lock, so two installs or registrations in the same user session
-            // cannot each read the old rows and overwrite the other's. The swap is atomic; the lock covers the read-modify-write.
-            using (var gate = new Mutex(false, @"Local\Foton-tools-" + Hashing.Sha256Hex(Encoding.UTF8.GetBytes(root.ToUpperInvariant())).Substring(0, 16)))
+            // Read, change, and swap happen under one lock, so two installs or registrations cannot each read the old rows and
+            // overwrite the other's. The swap is atomic; the lock covers the read-modify-write.
+            using (AcquireLock(root))
+                return SaveLocked(root, entry);
+        }
+
+        /// <summary>
+        /// An exclusive handle on tools.json.lock beside the manifest, waiting up to 30 seconds. The lock is the file, not a
+        /// name derived from the folder text, so every spelling of the folder (8.3 names, junctions, subst drives, other
+        /// sessions) contends on the same lock. DeleteOnClose removes it, including when a process dies holding it.
+        /// </summary>
+        static FileStream AcquireLock(string root)
+        {
+            var lockPath = LongPath.For(Path.Combine(root, FileName + ".lock"));
+            var started = DateTime.UtcNow;
+            while (true)
             {
-                bool held;
-                try { held = gate.WaitOne(TimeSpan.FromSeconds(30)); }
-                catch (AbandonedMutexException) { held = true; }   // a process died holding it; the manifest is still swapped atomically
-                if (!held) throw new IOException("Another Foton process is writing the tool manifest under " + root + ". Try again in a moment.");
-                try { return SaveLocked(root, entry); }
-                finally { gate.ReleaseMutex(); }
+                try { return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    // A holder gives a sharing violation; a lock being deleted gives access denied for a moment. Real access
+                    // denial (a read-only folder) is reported after a second rather than after the full wait.
+                    var waited = DateTime.UtcNow - started;
+                    if (waited > TimeSpan.FromSeconds(30) || (ex is UnauthorizedAccessException && waited > TimeSpan.FromSeconds(1)))
+                    {
+                        if (ex is UnauthorizedAccessException) throw;
+                        throw new IOException("Another Foton process is writing the tool manifest under " + root + ". Try again in a moment.", ex);
+                    }
+                    Thread.Sleep(25);
+                }
             }
         }
 
@@ -102,8 +122,18 @@ namespace Foton.Tools
             try
             {
                 TextFile.Write(temp, Json.Indented(doc));
-                if (File.Exists(LongPath.For(path))) File.Replace(temp, LongPath.For(path), null);
-                else File.Move(temp, LongPath.For(path));
+                // A process outside the lock (another Foton version, a hand edit) can create or remove tools.json between the
+                // check and the swap. Replace needs the file to exist and Move needs it not to, so try again with the other.
+                for (int attempt = 0; ; attempt++)
+                {
+                    try
+                    {
+                        if (File.Exists(LongPath.For(path))) File.Replace(temp, LongPath.For(path), null);
+                        else File.Move(temp, LongPath.For(path));
+                        break;
+                    }
+                    catch (IOException) when (attempt < 2) { }
+                }
             }
             finally
             {

@@ -18,7 +18,8 @@ namespace Foton.Package
 
         /// <summary>
         /// As Extract, skipping entries whose stored path (forward slashes) starts with one of <paramref name="skipPrefixes"/>.
-        /// A skipped entry is never written, so it is not checked for an unsafe path; every other entry is.
+        /// A skipped entry is never written, so its ".." steps, device names, and length are not checked; a rooted or
+        /// drive-qualified name still refuses the archive, and every other entry is checked before anything is written.
         /// </summary>
         public static void Extract(string zipPath, string destination, IReadOnlyCollection<string>? skipPrefixes) =>
             Extract(zipPath, destination, skipPrefixes, null);
@@ -39,10 +40,14 @@ namespace Foton.Package
             // The archive path can be past 260 characters too (a deep local copy); the open takes the prefixed form.
             using (var zip = ZipFile.OpenRead(LongPath.For(LongPath.Full(zipPath))))
             {
+                // Two passes. The first checks every entry and plans what to write; the second writes. A refused archive
+                // therefore writes nothing, instead of leaving the entries that came before the unsafe one.
+                var plan = new List<Planned>();
                 foreach (var entry in zip.Entries)
                 {
                     var name = entry.FullName.Replace('/', '\\');
                     if (name.Length == 0) continue;
+                    // A rooted or drive-qualified name refuses the archive even when the entry would be skipped.
                     if (Path.IsPathRooted(name) || name.IndexOf(':') >= 0)
                         throw new InvalidDataException("Unsafe ZIP entry (rooted path): " + entry.FullName);
                     // Skipped entries are never written, so they skip the containment check (and any over-long path).
@@ -59,19 +64,26 @@ namespace Foton.Package
                         tooLong.Add(entry.FullName);
                         continue;
                     }
-                    if (name.EndsWith("\\", StringComparison.Ordinal)) { Directory.CreateDirectory(LongPath.For(target)); continue; }
-                    Directory.CreateDirectory(LongPath.For(parent));
-                    entry.ExtractToFile(LongPath.For(target), overwrite: false);
+                    plan.Add(new Planned { Entry = entry, Target = target, Parent = parent, IsFolder = name.EndsWith("\\", StringComparison.Ordinal) });
+                }
+                foreach (var p in plan)
+                {
+                    if (p.IsFolder) { Directory.CreateDirectory(LongPath.For(p.Target)); continue; }
+                    Directory.CreateDirectory(LongPath.For(p.Parent));
+                    p.Entry.ExtractToFile(LongPath.For(p.Target), overwrite: false);
                 }
             }
         }
 
-        /// <summary>
-        /// The full path an entry lands on, built from its segments without touching the file system. Empty and "."
-        /// segments are dropped. A ".." segment steps back one segment, so a\..\b lands on b, as it does on disk; a step
-        /// above the folder is refused (the entry would leave it). Returns null for an entry that names the folder itself.
-        /// Root ends with a backslash.
-        /// </summary>
+        /// <summary>One entry that passed the checks, with where it goes.</summary>
+        sealed class Planned
+        {
+            public ZipArchiveEntry Entry = null!;
+            public string Target = "";
+            public string Parent = "";
+            public bool IsFolder;
+        }
+
         static readonly HashSet<string> DeviceNames = new HashSet<string>(new[]
         {
             "CON", "PRN", "AUX", "NUL",
@@ -79,6 +91,12 @@ namespace Foton.Package
             "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
         }, StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// The full path an entry lands on, built from its segments without touching the file system. Empty and "."
+        /// segments are dropped. A ".." segment steps back one segment, so a\..\b lands on b, as it does on disk; a step
+        /// above the folder is refused (the entry would leave it). Returns null for an entry that names the folder itself.
+        /// Root ends with a backslash.
+        /// </summary>
         static string? Contained(string root, string name, string stored)
         {
             var parts = new List<string>();
@@ -95,7 +113,9 @@ namespace Foton.Package
                 // segment would write to a device instead of a file. Trailing spaces are ignored by Windows, so they are trimmed too.
                 if (DeviceNames.Contains(seg.Split('.')[0].TrimEnd(' ')))
                     throw new InvalidDataException("Unsafe ZIP entry (Windows device name): " + stored);
-                // Windows drops trailing dots and spaces from a name, so "... " or ".. x" style segments are refused rather than guessed at.
+                // Windows drops trailing dots and spaces from a name, so a segment that is only dots and spaces ("...", ".. ")
+                // names the folder or a parent. It is refused rather than guessed at. A name with other characters (".. x") is a
+                // plain name and is allowed.
                 if (seg.Trim('.', ' ').Length == 0) throw new InvalidDataException("Unsafe ZIP entry (outside the extraction folder): " + stored);
                 parts.Add(seg);
             }

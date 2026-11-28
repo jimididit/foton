@@ -304,7 +304,7 @@ namespace Foton.Tools
                 {
                     var args = CommandLine.Join(j.Args(exe, j.NeedDir, stage));
                     log.Write($"{j.Tool}: {exe} {args}", StatusLevel.Info);
-                    exitCode = ToolProcess.RunToFiles(exe, args, workDir!, Path.Combine(stage, StdOut), Path.Combine(stage, StdErr));
+                    exitCode = ToolProcess.RunToFiles(exe, args, workDir, Path.Combine(stage, StdOut), Path.Combine(stage, StdErr));
                 }
                 catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is IOException || ex is UnauthorizedAccessException)
                 {

@@ -329,18 +329,32 @@ namespace Foton.Tests
             // rows and the later swap drops the earlier row.
             using (var t = new TempDir())
             {
-                var root = t.File("tools");
-                var names = Enumerable.Range(0, 8).Select(i => "Tool" + i).ToArray();
-                var failures = new System.Collections.Concurrent.ConcurrentBag<Exception>();
-                var threads = names.Select(n => new System.Threading.Thread(() =>
+                // Several rounds, each with every thread released at once, so a missing lock shows up reliably rather than by luck.
+                for (int round = 0; round < 10; round++)
                 {
-                    try { ToolManifest.Save(root, new Dictionary<string, object?> { ["Name"] = n }); }
-                    catch (Exception ex) { failures.Add(ex); }
-                })).ToArray();
-                foreach (var th in threads) th.Start();
-                foreach (var th in threads) th.Join();
-                Assert.Empty(failures);
-                Assert.Equal(names.OrderBy(n => n), ToolManifest.List(root).Select(r => ToolManifest.Get(r, "Name")).OrderBy(n => n));
+                    var root = t.File("tools" + round);
+                    var names = Enumerable.Range(0, 8).Select(i => "Tool" + i).ToArray();
+                    var failures = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+                    using (var gate = new System.Threading.ManualResetEventSlim(false))
+                    {
+                        var threads = names.Select(n => new System.Threading.Thread(() =>
+                        {
+                            try
+                            {
+                                gate.Wait();
+                                ToolManifest.Save(root, new Dictionary<string, object?> { ["Name"] = n });
+                            }
+                            catch (Exception ex) { failures.Add(ex); }
+                        })).ToArray();
+                        foreach (var th in threads) th.Start();
+                        gate.Set();
+                        foreach (var th in threads) th.Join();
+                    }
+                    Assert.Empty(failures);
+                    Assert.Equal(names.OrderBy(n => n), ToolManifest.List(root).Select(r => ToolManifest.Get(r, "Name")).OrderBy(n => n));
+                    // The lock file is not left behind.
+                    Assert.Empty(Directory.GetFiles(root, "*.lock"));
+                }
             }
         }
 
