@@ -296,10 +296,249 @@ namespace Foton.Tests
             }
         }
 
+        [Fact]
+        public void A_refused_archive_writes_nothing_even_when_good_entries_come_first()
+        {
+            // Entries used to be written as they were checked, so a bad entry late in the archive left the earlier ones behind.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("late-evil.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good/one.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("good/two.txt").Open())) w.Write("2");
+                    using (var w = new StreamWriter(z.CreateEntry("../escape.txt").Open())) w.Write("x");
+                }
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.False(Directory.Exists(extract));
+                Assert.False(File.Exists(Path.Combine(t.Path, "escape.txt")));
+            }
+        }
+
+        [Fact]
+        public void An_archive_with_two_entries_for_one_file_is_refused_before_anything_is_written()
+        {
+            // The second write used to fail after the first file was already on disk; a\b and a\.\b are the same file.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("dup.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("a/b.txt").Open())) w.Write("2");
+                    using (var w = new StreamWriter(z.CreateEntry("a/./B.txt").Open())) w.Write("3");
+                }
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.False(Directory.Exists(extract));
+            }
+        }
+
+        [Theory]
+        [InlineData('|')]
+        [InlineData('"')]
+        [InlineData('<')]
+        [InlineData('>')]
+        public void An_entry_name_with_a_character_Windows_cannot_use_is_refused_before_anything_is_written(char bad)
+        {
+            // .NET's own writer refuses these names, so the entry is written with a placeholder and the name bytes are patched,
+            // as an archive from another tool would carry them. net462's Path.IsPathRooted also throws on these characters;
+            // the refusal has to be the archive error, not that exception.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("badname.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("a/bXXc.txt").Open())) w.Write("2");
+                }
+                var bytes = File.ReadAllBytes(zip);
+                var target = System.Text.Encoding.ASCII.GetBytes("bXXc");
+                var patched = 0;
+                for (int i = 0; i + target.Length <= bytes.Length; i++)
+                {
+                    if (!bytes.Skip(i).Take(target.Length).SequenceEqual(target)) continue;
+                    bytes[i + 1] = (byte)bad;
+                    patched++;
+                }
+                Assert.Equal(2, patched);   // the local header and the central directory
+                File.WriteAllBytes(zip, bytes);
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.False(Directory.Exists(extract));
+            }
+        }
+
+        [Theory]
+        [InlineData("a/b.txt.")]
+        [InlineData("a/b.txt ")]
+        public void Two_entries_that_differ_only_by_trailing_dots_or_spaces_are_one_file(string second)
+        {
+            // Windows drops trailing dots and spaces, so both names are the same file and the second write would fail midway.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("dots.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("a/b.txt").Open())) w.Write("2");
+                    using (var w = new StreamWriter(z.CreateEntry(second).Open())) w.Write("3");
+                }
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.False(Directory.Exists(extract));
+            }
+        }
+
+        [Fact]
+        public void An_archive_with_a_file_and_a_folder_of_the_same_name_is_refused_before_anything_is_written()
+        {
+            // "a" as a file and "a\b.txt" cannot both exist; the second write used to fail after good.txt was already on disk.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("clash.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("good.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("a").Open())) w.Write("2");
+                    using (var w = new StreamWriter(z.CreateEntry("a/b.txt").Open())) w.Write("3");
+                }
+                var extract = Path.Combine(t.Path, "x");
+                Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
+                Assert.False(Directory.Exists(extract));
+            }
+        }
+
+        [Fact]
+        public void Names_that_differ_only_by_a_trailing_dot_are_two_files_under_a_long_path()
+        {
+            // At 240 characters or more the file is written with the \\?\ prefix, which does not drop trailing dots, so b.txt and
+            // "b.txt." are distinct files there and both extract. (Below that Windows treats them as one; see the neighbouring test.)
+            using (var t = new TempDir())
+            {
+                var folder = t.Path;
+                while (folder.Length < 245) folder = Path.Combine(folder, new string('f', 40));
+                var zip = t.File("dots-long.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    using (var w = new StreamWriter(z.CreateEntry("b.txt").Open())) w.Write("1");
+                    using (var w = new StreamWriter(z.CreateEntry("b.txt.").Open())) w.Write("2");
+                }
+                SafeZip.Extract(zip, folder);
+                var verbatim = Foton.Core.LongPath.For(folder);
+                var names = Directory.GetFiles(verbatim).Select(Path.GetFileName).OrderBy(n => n).ToArray();
+                // Delete through the prefixed form: a trailing-dot name cannot be reached any other way.
+                foreach (var f in Directory.GetFiles(verbatim)) File.Delete(f);
+                Assert.Equal(new[] { "b.txt", "b.txt." }, names);
+            }
+        }
+
+        [Fact]
+        public void LongPath_Full_resolves_short_drive_relative_and_root_relative_paths_and_keeps_a_trailing_backslash()
+        {
+            var cwd = Directory.GetCurrentDirectory();
+            var drive = cwd.Substring(0, 2);
+            // Short drive-relative and root-relative forms no longer go through GetFullPath, which throws when the working folder is long.
+            Assert.Equal(cwd.TrimEnd('\\'), Foton.Core.LongPath.Full(drive).TrimEnd('\\'));
+            Assert.Equal(Path.Combine(cwd, "sub"), Foton.Core.LongPath.Full(drive + "sub"));
+            Assert.Equal(drive + @"\x\y", Foton.Core.LongPath.Full(@"\x\y"));
+            // A long folder path keeps its trailing backslash, as the short form does.
+            var longFolder = @"C:\" + new string('a', 250);
+            Assert.EndsWith(@"\", Foton.Core.LongPath.Full(longFolder + @"\"));
+            Assert.False(Foton.Core.LongPath.Full(longFolder).EndsWith(@"\"));
+            Assert.EndsWith(@"\", Path.GetFullPath(@"C:\x\"));
+            Assert.EndsWith(@"\", Foton.Core.LongPath.Full(@"C:\x\"));
+        }
+
+        [Fact]
+        public void LongPath_ParentOf_reads_forward_slashes_as_backslashes()
+        {
+            Assert.Equal(@"C:\tools\x", Foton.Core.LongPath.ParentOf("C:/tools/x/tool.exe"));
+            Assert.Equal(@"C:\", Foton.Core.LongPath.ParentOf("C:/tool.exe"));
+        }
+
+        [Fact]
+        public void Extract_reads_an_archive_whose_own_path_is_past_260_characters()
+        {
+            // The archive itself sits in a folder past 260 characters (a deep local copy): the open takes the prefixed form.
+            using (var t = new TempDir())
+            {
+                var zip = t.File(new string('z', 250) + ".zip");
+                Assert.True(zip.Length > 259);
+                using (var z = ZipFile.Open(LongPath.For(zip), ZipArchiveMode.Create))
+                using (var w = new StreamWriter(z.CreateEntry("tool.txt").Open())) w.Write("ok");
+                var extract = t.File("out");
+                try
+                {
+                    SafeZip.Extract(zip, extract);
+                    Assert.Equal("ok", File.ReadAllText(Path.Combine(extract, "tool.txt")));
+                }
+                finally
+                {
+                    try { File.Delete(LongPath.For(zip)); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void Extract_into_a_destination_past_260_characters_writes_the_entry()
+        {
+            // GetFullPath on the destination threw at 260 characters under net462; the folder is created through the prefix.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("deep.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                using (var w = new StreamWriter(z.CreateEntry("tool.txt").Open())) w.Write("ok");
+                var deep = Path.Combine(t.Path, new string('d', 200), new string('e', 80));
+                try
+                {
+                    Assert.True(deep.Length > 259);
+                    SafeZip.Extract(zip, deep, null, null);
+                    Assert.Equal("ok", File.ReadAllText(LongPath.For(Path.Combine(deep, "tool.txt"))));
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(Path.Combine(t.Path, new string('d', 200))), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void A_parent_step_that_stays_inside_the_folder_extracts_to_the_name_it_lands_on()
+        {
+            // tools\x\..\rules.txt is inside the folder and lands on tools\rules.txt; it must not fail the whole ZIP.
+            using (var t = new TempDir())
+            {
+                var zip = t.File("inside.zip");
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                using (var w = new StreamWriter(z.CreateEntry("tools/x/../rules.txt").Open())) w.Write("ok");
+                var extract = Path.Combine(t.Path, "x");
+                SafeZip.Extract(zip, extract);
+                Assert.Equal("ok", File.ReadAllText(Path.Combine(extract, "tools", "rules.txt")));
+                Assert.False(Directory.Exists(Path.Combine(extract, "tools", "x")));
+            }
+        }
+
         [Theory]
         [InlineData("../escape.txt")]
         [InlineData("a/../../escape.txt")]
         [InlineData("C:/Windows/escape.txt")]
+        // Windows drops trailing dots and spaces from a name, so ".. " and "..." name a parent step or another folder once the
+        // path is normalized. They may land inside the folder (a/.. /x is x), but the name is ambiguous, so it is refused.
+        [InlineData("a/.. /escape.txt")]
+        [InlineData("a/.../escape.txt")]
+        [InlineData("a/ ../escape.txt")]
+        // Windows device names write to the device even with an extension: nul.txt is the null device, not a file.
+        [InlineData("nul.txt")]
+        [InlineData("dir/CON")]
+        [InlineData("a/com1.log")]
+        [InlineData("a/Nul .log")]
+        // Characters Windows cannot put in a file name would fail at the write, after earlier entries were already extracted.
+        [InlineData("a/what?.txt")]
+        [InlineData("a/star*.txt")]
         public void Refuses_zip_entries_outside_the_extraction_folder(string entryName)
         {
             using (var t = new TempDir())
@@ -310,6 +549,8 @@ namespace Foton.Tests
                 var extract = Path.Combine(t.Path, "x");
                 Assert.Throws<InvalidDataException>(() => SafeZip.Extract(zip, extract));
                 Assert.False(File.Exists(Path.Combine(t.Path, "escape.txt")));
+                // Nothing was written, and the folder it was asked to fill was not even created.
+                Assert.False(Directory.Exists(extract));
 
                 Assert.Throws<InvalidDataException>(() => FotonPackage.Open(zip));
                 // A refused ZIP leaves no extraction and no staging folder behind.

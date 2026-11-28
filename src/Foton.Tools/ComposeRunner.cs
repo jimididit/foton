@@ -274,6 +274,18 @@ namespace Foton.Tools
                     Retained("NoInput");
                     continue;
                 }
+                // Run in the tool's own install tree: Hayabusa resolves config\ relative to the working directory. Every
+                // path passed in is absolute, so this is safe for the EZ Tools too. ParentOf, not GetDirectoryName: the
+                // exe path can be past 260 characters here, and GetDirectoryName would throw before the check below.
+                var workDir = LongPath.ParentOf(exe);
+                if (workDir.Length == 0 || !Directory.Exists(LongPath.For(workDir))) workDir = toolDir;
+                // Checked before Pre, which may run the tool. Install still works under a long root; only starting it is refused.
+                if (!ToolProcess.CanStart(exe, workDir))
+                {
+                    rows.Add(Row("TooLongToStart", "", $"{j.Tool} would start from a path of {Math.Max(exe.Length, workDir.Length)} characters (its executable or its working folder). Windows starts a program only from paths under {ToolProcess.MaxStartPath + 1} characters, so {j.Tool} did not run. Install it under a shorter tool root, then run compose again."));
+                    Retained("TooLongToStart");
+                    continue;
+                }
                 var skip = j.Pre?.Invoke(exe);
                 if (skip != null)
                 {
@@ -288,15 +300,11 @@ namespace Foton.Tools
                 var stage = Path.Combine(extRoot, $".{lower}.staging-{Guid.NewGuid():N}");
                 Directory.CreateDirectory(stage);
                 int? exitCode = null;
-                // Run in the tool's own install tree: Hayabusa resolves config\ relative to the working directory. Every
-                // path passed in is absolute, so this is safe for the EZ Tools too.
-                var workDir = Path.GetDirectoryName(exe);
-                if (string.IsNullOrEmpty(workDir) || !Directory.Exists(workDir)) workDir = toolDir;
                 try
                 {
                     var args = CommandLine.Join(j.Args(exe, j.NeedDir, stage));
                     log.Write($"{j.Tool}: {exe} {args}", StatusLevel.Info);
-                    exitCode = ToolProcess.RunToFiles(exe, args, workDir!, Path.Combine(stage, StdOut), Path.Combine(stage, StdErr));
+                    exitCode = ToolProcess.RunToFiles(exe, args, workDir, Path.Combine(stage, StdOut), Path.Combine(stage, StdErr));
                 }
                 catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is IOException || ex is UnauthorizedAccessException)
                 {
@@ -389,19 +397,20 @@ namespace Foton.Tools
         static List<string> HayabusaArgs(string exe, string input, string output)
         {
             // v4 renamed csv-timeline to dfir-timeline. Probe the built-in help rather than guessing, so both work.
-            var exeDir = Path.GetDirectoryName(exe);
+            // ParentOf, not GetDirectoryName, which throws for a path of 260 characters or more.
+            var exeDir = LongPath.ParentOf(exe);
             var help = ToolProcess.Capture(exe, "--help", exeDir, 30000);
             var sub = help != null && (help.StdOut + help.StdErr).Contains("csv-timeline") ? "csv-timeline" : "dfir-timeline";
             // -w skips the interactive rule wizard. -U writes UTC; the default is the workstation's local zone, which is
             // neither the host's zone nor the package's UTC convention. Rules resolve relative to the working
             // directory, so point -r/-c at the install tree next to the binary.
             var a = new List<string> { sub, "-d", input, "-o", Path.Combine(output, "hayabusa.csv"), "-w", "-C", "-U" };
-            var rules = Path.Combine(exeDir ?? "", "rules");
-            if (Directory.Exists(rules) || File.Exists(rules))
+            var rules = Path.Combine(exeDir, "rules");
+            if (Directory.Exists(LongPath.For(rules)) || File.Exists(LongPath.For(rules)))
             {
                 a.AddRange(new[] { "-r", rules });
                 var cfg = Path.Combine(rules, "config");
-                if (Directory.Exists(cfg) || File.Exists(cfg)) a.AddRange(new[] { "-c", cfg });
+                if (Directory.Exists(LongPath.For(cfg)) || File.Exists(LongPath.For(cfg))) a.AddRange(new[] { "-c", cfg });
             }
             return a;
         }

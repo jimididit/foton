@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Foton.Core;
 
 namespace Foton.Tools
@@ -21,11 +22,12 @@ namespace Foton.Tools
         /// <summary>%LOCALAPPDATA%\Foton\tools unless overridden. Not PATH, not inside a case.</summary>
         public static string Root(string? toolRoot)
         {
-            if (!string.IsNullOrWhiteSpace(toolRoot)) return Path.GetFullPath(toolRoot!.Trim());
+            // LongPath.Full, not GetFullPath: a tool root of 260 characters or more is valid (install and compose work under it).
+            if (!string.IsNullOrWhiteSpace(toolRoot)) return LongPath.Full(toolRoot!.Trim());
             var baseDir = Environment.GetEnvironmentVariable("LOCALAPPDATA");
             if (string.IsNullOrEmpty(baseDir))
                 baseDir = Path.Combine(Environment.GetEnvironmentVariable("USERPROFILE") ?? "", "AppData", "Local");
-            return Path.GetFullPath(Path.Combine(baseDir, "Foton", "tools"));
+            return LongPath.Full(Path.Combine(baseDir, "Foton", "tools"));
         }
 
         public static string PathOf(string? toolRoot) => Path.Combine(Root(toolRoot), FileName);
@@ -34,11 +36,33 @@ namespace Foton.Tools
         public static IReadOnlyList<Dictionary<string, object?>> List(string? toolRoot)
         {
             var path = PathOf(toolRoot);
-            if (!File.Exists(path)) return new Dictionary<string, object?>[0];
-            try { return Rows(Json.Parse(File.ReadAllText(path, Encoding.UTF8))); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException)
+            if (!File.Exists(LongPath.For(path))) return new Dictionary<string, object?>[0];
+            return TryRead(path) ?? new Dictionary<string, object?>[0];
+        }
+
+        /// <summary>The rows in the file at path; null when it cannot be read or parsed (never "no rows").</summary>
+        static IReadOnlyList<Dictionary<string, object?>>? TryRead(string path)
+        {
+            string text;
+            for (int attempt = 0; ; attempt++)
             {
-                return new Dictionary<string, object?>[0];
+                try { text = File.ReadAllText(LongPath.For(path), Encoding.UTF8); break; }
+                // A save swapping the file in holds it for a moment; a read then meets a sharing violation, not a damaged file.
+                catch (IOException) when (attempt < 25) { Thread.Sleep(20); }
+                catch (Exception) { return null; }
+            }
+            try
+            {
+                var doc = Json.Parse(text);
+                // A file with no Installed list is not one this version (or 1.38.x) wrote; refuse it rather than read it as empty.
+                if (!(doc is IDictionary d) || !d.Contains("Installed")) return null;
+                return Rows(doc);
+            }
+            // Broad on purpose: the serializer and the file read can throw several types, and a lookup of "what is installed"
+            // must report the file as unreadable, not fail the caller.
+            catch (Exception)
+            {
+                return null;
             }
         }
 
@@ -52,9 +76,50 @@ namespace Foton.Tools
         public static string Save(string? toolRoot, Dictionary<string, object?> entry)
         {
             var root = Root(toolRoot);
-            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(LongPath.For(root));
+            // Read, change, and swap happen under one lock, so two installs or registrations cannot each read the old rows and
+            // overwrite the other's. The swap is atomic; the lock covers the read-modify-write.
+            using (AcquireLock(root))
+                return SaveLocked(root, entry);
+        }
+
+        /// <summary>
+        /// An exclusive handle on tools.json.lock beside the manifest, waiting up to 30 seconds. The lock is the file, not a
+        /// name derived from the folder text, so every spelling of the folder (8.3 names, junctions, subst drives, other
+        /// sessions) contends on the same lock. DeleteOnClose removes it, including when a process dies holding it.
+        /// </summary>
+        static FileStream AcquireLock(string root)
+        {
+            var lockPath = LongPath.For(Path.Combine(root, FileName + ".lock"));
+            var started = DateTime.UtcNow;
+            while (true)
+            {
+                try { return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    // A holder gives a sharing violation; a lock being deleted gives access denied for a moment. Real access
+                    // denial (a read-only folder) is reported after a second rather than after the full wait.
+                    var waited = DateTime.UtcNow - started;
+                    if (waited > TimeSpan.FromSeconds(30) || (ex is UnauthorizedAccessException && waited > TimeSpan.FromSeconds(1)))
+                    {
+                    // Access denied that does not clear in a second is a permissions problem, not a busy lock; say so.
+                    if (ex is UnauthorizedAccessException)
+                        throw new IOException("Foton cannot take the write lock for the tool manifest under " + root + " (access denied). Check that the tool folder is writable.", ex);
+                    throw new IOException("Another Foton process is writing the tool manifest under " + root + ". Try again in a moment.", ex);
+                    }
+                    Thread.Sleep(25);
+                }
+            }
+        }
+
+        static string SaveLocked(string root, Dictionary<string, object?> entry)
+        {
             var path = Path.Combine(root, FileName);
-            var rows = List(root).Where(r => !string.Equals(Get(r, "Name"), Get(entry, "Name"), StringComparison.OrdinalIgnoreCase)).ToList();
+            // A manifest that exists but cannot be read is not "no rows": rewriting it would drop every other registration.
+            var existing = File.Exists(LongPath.For(path)) ? TryRead(path) : new Dictionary<string, object?>[0];
+            if (existing == null)
+                throw new InvalidDataException("The tool manifest at " + path + " exists but cannot be read, so it was not overwritten. Move or repair the file, then try again.");
+            var rows = existing.Where(r => !string.Equals(Get(r, "Name"), Get(entry, "Name"), StringComparison.OrdinalIgnoreCase)).ToList();
             rows.Add(entry);
             var doc = new Dictionary<string, object?>
             {
@@ -62,7 +127,30 @@ namespace Foton.Tools
                 ["UpdatedUtc"] = FotonTime.Format(DateTime.UtcNow),
                 ["Installed"] = rows,
             };
-            TextFile.Write(path, Json.Indented(doc));
+            // Written beside the file and then swapped in, so a crash mid-write leaves the old manifest, never a half-written one.
+            var temp = LongPath.For(path + ".tmp-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                TextFile.Write(temp, Json.Indented(doc));
+                // A process outside the lock (another Foton version, a hand edit) can create or remove tools.json between the
+                // check and the swap, and a reader (compose looking up a tool) holds it open for a moment. Replace needs the file
+                // to exist and Move needs it not to, so each retry checks again; about half a second covers a read.
+                for (int attempt = 0; ; attempt++)
+                {
+                    try
+                    {
+                        if (File.Exists(LongPath.For(path))) File.Replace(temp, LongPath.For(path), null);
+                        else File.Move(temp, LongPath.For(path));
+                        break;
+                    }
+                    catch (IOException) when (attempt < 25) { Thread.Sleep(20); }
+                }
+            }
+            finally
+            {
+                try { if (File.Exists(temp)) File.Delete(temp); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
             return path;
         }
 

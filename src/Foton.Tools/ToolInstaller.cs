@@ -101,11 +101,11 @@ namespace Foton.Tools
         /// Returns the kept name, or null when nothing was there. Kept, not deleted, so local edits stay recoverable.</summary>
         static string? MoveAside(string target, List<Moved> moved)
         {
-            var isFolder = Directory.Exists(target);
-            if (!isFolder && !File.Exists(target)) return null;
+            var isFolder = Directory.Exists(LongPath.For(target));
+            if (!isFolder && !File.Exists(LongPath.For(target))) return null;
             var kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z";
-            for (int n = 2; Directory.Exists(kept) || File.Exists(kept); n++) kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
-            if (isFolder) Directory.Move(target, kept); else File.Move(target, kept);
+            for (int n = 2; Directory.Exists(LongPath.For(kept)) || File.Exists(LongPath.For(kept)); n++) kept = target + ".replaced-" + FotonTime.Stamp(DateTime.UtcNow) + "Z-" + n;
+            if (isFolder) Directory.Move(LongPath.For(target), LongPath.For(kept)); else File.Move(LongPath.For(target), LongPath.For(kept));
             moved.Add(new Moved { Original = target, Kept = kept, IsFolder = isFolder });
             return kept;
         }
@@ -124,17 +124,30 @@ namespace Foton.Tools
         {
             foreach (var written in copied)
             {
-                try { if (Directory.Exists(written)) Directory.Delete(written, true); else if (File.Exists(written)) File.Delete(written); }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                { log($"Could not remove the partial copy {written}: {ex.Message}"); }
+                try { if (Directory.Exists(LongPath.For(written))) DeleteTree(written); else if (File.Exists(LongPath.For(written))) File.Delete(LongPath.For(written)); }
+                catch (Exception ex) when (IsFileFailure(ex))
+                { TryLog(log, $"Could not remove the partial copy {written}: {ex.Message}"); }
             }
             for (int i = moved.Count - 1; i >= 0; i--)
             {
                 var m = moved[i];
-                try { if (m.IsFolder) Directory.Move(m.Kept, m.Original); else File.Move(m.Kept, m.Original); }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                { log($"Could not restore {m.Original}; the earlier copy is at {m.Kept}: {ex.Message}"); }
+                try { if (m.IsFolder) Directory.Move(LongPath.For(m.Kept), LongPath.For(m.Original)); else File.Move(LongPath.For(m.Kept), LongPath.For(m.Original)); }
+                catch (Exception ex) when (IsFileFailure(ex))
+                { TryLog(log, $"Could not restore {m.Original}; the earlier copy is at {m.Kept}: {ex.Message}"); }
             }
+        }
+
+        static bool IsFileFailure(Exception ex) =>
+            ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException || ex is ArgumentException;
+
+        /// <summary>
+        /// Writes a rollback note. The log is install.log, which can fail for the same reason the install did (disk full,
+        /// locked file); that must not replace the error the caller is about to rethrow.
+        /// </summary>
+        static void TryLog(Action<string> log, string message)
+        {
+            try { log(message); }
+            catch (Exception ex) when (IsFileFailure(ex)) { }
         }
 
         /// <summary>The rule set recorded at install. A manifest with no RulesVersion key predates the field, so it says
@@ -162,11 +175,11 @@ namespace Foton.Tools
                 if (!SupportFolderName.IsMatch(leaf ?? "") || string.Equals(leaf, entry.Version, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("Catalog support folder must be one plain folder name other than the version: '" + leaf + "'");
             var root = ToolManifest.Root(toolRoot);
-            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(LongPath.For(root));
             var logPath = Path.Combine(root, "install.log");
             void Log(string msg)
             {
-                TextFile.AppendLine(logPath, FotonTime.Format(DateTime.UtcNow) + " UTC  " + msg);
+                TextFile.AppendLine(LongPath.For(logPath), FotonTime.Format(DateTime.UtcNow) + " UTC  " + msg);
                 log.Write(msg, StatusLevel.Info);
             }
 
@@ -176,8 +189,8 @@ namespace Foton.Tools
                 string zip;
                 if (archivePath != null)
                 {
-                    if (!File.Exists(archivePath)) throw new FileNotFoundException("Archive not found: " + archivePath, archivePath);
-                    zip = Path.GetFullPath(archivePath);
+                    if (!File.Exists(LongPath.For(LongPath.Full(archivePath)))) throw new FileNotFoundException("Archive not found: " + archivePath, archivePath);
+                    zip = LongPath.Full(archivePath);
                     Log("Using local archive " + zip);
                 }
                 else
@@ -216,29 +229,29 @@ namespace Foton.Tools
                     // config\ and rules\ when the entry names none), so the path in tools.json does not change shape between
                     // releases that nest the binary differently. Folders from an earlier version are replaced: rules are
                     // part of the pinned release.
-                    stableDir = Path.GetDirectoryName(destVer)!;
-                    stable = Path.Combine(stableDir, Path.GetFileName(exe));
-                    exeDir = Path.GetDirectoryName(exe)!;
+                    // Parent and leaf are cut from the string, not Path.GetDirectoryName: the version folder can be past 260
+                    // characters under net462 and the path APIs here reject that.
+                    stableDir = Parent(destVer);
+                    stable = Path.Combine(stableDir, Leaf(exe));
+                    exeDir = Parent(exe);
 
                     var exeKept = MoveAside(stable, moved);
                     copied.Add(stable);
-                    File.Copy(exe, stable, true);
+                    File.Copy(LongPath.For(exe), LongPath.For(stable), true);
                     if (exeKept != null) notes.Add($"Kept the earlier executable as {Path.GetFileName(exeKept)}.");
 
                     foreach (var leaf in folders)
                     {
+                        // leaf passed SupportFolderName and is not the version, so dst is one folder directly under stableDir.
                         var src = Path.Combine(exeDir, leaf!);
-                        var dst = Path.GetFullPath(Path.Combine(stableDir, leaf!));
-                        if (!string.Equals(Path.GetDirectoryName(dst), Path.GetFullPath(stableDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
-                            || string.Equals(dst, Path.GetFullPath(destVer).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
-                            throw new InvalidDataException("Catalog support folder resolves outside the tool folder: '" + leaf + "'");
+                        var dst = Path.Combine(stableDir, leaf!);
                         // A file where the release ships a folder would be skipped silently; refuse it instead.
-                        if (File.Exists(src)) throw new InvalidDataException($"The pinned release ships '{leaf}' as a file, not a folder.");
+                        if (File.Exists(LongPath.For(src))) throw new InvalidDataException($"The pinned release ships '{leaf}' as a file, not a folder.");
 
                         // An earlier version's folder, or a stray file in the way, is moved aside even when this release has no
                         // such folder, so a stale rules\ is never used (or recorded). Kept, not deleted: local edits stay recoverable.
                         var kept = MoveAside(dst, moved);
-                        var srcExists = Directory.Exists(src);
+                        var srcExists = Directory.Exists(LongPath.For(src));
                         if (srcExists)
                         {
                             copied.Add(dst);
@@ -255,7 +268,9 @@ namespace Foton.Tools
                     RollBack(moved, copied, Log);
                     throw;
                 }
-                foreach (var note in notes) Log(note);
+                // The swap is done. A log line that cannot be written (a locked or full disk) must not undo or abort an install
+                // that has no record yet, so these are best effort; the run's own log still shows them.
+                foreach (var note in notes) TryLog(Log, note);
                 exe = stable;
 
                 // Empty unless the pinned release actually brought a rules folder: a tool with none records no rule set.
@@ -264,9 +279,9 @@ namespace Foton.Tools
                 if (entry.RulesRelativePath.Length > 0)
                 {
                     var rp = Path.Combine(stableDir, entry.RulesRelativePath);
-                    if (Directory.Exists(rp) || File.Exists(rp))
+                    if (Directory.Exists(LongPath.For(rp)) || File.Exists(LongPath.For(rp)))
                     {
-                        rulesPath = Path.GetFullPath(rp);
+                        rulesPath = rp;
                         // Not a rule-set identifier: with no git history, it only says the rules came with this release.
                         rulesVersion = GitRulesVersion(rp) ?? "bundled with release " + entry.Version;
                     }
@@ -288,28 +303,30 @@ namespace Foton.Tools
                 // tools.json is rewritten in place, so a failed write can leave it short. The earlier bytes are kept and put back,
                 // and the swap is undone, so a failed save leaves the tool and its record as they were.
                 var manifestPath = ToolManifest.PathOf(root);
-                var manifestExisted = File.Exists(manifestPath);
+                var manifestExisted = File.Exists(LongPath.For(manifestPath));
                 byte[]? priorManifest = null;
                 try
                 {
                     // The read is inside the try too: if it fails, the swap is still undone below.
-                    if (manifestExisted) priorManifest = File.ReadAllBytes(manifestPath);
-                    Log("Wrote manifest " + ToolManifest.Save(root, record));
+                    if (manifestExisted) priorManifest = File.ReadAllBytes(LongPath.For(manifestPath));
+                    var written = ToolManifest.Save(root, record);
+                    // Saved. If this line cannot be logged the install is still recorded, so it is not rolled back.
+                    TryLog(Log, "Wrote manifest " + written);
                 }
                 catch
                 {
                     try
                     {
                         // Restore only what was read. A failed read leaves tools.json as it was, since Save never ran.
-                        if (!manifestExisted) { if (File.Exists(manifestPath)) File.Delete(manifestPath); }
-                        else if (priorManifest != null) File.WriteAllBytes(manifestPath, priorManifest);
+                        if (!manifestExisted) { if (File.Exists(LongPath.For(manifestPath))) File.Delete(LongPath.For(manifestPath)); }
+                        else if (priorManifest != null) File.WriteAllBytes(LongPath.For(manifestPath), priorManifest);
                     }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                    { Log($"Could not restore {manifestPath}: {ex.Message}"); }
+                    catch (Exception ex) when (IsFileFailure(ex))
+                    { TryLog(Log, $"Could not restore {manifestPath}: {ex.Message}"); }
                     RollBack(moved, copied, Log);
                     throw;
                 }
-                Log($"Installed {entry.Name} {entry.Version} -> {exe}");
+                TryLog(Log, $"Installed {entry.Name} {entry.Version} -> {exe}");
                 return record;
             }
             finally
@@ -340,29 +357,79 @@ namespace Foton.Tools
         {
             try
             {
-                var head = Path.Combine(rulesDir, ".git", "HEAD");
+                var head = LongPath.For(Path.Combine(rulesDir, ".git", "HEAD"));
                 if (!File.Exists(head)) return null;
                 var h = (File.ReadLines(head).FirstOrDefault() ?? "").Trim();
                 var m = Regex.Match(h, @"ref:\s*refs/heads/(.+)$");
                 string commit;
                 if (m.Success)
                 {
-                    if (m.Groups[1].Value.Contains("..")) return null;
-                    var refPath = Path.Combine(rulesDir, ".git", "refs", "heads", m.Groups[1].Value);
+                    // The ref is joined under .git\refs\heads. A rooted or drive value would make Path.Combine return that path itself,
+                    // so only plain relative names (letters, digits, . _ - and /) are read.
+                    var branch = m.Groups[1].Value;
+                    // No leading or doubled slash either: a leading slash makes the segment rooted, and Path.Combine would drop the folder.
+                    if (branch.Contains("..") || !Regex.IsMatch(branch, @"^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$")) return null;
+                    var refPath = LongPath.For(Path.Combine(rulesDir, ".git", "refs", "heads", branch));
                     if (!File.Exists(refPath)) return null;
                     commit = (File.ReadLines(refPath).FirstOrDefault() ?? "").Trim();
                 }
                 else commit = h;
-                return commit.Length >= 12 ? commit.Substring(0, 12) : null;
+                // Only a hash counts. HEAD can also point at a tag or a remote ref ("ref: refs/tags/..."), and its text is not a
+                // commit; a detached HEAD holds the hash itself.
+                return Regex.IsMatch(commit, "^[0-9a-fA-F]{12,}$") ? commit.Substring(0, 12) : null;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException) { return null; }
         }
 
         static void CopyDirectory(string src, string dst)
         {
-            Directory.CreateDirectory(dst);
-            foreach (var f in Directory.GetFiles(src)) File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), true);
-            foreach (var d in Directory.GetDirectories(src)) CopyDirectory(d, Path.Combine(dst, Path.GetFileName(d)));
+            // Names come back prefixed from a prefixed folder; they are turned back to the normal form before they are
+            // joined with dst, so the destination is built from the same plain strings as everything else.
+            Directory.CreateDirectory(LongPath.For(dst));
+            foreach (var found in Directory.GetFiles(LongPath.For(src)))
+            {
+                var f = LongPath.Plain(found);
+                File.Copy(LongPath.For(f), LongPath.For(Path.Combine(dst, Leaf(f))), true);
+            }
+            foreach (var found in Directory.GetDirectories(LongPath.For(src)))
+            {
+                var d = LongPath.Plain(found);
+                CopyDirectory(d, Path.Combine(dst, Leaf(d)));
+            }
         }
+
+        /// <summary>
+        /// Recursive delete that works past 260 characters. On net462, Directory.Delete(path, true) rebuilds child names
+        /// without the prefix and fails on a deep tree, so the walk is done here with the prefix on every call. Links
+        /// (junctions, symlinks) are removed as links and never followed, so nothing outside the tree is touched.
+        /// </summary>
+        static void DeleteTree(string path)
+        {
+            // The top of the tree can itself be a link (a junction put where the folder was): remove the link, not its target.
+            if ((File.GetAttributes(LongPath.For(path)) & FileAttributes.ReparsePoint) != 0)
+            {
+                Directory.Delete(LongPath.For(path));
+                return;
+            }
+            // Every call takes LongPath.For on the name it is given. A short folder can list children past 260
+            // characters (the threshold is on the folder's own length), so each child is prefixed by its own length.
+            foreach (var file in Directory.GetFiles(LongPath.For(path)))
+            {
+                File.SetAttributes(LongPath.For(file), FileAttributes.Normal);
+                File.Delete(LongPath.For(file));
+            }
+            foreach (var dir in Directory.GetDirectories(LongPath.For(path)))
+            {
+                if ((File.GetAttributes(LongPath.For(dir)) & FileAttributes.ReparsePoint) != 0) Directory.Delete(LongPath.For(dir));
+                else DeleteTree(dir);
+            }
+            Directory.Delete(LongPath.For(path));
+        }
+
+        /// <summary>The text after the last backslash. A substring, not Path.GetFileName, so it works on any length.</summary>
+        static string Leaf(string path) => path.Substring(path.LastIndexOf('\\') + 1);
+
+        /// <summary>The text before the last backslash. A substring, not Path.GetDirectoryName, so it works on any length.</summary>
+        static string Parent(string path) => LongPath.ParentOf(path);
     }
 }

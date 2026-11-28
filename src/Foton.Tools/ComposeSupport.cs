@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Foton.Core;
 
 namespace Foton.Tools
 {
@@ -21,10 +22,11 @@ namespace Foton.Tools
         /// </summary>
         public static string? RecmdBatch(string recmdPath)
         {
-            var dir = Path.GetDirectoryName(Path.GetFullPath(recmdPath)) ?? "";
+            var dir = FolderOf(recmdPath);
+            if (dir.Length == 0) return null;
             return new[] { "DFIRBatch.reb", "Kroll_Batch.reb" }
                 .Select(leaf => Path.Combine(dir, "BatchExamples", leaf))
-                .FirstOrDefault(File.Exists);
+                .FirstOrDefault(p => File.Exists(LongPath.For(p)));
         }
 
         /// <summary>
@@ -33,14 +35,16 @@ namespace Foton.Tools
         /// </summary>
         public static ChainsawRules ChainsawRulesFor(string chainsawPath)
         {
-            var dir = Path.GetDirectoryName(Path.GetFullPath(chainsawPath)) ?? "";
+            var dir = FolderOf(chainsawPath);
             var result = new ChainsawRules();
+            // No folder to look in (a bare name): report nothing rather than search the working folder.
+            if (dir.Length == 0) return result;
             var rules = Path.Combine(dir, "rules");
-            if (Directory.Exists(rules)) result.RulesPath = rules;
+            if (Directory.Exists(LongPath.For(rules))) result.RulesPath = rules;
             var sigma = Path.Combine(dir, "sigma");
             var mapping = new[] { Path.Combine(dir, "mappings", "sigma-event-logs-all.yml"), Path.Combine(dir, "sigma-event-logs-all.yml") }
-                .FirstOrDefault(File.Exists);
-            if (Directory.Exists(sigma) && mapping != null)
+                .FirstOrDefault(p => File.Exists(LongPath.For(p)));
+            if (Directory.Exists(LongPath.For(sigma)) && mapping != null)
             {
                 result.SigmaPath = sigma;
                 result.MappingPath = mapping;
@@ -58,11 +62,26 @@ namespace Foton.Tools
         {
             foreach (var p in outputFiles)
             {
-                if (string.IsNullOrEmpty(p) || !File.Exists(p)) continue;
-                try { if (MissingRuntimeText.IsMatch(File.ReadAllText(p))) return true; }
+                // Prefixed for the disk calls: a captured output path past 260 characters would otherwise read as absent.
+                if (string.IsNullOrEmpty(p) || !File.Exists(LongPath.For(p))) continue;
+                try { if (MissingRuntimeText.IsMatch(File.ReadAllText(LongPath.For(p)))) return true; }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
             return false;
+        }
+
+        /// <summary>
+        /// The folder a tool's executable sits in, for any length: LongPath.Full makes the path absolute without GetFullPath
+        /// (which throws on 260 characters or more under net462), and LongPath.ParentOf cuts the text before its last
+        /// backslash. There is no fallback to try; neither step touches the disk or throws for length.
+        /// </summary>
+        static string FolderOf(string exePath)
+        {
+            // A bare name has no folder of its own. Full would resolve it against the working folder and pick up files there.
+            // D:name is drive-relative (the folder is drive D's current folder), so it is not a bare name.
+            var driveRelative = exePath.Length >= 2 && exePath[1] == ':';
+            if (!driveRelative && exePath.IndexOf('\\') < 0 && exePath.IndexOf('/') < 0) return "";
+            return LongPath.ParentOf(LongPath.Full(exePath));
         }
     }
 }

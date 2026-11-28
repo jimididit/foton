@@ -58,6 +58,187 @@ namespace Foton.Tests
         }
 
         [Fact]
+        public void A_tool_root_past_260_characters_still_installs_a_release_with_deep_rule_files()
+        {
+            // The Chainsaw Sigma tree is several folders deep. Under a long profile path the extracted and copied rule files
+            // pass 260 characters, which net462 rejects unless the path carries the \\?\ prefix (LongPath). The zip is built
+            // directly: writing the long payload with the test helper would hit the same limit.
+            using (var t = new TempDir())
+            {
+                var deepRoot = t.File(new string('s', 60) + @"\" + new string('t', 60) + @"\tools");
+                var deepFolders = string.Join(@"\", Enumerable.Repeat(new string('r', 60), 4));
+                var zip = t.File("chainsaw-deep.zip");
+                using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    WriteEntry(archive, "chainsaw/chainsaw_x86_64-pc-windows-msvc.exe", "fake-chainsaw");
+                    WriteEntry(archive, "chainsaw/sigma/" + deepFolders.Replace('\\', '/') + "/rule.yml", "title: deep");
+                    WriteEntry(archive, "chainsaw/rules/evtx/log_tampering.yml", "title: test");
+                    WriteEntry(archive, "chainsaw/mappings/sigma-event-logs-all.yml", "name: test");
+                }
+                File.WriteAllText(t.File("catalog.json"), Json.Indented(new Dictionary<string, object?>
+                {
+                    ["Tools"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["Name"] = "Chainsaw", ["Version"] = "9.9.9-test", ["AssetName"] = "chainsaw-deep.zip",
+                            ["DownloadUrl"] = "https://example.invalid/chainsaw-deep.zip", ["ExpectedSha256"] = Hashing.Sha256Hex(zip),
+                            ["License"] = "GPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                            ["ExecutableNames"] = new[] { "chainsaw_x86_64-pc-windows-msvc.exe", "chainsaw.exe" }, ["RulesRelativePath"] = "rules",
+                            ["SupportFolders"] = new[] { "rules", "sigma", "mappings" },
+                            ["Notes"] = "test pin",
+                        },
+                    },
+                }));
+                try
+                {
+                    var entry = ToolCatalog.Entry("Chainsaw", t.File("catalog.json"));
+                    var record = ToolInstaller.Install(entry, zip, deepRoot, Quiet());
+                    var exe = (string)record["ExecutablePath"]!;
+                    // The record holds the normal form, never the prefix.
+                    Assert.DoesNotContain(@"\\?\", exe);
+                    Assert.Equal(Path.Combine(deepRoot, @"chainsaw\chainsaw_x86_64-pc-windows-msvc.exe"), exe);
+                    Assert.True(File.Exists(LongPath.For(Path.Combine(deepRoot, @"chainsaw\sigma\" + deepFolders + @"\rule.yml"))));
+                    // The installed executable hashes to the bytes the release shipped (the payload written into the zip above).
+                    Assert.Equal(Hashing.Sha256Hex(Encoding.UTF8.GetBytes("fake-chainsaw")), Hashing.Sha256Hex(exe));
+                    var rules = ComposeSupport.ChainsawRulesFor(exe);
+                    Assert.NotNull(rules.RulesPath);
+                    Assert.NotNull(rules.SigmaPath);
+                    Assert.EndsWith("sigma-event-logs-all.yml", rules.MappingPath);
+                    Assert.Equal("bundled with release 9.9.9-test", ToolInstaller.List(deepRoot).Single(r => r.Name == "Chainsaw").RulesVersion);
+                }
+                finally
+                {
+                    // TempDir cannot delete past 260 characters; remove the deep tool root here.
+                    try { Directory.Delete(LongPath.For(deepRoot), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void LongPath_Full_normalizes_a_prefixed_long_path_instead_of_returning_it_with_dot_segments()
+        {
+            // A prefixed path is not normalized on disk, so Full resolves its . and .. from the normal form.
+            var prefixed = @"\\?\C:\" + new string('a', 200) + @"\..\" + new string('b', 60) + @"\tool.exe";
+            Assert.Equal(@"C:\" + new string('b', 60) + @"\tool.exe", LongPath.Full(prefixed));
+        }
+
+        [Fact]
+        public void LongPath_For_maps_a_device_path_to_the_drive_form_not_a_share()
+        {
+            // \\.\C:\... names the drive; treating it as \\server\share would rewrite it as a UNC share and break the path.
+            var drive = @"C:\" + string.Join(@"\", Enumerable.Repeat(new string('b', 60), 5));
+            Assert.Equal(@"\\?\" + drive, LongPath.For(@"\\.\" + drive));
+        }
+
+        [Fact]
+        public void LongPath_ParentOf_keeps_the_backslash_of_a_drive_root()
+        {
+            // Cut at the last backslash, the parent of C:\tool.exe is "C:", which is drive-relative (a different folder).
+            Assert.Equal(@"C:\", LongPath.ParentOf(@"C:\tool.exe"));
+            Assert.Equal(@"C:\a", LongPath.ParentOf(@"C:\a\tool.exe"));
+            Assert.Equal(@"\\server\share", LongPath.ParentOf(@"\\server\share\tool.exe"));
+            // A share root has no parent folder: \\server is not a valid path to hand to a file call.
+            Assert.Equal("", LongPath.ParentOf(@"\\server\share"));
+            // A prefixed drive root keeps its backslash too: \\?\C: is drive-relative, \\?\C:\ is the root.
+            Assert.Equal(@"\\?\C:\", LongPath.ParentOf(@"\\?\C:\tool.exe"));
+            Assert.Equal(@"\\.\C:\", LongPath.ParentOf(@"\\.\C:\tool.exe"));
+            Assert.Equal(@"\\.\C:\a", LongPath.ParentOf(@"\\.\C:\a\tool.exe"));
+            Assert.Equal(@"\\?\C:\a", LongPath.ParentOf(@"\\?\C:\a\tool.exe"));
+            // A prefixed share root has no parent; a file under it lies in the share root, not in \\?\UNC.
+            Assert.Equal("", LongPath.ParentOf(@"\\?\UNC\server\share"));
+            Assert.Equal(@"\\?\UNC\server\share", LongPath.ParentOf(@"\\?\UNC\server\share\tool.exe"));
+            Assert.Equal(@"\\?\UNC\server\share\a", LongPath.ParentOf(@"\\?\UNC\server\share\a\tool.exe"));
+            // A null path is an argument error, as in Full, not a NullReferenceException.
+            Assert.Throws<ArgumentNullException>(() => LongPath.ParentOf(null!));
+
+            // A root-relative long path (\folder\...) gets the current drive, so a later call can take the prefix.
+            var drive = Path.GetPathRoot(Directory.GetCurrentDirectory()).TrimEnd('\\');
+            var deep = new string('x', 250);
+            Assert.Equal(drive + @"\" + deep + @"\tool.exe", LongPath.Full(@"\" + deep + @"\tool.exe"));
+            // A drive-relative long path (E:folder\...) starts in that drive's current folder. On the current drive that is the
+            // process folder (the =E: variable may be unset when the process was not started from a shell); other drives use =X:.
+            var driveCwd = Directory.GetCurrentDirectory();
+            Assert.Equal(driveCwd.TrimEnd('\\') + @"\" + deep + @"\tool.exe", LongPath.Full(drive + deep + @"\tool.exe"));
+            Assert.Equal("", LongPath.ParentOf("tool.exe"));
+        }
+
+        [Fact]
+        public void LongPath_Full_resolves_dot_segments_in_a_long_share_path_without_GetFullPath()
+        {
+            // The share is the root: .. steps are resolved in the rest of the path, and a long UNC path keeps its share.
+            var share = @"\\server\share\";
+            var full = LongPath.Full(share + new string('a', 200) + @"\..\" + new string('b', 60) + @"\.\tool.exe");
+            Assert.Equal(share + new string('b', 60) + @"\tool.exe", full);
+        }
+
+        [Fact]
+        public void SafeHash_hashes_a_local_file_past_260_characters_instead_of_reporting_HashError()
+        {
+            using (var t = new TempDir())
+            {
+                // One folder name of 210 characters puts the file past the limit that FileInfo enforces without the prefix.
+                var deepDir = Path.Combine(t.Path, new string('h', 210));
+                var file = Path.Combine(deepDir, "payload.bin");
+                Directory.CreateDirectory(LongPath.For(deepDir));
+                File.WriteAllBytes(LongPath.For(file), Encoding.UTF8.GetBytes("payload"));
+                try
+                {
+                    Assert.True(file.Length > 259);
+                    Assert.Equal(Hashing.Sha256Hex(Encoding.UTF8.GetBytes("payload")), Hashing.SafeHash(file, false));
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(deepDir), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void LongPath_prefixes_only_long_local_paths_and_Plain_gives_the_normal_form_back()
+        {
+            // Short and relative paths pass through untouched; a long drive path gets the \\?\ prefix; Plain undoes it.
+            Assert.Equal(@"C:\tools\x.exe", LongPath.For(@"C:\tools\x.exe"));
+            Assert.Equal(@"relative\" + new string('a', 300), LongPath.For(@"relative\" + new string('a', 300)));
+            Assert.Equal(@"\\?\UNC\server\share\" + new string('a', 300), LongPath.For(@"\\server\share\" + new string('a', 300)));
+            var longPath = @"C:\" + string.Join(@"\", Enumerable.Repeat(new string('b', 60), 5));
+            Assert.Equal(@"\\?\" + longPath, LongPath.For(longPath));
+            Assert.Equal(longPath, LongPath.Plain(LongPath.For(longPath)));
+            Assert.Equal(longPath, LongPath.Plain(longPath));
+            Assert.Equal(@"\\?\" + longPath, LongPath.For(LongPath.For(longPath)));
+        }
+
+        [Fact]
+        public void LongPath_Full_makes_a_long_relative_path_absolute_and_drops_dot_segments()
+        {
+            // GetFullPath throws at 260 characters under net462, so a long relative path (274 here) used to come back
+            // unchanged, and a record match or existence check on it then failed.
+            // The working folder is read, not changed: tests run in parallel, and another test may use a relative path.
+            var relative = new string('a', 200) + @"\..\" + new string('b', 60) + @"\.\tool.exe";
+            Assert.True(relative.Length >= 240);
+            Assert.Equal(Path.Combine(Directory.GetCurrentDirectory(), new string('b', 60), "tool.exe"), LongPath.Full(relative));
+            // A short relative name is joined the same way, and null is the documented ArgumentNullException.
+            Assert.Equal(Path.Combine(Directory.GetCurrentDirectory(), "rule.yml"), LongPath.Full("rule.yml"));
+            Assert.Throws<ArgumentNullException>(() => LongPath.Full(null!));
+        }
+
+        [Fact]
+        public void LongPath_For_prefixes_a_forward_slash_drive_path_after_turning_the_slashes_into_backslashes()
+        {
+            var longPath = @"C:\" + string.Join(@"\", Enumerable.Repeat(new string('b', 60), 5));
+            Assert.Equal(@"\\?\" + longPath, LongPath.For(longPath.Replace('\\', '/')));
+            Assert.Equal(@"\\?\UNC\server\share\" + new string('a', 300), LongPath.For(@"//server/share/" + new string('a', 300)));
+        }
+
+        static void WriteEntry(ZipArchive archive, string name, string text)
+        {
+            using (var writer = new StreamWriter(archive.CreateEntry(name).Open()))
+                writer.Write(text);
+        }
+
+        [Fact]
         public void A_Chainsaw_archive_installs_with_rules_sigma_and_mappings_beside_the_binary()
         {
             using (var t = new TempDir())
@@ -139,6 +320,99 @@ namespace Foton.Tests
                 Assert.EndsWith(@"\ez\PECmd.exe", pe.Location);
                 Assert.False(pe.Verified);
                 Assert.Equal("Catalog", rows.Single(r => r.Name == "Hayabusa").Source);
+            }
+        }
+
+        [Fact]
+        public void Concurrent_saves_to_one_manifest_keep_every_row()
+        {
+            // Each save reads the rows, adds its own, and swaps the file in. Without the lock, two saves read the same old
+            // rows and the later swap drops the earlier row.
+            using (var t = new TempDir())
+            {
+                // Several rounds, each with every thread released at once, so a missing lock shows up reliably rather than by luck.
+                for (int round = 0; round < 10; round++)
+                {
+                    var root = t.File("tools" + round);
+                    var names = Enumerable.Range(0, 8).Select(i => "Tool" + i).ToArray();
+                    var failures = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+                    using (var gate = new System.Threading.ManualResetEventSlim(false))
+                    {
+                        var threads = names.Select(n => new System.Threading.Thread(() =>
+                        {
+                            try
+                            {
+                                gate.Wait();
+                                ToolManifest.Save(root, new Dictionary<string, object?> { ["Name"] = n });
+                            }
+                            catch (Exception ex) { failures.Add(ex); }
+                        })).ToArray();
+                        foreach (var th in threads) th.Start();
+                        gate.Set();
+                        foreach (var th in threads) th.Join();
+                    }
+                    Assert.Empty(failures);
+                    Assert.Equal(names.OrderBy(n => n), ToolManifest.List(root).Select(r => ToolManifest.Get(r, "Name")).OrderBy(n => n));
+                    // The lock file is not left behind.
+                    Assert.Empty(Directory.GetFiles(root, "*.lock"));
+                }
+            }
+        }
+
+        [Fact]
+        public void A_damaged_manifest_is_refused_by_a_save_and_left_as_it_was()
+        {
+            // An unreadable tools.json used to read as "no rows", so the next save wrote only its own row and dropped the rest.
+            using (var t = new TempDir())
+            {
+                var root = t.File("tools");
+                Directory.CreateDirectory(root);
+                var path = Path.Combine(root, ToolManifest.FileName);
+                File.WriteAllText(path, "{ not json");
+                Assert.Throws<InvalidDataException>(() => ToolManifest.Save(root, new Dictionary<string, object?> { ["Name"] = "PECmd" }));
+                Assert.Equal("{ not json", File.ReadAllText(path));
+                // Parses, but has no Installed list: also refused, not read as empty.
+                File.WriteAllText(path, "{\"Other\": 1}");
+                Assert.Throws<InvalidDataException>(() => ToolManifest.Save(root, new Dictionary<string, object?> { ["Name"] = "PECmd" }));
+                Assert.Equal("{\"Other\": 1}", File.ReadAllText(path));
+                Assert.Empty(Directory.GetFiles(root, "tools.json.tmp-*"));
+            }
+        }
+
+        [Fact]
+        public void LongPath_Full_leaves_a_bare_long_share_without_a_trailing_backslash()
+        {
+            // A share root (\\server\share) with a long name is returned as given; a path under it keeps the dot-segment rules.
+            var share = @"\\" + new string('a', 120) + @"\" + new string('b', 120);
+            Assert.True(share.Length >= 240);
+            Assert.Equal(share, LongPath.Full(share));
+            Assert.Equal(share + @"\tool.exe", LongPath.Full(share + @"\x\..\tool.exe"));
+        }
+
+        [Fact]
+        public void Register_finds_a_tool_under_a_folder_past_260_characters()
+        {
+            // Directory.Exists and File.Exists answer "missing" past 260 characters without the prefix, so registration threw
+            // before it searched. Here the tool sits at the end of a 200-character folder.
+            using (var t = new TempDir())
+            {
+                var deepDir = Path.Combine(t.Path, new string('p', 200));
+                var exe = Path.Combine(deepDir, "PECmd.exe");
+                Directory.CreateDirectory(LongPath.For(deepDir));
+                File.WriteAllText(LongPath.For(exe), "x");
+                var root = t.File("tools");
+                try
+                {
+                    Assert.True(exe.Length > 259);
+                    ToolRegistry.Register("PECmd", exe, root);
+                    var pe = Assert.Single(ToolInstaller.List(root), r => r.Name == "PECmd");
+                    Assert.Equal("Registered", pe.Source);
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(deepDir), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
             }
         }
 
@@ -227,6 +501,239 @@ namespace Foton.Tests
                 // No version is invented before install: only that the pinned release bundles its rules.
                 Assert.Equal("bundled with release (on install)", hb.RulesVersion);
             }
+        }
+
+        [Fact]
+        public void Install_under_a_root_that_is_itself_past_260_characters_writes_the_log_and_manifest()
+        {
+            // Not the rule files: the tool root itself is 260+ characters. Root, install.log, the archive path and tools.json all
+            // go through LongPath, so every step of the install reaches the disk.
+            using (var t = new TempDir())
+            {
+                var deepRoot = t.File(new string('s', 120) + @"\" + new string('t', 120) + @"\tools");
+                Assert.True(deepRoot.Length >= 260);
+                var zip = t.File("chainsaw-root.zip");
+                using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+                    WriteEntry(archive, "chainsaw/chainsaw_x86_64-pc-windows-msvc.exe", "fake-chainsaw");
+                File.WriteAllText(t.File("catalog.json"), Json.Indented(new Dictionary<string, object?>
+                {
+                    ["Tools"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["Name"] = "Chainsaw", ["Version"] = "9.9.9-test", ["AssetName"] = "chainsaw-root.zip",
+                            ["DownloadUrl"] = "https://example.invalid/chainsaw-root.zip", ["ExpectedSha256"] = Hashing.Sha256Hex(zip),
+                            ["License"] = "GPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                            ["ExecutableNames"] = new[] { "chainsaw_x86_64-pc-windows-msvc.exe", "chainsaw.exe" }, ["RulesRelativePath"] = "",
+                            ["SupportFolders"] = new[] { "rules" },
+                            ["Notes"] = "test pin",
+                        },
+                    },
+                }));
+                try
+                {
+                    var entry = ToolCatalog.Entry("Chainsaw", t.File("catalog.json"));
+                    ToolInstaller.Install(entry, zip, deepRoot, Quiet());
+                    Assert.True(File.Exists(LongPath.For(Path.Combine(deepRoot, "install.log"))));
+                    var row = Assert.Single(ToolInstaller.List(deepRoot), r => r.Name == "Chainsaw");
+                    Assert.Equal("9.9.9-test", row.Version);
+                    Assert.Equal(Path.Combine(deepRoot, @"chainsaw\chainsaw_x86_64-pc-windows-msvc.exe"), row.Location);
+                }
+                finally
+                {
+                    // TempDir cannot delete past 260 characters; remove the deep tool root here.
+                    try { Directory.Delete(LongPath.For(deepRoot), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void A_rules_git_ref_that_points_outside_refs_heads_is_not_read_as_a_commit()
+        {
+            // A rooted ref (C:\...) made Path.Combine return that file, and its first 12 characters became the rules version.
+            using (var t = new TempDir())
+            {
+                var secret = t.File("not-a-commit.txt");
+                File.WriteAllText(secret, "0123456789abcdef0123456789abcdef\n");
+                Assert.Equal("bundled with release 9.9.9-test", RulesVersionFor(t, "ref: refs/heads/" + secret + "\n", null));
+            }
+        }
+
+        [Theory]
+        [InlineData("ref: refs/tags/v1.2.3\n", null, "bundled with release 9.9.9-test")]     // a tag ref is not a commit; its text used to be recorded
+        [InlineData("ref: refs/remotes/origin/main\n", null, "bundled with release 9.9.9-test")]
+        [InlineData("0123456789abcdef0123456789abcdef01234567\n", null, "0123456789ab")]    // detached HEAD holds the hash
+        [InlineData("ref: refs/heads/main\n", "fedcba9876543210fedcba9876543210fedcba98\n", "fedcba987654")]
+        [InlineData("ref: refs/heads/main\n", "not a hash at all\n", "bundled with release 9.9.9-test")]
+        public void The_rules_version_is_a_commit_hash_or_says_it_came_with_the_release(string head, string? mainRef, string expected)
+        {
+            using (var t = new TempDir())
+                Assert.Equal(expected, RulesVersionFor(t, head, mainRef));
+        }
+
+        static string RulesVersionFor(TempDir t, string head, string? refsHeadsMain)
+        {
+            {
+                var zip = t.File("chainsaw-ref.zip");
+                using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    WriteEntry(archive, "chainsaw/chainsaw_x86_64-pc-windows-msvc.exe", "fake-chainsaw");
+                    WriteEntry(archive, "chainsaw/rules/.git/HEAD", head);
+                    if (refsHeadsMain != null) WriteEntry(archive, "chainsaw/rules/.git/refs/heads/main", refsHeadsMain);
+                }
+                File.WriteAllText(t.File("catalog.json"), Json.Indented(new Dictionary<string, object?>
+                {
+                    ["Tools"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["Name"] = "Chainsaw", ["Version"] = "9.9.9-test", ["AssetName"] = "chainsaw-ref.zip",
+                            ["DownloadUrl"] = "https://example.invalid/chainsaw-ref.zip", ["ExpectedSha256"] = Hashing.Sha256Hex(zip),
+                            ["License"] = "GPL-3.0", ["ProjectUrl"] = "https://example.invalid",
+                            ["ExecutableNames"] = new[] { "chainsaw_x86_64-pc-windows-msvc.exe", "chainsaw.exe" }, ["RulesRelativePath"] = "rules",
+                            ["SupportFolders"] = new[] { "rules" },
+                            ["Notes"] = "test pin",
+                        },
+                    },
+                }));
+                var entry = ToolCatalog.Entry("Chainsaw", t.File("catalog.json"));
+                var record = ToolInstaller.Install(entry, zip, t.File("tools"), Quiet());
+                return (string)record["RulesVersion"]!;
+            }
+        }
+
+        [Fact]
+        public void A_tool_at_a_path_too_long_to_start_is_refused_with_a_row_and_never_launched()
+        {
+            using (var t = new TempDir())
+            {
+                // One folder name of 210 characters pushes the executable past the 259-character start limit.
+                var deepDir = Path.Combine(t.Path, new string('d', 210));
+                var exe = Path.Combine(deepDir, "evtxecmd.cmd");
+                Directory.CreateDirectory(LongPath.For(deepDir));
+                File.WriteAllText(LongPath.For(exe), ArgsRecorder(0), Encoding.ASCII);
+                var pkg = Package(t.File("Foton_HOST_20260101-000000Z"), @"07_Event_Logs\evtx");
+                Write(Path.Combine(pkg, @"07_Event_Logs\evtx\Security.evtx"), "x");
+                try
+                {
+                    Assert.True(exe.Length > ToolProcess.MaxStartPath);
+                    var run = ComposeRunner.Run(pkg, Quiet(), t.File("empty"),
+                        new Dictionary<string, string> { ["EvtxECmd"] = exe }, System32Only, new[] { "EvtxECmd" });
+                    var row = run.Rows.Single(r => r.Tool == "EvtxECmd");
+                    Assert.Equal("TooLongToStart", row.Status);
+                    Assert.Contains("shorter tool root", row.Note);
+                    // Refused before anything ran: the recorder's arguments file was never written.
+                    Assert.False(File.Exists(LongPath.For(Path.Combine(deepDir, "args_evtxecmd.txt"))));
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(deepDir), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void A_tool_found_on_PATH_in_a_folder_past_260_characters_resolves()
+        {
+            using (var t = new TempDir())
+            {
+                var deepDir = Path.Combine(t.Path, new string('p', 220));
+                var exe = Path.Combine(deepDir, "chainsaw.exe");
+                Directory.CreateDirectory(LongPath.For(deepDir));
+                File.WriteAllText(LongPath.For(exe), "x");
+                try
+                {
+                    Assert.True(exe.Length > 259);
+                    var r = ToolResolver.Resolve("Chainsaw", new[] { "chainsaw.exe" }, null, t.File("tools"), deepDir);
+                    Assert.NotNull(r);
+                    Assert.Equal("PATH", r!.Source);
+                    Assert.Equal(exe, r.Path);
+                }
+                finally
+                {
+                    try { Directory.Delete(LongPath.For(deepDir), true); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        [Fact]
+        public void CanStart_measures_the_working_folder_as_well_as_the_executable()
+        {
+            var shortExe = @"C:\tools\x.exe";
+            Assert.True(ToolProcess.CanStart(shortExe));
+            Assert.True(ToolProcess.CanStart(shortExe, @"C:\tools"));
+            Assert.True(ToolProcess.CanStart(shortExe, @"C:\" + new string('w', ToolProcess.MaxStartPath - 3)));
+            Assert.False(ToolProcess.CanStart(shortExe, @"C:\" + new string('w', ToolProcess.MaxStartPath)));
+            Assert.False(ToolProcess.CanStart(@"C:\" + new string('e', ToolProcess.MaxStartPath), @"C:\tools"));
+        }
+
+        [Fact]
+        public void CanStart_measures_a_relative_path_as_Windows_will_see_it()
+        {
+            // A relative name is joined to the working folder before it is started, so its length is that of the full path.
+            var cwd = Directory.GetCurrentDirectory();
+            var fits = new string('r', ToolProcess.MaxStartPath - cwd.Length - 1);
+            Assert.True(ToolProcess.CanStart(fits));
+            Assert.False(ToolProcess.CanStart(fits + "rr"));
+        }
+
+        [Fact]
+        public void RunToFiles_does_not_start_the_tool_when_an_output_file_cannot_be_created()
+        {
+            // The tool used to start first and keep running after the file error was thrown.
+            using (var t = new TempDir())
+            {
+                var marker = Path.Combine(t.Path, "ran.txt");
+                var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+                Assert.ThrowsAny<IOException>(() => ToolProcess.RunToFiles(cmd, "/c echo hi> \"" + marker + "\"", t.Path,
+                    Path.Combine(t.Path, "no-such-folder", "out.txt"), Path.Combine(t.Path, "err.txt")));
+                System.Threading.Thread.Sleep(700);
+                Assert.False(File.Exists(marker));
+            }
+        }
+
+        [Fact]
+        public void A_file_in_a_folder_past_250_characters_hashes()
+        {
+            using (var t = new TempDir())
+            {
+                var dir = t.Path;
+                while (dir.Length < 252) dir = Path.Combine(dir, new string('d', 50));
+                Directory.CreateDirectory(LongPath.For(dir));
+                var file = Path.Combine(dir, "x.bin");
+                File.WriteAllBytes(LongPath.For(file), new byte[] { 1, 2, 3 });
+                var hash = Hashing.SafeHash(file, false);
+                Assert.Matches("^[0-9A-F]{64}$", hash);
+                // The same file named with forward slashes, or already prefixed, hashes the same: no HashError, no double prefix.
+                Assert.Equal(hash, Hashing.SafeHash(file.Replace('\\', '/'), false));
+                Assert.Equal(hash, Hashing.SafeHash(LongPath.For(file), false));
+            }
+        }
+
+        [Fact]
+        public void LongPath_For_is_idempotent_and_leaves_relative_paths_alone()
+        {
+            var deep = new string('a', 250);
+            foreach (var p in new[] { @"C:\" + deep + @"\x.exe", @"\\server\share\" + deep + @"\x.exe", @"\\.\C:\" + deep + @"\x.exe" })
+                Assert.Equal(LongPath.For(p), LongPath.For(LongPath.For(p)));
+            Assert.Equal(@"\\?\C:\" + deep + @"\x.exe", LongPath.For("C:/" + deep + "/x.exe"));
+            Assert.Equal(@"\\?\UNC\server\share\" + deep + @"\x.exe", LongPath.For(@"\\server\share\" + deep + @"\x.exe"));
+            // Relative: no prefix (the prefix needs a full path), so Windows resolves it as before.
+            Assert.Equal(deep + @"\x.exe", LongPath.For(deep + @"\x.exe"));
+        }
+
+        [Fact]
+        public void CanStart_resolves_a_drive_relative_path_before_measuring_it()
+        {
+            // C:tool.exe counts as rooted to .NET but starts in drive C's current folder; measured as written it looked short.
+            var cwd = Directory.GetCurrentDirectory();
+            var drive = cwd.Substring(0, 2);
+            var fits = new string('r', ToolProcess.MaxStartPath - cwd.TrimEnd('\\').Length - 1);
+            Assert.True(ToolProcess.CanStart(drive + fits));
+            Assert.False(ToolProcess.CanStart(drive + fits + "rr"));
         }
 
         [Fact]

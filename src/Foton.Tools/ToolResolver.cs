@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Foton.Core;
 
 namespace Foton.Tools
 {
@@ -20,14 +21,25 @@ namespace Foton.Tools
     /// </summary>
     public static class ToolResolver
     {
+        static string? AbsoluteOrNull(string? toolPath)
+        {
+            if (string.IsNullOrWhiteSpace(toolPath)) return null;
+            try { return LongPath.Full(toolPath!.Trim()); }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is IOException
+                || ex is UnauthorizedAccessException || ex is System.Security.SecurityException) { return null; }
+        }
+
         public static ResolvedTool? Resolve(string tool, IEnumerable<string> executableNames, string? toolPath, string? toolRoot, string? pathEnv = null)
         {
             // Every output in the compose inventory names the tool version that wrote it: tools.json records it for
             // installs and registrations; anything else is read from the executable's version resource as found
             // (nothing is run here; compose asks a tool without one only when it is about to run it).
-            if (!string.IsNullOrWhiteSpace(toolPath) && File.Exists(toolPath!.Trim()))
+            // Made absolute before the existence check: a long relative path can't be checked as it is, and the record
+            // match below needs the absolute form. A path that can't be normalized is treated as absent.
+            var explicitPath = AbsoluteOrNull(toolPath);
+            if (explicitPath != null && File.Exists(LongPath.For(explicitPath)))
             {
-                var path = Path.GetFullPath(toolPath.Trim());
+                var path = explicitPath;
                 // An explicit path to the executable tools.json already records is that install: report what it recorded.
                 // A damaged tool root must not stop a valid explicit path, so this lookup is best effort.
                 var recorded = TryFind(tool, toolRoot);
@@ -38,13 +50,18 @@ namespace Foton.Tools
 
             var installed = ToolManifest.Find(tool, toolRoot);
             var exe = installed != null ? ToolManifest.Get(installed, "ExecutablePath") : "";
-            if (exe.Length > 0 && File.Exists(exe))
-                return FromManifest(installed!, Path.GetFullPath(exe), "Manifest");
+            // Absolute before the check, as on the explicit branch: a long relative path can't be checked as it is.
+            var manifestExe = exe.Length > 0 ? AbsoluteOrNull(exe) : null;
+            if (manifestExe != null && File.Exists(LongPath.For(manifestExe)))
+                return FromManifest(installed!, manifestExe, "Manifest");
 
             foreach (var name in executableNames)
             {
                 var hit = OnPath(name, pathEnv ?? Environment.GetEnvironmentVariable("PATH") ?? "");
-                if (hit != null) return new ResolvedTool { Path = hit, Source = "PATH", Version = ToolRegistry.FileVersion(hit), RulesVersion = LocalRules(hit) };
+                if (hit == null) continue;
+                // OnPath returns the absolute form (a relative PATH entry resolved against the working folder), which is what
+                // gets checked and run.
+                return new ResolvedTool { Path = hit, Source = "PATH", Version = ToolRegistry.FileVersion(hit), RulesVersion = LocalRules(hit) };
             }
             return null;
         }
@@ -83,8 +100,8 @@ namespace Foton.Tools
         static bool SameFile(string recorded, string path)
         {
             // File.Exists is checked first: a damaged ExecutablePath with invalid path characters must not make GetFullPath throw.
-            if (recorded.Length == 0 || !File.Exists(recorded)) return false;
-            return string.Equals(Path.GetFullPath(recorded), path, StringComparison.OrdinalIgnoreCase);
+            if (recorded.Length == 0 || !File.Exists(LongPath.For(recorded))) return false;
+            return string.Equals(LongPath.Full(recorded), path, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>An untracked executable has no recorded rule set. If a rules or sigma folder sits beside it, the rules
@@ -93,8 +110,9 @@ namespace Foton.Tools
         /// unrelated rules\ is reported too, because that is what the tool itself loads from beside its executable.</summary>
         static string LocalRules(string exePath)
         {
-            var dir = Path.GetDirectoryName(exePath) ?? "";
-            return new[] { "rules", "sigma" }.Any(leaf => Directory.Exists(Path.Combine(dir, leaf)))
+            var dir = LongPath.ParentOf(exePath);
+            if (dir.Length == 0) return "";
+            return new[] { "rules", "sigma" }.Any(leaf => Directory.Exists(LongPath.For(Path.Combine(dir, leaf))))
                 ? "local-unversioned" : "";
         }
 
@@ -109,10 +127,14 @@ namespace Foton.Tools
                 {
                     try
                     {
-                        var candidate = Path.Combine(dir, name + ext);
-                        if (File.Exists(candidate)) return Path.GetFullPath(candidate);
+                        // Full, then the prefixed check: a PATH folder past 260 characters would otherwise be skipped (and
+                        // GetFullPath would throw for it).
+                        var candidate = LongPath.Full(Path.Combine(dir, name + ext));
+                        if (File.Exists(LongPath.For(candidate))) return candidate;
                     }
-                    catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { }
+                    // One unusable PATH entry (bad characters, no access, a dead network drive) must not stop the search.
+                    catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is IOException
+                        || ex is UnauthorizedAccessException || ex is System.Security.SecurityException) { }
                 }
             return null;
         }

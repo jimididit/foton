@@ -28,7 +28,20 @@ namespace Foton.Tests
         public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "foton-test-" + Guid.NewGuid().ToString("N"));
         public TempDir() { Directory.CreateDirectory(Path); }
         public string File(string name) => System.IO.Path.Combine(Path, name);
-        public void Dispose() { try { Directory.Delete(Path, true); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
+        // Several tests build folders past 260 characters (and names with trailing dots that only the prefixed form reaches),
+        // so the walk uses the \\?\ form throughout. Cleanup failures are ignored: a leftover temp folder must not fail a test.
+        public void Dispose() { try { Delete(@"\\?\" + Path); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
+
+        static void Delete(string dir)
+        {
+            foreach (var f in Directory.GetFiles(dir)) { System.IO.File.SetAttributes(f, FileAttributes.Normal); System.IO.File.Delete(f); }
+            foreach (var d in Directory.GetDirectories(dir))
+            {
+                if ((System.IO.File.GetAttributes(d) & FileAttributes.ReparsePoint) != 0) Directory.Delete(d);
+                else Delete(d);
+            }
+            Directory.Delete(dir);
+        }
     }
 
     static class Sessions

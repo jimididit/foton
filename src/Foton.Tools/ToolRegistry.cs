@@ -29,9 +29,10 @@ namespace Foton.Tools
         public static IReadOnlyList<RegistrationRow> Register(string name, string path, string? toolRoot)
         {
             var wanted = ComposeTools.Expand(name);
-            bool isDir = Directory.Exists(path);
-            if (!isDir && !File.Exists(path)) throw new FileNotFoundException("Path not found: " + path, path);
-            var full = Path.GetFullPath(path);
+            // Full first (GetFullPath throws at 260 characters under net462), then the existence checks on the prefixed form.
+            var full = LongPath.Full(path);
+            bool isDir = Directory.Exists(LongPath.For(full));
+            if (!isDir && !File.Exists(LongPath.For(full))) throw new FileNotFoundException("Path not found: " + path, path);
             var root = ToolManifest.Root(toolRoot);
 
             var rows = new List<RegistrationRow>();
@@ -53,9 +54,9 @@ namespace Foton.Tools
                 }
 
                 var ver = VersionOf(tool.Name, exe);
-                var dir = Path.GetDirectoryName(exe)!;
+                var dir = LongPath.ParentOf(exe);
                 var rulesPath = new[] { "rules", "sigma" }.Select(leaf => Path.Combine(dir, leaf))
-                    .FirstOrDefault(Directory.Exists) ?? "";
+                    .FirstOrDefault(p => Directory.Exists(LongPath.For(p))) ?? "";
                 var sha = Hashing.Sha256Hex(exe);
                 ToolManifest.Save(root, new Dictionary<string, object?>
                 {
@@ -87,8 +88,8 @@ namespace Foton.Tools
         /// <summary>The version resource only; runs nothing. "" when the file has none.</summary>
         public static string FileVersion(string exe)
         {
-            try { return (FileVersionInfo.GetVersionInfo(exe).FileVersion ?? "").Trim(); }
-            catch (Exception ex) when (ex is IOException || ex is ArgumentException) { return ""; }
+            try { return (FileVersionInfo.GetVersionInfo(LongPath.For(exe)).FileVersion ?? "").Trim(); }
+            catch (Exception ex) when (ex is IOException || ex is ArgumentException || ex is UnauthorizedAccessException || ex is NotSupportedException) { return ""; }
         }
 
         /// <summary>
@@ -120,12 +121,21 @@ namespace Foton.Tools
             {
                 var item = pending.Pop();
                 string[] files, dirs;
-                try { files = Directory.GetFiles(item.Key); dirs = Directory.GetDirectories(item.Key); }
+                // Enumerated with the long-path form (a rule tree under the tool root is often past 260 characters); the
+                // names handed back and pushed are the normal form, so callers and tools.json never see the prefix.
+                try { files = Directory.GetFiles(LongPath.For(item.Key)); dirs = Directory.GetDirectories(LongPath.For(item.Key)); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { continue; }
-                foreach (var f in files.Where(f => Like(Path.GetFileName(f), pattern))) yield return f;
+                foreach (var found in files)
+                {
+                    var f = LongPath.Plain(found);
+                    if (Like(f.Substring(f.LastIndexOf('\\') + 1), pattern)) yield return f;
+                }
                 if (item.Value >= maxDepth) continue;
                 for (int i = dirs.Length - 1; i >= 0; i--)
-                    if (!Reparse(dirs[i])) pending.Push(new KeyValuePair<string, int>(dirs[i], item.Value + 1));
+                {
+                    var d = LongPath.Plain(dirs[i]);
+                    if (!Reparse(d)) pending.Push(new KeyValuePair<string, int>(d, item.Value + 1));
+                }
             }
         }
 
@@ -135,7 +145,7 @@ namespace Foton.Tools
 
         static bool Reparse(string path)
         {
-            try { return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0; }
+            try { return (File.GetAttributes(LongPath.For(path)) & FileAttributes.ReparsePoint) != 0; }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return true; }
         }
     }
